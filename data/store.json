@@ -1,0 +1,40 @@
+﻿{
+  "areas": [
+    { "id": "AREA-1", "name": "Produzione", "code": "PROD", "buyerOffice": "Ufficio Acquisti" },
+    { "id": "AREA-2", "name": "Montaggio", "code": "MNT", "buyerOffice": "Ufficio Acquisti" },
+    { "id": "AREA-3", "name": "Magazzino", "code": "MAG", "buyerOffice": "Ufficio Acquisti" }
+  ],
+  "users": [
+    { "id": "USER-1", "name": "Marco Rossi", "email": "marco.rossi@azienda.it", "role": "operatore", "areaIds": ["AREA-1"] },
+    { "id": "USER-2", "name": "Laura Bianchi", "email": "laura.bianchi@azienda.it", "role": "responsabile", "areaIds": ["AREA-2"] },
+    { "id": "USER-3", "name": "Ufficio Acquisti", "email": "acquisti@azienda.it", "role": "acquisti", "areaIds": ["AREA-1", "AREA-2", "AREA-3"] }
+  ],
+  "materials": [
+    { "id": "MAT-1", "code": "MAT-100", "description": "Cavo 3x1.5 mm²", "stock": 120 },
+    { "id": "MAT-2", "code": "MAT-200", "description": "Terminale rapido", "stock": 85 },
+    { "id": "MAT-3", "code": "MAT-300", "description": "Quadro di comando", "stock": 40 }
+  ],
+  "suppliers": [
+    { "id": "SUP-1", "name": "Schneider Electric", "code": "SCH", "website": "https://www.se.com/it/it/" },
+    { "id": "SUP-2", "name": "Pizzato", "code": "PIZ", "website": "https://www.pizzato.com/" }
+  ],
+  "supplierCatalog": [
+    { "id": "CAT-1", "supplier": "Schneider Electric", "code": "A9N", "name": "Interruttore magnetotermico", "description": "MCCB per quadro", "family": "Protezione", "uom": "pz", "price": 28.5 },
+    { "id": "CAT-2", "supplier": "Schneider Electric", "code": "GV2ME", "name": "Contattore", "description": "Contattore 3 poli", "family": "Controllo", "uom": "pz", "price": 42.0 },
+    { "id": "CAT-3", "supplier": "Schneider Electric", "code": "GV3P", "name": "Relè termico", "description": "Relè termico per contattore", "family": "Protezione", "uom": "pz", "price": 19.4 },
+    { "id": "CAT-4", "supplier": "Schneider Electric", "code": "NSX400", "name": "Modulo quadro automatico", "description": "Modulo quadro automatico", "family": "Quadri", "uom": "pz", "price": 180.0 },
+    { "id": "CAT-5", "supplier": "Pizzato", "code": "PZ-101", "name": "Terminale a vite", "description": "Terminale rapido", "family": "Connessioni", "uom": "pz", "price": 1.2 },
+    { "id": "CAT-6", "supplier": "Pizzato", "code": "PZ-220", "name": "Supporto guida cavo", "description": "Supporto staffa", "family": "Accessori", "uom": "pz", "price": 3.8 },
+    { "id": "CAT-7", "supplier": "Pizzato", "code": "PZ-330", "name": "Barra di terra", "description": "Barra di terra din", "family": "Distribuzione", "uom": "pz", "price": 11.4 },
+    { "id": "CAT-8", "supplier": "Pizzato", "code": "PZ-440", "name": "Cassettone supporto", "description": "Supporto cassettone", "family": "Accessori", "uom": "pz", "price": 5.6 }
+  ],
+  "rules": [
+    { "id": "RULE-1", "name": "Codice non presente", "description": "Se il materiale non è presente in catalogo, avvisa l’ufficio acquisti e genera una richiesta d’ordine.", "severity": "high", "action": "notify_buyer" },
+    { "id": "RULE-2", "name": "Area riservata", "description": "Ogni utente può operare solo sulle aree assegnate.", "severity": "medium", "action": "restrict_area" },
+    { "id": "RULE-3", "name": "Conferma ordine", "description": "Se il materiale è mancante e l’utente è autorizzato, viene generata una conferma d’ordine fornitore.", "severity": "high", "action": "create_purchase_order" }
+  ],
+  "withdrawals": [],
+  "alerts": [],
+  "purchaseOrders": [],
+  "events": []
+}

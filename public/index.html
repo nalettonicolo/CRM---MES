@@ -1,0 +1,400 @@
+<!DOCTYPE html>
+<html lang="it">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Gestionale Distinte di Prelievo</title>
+    <style>
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        font-family: Arial, sans-serif;
+        background: #f2f4f8;
+        color: #1d1d1f;
+      }
+      .container {
+        max-width: 1200px;
+        margin: 32px auto;
+        padding: 0 20px 40px;
+      }
+      .topbar {
+        background: linear-gradient(135deg, #1f3b75, #365fb8);
+        color: white;
+        padding: 20px 24px;
+        border-radius: 12px;
+        margin-bottom: 24px;
+      }
+      h1, h2, h3 { margin-top: 0; }
+      .grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+        gap: 16px;
+        margin-bottom: 24px;
+      }
+      .card {
+        background: white;
+        border-radius: 12px;
+        padding: 18px;
+        box-shadow: 0 4px 10px rgba(0, 0, 0, 0.04);
+      }
+      .stat-value {
+        font-size: 2rem;
+        font-weight: bold;
+        color: #1f3b75;
+      }
+      .panel {
+        background: white;
+        border-radius: 12px;
+        padding: 18px;
+        margin-bottom: 24px;
+        box-shadow: 0 4px 10px rgba(0, 0, 0, 0.04);
+      }
+      form {
+        display: grid;
+        gap: 12px;
+      }
+      input, select, button, textarea {
+        width: 100%;
+        padding: 10px 12px;
+        border: 1px solid #d5d9e2;
+        border-radius: 8px;
+        font-size: 14px;
+      }
+      button {
+        background: #1f3b75;
+        color: white;
+        border: none;
+        cursor: pointer;
+      }
+      .two-col {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+        gap: 16px;
+      }
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        margin-top: 12px;
+      }
+      th, td {
+        padding: 10px;
+        border-bottom: 1px solid #e7ebf1;
+        text-align: left;
+      }
+      .status {
+        display: inline-block;
+        padding: 4px 8px;
+        border-radius: 999px;
+        font-size: 12px;
+        font-weight: bold;
+      }
+      .status.pending { background: #fff0d6; color: #8a5b00; }
+      .status.confirmed { background: #dff7e9; color: #167d42; }
+      .status.open { background: #e8f0ff; color: #244fb7; }
+      .status.closed { background: #ececf3; color: #4e4f5d; }
+      .muted { color: #5f6470; }
+      .small { font-size: 12px; }
+      .highlight {
+        background: #f3f8ff;
+        border-left: 4px solid #365fb8;
+        padding: 10px 12px;
+        border-radius: 8px;
+        margin-bottom: 10px;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <div class="topbar">
+        <h1>Gestionale Distinte di Prelievo</h1>
+      </div>
+
+      <section id="summary" class="grid"></section>
+
+      <div class="two-col">
+        <div class="panel">
+          <h2>Crea area</h2>
+          <form id="areaForm">
+            <input name="name" placeholder="Nome area" required />
+            <input name="code" placeholder="Codice area" required />
+            <input name="buyerOffice" placeholder="Ufficio acquisti" value="Ufficio Acquisti" />
+            <button type="submit">Salva area</button>
+          </form>
+        </div>
+
+        <div class="panel">
+          <h2>Crea utente</h2>
+          <form id="userForm">
+            <input name="name" placeholder="Nome utente" required />
+            <input name="email" placeholder="Email" required />
+            <select name="role">
+              <option value="operatore">Operatore</option>
+              <option value="responsabile">Responsabile</option>
+              <option value="acquisti">Ufficio Acquisti</option>
+            </select>
+            <input name="areaIds" placeholder="ID aree separate da virgola" />
+            <button type="submit">Salva utente</button>
+          </form>
+        </div>
+      </div>
+
+      <div class="two-col">
+        <div class="panel">
+          <h2>Nuovo materiale</h2>
+          <form id="materialForm">
+            <input name="code" placeholder="Codice materiale" required />
+            <input name="description" placeholder="Descrizione" required />
+            <input name="stock" type="number" placeholder="Stock iniziale" value="0" required />
+            <button type="submit">Salva materiale</button>
+          </form>
+        </div>
+
+        <div class="panel">
+          <h2>Nuova distinta</h2>
+          <form id="withdrawalForm">
+            <input name="userId" placeholder="UserId" required />
+            <input name="areaId" placeholder="AreaId" required />
+            <textarea name="notes" placeholder="Note distinta"></textarea>
+            <button type="submit">Crea distinta</button>
+          </form>
+        </div>
+      </div>
+
+      <div class="panel">
+        <h2>Import / export fogli e documenti</h2>
+        <div class="two-col">
+          <form id="spreadsheetForm" enctype="multipart/form-data">
+            <input type="file" name="file" accept=".csv,.xlsx,.xls" required />
+            <button type="submit">Importa foglio</button>
+          </form>
+          <form id="docForm" enctype="multipart/form-data">
+            <input type="file" name="file" accept=".doc,.docx,.txt,.pdf" required />
+            <button type="submit">Importa documento</button>
+          </form>
+        </div>
+      </div>
+
+      <div class="panel">
+        <h2>Cataloghi fornitori</h2>
+        <div class="two-col">
+          <form id="catalogImportForm" enctype="multipart/form-data">
+            <input type="text" name="supplier" placeholder="Schneider Electric / Pizzato" value="Schneider Electric" required />
+            <input type="file" name="file" accept=".csv,.xlsx,.xls" required />
+            <button type="submit">Importa catalogo fornitore</button>
+          </form>
+          <form id="componentSearchForm">
+            <input type="text" name="component" placeholder="Ricerca nome componente" required />
+            <button type="submit">Cerca componente</button>
+          </form>
+        </div>
+        <div id="catalogResult" class="highlight">Nessuna ricerca eseguita.</div>
+      </div>
+
+      <div class="panel">
+        <h2>Carica disegno meccanico / CAD</h2>
+        <form id="mechanicalForm" enctype="multipart/form-data">
+          <input type="file" name="file" accept=".pdf,.docx,.step,.stp,.dxf,.dwg,.ipt,.iam,.sldprt,.sldasm,.iges,.igs" required />
+          <button type="submit">Genera distinta preliminare</button>
+        </form>
+        <div id="mechanicalResult" class="highlight">Nessun file caricato.</div>
+      </div>
+
+      <div class="panel">
+        <h2>Carica PDF distinta</h2>
+        <form id="pdfForm" enctype="multipart/form-data">
+          <input name="withdrawalId" placeholder="ID distinta" required />
+          <input type="file" name="file" accept="application/pdf" required />
+          <button type="submit">Analizza PDF</button>
+        </form>
+      </div>
+
+      <div class="panel">
+        <h2>Ordini fornitore</h2>
+        <form id="poForm">
+          <input name="materialCode" placeholder="Codice materiale" required />
+          <input name="withdrawalId" placeholder="ID distinta" />
+          <input name="supplier" placeholder="Fornitore" />
+          <input name="qty" type="number" placeholder="Quantità" value="1" />
+          <button type="submit">Genera conferma ordine</button>
+        </form>
+      </div>
+
+      <div class="panel">
+        <h2>Dashboard</h2>
+        <table>
+          <thead>
+            <tr>
+              <th>Area</th>
+              <th>Utente</th>
+              <th>Stato</th>
+              <th>Materiali mancanti</th>
+            </tr>
+          </thead>
+          <tbody id="withdrawalTable"></tbody>
+        </table>
+      </div>
+
+      <div class="panel">
+        <h2>Eventi recenti</h2>
+        <ul id="eventsList"></ul>
+      </div>
+    </div>
+
+    <script>
+      const summaryEl = document.getElementById('summary');
+      const withdrawalTable = document.getElementById('withdrawalTable');
+      const eventsList = document.getElementById('eventsList');
+
+      async function loadDashboard() {
+        const res = await fetch('/api/dashboard');
+        const data = await res.json();
+
+        summaryEl.innerHTML = `
+          <div class="card"><div class="muted">Distinte</div><div class="stat-value">${data.summary.withdrawals}</div></div>
+          <div class="card"><div class="muted">Aperte</div><div class="stat-value">${data.summary.openWithdrawals}</div></div>
+          <div class="card"><div class="muted">Mancanti</div><div class="stat-value">${data.summary.missing}</div></div>
+          <div class="card"><div class="muted">Ordini</div><div class="stat-value">${data.summary.purchaseOrders}</div></div>
+        `;
+
+        withdrawalTable.innerHTML = (data.withdrawals || []).map(w => `
+          <tr>
+            <td>${(data.areas.find(a => a.id === w.areaId) || {}).name || w.areaId}</td>
+            <td>${(data.users.find(u => u.id === w.userId) || {}).name || w.userId}</td>
+            <td><span class="status ${w.status}">${w.status}</span></td>
+            <td>${(w.missingCodes || []).join(', ') || 'nessuno'}</td>
+          </tr>
+        `).join('');
+
+        eventsList.innerHTML = (data.events || []).map(e => `<li>${e.message} <span class="small muted">${new Date(e.at).toLocaleString('it-IT')}</span></li>`).join('');
+      }
+
+      document.getElementById('areaForm').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const data = Object.fromEntries(new FormData(e.target).entries());
+        await fetch('/api/areas', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(data)
+        });
+        e.target.reset();
+        loadDashboard();
+      });
+
+      document.getElementById('userForm').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const data = Object.fromEntries(new FormData(e.target).entries());
+        data.areaIds = (data.areaIds || '').split(',').map(v => v.trim()).filter(Boolean);
+        await fetch('/api/users', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(data)
+        });
+        e.target.reset();
+        loadDashboard();
+      });
+
+      document.getElementById('materialForm').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const data = Object.fromEntries(new FormData(e.target).entries());
+        await fetch('/api/materials', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(data)
+        });
+        e.target.reset();
+        loadDashboard();
+      });
+
+      document.getElementById('withdrawalForm').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const data = Object.fromEntries(new FormData(e.target).entries());
+        await fetch('/api/withdrawals', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(data)
+        });
+        e.target.reset();
+        loadDashboard();
+      });
+
+      document.getElementById('spreadsheetForm').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const formData = new FormData(e.target);
+        const res = await fetch('/api/import-spreadsheet', { method: 'POST', body: formData });
+        const json = await res.json();
+        alert(json.message + (json.rows ? ` (${json.rows.length} righe)` : ''));
+      });
+
+      document.getElementById('docForm').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const formData = new FormData(e.target);
+        const res = await fetch('/api/import-document', { method: 'POST', body: formData });
+        const json = await res.json();
+        alert(`${json.message} Codici rilevati: ${json.extractedCodes ? json.extractedCodes.length : 0}`);
+      });
+
+      document.getElementById('catalogImportForm').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const formData = new FormData(e.target);
+        const res = await fetch('/api/import-catalog', { method: 'POST', body: formData });
+        const json = await res.json();
+        document.getElementById('catalogResult').innerHTML = `<strong>${json.message}</strong><br>Importati: ${json.imported || 0}`;
+      });
+
+      document.getElementById('componentSearchForm').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const form = new FormData(e.target);
+        const q = form.get('component');
+        const res = await fetch(`/api/catalog-search?q=${encodeURIComponent(q)}`);
+        const json = await res.json();
+
+        const rows = (json.results || []).map(item => {
+          const name = item.name || item.title || item.code || 'Componente';
+          const code = item.code || item.partCode || 'n.d.';
+          const supplier = item.supplier || 'ricerca esterna';
+          return `<li><strong>${name}</strong> (${code}) - ${supplier}</li>`;
+        }).join('');
+
+        document.getElementById('catalogResult').innerHTML = `<strong>${json.message}</strong><ul>${rows || '<li>Nessun risultato.</li>'}</ul>`;
+      });
+
+      document.getElementById('mechanicalForm').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const formData = new FormData(e.target);
+        const res = await fetch('/api/upload-mechanical-file', { method: 'POST', body: formData });
+        const json = await res.json();
+        document.getElementById('mechanicalResult').innerHTML = `
+          <strong>${json.message}</strong><br>
+          File: ${json.sourceFile}<br>
+          ${json.bom ? json.bom.map(item => `${item.partCode} - qty ${item.qty}`).join('<br>') : ''}
+        `;
+      });
+
+      document.getElementById('pdfForm').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const formData = new FormData(e.target);
+        const res = await fetch('/api/withdrawals/' + formData.get('withdrawalId') + '/upload-pdf', {
+          method: 'POST',
+          body: formData
+        });
+        const json = await res.json();
+        alert(json.message || 'PDF processato');
+        loadDashboard();
+      });
+
+      document.getElementById('poForm').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const data = Object.fromEntries(new FormData(e.target).entries());
+        await fetch('/api/purchase-orders', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(data)
+        });
+        e.target.reset();
+        loadDashboard();
+      });
+
+      loadDashboard();
+    </script>
+  </body>
+</html>

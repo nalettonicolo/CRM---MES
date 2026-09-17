@@ -1,0 +1,34 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.0.31903.59
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "CrmMes.Api", "CrmMes.Api\CrmMes.Api.csproj", "{D1DFBFF9-5B2F-4334-B582-F51C2E44530B}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "CrmMes.Core", "CrmMes.Core\CrmMes.Core.csproj", "{538B9FA0-0BC6-4F6C-A36F-D5104442B90B}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "CrmMes.Desktop", "CrmMes.Desktop\CrmMes.Desktop.csproj", "{C6760399-E43B-4568-A6D8-0CDCC4337A09}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{D1DFBFF9-5B2F-4334-B582-F51C2E44530B}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{D1DFBFF9-5B2F-4334-B582-F51C2E44530B}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{D1DFBFF9-5B2F-4334-B582-F51C2E44530B}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{D1DFBFF9-5B2F-4334-B582-F51C2E44530B}.Release|Any CPU.Build.0 = Release|Any CPU
+		{538B9FA0-0BC6-4F6C-A36F-D5104442B90B}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{538B9FA0-0BC6-4F6C-A36F-D5104442B90B}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{538B9FA0-0BC6-4F6C-A36F-D5104442B90B}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{538B9FA0-0BC6-4F6C-A36F-D5104442B90B}.Release|Any CPU.Build.0 = Release|Any CPU
+		{C6760399-E43B-4568-A6D8-0CDCC4337A09}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{C6760399-E43B-4568-A6D8-0CDCC4337A09}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{C6760399-E43B-4568-A6D8-0CDCC4337A09}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{C6760399-E43B-4568-A6D8-0CDCC4337A09}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+EndGlobal

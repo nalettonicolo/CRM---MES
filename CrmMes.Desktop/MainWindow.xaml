@@ -1,0 +1,239 @@
+<Window x:Class="CrmMes.Desktop.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:local="clr-namespace:CrmMes.Desktop"
+        mc:Ignorable="d"
+        Title="Gestionale Elettrico" Height="680" Width="1180"
+        MinHeight="560" MinWidth="960" Background="{StaticResource BackgroundBrush}">
+    <Grid Margin="28">
+        <Grid x:Name="LoginPanel" Visibility="Visible" HorizontalAlignment="Center" VerticalAlignment="Center" Width="360">
+            <Border Style="{StaticResource CardBorder}" Padding="28">
+                <StackPanel>
+                    <TextBlock Text="Accesso" FontSize="24" FontWeight="SemiBold" Foreground="{StaticResource TextPrimaryBrush}" />
+                    <TextBlock Text="Accedi al gestionale" Margin="0,6,0,22" Foreground="{StaticResource TextSecondaryBrush}" />
+                    <TextBlock Text="Email" Margin="0,0,0,5" Foreground="{StaticResource TextSecondaryBrush}" FontSize="12.5" />
+                    <TextBox x:Name="EmailBox" Height="36" />
+                    <TextBlock Text="Password" Margin="0,16,0,5" Foreground="{StaticResource TextSecondaryBrush}" FontSize="12.5" />
+                    <PasswordBox x:Name="PasswordBox" Height="36" />
+                    <Button x:Name="LoginButton" Content="Accedi" Height="38" Margin="0,22,0,0" Click="LoginButton_Click" IsEnabled="False" />
+                    <TextBlock x:Name="LoginError" Margin="0,12,0,0" Foreground="{StaticResource DangerBrush}" TextWrapping="Wrap" />
+                </StackPanel>
+            </Border>
+        </Grid>
+
+        <Grid x:Name="DashboardPanel" Visibility="Collapsed">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+
+        <DockPanel Grid.Row="0" Margin="0,0,0,20">
+            <StackPanel>
+                <TextBlock Text="GESTIONALE ELETTRICO" FontSize="23" FontWeight="SemiBold" Foreground="{StaticResource TextPrimaryBrush}" />
+                <TextBlock Text="Distinte di prelievo e materiali" Margin="0,3,0,0" Foreground="{StaticResource TextSecondaryBrush}" />
+            </StackPanel>
+            <Button x:Name="UpdateButton" DockPanel.Dock="Right" Style="{StaticResource SecondaryButton}" Content="Controlla aggiornamenti" Height="34" Margin="0,0,14,0" Click="UpdateButton_Click" />
+            <Border DockPanel.Dock="Right" Background="{StaticResource SuccessBgBrush}" CornerRadius="5" Padding="12,7" VerticalAlignment="Center">
+                <TextBlock x:Name="ConnectionStatus" Text="Connessione..." Foreground="{StaticResource SuccessTextBrush}" FontWeight="SemiBold" />
+            </Border>
+            <Border DockPanel.Dock="Right" Margin="0,0,10,0" Padding="10,7" VerticalAlignment="Center">
+                <TextBlock x:Name="BusyIndicator" Text="" Foreground="{StaticResource TextSecondaryBrush}" FontStyle="Italic" />
+            </Border>
+        </DockPanel>
+
+        <TabControl Grid.Row="1" x:Name="MainTabs" SelectionChanged="MainTabs_SelectionChanged">
+
+            <TabItem Header="Materiali">
+                <Grid Margin="0,16,0,0">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="*" />
+                    </Grid.RowDefinitions>
+                    <DockPanel Grid.Row="0" Margin="0,0,0,12">
+                        <Button DockPanel.Dock="Right" Content="Cerca" Width="100" Height="36" Click="SearchButton_Click" />
+                        <TextBox x:Name="SearchBox" Height="36" Margin="0,0,12,0" Text="" KeyDown="SearchBox_KeyDown" />
+                    </DockPanel>
+                    <Border Grid.Row="1" Style="{StaticResource CardBorder}" Padding="4">
+                        <ListView x:Name="MaterialsList">
+                            <ListView.View>
+                                <GridView>
+                                    <GridViewColumn Header="Codice" DisplayMemberBinding="{Binding Code}" Width="160" />
+                                    <GridViewColumn Header="Descrizione" DisplayMemberBinding="{Binding Name}" Width="360" />
+                                    <GridViewColumn Header="Unità" DisplayMemberBinding="{Binding Unit}" Width="90" />
+                                    <GridViewColumn Header="Giacenza" DisplayMemberBinding="{Binding Stock}" Width="110" />
+                                    <GridViewColumn Header="Sotto scorta" DisplayMemberBinding="{Binding BelowMinimum}" Width="120" />
+                                </GridView>
+                            </ListView.View>
+                        </ListView>
+                    </Border>
+                </Grid>
+            </TabItem>
+
+            <TabItem Header="Sotto scorta">
+                <Grid Margin="0,16,0,0">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="*" />
+                    </Grid.RowDefinitions>
+                    <DockPanel Grid.Row="0" Margin="0,0,0,12">
+                        <Button DockPanel.Dock="Right" Content="Scansiona sottoscorte" Width="180" Height="36" Click="ScanLowStockButton_Click" />
+                        <Button DockPanel.Dock="Right" Style="{StaticResource SecondaryButton}" Content="Aggiorna" Width="100" Height="36" Margin="0,0,10,0" Click="RefreshLowStockButton_Click" />
+                        <TextBlock Text="Materiali sotto la scorta minima" VerticalAlignment="Center" Foreground="{StaticResource TextSecondaryBrush}" />
+                    </DockPanel>
+                    <Border Grid.Row="1" Style="{StaticResource CardBorder}" Padding="4">
+                        <ListView x:Name="LowStockList">
+                            <ListView.View>
+                                <GridView>
+                                    <GridViewColumn Header="Codice" DisplayMemberBinding="{Binding Code}" Width="150" />
+                                    <GridViewColumn Header="Descrizione" DisplayMemberBinding="{Binding Name}" Width="300" />
+                                    <GridViewColumn Header="Giacenza" DisplayMemberBinding="{Binding Stock}" Width="90" />
+                                    <GridViewColumn Header="Minimo" DisplayMemberBinding="{Binding MinStock}" Width="90" />
+                                    <GridViewColumn Header="Da riordinare" DisplayMemberBinding="{Binding SuggestedQuantity}" Width="110" />
+                                    <GridViewColumn Header="Già richiesto" DisplayMemberBinding="{Binding AlreadyRequested}" Width="110" />
+                                </GridView>
+                            </ListView.View>
+                        </ListView>
+                    </Border>
+                </Grid>
+            </TabItem>
+
+            <TabItem Header="Materiali mancanti">
+                <Grid Margin="0,16,0,0">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="*" />
+                    </Grid.RowDefinitions>
+                    <DockPanel Grid.Row="0" Margin="0,0,0,12">
+                        <Button DockPanel.Dock="Right" Style="{StaticResource SecondaryButton}" Content="Aggiorna" Width="100" Height="36" Click="RefreshMissingButton_Click" />
+                        <TextBlock Text="Materiali mancanti aperti (distinte e sottoscorte)" VerticalAlignment="Center" Foreground="{StaticResource TextSecondaryBrush}" />
+                    </DockPanel>
+                    <Border Grid.Row="1" Style="{StaticResource CardBorder}" Padding="4">
+                        <ListView x:Name="MissingMaterialsList">
+                            <ListView.View>
+                                <GridView>
+                                    <GridViewColumn Header="Codice" DisplayMemberBinding="{Binding MaterialCode}" Width="150" />
+                                    <GridViewColumn Header="Quantità" DisplayMemberBinding="{Binding Quantity}" Width="100" />
+                                    <GridViewColumn Header="Origine" DisplayMemberBinding="{Binding Source}" Width="120" />
+                                    <GridViewColumn Header="Stato" DisplayMemberBinding="{Binding Status}" Width="100" />
+                                    <GridViewColumn Header="Creato il" DisplayMemberBinding="{Binding CreatedAt}" Width="160" />
+                                </GridView>
+                            </ListView.View>
+                        </ListView>
+                    </Border>
+                </Grid>
+            </TabItem>
+
+            <TabItem Header="Distinte di prelievo">
+                <Grid Margin="0,16,0,0">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="*" />
+                    </Grid.RowDefinitions>
+                    <DockPanel Grid.Row="0" Margin="0,0,0,12">
+                        <Button DockPanel.Dock="Right" Style="{StaticResource SecondaryButton}" Content="Aggiorna" Width="100" Height="36" Click="RefreshWithdrawalSlipsButton_Click" />
+                        <TextBlock Text="Ultime distinte di prelievo" VerticalAlignment="Center" Foreground="{StaticResource TextSecondaryBrush}" />
+                    </DockPanel>
+                    <Border Grid.Row="1" Style="{StaticResource CardBorder}" Padding="4">
+                        <ListView x:Name="WithdrawalSlipsList">
+                            <ListView.View>
+                                <GridView>
+                                    <GridViewColumn Header="Codice" DisplayMemberBinding="{Binding Code}" Width="150" />
+                                    <GridViewColumn Header="Stato" DisplayMemberBinding="{Binding Status}" Width="100" />
+                                    <GridViewColumn Header="Righe" DisplayMemberBinding="{Binding ItemCount}" Width="80" />
+                                    <GridViewColumn Header="Mancanti" DisplayMemberBinding="{Binding MissingItemCount}" Width="90" />
+                                    <GridViewColumn Header="Creata il" DisplayMemberBinding="{Binding CreatedAt}" Width="160" />
+                                </GridView>
+                            </ListView.View>
+                        </ListView>
+                    </Border>
+                </Grid>
+            </TabItem>
+
+            <TabItem Header="Ordini fornitore">
+                <Grid Margin="0,16,0,0">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="*" />
+                        <RowDefinition Height="Auto" />
+                    </Grid.RowDefinitions>
+                    <DockPanel Grid.Row="0" Margin="0,0,0,12">
+                        <Button DockPanel.Dock="Right" Style="{StaticResource SecondaryButton}" Content="Aggiorna" Width="100" Height="36" Click="RefreshPurchaseOrdersButton_Click" />
+                        <TextBlock Text="Ordini fornitore" VerticalAlignment="Center" Foreground="{StaticResource TextSecondaryBrush}" />
+                    </DockPanel>
+                    <Border Grid.Row="1" Style="{StaticResource CardBorder}" Padding="4">
+                        <ListView x:Name="PurchaseOrdersList" SelectionChanged="PurchaseOrdersList_SelectionChanged">
+                            <ListView.View>
+                                <GridView>
+                                    <GridViewColumn Header="Codice" DisplayMemberBinding="{Binding Code}" Width="150" />
+                                    <GridViewColumn Header="Stato" DisplayMemberBinding="{Binding Status}" Width="110" />
+                                    <GridViewColumn Header="Righe" DisplayMemberBinding="{Binding ItemCount}" Width="70" />
+                                    <GridViewColumn Header="Creato il" DisplayMemberBinding="{Binding CreatedAt}" Width="150" />
+                                    <GridViewColumn Header="Confermato il" DisplayMemberBinding="{Binding ConfirmedAt}" Width="150" />
+                                    <GridViewColumn Header="Ricevuto il" DisplayMemberBinding="{Binding ReceivedAt}" Width="150" />
+                                </GridView>
+                            </ListView.View>
+                        </ListView>
+                    </Border>
+                    <StackPanel Grid.Row="2" Orientation="Horizontal" Margin="0,14,0,0">
+                        <Button x:Name="ConfirmOrderButton" Content="Conferma selezionato" Width="160" Height="36" Margin="0,0,10,0" Click="ConfirmOrderButton_Click" IsEnabled="False" />
+                        <Button x:Name="ReceiveOrderButton" Content="Ricevi residuo" Width="140" Height="36" Margin="0,0,10,0" Click="ReceiveOrderButton_Click" IsEnabled="False" />
+                        <Button x:Name="CancelOrderButton" Style="{StaticResource DangerButton}" Content="Annulla selezionato" Width="160" Height="36" Click="CancelOrderButton_Click" IsEnabled="False" />
+                    </StackPanel>
+                </Grid>
+            </TabItem>
+
+            <TabItem Header="Aree">
+                <Grid Margin="0,16,0,0">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="*" />
+                    </Grid.RowDefinitions>
+                    <DockPanel Grid.Row="0" Margin="0,0,0,12">
+                        <Button DockPanel.Dock="Right" Style="{StaticResource SecondaryButton}" Content="Aggiorna" Width="100" Height="36" Click="RefreshAreasButton_Click" />
+                        <TextBlock Text="Aree aziendali" VerticalAlignment="Center" Foreground="{StaticResource TextSecondaryBrush}" />
+                    </DockPanel>
+                    <Border Grid.Row="1" Style="{StaticResource CardBorder}" Padding="4">
+                        <ListView x:Name="AreasList">
+                            <ListView.View>
+                                <GridView>
+                                    <GridViewColumn Header="Codice" DisplayMemberBinding="{Binding Code}" Width="140" />
+                                    <GridViewColumn Header="Nome" DisplayMemberBinding="{Binding Name}" Width="260" />
+                                    <GridViewColumn Header="Attiva" DisplayMemberBinding="{Binding IsActive}" Width="90" />
+                                </GridView>
+                            </ListView.View>
+                        </ListView>
+                    </Border>
+                </Grid>
+            </TabItem>
+
+            <TabItem Header="Utenti">
+                <Grid Margin="0,16,0,0">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="*" />
+                    </Grid.RowDefinitions>
+                    <DockPanel Grid.Row="0" Margin="0,0,0,12">
+                        <Button DockPanel.Dock="Right" Style="{StaticResource SecondaryButton}" Content="Aggiorna" Width="100" Height="36" Click="RefreshUsersButton_Click" />
+                        <TextBlock Text="Utenti registrati" VerticalAlignment="Center" Foreground="{StaticResource TextSecondaryBrush}" />
+                    </DockPanel>
+                    <Border Grid.Row="1" Style="{StaticResource CardBorder}" Padding="4">
+                        <ListView x:Name="UsersList">
+                            <ListView.View>
+                                <GridView>
+                                    <GridViewColumn Header="Nome" DisplayMemberBinding="{Binding Name}" Width="200" />
+                                    <GridViewColumn Header="Email" DisplayMemberBinding="{Binding Email}" Width="240" />
+                                    <GridViewColumn Header="Ruolo" DisplayMemberBinding="{Binding Role}" Width="110" />
+                                    <GridViewColumn Header="Attivo" DisplayMemberBinding="{Binding IsActive}" Width="90" />
+                                </GridView>
+                            </ListView.View>
+                        </ListView>
+                    </Border>
+                </Grid>
+            </TabItem>
+
+        </TabControl>
+        </Grid>
+    </Grid>
+</Window>

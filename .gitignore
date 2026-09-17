@@ -1,0 +1,10 @@
+CrmMes.Api/appsettings.Local.json
+node_modules/
+.env
+.DS_Store
+/tmp/
+
+# .NET build output
+bin/
+obj/
+*.user
