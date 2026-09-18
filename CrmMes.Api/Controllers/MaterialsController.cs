@@ -130,6 +130,7 @@ public class MaterialsController : ControllerBase
         return CreatedAtAction(nameof(GetMaterial), new { id = material.Id }, response);
     }
 
+    [Authorize(Policy = "Warehouse")]
     [HttpDelete("{id:guid}")]
     public async Task<IActionResult> DeactivateMaterial(
         Guid id,

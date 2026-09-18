@@ -14,6 +14,23 @@ builder.Services.AddResponseCompression(options =>
 {
     options.EnableForHttps = true;
 });
+builder.Services.AddProblemDetails(options =>
+{
+    options.CustomizeProblemDetails = context =>
+    {
+        if (builder.Environment.IsDevelopment() && context.Exception is not null)
+        {
+            context.ProblemDetails.Detail = context.Exception.ToString();
+        }
+    };
+});
+builder.Services.AddHttpLogging(options =>
+{
+    options.LoggingFields = Microsoft.AspNetCore.HttpLogging.HttpLoggingFields.RequestMethod
+        | Microsoft.AspNetCore.HttpLogging.HttpLoggingFields.RequestPath
+        | Microsoft.AspNetCore.HttpLogging.HttpLoggingFields.ResponseStatusCode
+        | Microsoft.AspNetCore.HttpLogging.HttpLoggingFields.Duration;
+});
 
 var jwtKey = builder.Configuration["Jwt:Key"]
     ?? Environment.GetEnvironmentVariable("CRM_MES_JWT_KEY")
@@ -63,12 +80,19 @@ builder.Services.AddDbContext<ApplicationDbContext>(options =>
 
 var app = builder.Build();
 
+app.UseExceptionHandler();
+
 if (app.Environment.IsDevelopment())
 {
     app.UseSwagger();
     app.UseSwaggerUI();
 }
+else
+{
+    app.UseHsts();
+}
 
+app.UseHttpLogging();
 app.UseResponseCompression();
 app.UseHttpsRedirection();
 app.UseAuthentication();
@@ -90,3 +114,6 @@ app.MapGet("/health", async (ApplicationDbContext db) =>
 });
 
 app.Run();
+
+// Marker per WebApplicationFactory<Program> nei test di integrazione.
+public partial class Program;

@@ -20,6 +20,7 @@ public class ApplicationDbContext : DbContext
     public DbSet<PurchaseOrder> PurchaseOrders => Set<PurchaseOrder>();
     public DbSet<PurchaseOrderItem> PurchaseOrderItems => Set<PurchaseOrderItem>();
     public DbSet<AuditLog> AuditLogs => Set<AuditLog>();
+    public DbSet<RefreshToken> RefreshTokens => Set<RefreshToken>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -109,5 +110,29 @@ public class ApplicationDbContext : DbContext
             entity.Property(a => a.EntityType).HasMaxLength(100);
             entity.Property(a => a.UserName).HasMaxLength(200);
         });
+
+        modelBuilder.Entity<RefreshToken>(entity =>
+        {
+            entity.Property(rt => rt.TokenHash).HasMaxLength(128);
+            entity.HasIndex(rt => rt.TokenHash).IsUnique();
+            entity.HasOne(rt => rt.User)
+                .WithMany()
+                .HasForeignKey(rt => rt.UserId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        // Sqlite has no native decimal type and can't ORDER BY / compare the TEXT it stores decimals as.
+        // Postgres (production) handles decimal natively, so this only kicks in for the Sqlite test provider.
+        if (Database.ProviderName == "Microsoft.EntityFrameworkCore.Sqlite")
+        {
+            foreach (var property in modelBuilder.Model.GetEntityTypes()
+                .SelectMany(entityType => entityType.GetProperties())
+                .Where(property => property.ClrType == typeof(decimal)))
+            {
+                property.SetValueConverter(new Microsoft.EntityFrameworkCore.Storage.ValueConversion.ValueConverter<decimal, double>(
+                    value => (double)value,
+                    value => (decimal)value));
+            }
+        }
     }
 }

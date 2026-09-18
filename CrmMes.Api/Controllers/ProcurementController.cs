@@ -201,53 +201,25 @@ public class ProcurementController : ControllerBase
             return BadRequest(new { message = "Fornitore non trovato o non attivo." });
         }
 
-        var missingMaterialIds = request.Items
-            .Where(item => item.MissingMaterialId.HasValue)
-            .Select(item => item.MissingMaterialId!.Value)
-            .Distinct()
-            .ToArray();
-
-        var missingMaterials = missingMaterialIds.Length == 0
-            ? new Dictionary<Guid, MissingMaterial>()
-            : await _dbContext.MissingMaterials
-                .Where(mm => missingMaterialIds.Contains(mm.Id))
-                .ToDictionaryAsync(mm => mm.Id, cancellationToken);
-
-        foreach (var missingMaterialId in missingMaterialIds)
-        {
-            if (!missingMaterials.TryGetValue(missingMaterialId, out var missingMaterial) || missingMaterial.Status != "Open")
-            {
-                return BadRequest(new { message = $"Materiale mancante {missingMaterialId} non trovato o non aperto." });
-            }
-        }
-
         var order = new PurchaseOrder
         {
-            Code = string.IsNullOrWhiteSpace(request.Code) ? $"OD-{DateTime.UtcNow:yyyyMMdd-HHmmss}" : request.Code.Trim(),
+            // Random suffix avoids collisions when two orders are created within the same second.
+            Code = string.IsNullOrWhiteSpace(request.Code)
+                ? $"OD-{DateTime.UtcNow:yyyyMMdd-HHmmss}-{Guid.NewGuid().ToString("N")[..6]}"
+                : request.Code.Trim(),
             SupplierId = request.SupplierId,
             Status = "Draft"
         };
 
-        foreach (var item in request.Items)
+        var (items, error) = await BuildOrderItemsAsync(request.Items, cancellationToken);
+        if (error is not null)
         {
-            if (string.IsNullOrWhiteSpace(item.MaterialCode) || item.Quantity <= 0)
-            {
-                return BadRequest(new { message = "Ogni riga deve avere codice e quantità positiva." });
-            }
-
-            order.Items.Add(new PurchaseOrderItem
-            {
-                MaterialCode = item.MaterialCode.Trim(),
-                Description = item.Description?.Trim() ?? string.Empty,
-                Quantity = item.Quantity,
-                UnitPrice = item.UnitPrice,
-                MissingMaterialId = item.MissingMaterialId
-            });
+            return BadRequest(new { message = error });
         }
 
-        foreach (var missingMaterial in missingMaterials.Values)
+        foreach (var item in items!)
         {
-            missingMaterial.Status = "Ordered";
+            order.Items.Add(item);
         }
 
         _dbContext.PurchaseOrders.Add(order);
@@ -263,6 +235,147 @@ public class ProcurementController : ControllerBase
         await _dbContext.SaveChangesAsync(cancellationToken);
 
         return CreatedAtAction(nameof(GetPurchaseOrder), new { id = order.Id }, ToResponse(order));
+    }
+
+    [Authorize(Policy = "Purchasing")]
+    [HttpPut("purchase-orders/{id:guid}")]
+    public async Task<ActionResult<PurchaseOrderResponse>> EditPurchaseOrder(
+        Guid id,
+        EditPurchaseOrderRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        if (request.SupplierId == Guid.Empty || request.Items is null || request.Items.Count == 0)
+        {
+            return BadRequest(new { message = "Fornitore e almeno una riga sono obbligatori." });
+        }
+
+        if (!await _dbContext.Suppliers.AnyAsync(supplier => supplier.Id == request.SupplierId && supplier.IsActive, cancellationToken))
+        {
+            return BadRequest(new { message = "Fornitore non trovato o non attivo." });
+        }
+
+        var order = await _dbContext.PurchaseOrders
+            .Include(item => item.Items)
+            .SingleOrDefaultAsync(item => item.Id == id, cancellationToken);
+
+        if (order is null)
+        {
+            return NotFound();
+        }
+
+        if (order.Status != "Draft")
+        {
+            return Conflict(new { message = "Solo un ordine in bozza può essere modificato." });
+        }
+
+        // Reopen the missing materials linked to the lines being replaced, so BuildOrderItemsAsync
+        // can validate/relink them again below (works whether the edit keeps or drops each link).
+        var oldMissingIds = order.Items
+            .Where(item => item.MissingMaterialId.HasValue)
+            .Select(item => item.MissingMaterialId!.Value)
+            .Distinct()
+            .ToArray();
+        if (oldMissingIds.Length > 0)
+        {
+            var oldMissing = await _dbContext.MissingMaterials
+                .Where(mm => oldMissingIds.Contains(mm.Id) && mm.Status == "Ordered")
+                .ToListAsync(cancellationToken);
+            foreach (var missingMaterial in oldMissing)
+            {
+                missingMaterial.Status = "Open";
+            }
+        }
+
+        // PurchaseOrderId is a required FK, so removing an item from this navigation collection is
+        // enough for EF Core to schedule the delete; also calling PurchaseOrderItems.Remove(item)
+        // double-tracks it and throws a DbUpdateConcurrencyException ("0 rows affected").
+        foreach (var item in order.Items.ToList())
+        {
+            order.Items.Remove(item);
+        }
+
+        var (items, error) = await BuildOrderItemsAsync(request.Items, cancellationToken);
+        if (error is not null)
+        {
+            return BadRequest(new { message = error });
+        }
+
+        foreach (var item in items!)
+        {
+            order.Items.Add(item);
+        }
+
+        order.SupplierId = request.SupplierId;
+
+        _dbContext.AuditLogs.Add(new AuditLog
+        {
+            Action = "PurchaseOrderUpdated",
+            EntityType = "PurchaseOrder",
+            EntityId = order.Id,
+            UserName = GetCurrentUserName(),
+            Details = $"Ordine {order.Code} modificato, {order.Items.Count} righe."
+        });
+
+        await _dbContext.SaveChangesAsync(cancellationToken);
+        return Ok(ToResponse(order));
+    }
+
+    /// <summary>Validates missing-material links (must exist and be Open) and builds the order item
+    /// entities, flipping each referenced missing material to Ordered. Returns an error message
+    /// instead of throwing so callers can turn it into a 400 response.</summary>
+    private async Task<(List<PurchaseOrderItem>? Items, string? Error)> BuildOrderItemsAsync(
+        IReadOnlyList<CreatePurchaseOrderItemRequest> requestItems,
+        CancellationToken cancellationToken)
+    {
+        var missingMaterialIds = requestItems
+            .Where(item => item.MissingMaterialId.HasValue)
+            .Select(item => item.MissingMaterialId!.Value)
+            .Distinct()
+            .ToArray();
+
+        var missingMaterials = missingMaterialIds.Length == 0
+            ? new Dictionary<Guid, MissingMaterial>()
+            : await _dbContext.MissingMaterials
+                .Where(mm => missingMaterialIds.Contains(mm.Id))
+                .ToDictionaryAsync(mm => mm.Id, cancellationToken);
+
+        foreach (var missingMaterialId in missingMaterialIds)
+        {
+            if (!missingMaterials.TryGetValue(missingMaterialId, out var missingMaterial) || missingMaterial.Status != "Open")
+            {
+                return (null, $"Materiale mancante {missingMaterialId} non trovato o non aperto.");
+            }
+        }
+
+        var items = new List<PurchaseOrderItem>();
+        foreach (var item in requestItems)
+        {
+            if (string.IsNullOrWhiteSpace(item.MaterialCode) || item.Quantity <= 0)
+            {
+                return (null, "Ogni riga deve avere codice e quantità positiva.");
+            }
+
+            var orderItem = new PurchaseOrderItem
+            {
+                MaterialCode = item.MaterialCode.Trim(),
+                Description = item.Description?.Trim() ?? string.Empty,
+                Quantity = item.Quantity,
+                UnitPrice = item.UnitPrice,
+                MissingMaterialId = item.MissingMaterialId
+            };
+            // See the analogous comment in WithdrawalSlipsController: without this, attaching a new
+            // item to an already-tracked order (the edit path) gets EF Core to emit an UPDATE instead
+            // of an INSERT, since the pre-populated Guid Id looks like an existing key.
+            _dbContext.PurchaseOrderItems.Add(orderItem);
+            items.Add(orderItem);
+        }
+
+        foreach (var missingMaterial in missingMaterials.Values)
+        {
+            missingMaterial.Status = "Ordered";
+        }
+
+        return (items, null);
     }
 
     [Authorize(Policy = "Purchasing")]
@@ -530,6 +643,10 @@ public sealed record CreatePurchaseOrderItemRequest(
     string? Description,
     decimal UnitPrice,
     Guid? MissingMaterialId);
+
+public sealed record EditPurchaseOrderRequest(
+    Guid SupplierId,
+    List<CreatePurchaseOrderItemRequest> Items);
 
 public sealed record ReceivePurchaseOrderRequest(
     List<ReceivePurchaseOrderItemRequest> Items);

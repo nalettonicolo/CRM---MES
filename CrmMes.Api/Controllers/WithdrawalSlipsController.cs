@@ -103,7 +103,120 @@ public class WithdrawalSlipsController : ControllerBase
             return Forbid();
         }
 
-        var requestedCodes = request.Items
+        var slip = new WithdrawalSlip
+        {
+            // Appends a short random suffix: the timestamp alone is only second-precision, so two
+            // slips created within the same second (a real possibility under normal usage) would
+            // otherwise collide on the unique Code index.
+            Code = string.IsNullOrWhiteSpace(request.Code)
+                ? $"DP-{DateTime.UtcNow:yyyyMMdd-HHmmss}-{Guid.NewGuid().ToString("N")[..6]}"
+                : request.Code.Trim(),
+            AreaId = request.AreaId,
+            RequestedByUserId = request.RequestedByUserId,
+            Notes = string.IsNullOrWhiteSpace(request.Notes) ? null : request.Notes.Trim(),
+            Status = "Draft"
+        };
+
+        foreach (var item in await BuildItemsWithMissingTrackingAsync(slip.Id, request.Items, cancellationToken))
+        {
+            slip.Items.Add(item);
+        }
+
+        _dbContext.WithdrawalSlips.Add(slip);
+        _dbContext.AuditLogs.Add(new AuditLog
+        {
+            Action = "WithdrawalSlipCreated",
+            EntityType = "WithdrawalSlip",
+            EntityId = slip.Id,
+            UserName = GetCurrentUserName(),
+            Details = $"Distinta {slip.Code} creata con {slip.Items.Count} righe."
+        });
+        await _dbContext.SaveChangesAsync(cancellationToken);
+
+        return CreatedAtAction(nameof(GetWithdrawalSlip), new { id = slip.Id }, ToResponse(slip));
+    }
+
+    [Authorize]
+    [HttpPut("{id:guid}")]
+    public async Task<ActionResult<WithdrawalSlipResponse>> EditWithdrawalSlip(
+        Guid id,
+        EditWithdrawalSlipRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        if (request.Items is null || request.Items.Count == 0)
+        {
+            return BadRequest(new { message = "La distinta deve contenere almeno un materiale." });
+        }
+
+        if (request.Items.Any(item => string.IsNullOrWhiteSpace(item.MaterialCode) || item.Quantity <= 0))
+        {
+            return BadRequest(new { message = "Ogni riga deve avere codice materiale e quantità maggiore di zero." });
+        }
+
+        var slip = await _dbContext.WithdrawalSlips
+            .Include(item => item.Items)
+            .SingleOrDefaultAsync(item => item.Id == id, cancellationToken);
+
+        if (slip is null)
+        {
+            return NotFound();
+        }
+
+        if (!HasElevatedAccess() && !await CanAccessSlipAsync(slip, cancellationToken))
+        {
+            return Forbid();
+        }
+
+        if (slip.Status != "Draft")
+        {
+            return Conflict(new { message = "Solo una distinta in bozza può essere modificata." });
+        }
+
+        // Only the still-open missing materials this slip generated are removed; ones already
+        // linked to a purchase order (Ordered) or fulfilled (Resolved) are left as history.
+        var openMissing = await _dbContext.MissingMaterials
+            .Where(mm => mm.WithdrawalSlipId == id && mm.Status == "Open")
+            .ToListAsync(cancellationToken);
+        _dbContext.MissingMaterials.RemoveRange(openMissing);
+
+        // WithdrawalSlipId is a required FK, so removing an item from this navigation collection is
+        // enough: EF Core's change tracker schedules the delete on its own. Also calling
+        // WithdrawalItems.Remove(item) on top of that double-tracks the deletion and throws a
+        // DbUpdateConcurrencyException ("0 rows affected") because the row is already gone by the
+        // time the second delete command runs.
+        foreach (var item in slip.Items.ToList())
+        {
+            slip.Items.Remove(item);
+        }
+
+        foreach (var item in await BuildItemsWithMissingTrackingAsync(slip.Id, request.Items, cancellationToken))
+        {
+            slip.Items.Add(item);
+        }
+
+        slip.Notes = string.IsNullOrWhiteSpace(request.Notes) ? null : request.Notes.Trim();
+
+        _dbContext.AuditLogs.Add(new AuditLog
+        {
+            Action = "WithdrawalSlipUpdated",
+            EntityType = "WithdrawalSlip",
+            EntityId = slip.Id,
+            UserName = GetCurrentUserName(),
+            Details = $"Distinta {slip.Code} modificata, {slip.Items.Count} righe."
+        });
+
+        await _dbContext.SaveChangesAsync(cancellationToken);
+        return Ok(ToResponse(slip));
+    }
+
+    /// <summary>Builds withdrawal items from the request, matching each against the active material
+    /// catalog, and registers a MissingMaterial for every line that can't be fully covered by stock.</summary>
+    private async Task<List<WithdrawalItem>> BuildItemsWithMissingTrackingAsync(
+        Guid slipId,
+        IReadOnlyList<CreateWithdrawalSlipItemRequest> requestItems,
+        CancellationToken cancellationToken)
+    {
+        var requestedCodes = requestItems
             .Select(item => item.MaterialCode.Trim())
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .ToArray();
@@ -113,49 +226,40 @@ public class WithdrawalSlipsController : ControllerBase
             .Where(material => material.IsActive && requestedCodes.Contains(material.Code))
             .ToDictionaryAsync(material => material.Code, StringComparer.OrdinalIgnoreCase, cancellationToken);
 
-        var slip = new WithdrawalSlip
-        {
-            Code = string.IsNullOrWhiteSpace(request.Code)
-                ? $"DP-{DateTime.UtcNow:yyyyMMdd-HHmmss}"
-                : request.Code.Trim(),
-            AreaId = request.AreaId,
-            RequestedByUserId = request.RequestedByUserId,
-            Notes = string.IsNullOrWhiteSpace(request.Notes) ? null : request.Notes.Trim(),
-            Status = "Draft"
-        };
-
-        foreach (var requestItem in request.Items)
+        var items = new List<WithdrawalItem>();
+        foreach (var requestItem in requestItems)
         {
             var code = requestItem.MaterialCode.Trim();
             var catalogMaterial = catalogMaterials.GetValueOrDefault(code);
-            var isMissing = catalogMaterial is null || catalogMaterial.Stock < requestItem.Quantity;
-
-            slip.Items.Add(new WithdrawalItem
+            var item = new WithdrawalItem
             {
                 MaterialCode = code,
                 Description = catalogMaterial?.Name ?? requestItem.Description?.Trim() ?? "Materiale non catalogato",
                 Quantity = requestItem.Quantity,
                 Unit = catalogMaterial?.Unit ?? (string.IsNullOrWhiteSpace(requestItem.Unit) ? "pz" : requestItem.Unit.Trim()),
-                IsMissing = isMissing
-            });
-        }
+                IsMissing = catalogMaterial is null || catalogMaterial.Stock < requestItem.Quantity
+            };
+            // Explicitly marks the item Added. Without this, attaching a brand-new item to an
+            // *already tracked* parent (the edit path) makes EF Core's change detection assume it
+            // already exists in the database (its Guid Id looks like a real key, not a "new" default
+            // value) and emit an UPDATE instead of an INSERT, which affects 0 rows and throws.
+            _dbContext.WithdrawalItems.Add(item);
+            items.Add(item);
 
-        foreach (var item in slip.Items.Where(item => item.IsMissing))
-        {
-            _dbContext.MissingMaterials.Add(new MissingMaterial
+            if (item.IsMissing)
             {
-                WithdrawalSlipId = slip.Id,
-                MaterialCode = item.MaterialCode,
-                Quantity = item.Quantity,
-                Source = catalogMaterials.ContainsKey(item.MaterialCode) ? "Stock" : "Catalog",
-                Status = "Open"
-            });
+                _dbContext.MissingMaterials.Add(new MissingMaterial
+                {
+                    WithdrawalSlipId = slipId,
+                    MaterialCode = item.MaterialCode,
+                    Quantity = item.Quantity,
+                    Source = catalogMaterials.ContainsKey(item.MaterialCode) ? "Stock" : "Catalog",
+                    Status = "Open"
+                });
+            }
         }
 
-        _dbContext.WithdrawalSlips.Add(slip);
-        await _dbContext.SaveChangesAsync(cancellationToken);
-
-        return CreatedAtAction(nameof(GetWithdrawalSlip), new { id = slip.Id }, ToResponse(slip));
+        return items;
     }
 
     [Authorize]
@@ -213,6 +317,14 @@ public class WithdrawalSlipsController : ControllerBase
         }
 
         slip.Status = "Ready";
+        _dbContext.AuditLogs.Add(new AuditLog
+        {
+            Action = "WithdrawalSlipReady",
+            EntityType = "WithdrawalSlip",
+            EntityId = slip.Id,
+            UserName = GetCurrentUserName(),
+            Details = $"Distinta {slip.Code} pronta per il prelievo."
+        });
         await _dbContext.SaveChangesAsync(cancellationToken);
         return Ok(ToResponse(slip));
     }
@@ -238,9 +350,9 @@ public class WithdrawalSlipsController : ControllerBase
             return Forbid();
         }
 
-        if (slip.Status == "Closed")
+        if (slip.Status is "Closed" or "Cancelled")
         {
-            return Conflict(new { message = "La distinta è già chiusa." });
+            return Conflict(new { message = "Solo una distinta in bozza o pronta può essere chiusa." });
         }
 
         var codes = slip.Items.Select(item => item.MaterialCode).Distinct().ToArray();
@@ -267,6 +379,14 @@ public class WithdrawalSlipsController : ControllerBase
 
         slip.Status = "Closed";
         await CreateLowStockAlertsAsync(materials.Values, cancellationToken);
+        _dbContext.AuditLogs.Add(new AuditLog
+        {
+            Action = "WithdrawalSlipClosed",
+            EntityType = "WithdrawalSlip",
+            EntityId = slip.Id,
+            UserName = GetCurrentUserName(),
+            Details = $"Distinta {slip.Code} chiusa, scarico stock per {slip.Items.Count} righe."
+        });
         await _dbContext.SaveChangesAsync(cancellationToken);
         await transaction.CommitAsync(cancellationToken);
 
@@ -298,6 +418,14 @@ public class WithdrawalSlipsController : ControllerBase
         }
 
         slip.Status = "Cancelled";
+        _dbContext.AuditLogs.Add(new AuditLog
+        {
+            Action = "WithdrawalSlipCancelled",
+            EntityType = "WithdrawalSlip",
+            EntityId = slip.Id,
+            UserName = GetCurrentUserName(),
+            Details = $"Distinta {slip.Code} annullata."
+        });
         await _dbContext.SaveChangesAsync(cancellationToken);
         return NoContent();
     }
@@ -331,6 +459,8 @@ public class WithdrawalSlipsController : ControllerBase
             });
         }
     }
+
+    private string? GetCurrentUserName() => User.FindFirstValue(ClaimTypes.Name);
 
     private bool HasElevatedAccess() => User.IsInRole("Admin") || User.IsInRole("Warehouse");
 
@@ -381,6 +511,10 @@ public sealed record CreateWithdrawalSlipItemRequest(
     decimal Quantity,
     string? Description,
     string? Unit);
+
+public sealed record EditWithdrawalSlipRequest(
+    string? Notes,
+    List<CreateWithdrawalSlipItemRequest> Items);
 
 public sealed record WithdrawalSlipResponse(
     Guid Id,

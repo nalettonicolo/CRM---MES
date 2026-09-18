@@ -9,6 +9,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "CrmMes.Core", "CrmMes.Core\
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "CrmMes.Desktop", "CrmMes.Desktop\CrmMes.Desktop.csproj", "{C6760399-E43B-4568-A6D8-0CDCC4337A09}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "CrmMes.Api.Tests", "CrmMes.Api.Tests\CrmMes.Api.Tests.csproj", "{04E213E1-3835-4A41-97D6-3C40766C6980}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -30,5 +32,9 @@ Global
 		{C6760399-E43B-4568-A6D8-0CDCC4337A09}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{C6760399-E43B-4568-A6D8-0CDCC4337A09}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{C6760399-E43B-4568-A6D8-0CDCC4337A09}.Release|Any CPU.Build.0 = Release|Any CPU
+		{04E213E1-3835-4A41-97D6-3C40766C6980}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{04E213E1-3835-4A41-97D6-3C40766C6980}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{04E213E1-3835-4A41-97D6-3C40766C6980}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{04E213E1-3835-4A41-97D6-3C40766C6980}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 EndGlobal

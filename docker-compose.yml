@@ -1,0 +1,16 @@
+# Local container run of the API, still pointed at the real Neon database (there is no local
+# Postgres container here on purpose: Neon is the only environment this project targets).
+# Usage:
+#   1. Copy .env.example to .env and fill in the values.
+#   2. docker compose up --build
+services:
+  api:
+    build:
+      context: .
+      dockerfile: CrmMes.Api/Dockerfile
+    ports:
+      - "8080:8080"
+    environment:
+      ASPNETCORE_ENVIRONMENT: Production
+      NEON_DATABASE_URL: ${NEON_DATABASE_URL}
+      CRM_MES_JWT_KEY: ${CRM_MES_JWT_KEY}

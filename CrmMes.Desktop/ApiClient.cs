@@ -2,6 +2,8 @@ using System.Net.Http;
 using System.Net.Http.Json;
 using System.Diagnostics;
 using System.IO;
+using System.Net;
+using System.Text.Json;
 
 namespace CrmMes.Desktop;
 
@@ -87,6 +89,41 @@ public sealed class ApiClient
         }
     }
 
+    public async Task<AuthDto> RefreshAsync(string refreshToken, CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            using var response = await _httpClient.PostAsJsonAsync(
+                "api/auth/refresh",
+                new { refreshToken },
+                cancellationToken);
+            if (response.StatusCode == HttpStatusCode.Unauthorized)
+            {
+                throw new InvalidOperationException("Sessione scaduta, effettua di nuovo il login.");
+            }
+
+            response.EnsureSuccessStatusCode();
+            var result = await response.Content.ReadFromJsonAsync<AuthDto>(cancellationToken: cancellationToken);
+            return result ?? throw new InvalidOperationException("Risposta di rinnovo sessione non valida.");
+        }
+        catch (HttpRequestException exception)
+        {
+            throw new InvalidOperationException("API non disponibile. Avvia CrmMes.Api sulla porta 5092.", exception);
+        }
+    }
+
+    public async Task LogoutAsync(string refreshToken, CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            using var response = await _httpClient.PostAsJsonAsync("api/auth/logout", new { refreshToken }, cancellationToken);
+        }
+        catch (HttpRequestException)
+        {
+            // Best-effort: se l'API non è raggiungibile il refresh token scadrà comunque da solo.
+        }
+    }
+
     public void SetToken(string token)
     {
         _httpClient.DefaultRequestHeaders.Authorization =
@@ -109,6 +146,14 @@ public sealed class ApiClient
 
     public Task<IReadOnlyList<WithdrawalSlipSummaryDto>> GetWithdrawalSlipsAsync(CancellationToken cancellationToken = default)
         => GetAsync<WithdrawalSlipSummaryDto>("api/withdrawal-slips", cancellationToken);
+
+    public async Task<WithdrawalSlipDetailDto> GetWithdrawalSlipAsync(Guid id, CancellationToken cancellationToken = default)
+    {
+        using var response = await _httpClient.GetAsync($"api/withdrawal-slips/{id}", cancellationToken);
+        await EnsureSuccessAsync(response, cancellationToken);
+        return await response.Content.ReadFromJsonAsync<WithdrawalSlipDetailDto>(cancellationToken: cancellationToken)
+            ?? throw new InvalidOperationException("Risposta distinta non valida.");
+    }
 
     public Task<IReadOnlyList<MissingMaterialDto>> GetMissingMaterialsAsync(string status = "Open", CancellationToken cancellationToken = default)
         => GetAsync<MissingMaterialDto>($"api/procurement/missing?status={Uri.EscapeDataString(status)}", cancellationToken);
@@ -173,6 +218,134 @@ public sealed class ApiClient
     public Task<IReadOnlyList<UserRowDto>> GetUsersAsync(CancellationToken cancellationToken = default)
         => GetAsync<UserRowDto>("api/users", cancellationToken);
 
+    public Task<IReadOnlyList<SupplierDto>> GetSuppliersAsync(CancellationToken cancellationToken = default)
+        => GetAsync<SupplierDto>("api/suppliers", cancellationToken);
+
+    public async Task<ImportSummaryDto> ImportCatalogExcelAsync(string filePath, CancellationToken cancellationToken = default)
+    {
+        using var content = new MultipartFormDataContent();
+        await using var stream = File.OpenRead(filePath);
+        using var fileContent = new StreamContent(stream);
+        fileContent.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue(
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+        content.Add(fileContent, "file", Path.GetFileName(filePath));
+
+        using var response = await _httpClient.PostAsync("api/supplier-catalog/import-excel", content, cancellationToken);
+        await EnsureSuccessAsync(response, cancellationToken);
+        return await response.Content.ReadFromJsonAsync<ImportSummaryDto>(cancellationToken: cancellationToken)
+            ?? throw new InvalidOperationException("Risposta di importazione non valida.");
+    }
+
+    public async Task CreateWithdrawalSlipAsync(
+        Guid areaId,
+        Guid requestedByUserId,
+        string? notes,
+        IReadOnlyList<(string MaterialCode, decimal Quantity)> items,
+        CancellationToken cancellationToken = default)
+    {
+        var payload = new
+        {
+            areaId,
+            requestedByUserId,
+            notes,
+            items = items.Select(item => new { materialCode = item.MaterialCode, quantity = item.Quantity })
+        };
+        using var response = await _httpClient.PostAsJsonAsync("api/withdrawal-slips", payload, cancellationToken);
+        await EnsureSuccessAsync(response, cancellationToken);
+    }
+
+    public async Task EditWithdrawalSlipAsync(
+        Guid id,
+        string? notes,
+        IReadOnlyList<(string MaterialCode, decimal Quantity)> items,
+        CancellationToken cancellationToken = default)
+    {
+        var payload = new
+        {
+            notes,
+            items = items.Select(item => new { materialCode = item.MaterialCode, quantity = item.Quantity })
+        };
+        using var response = await _httpClient.PutAsJsonAsync($"api/withdrawal-slips/{id}", payload, cancellationToken);
+        await EnsureSuccessAsync(response, cancellationToken);
+    }
+
+    public async Task MarkWithdrawalSlipReadyAsync(Guid id, CancellationToken cancellationToken = default)
+    {
+        using var response = await _httpClient.PostAsync($"api/withdrawal-slips/{id}/ready", null, cancellationToken);
+        await EnsureSuccessAsync(response, cancellationToken);
+    }
+
+    public async Task CloseWithdrawalSlipAsync(Guid id, CancellationToken cancellationToken = default)
+    {
+        using var response = await _httpClient.PostAsync($"api/withdrawal-slips/{id}/close", null, cancellationToken);
+        await EnsureSuccessAsync(response, cancellationToken);
+    }
+
+    public async Task CancelWithdrawalSlipAsync(Guid id, CancellationToken cancellationToken = default)
+    {
+        using var response = await _httpClient.PostAsync($"api/withdrawal-slips/{id}/cancel", null, cancellationToken);
+        await EnsureSuccessAsync(response, cancellationToken);
+    }
+
+    public async Task CreatePurchaseOrderAsync(
+        Guid supplierId,
+        IReadOnlyList<(string MaterialCode, decimal Quantity, decimal UnitPrice)> items,
+        CancellationToken cancellationToken = default)
+    {
+        var payload = new
+        {
+            supplierId,
+            items = items.Select(item => new { materialCode = item.MaterialCode, quantity = item.Quantity, unitPrice = item.UnitPrice })
+        };
+        using var response = await _httpClient.PostAsJsonAsync("api/procurement/purchase-orders", payload, cancellationToken);
+        await EnsureSuccessAsync(response, cancellationToken);
+    }
+
+    public async Task EditPurchaseOrderAsync(
+        Guid id,
+        Guid supplierId,
+        IReadOnlyList<(string MaterialCode, decimal Quantity, decimal UnitPrice)> items,
+        CancellationToken cancellationToken = default)
+    {
+        var payload = new
+        {
+            supplierId,
+            items = items.Select(item => new { materialCode = item.MaterialCode, quantity = item.Quantity, unitPrice = item.UnitPrice })
+        };
+        using var response = await _httpClient.PutAsJsonAsync($"api/procurement/purchase-orders/{id}", payload, cancellationToken);
+        await EnsureSuccessAsync(response, cancellationToken);
+    }
+
+    public async Task CreateMaterialAsync(string code, string name, string unit, decimal stock, decimal minStock, CancellationToken cancellationToken = default)
+    {
+        using var response = await _httpClient.PostAsJsonAsync(
+            "api/materials",
+            new { code, name, unit, stock, minStock },
+            cancellationToken);
+        await EnsureSuccessAsync(response, cancellationToken);
+    }
+
+    public async Task CreateSupplierAsync(string name, string code, string? email, string? phone, CancellationToken cancellationToken = default)
+    {
+        using var response = await _httpClient.PostAsJsonAsync(
+            "api/suppliers",
+            new { name, code, email, phone },
+            cancellationToken);
+        await EnsureSuccessAsync(response, cancellationToken);
+    }
+
+    public async Task CreateAreaAsync(string name, string code, CancellationToken cancellationToken = default)
+    {
+        using var response = await _httpClient.PostAsJsonAsync("api/areas", new { name, code }, cancellationToken);
+        await EnsureSuccessAsync(response, cancellationToken);
+    }
+
+    public async Task CreateUserAsync(string name, string email, string password, string role, CancellationToken cancellationToken = default)
+    {
+        using var response = await _httpClient.PostAsJsonAsync("api/users", new { name, email, password, role }, cancellationToken);
+        await EnsureSuccessAsync(response, cancellationToken);
+    }
+
     private async Task<IReadOnlyList<T>> GetAsync<T>(string path, CancellationToken cancellationToken)
     {
         using var response = await _httpClient.GetAsync(path, cancellationToken);
@@ -188,13 +361,28 @@ public sealed class ApiClient
             return;
         }
 
-        if (response.StatusCode == System.Net.HttpStatusCode.Forbidden)
+        if (response.StatusCode == HttpStatusCode.Forbidden)
         {
             throw new InvalidOperationException("Il tuo ruolo utente non ha i permessi per questa operazione.");
         }
 
         var body = await response.Content.ReadAsStringAsync(cancellationToken);
-        throw new InvalidOperationException($"Errore API ({(int)response.StatusCode}): {body}");
+        throw new InvalidOperationException($"Errore API ({(int)response.StatusCode}): {TryExtractMessage(body) ?? body}");
+    }
+
+    private static string? TryExtractMessage(string body)
+    {
+        try
+        {
+            using var document = JsonDocument.Parse(body);
+            return document.RootElement.TryGetProperty("message", out var messageElement)
+                ? messageElement.GetString()
+                : null;
+        }
+        catch (JsonException)
+        {
+            return null;
+        }
     }
 }
 
@@ -208,7 +396,14 @@ public sealed record MaterialDto(
     bool IsActive,
     bool BelowMinimum);
 
-public sealed record AuthDto(string Token, Guid UserId, string Name, string Email, string Role);
+public sealed record AuthDto(
+    string Token,
+    string RefreshToken,
+    DateTime ExpiresAt,
+    Guid UserId,
+    string Name,
+    string Email,
+    string Role);
 
 public sealed record WithdrawalSlipSummaryDto(
     Guid Id,
@@ -219,6 +414,24 @@ public sealed record WithdrawalSlipSummaryDto(
     DateTime CreatedAt,
     int ItemCount,
     int MissingItemCount);
+
+public sealed record WithdrawalSlipDetailDto(
+    Guid Id,
+    string Code,
+    Guid AreaId,
+    Guid RequestedByUserId,
+    string Status,
+    string? Notes,
+    DateTime CreatedAt,
+    List<WithdrawalSlipItemDto> Items);
+
+public sealed record WithdrawalSlipItemDto(
+    Guid Id,
+    string MaterialCode,
+    string Description,
+    decimal Quantity,
+    string Unit,
+    bool IsMissing);
 
 public sealed record MissingMaterialDto(
     Guid Id,
@@ -276,3 +489,7 @@ public sealed record PurchaseOrderItemDto(
 public sealed record AreaDto(Guid Id, string Name, string Code, bool IsActive, DateTime CreatedAt);
 
 public sealed record UserRowDto(Guid Id, string Name, string Email, string Role, bool IsActive, DateTime CreatedAt);
+
+public sealed record SupplierDto(Guid Id, string Name, string Code, string? Email, string? Phone, bool IsActive);
+
+public sealed record ImportSummaryDto(int Imported, int CreatedMaterials, int CreatedLinks);

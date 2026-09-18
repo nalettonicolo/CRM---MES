@@ -1,0 +1,11 @@
+**/bin/
+**/obj/
+**/.vs/
+**/.vscode/
+CrmMes.Desktop/
+CrmMes.Api.Tests/
+node_modules/
+data/
+public/
+*.user
+.git/

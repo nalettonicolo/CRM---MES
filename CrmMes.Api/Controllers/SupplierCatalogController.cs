@@ -1,4 +1,6 @@
 using System.Globalization;
+using System.Runtime.CompilerServices;
+using ClosedXML.Excel;
 using CrmMes.Core.Data;
 using CrmMes.Core.Models;
 using Microsoft.AspNetCore.Authorization;
@@ -12,6 +14,8 @@ namespace CrmMes.Api.Controllers;
 [Route("api/supplier-catalog")]
 public class SupplierCatalogController : ControllerBase
 {
+    private static readonly string[] RequiredColumns = ["suppliercode", "suppliername", "code", "name", "partnumber"];
+
     private readonly ApplicationDbContext _dbContext;
 
     public SupplierCatalogController(ApplicationDbContext dbContext)
@@ -67,7 +71,6 @@ public class SupplierCatalogController : ControllerBase
             return BadRequest(new { message = "Selezionare un file CSV non vuoto." });
         }
 
-        await using var transaction = await _dbContext.Database.BeginTransactionAsync(cancellationToken);
         using var reader = new StreamReader(file.OpenReadStream());
         var headerLine = await reader.ReadLineAsync(cancellationToken);
         if (string.IsNullOrWhiteSpace(headerLine))
@@ -75,32 +78,86 @@ public class SupplierCatalogController : ControllerBase
             return BadRequest(new { message = "Il CSV non contiene intestazioni." });
         }
 
-        var headers = ParseCsvLine(headerLine)
-            .Select((value, index) => new { Key = value.Trim().ToLowerInvariant(), index })
-            .ToDictionary(item => item.Key, item => item.index);
-        var required = new[] { "suppliercode", "suppliername", "code", "name", "partnumber" };
-        if (required.Any(item => !headers.ContainsKey(item)))
+        var headers = ParseHeaders(ParseCsvLine(headerLine));
+        var headerError = ValidateHeaders(headers);
+        if (headerError is not null)
         {
-            return BadRequest(new { message = "Colonne obbligatorie: supplierCode, supplierName, code, name, partNumber." });
+            return BadRequest(new { message = headerError });
         }
 
+        await using var transaction = await _dbContext.Database.BeginTransactionAsync(cancellationToken);
+        var summary = await ImportRowsAsync(ReadCsvRowsAsync(reader, headers, cancellationToken), cancellationToken);
+        await transaction.CommitAsync(cancellationToken);
+
+        return Ok(summary);
+    }
+
+    [HttpPost("import-excel")]
+    [RequestSizeLimit(25_000_000)]
+    public async Task<IActionResult> ImportExcel(
+        IFormFile file,
+        CancellationToken cancellationToken = default)
+    {
+        if (file is null || file.Length == 0)
+        {
+            return BadRequest(new { message = "Selezionare un file Excel (.xlsx) non vuoto." });
+        }
+
+        using var workbook = new XLWorkbook(file.OpenReadStream());
+        var worksheet = workbook.Worksheets.FirstOrDefault();
+        if (worksheet is null || worksheet.LastRowUsed() is null)
+        {
+            return BadRequest(new { message = "Il file Excel non contiene un foglio con dati." });
+        }
+
+        var headerRow = worksheet.Row(1);
+        var headerValues = headerRow.CellsUsed().Select(cell => cell.GetString()).ToList();
+        var headers = ParseHeaders(headerValues);
+        var headerError = ValidateHeaders(headers);
+        if (headerError is not null)
+        {
+            return BadRequest(new { message = headerError });
+        }
+
+        await using var transaction = await _dbContext.Database.BeginTransactionAsync(cancellationToken);
+        var summary = await ImportRowsAsync(ReadExcelRows(worksheet, headers), cancellationToken);
+        await transaction.CommitAsync(cancellationToken);
+
+        return Ok(summary);
+    }
+
+    private static Dictionary<string, int> ParseHeaders(IReadOnlyList<string> headerValues)
+    {
+        return headerValues
+            .Select((value, index) => new { Key = value.Trim().ToLowerInvariant(), index })
+            .Where(item => !string.IsNullOrEmpty(item.Key))
+            .ToDictionary(item => item.Key, item => item.index);
+    }
+
+    private static string? ValidateHeaders(Dictionary<string, int> headers)
+    {
+        return RequiredColumns.Any(column => !headers.ContainsKey(column))
+            ? "Colonne obbligatorie: supplierCode, supplierName, code, name, partNumber."
+            : null;
+    }
+
+    /// <summary>Applies the supplier/material/catalog-link upsert logic shared by CSV and Excel import,
+    /// so both formats stay behaviourally identical.</summary>
+    private async Task<ImportSummary> ImportRowsAsync(
+        IAsyncEnumerable<IReadOnlyDictionary<string, string>> rows,
+        CancellationToken cancellationToken)
+    {
         var imported = 0;
         var createdMaterials = 0;
         var createdLinks = 0;
-        string? line;
-        while ((line = await reader.ReadLineAsync(cancellationToken)) is not null)
-        {
-            if (string.IsNullOrWhiteSpace(line))
-            {
-                continue;
-            }
 
-            var values = ParseCsvLine(line);
-            var supplierCode = Value(values, headers, "suppliercode").Trim();
-            var supplierName = Value(values, headers, "suppliername").Trim();
-            var materialCode = Value(values, headers, "code").Trim();
-            var materialName = Value(values, headers, "name").Trim();
-            var partNumber = Value(values, headers, "partnumber").Trim();
+        await foreach (var row in rows.WithCancellation(cancellationToken))
+        {
+            var supplierCode = row.GetValueOrDefault("suppliercode", "").Trim();
+            var supplierName = row.GetValueOrDefault("suppliername", "").Trim();
+            var materialCode = row.GetValueOrDefault("code", "").Trim();
+            var materialName = row.GetValueOrDefault("name", "").Trim();
+            var partNumber = row.GetValueOrDefault("partnumber", "").Trim();
 
             if (string.IsNullOrWhiteSpace(supplierCode) || string.IsNullOrWhiteSpace(supplierName) ||
                 string.IsNullOrWhiteSpace(materialCode) || string.IsNullOrWhiteSpace(materialName) ||
@@ -123,9 +180,9 @@ public class SupplierCatalogController : ControllerBase
                 {
                     Code = materialCode,
                     Name = materialName,
-                    Unit = Value(values, headers, "unit", "pz").Trim(),
-                    Stock = DecimalValue(values, headers, "stock"),
-                    MinStock = DecimalValue(values, headers, "minstock")
+                    Unit = ValueOrDefault(row, "unit", "pz").Trim(),
+                    Stock = DecimalValue(row, "stock"),
+                    MinStock = DecimalValue(row, "minstock")
                 };
                 _dbContext.Materials.Add(material);
                 createdMaterials++;
@@ -136,7 +193,7 @@ public class SupplierCatalogController : ControllerBase
             }
 
             await _dbContext.SaveChangesAsync(cancellationToken);
-            var link = await _dbContext.MaterialSuppliers.FindAsync(new object[] { material.Id, supplier.Id }, cancellationToken);
+            var link = await _dbContext.MaterialSuppliers.FindAsync([material.Id, supplier.Id], cancellationToken);
             if (link is null)
             {
                 link = new MaterialSupplier { MaterialId = material.Id, SupplierId = supplier.Id };
@@ -145,26 +202,66 @@ public class SupplierCatalogController : ControllerBase
             }
 
             link.PartNumber = partNumber;
-            link.Description = Value(values, headers, "description");
-            link.UnitPrice = DecimalValue(values, headers, "unitprice");
-            link.LeadTimeDays = DecimalValue(values, headers, "leadtimedays");
+            link.Description = row.GetValueOrDefault("description");
+            link.UnitPrice = DecimalValue(row, "unitprice");
+            link.LeadTimeDays = DecimalValue(row, "leadtimedays");
             imported++;
         }
 
         await _dbContext.SaveChangesAsync(cancellationToken);
-        await transaction.CommitAsync(cancellationToken);
-        return Ok(new { imported, createdMaterials, createdLinks });
+        return new ImportSummary(imported, createdMaterials, createdLinks);
     }
 
-    private static string Value(IReadOnlyList<string> values, IReadOnlyDictionary<string, int> headers, string key, string fallback = "")
+    private static async IAsyncEnumerable<IReadOnlyDictionary<string, string>> ReadCsvRowsAsync(
+        StreamReader reader,
+        IReadOnlyDictionary<string, int> headers,
+        [EnumeratorCancellation] CancellationToken cancellationToken)
     {
-        return headers.TryGetValue(key, out var index) && index < values.Count ? values[index] : fallback;
+        string? line;
+        while ((line = await reader.ReadLineAsync(cancellationToken)) is not null)
+        {
+            if (string.IsNullOrWhiteSpace(line))
+            {
+                continue;
+            }
+
+            var values = ParseCsvLine(line);
+            yield return headers.ToDictionary(
+                header => header.Key,
+                header => header.Value < values.Count ? values[header.Value] : string.Empty);
+        }
     }
 
-    private static decimal DecimalValue(IReadOnlyList<string> values, IReadOnlyDictionary<string, int> headers, string key)
+    private static async IAsyncEnumerable<IReadOnlyDictionary<string, string>> ReadExcelRows(
+        IXLWorksheet worksheet,
+        IReadOnlyDictionary<string, int> headers)
     {
-        var value = Value(values, headers, key);
-        return decimal.TryParse(value, NumberStyles.Any, CultureInfo.InvariantCulture, out var result) ? result : 0;
+        var lastRow = worksheet.LastRowUsed()!.RowNumber();
+        for (var rowNumber = 2; rowNumber <= lastRow; rowNumber++)
+        {
+            var row = worksheet.Row(rowNumber);
+            if (row.IsEmpty())
+            {
+                continue;
+            }
+
+            yield return headers.ToDictionary(
+                header => header.Key,
+                header => row.Cell(header.Value + 1).GetString());
+        }
+
+        await Task.CompletedTask;
+    }
+
+    private static string ValueOrDefault(IReadOnlyDictionary<string, string> row, string key, string fallback) =>
+        row.TryGetValue(key, out var value) && !string.IsNullOrWhiteSpace(value) ? value : fallback;
+
+    private static decimal DecimalValue(IReadOnlyDictionary<string, string> row, string key)
+    {
+        return row.TryGetValue(key, out var value) &&
+               decimal.TryParse(value, NumberStyles.Any, CultureInfo.InvariantCulture, out var result)
+            ? result
+            : 0;
     }
 
     private static List<string> ParseCsvLine(string line)
@@ -192,3 +289,5 @@ public class SupplierCatalogController : ControllerBase
         return values;
     }
 }
+
+public sealed record ImportSummary(int Imported, int CreatedMaterials, int CreatedLinks);
