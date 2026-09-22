@@ -18,7 +18,10 @@
         <TextBlock Grid.Row="1" Text="Indirizzo dell'API a cui il client si collega. Cambialo per puntare a un server pubblicato invece che a quello locale." Foreground="{StaticResource TextSecondaryBrush}" TextWrapping="Wrap" Margin="0,8,0,16" />
 
         <TextBlock Grid.Row="2" Text="URL API" Foreground="{StaticResource TextSecondaryBrush}" FontSize="12.5" Margin="0,0,0,5" />
-        <TextBox Grid.Row="3" x:Name="ApiUrlBox" Height="34" />
+        <DockPanel Grid.Row="3">
+            <Button DockPanel.Dock="Right" Style="{StaticResource SecondaryButton}" Content="Incolla" Width="80" Height="34" Margin="10,0,0,0" Click="Paste_Click" />
+            <TextBox x:Name="ApiUrlBox" Height="34" />
+        </DockPanel>
 
         <StackPanel Grid.Row="4" VerticalAlignment="Bottom">
             <TextBlock x:Name="TestResultText" Margin="0,14,0,0" TextWrapping="Wrap" />

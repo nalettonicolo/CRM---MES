@@ -14,6 +14,7 @@ public partial class MainWindow : Window
     private readonly UpdateService _updateService = new();
     private bool _isAuthenticated;
     private Guid _currentUserId;
+    private string? _currentRole;
     private string? _refreshToken;
     private readonly DispatcherTimer _refreshTimer = new();
     private PurchaseOrderSummaryDto? _selectedOrder;
@@ -154,6 +155,21 @@ public partial class MainWindow : Window
 
     private async void SettingsButton_Click(object sender, RoutedEventArgs e)
     {
+        // The sidebar entry only appears once logged in as Admin (see CompleteLogin), so no extra check
+        // is needed there. The login-screen entry has no logged-in user yet to check a role against, so
+        // it asks for Admin credentials first instead — but only when the currently configured server is
+        // actually reachable: if it isn't, that's exactly the "fix a wrong/unreachable address" scenario
+        // this link exists for, and there is no server to verify credentials against anyway.
+        if (sender == LoginSettingsButton && LoginButton.IsEnabled)
+        {
+            var gate = new AdminGateWindow(_apiClient) { Owner = this };
+            gate.ShowDialog();
+            if (!gate.Verified)
+            {
+                return;
+            }
+        }
+
         var window = new SettingsWindow(_apiClient) { Owner = this };
         window.ShowDialog();
         if (window.SettingsChanged)
@@ -210,11 +226,13 @@ public partial class MainWindow : Window
         _apiClient.SetToken(auth.Token);
         _isAuthenticated = true;
         _currentUserId = auth.UserId;
+        _currentRole = auth.Role;
         _refreshToken = auth.RefreshToken;
         ScheduleTokenRefresh(auth.ExpiresAt);
         LoginPanel.Visibility = Visibility.Collapsed;
         DashboardPanel.Visibility = Visibility.Visible;
         ConnectionStatus.Text = $"Online: {auth.Name} ({auth.Role})";
+        SidebarSettingsButton.Visibility = auth.Role == "Admin" ? Visibility.Visible : Visibility.Collapsed;
         if (reloadMaterials)
         {
             _ = SearchMaterialsAsync();

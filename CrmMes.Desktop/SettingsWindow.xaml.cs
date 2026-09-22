@@ -17,6 +17,22 @@ public partial class SettingsWindow : Window
         ApiUrlBox.Text = ClientSettings.Load().ApiBaseUrl;
     }
 
+    private void Paste_Click(object sender, RoutedEventArgs e)
+    {
+        try
+        {
+            if (Clipboard.ContainsText())
+            {
+                ApiUrlBox.Text = Clipboard.GetText().Trim();
+                ApiUrlBox.CaretIndex = ApiUrlBox.Text.Length;
+            }
+        }
+        catch
+        {
+            // Appunti non accessibili (raro, es. bloccati da un'altra app): l'utente può comunque digitare a mano.
+        }
+    }
+
     private async void TestButton_Click(object sender, RoutedEventArgs e)
     {
         var url = ApiUrlBox.Text.Trim();
