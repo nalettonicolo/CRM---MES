@@ -499,6 +499,33 @@ public class ProcurementController : ControllerBase
             if (materials.TryGetValue(orderItem.MaterialCode, out var material))
             {
                 material.Stock += requestItem.Quantity;
+
+                // Each receive line is its own traceable lot, even across repeated partial receives of
+                // the same order line: physically they are separate deliveries. The one exception is a
+                // lot number the supplier reuses on purpose (same physical batch, split delivery): merge
+                // into the existing lot instead of tripping the (MaterialCode, LotNumber) unique index.
+                var lotNumber = string.IsNullOrWhiteSpace(requestItem.LotNumber)
+                    ? $"LOT-{DateTime.UtcNow:yyyyMMdd-HHmmss}-{Guid.NewGuid().ToString("N")[..6]}"
+                    : requestItem.LotNumber.Trim();
+                var existingLot = await _dbContext.MaterialLots.SingleOrDefaultAsync(
+                    lot => lot.MaterialCode == orderItem.MaterialCode && lot.LotNumber == lotNumber, cancellationToken);
+                if (existingLot is not null)
+                {
+                    existingLot.Quantity += requestItem.Quantity;
+                    existingLot.InitialQuantity += requestItem.Quantity;
+                }
+                else
+                {
+                    _dbContext.MaterialLots.Add(new MaterialLot
+                    {
+                        MaterialCode = orderItem.MaterialCode,
+                        LotNumber = lotNumber,
+                        Quantity = requestItem.Quantity,
+                        InitialQuantity = requestItem.Quantity,
+                        SupplierId = order.SupplierId,
+                        PurchaseOrderId = order.Id
+                    });
+                }
             }
 
             if (orderItem.MissingMaterialId.HasValue &&
@@ -653,7 +680,8 @@ public sealed record ReceivePurchaseOrderRequest(
 
 public sealed record ReceivePurchaseOrderItemRequest(
     Guid PurchaseOrderItemId,
-    decimal Quantity);
+    decimal Quantity,
+    string? LotNumber = null);
 
 public sealed record PurchaseOrderResponse(
     Guid Id,

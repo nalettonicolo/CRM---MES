@@ -115,6 +115,21 @@ public class MaterialsController : ControllerBase
         };
 
         _dbContext.Materials.Add(material);
+
+        // Opening stock becomes its own traceable lot, so the material's lot ledger starts consistent
+        // with Material.Stock from day one instead of only covering intake from this point forward.
+        if (material.Stock > 0)
+        {
+            _dbContext.MaterialLots.Add(new MaterialLot
+            {
+                MaterialCode = material.Code,
+                LotNumber = $"INIZIALE-{DateTime.UtcNow:yyyyMMdd-HHmmss}",
+                Quantity = material.Stock,
+                InitialQuantity = material.Stock,
+                Notes = "Giacenza iniziale dichiarata alla creazione del materiale."
+            });
+        }
+
         await _dbContext.SaveChangesAsync(cancellationToken);
 
         var response = new MaterialResponse(

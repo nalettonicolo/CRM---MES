@@ -1,0 +1,61 @@
+<Window x:Class="CrmMes.Desktop.MaterialLotDetailWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Lotto materiale" Height="520" Width="620"
+        WindowStartupLocation="CenterOwner" ResizeMode="CanResize" MinHeight="420" MinWidth="520"
+        Background="{StaticResource BackgroundBrush}">
+    <Grid Margin="24">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
+        <TextBlock Grid.Row="0" x:Name="TitleText" FontSize="20" FontWeight="SemiBold" Foreground="{StaticResource TextPrimaryBrush}" />
+        <TextBlock Grid.Row="1" x:Name="LoadingText" Text="Caricamento..." Foreground="{StaticResource TextSecondaryBrush}" Margin="0,10,0,0" />
+
+        <Grid Grid.Row="2" x:Name="HeaderInfo" Visibility="Collapsed" Margin="0,14,0,10">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="*" />
+            </Grid.ColumnDefinitions>
+            <StackPanel Grid.Column="0" Margin="0,0,10,0">
+                <TextBlock Text="Residuo" Foreground="{StaticResource TextSecondaryBrush}" FontSize="11.5" />
+                <TextBlock x:Name="QuantityText" FontWeight="SemiBold" Foreground="{StaticResource TextPrimaryBrush}" />
+            </StackPanel>
+            <StackPanel Grid.Column="1" Margin="0,0,10,0">
+                <TextBlock Text="Quantità iniziale" Foreground="{StaticResource TextSecondaryBrush}" FontSize="11.5" />
+                <TextBlock x:Name="InitialQuantityText" FontWeight="SemiBold" Foreground="{StaticResource TextPrimaryBrush}" />
+            </StackPanel>
+            <StackPanel Grid.Column="2">
+                <TextBlock Text="Ricevuto il" Foreground="{StaticResource TextSecondaryBrush}" FontSize="11.5" />
+                <TextBlock x:Name="ReceivedAtText" FontWeight="SemiBold" Foreground="{StaticResource TextPrimaryBrush}" />
+            </StackPanel>
+        </Grid>
+
+        <TextBlock Grid.Row="3" x:Name="NotesText" Foreground="{StaticResource TextSecondaryBrush}" TextWrapping="Wrap" Margin="0,0,0,10" />
+
+        <Border Grid.Row="4" Style="{StaticResource CardBorder}" Padding="4">
+            <StackPanel>
+                <TextBlock Text="Consumato in (tracciabilità in avanti)" FontWeight="SemiBold" Foreground="{StaticResource TextPrimaryBrush}" Margin="10,10,10,6" />
+                <ListView x:Name="UsagesList">
+                    <ListView.View>
+                        <GridView>
+                            <GridViewColumn Header="Quantità" DisplayMemberBinding="{Binding Quantity}" Width="90" />
+                            <GridViewColumn Header="Distinta di prelievo" DisplayMemberBinding="{Binding WithdrawalSlipCode}" Width="220" />
+                            <GridViewColumn Header="Consumato il" DisplayMemberBinding="{Binding ConsumedAt}" Width="150" />
+                        </GridView>
+                    </ListView.View>
+                </ListView>
+            </StackPanel>
+        </Border>
+
+        <StackPanel Grid.Row="5" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,16,0,0">
+            <Button Style="{StaticResource SecondaryButton}" Content="Chiudi" Width="100" Height="36" Click="Close_Click" />
+        </StackPanel>
+    </Grid>
+</Window>

@@ -38,6 +38,10 @@ public partial class CreateWorkOrderWindow : Window
             CustomerReferenceBox.Text = existing.CustomerReference;
             DueDatePicker.SelectedDate = existing.DueDate;
             NotesBox.Text = existing.Notes;
+
+            // The API doesn't allow changing the lot number after creation.
+            ProductLotNumberBox.Text = existing.ProductLotNumber;
+            ProductLotNumberBox.IsEnabled = false;
         }
     }
 
@@ -69,7 +73,8 @@ public partial class CreateWorkOrderWindow : Window
                     return;
                 }
 
-                await _apiClient.CreateWorkOrderAsync(product.Id, quantity, areaId, customerReference, DueDatePicker.SelectedDate, notes);
+                var lotNumber = string.IsNullOrWhiteSpace(ProductLotNumberBox.Text) ? null : ProductLotNumberBox.Text.Trim();
+                await _apiClient.CreateWorkOrderAsync(product.Id, quantity, areaId, customerReference, DueDatePicker.SelectedDate, notes, lotNumber);
             }
 
             Created = true;

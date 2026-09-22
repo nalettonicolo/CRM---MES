@@ -1,7 +1,7 @@
 <Window x:Class="CrmMes.Desktop.CreateWorkOrderWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="Nuova commessa" Height="560" Width="440"
+        Title="Nuova commessa" Height="620" Width="440"
         WindowStartupLocation="CenterOwner" ResizeMode="NoResize"
         Background="{StaticResource BackgroundBrush}">
     <StackPanel Margin="24">
@@ -37,6 +37,9 @@
 
         <TextBlock Text="Note (opzionale)" Foreground="{StaticResource TextSecondaryBrush}" FontSize="12.5" Margin="0,0,0,5" />
         <TextBox x:Name="NotesBox" Margin="0,0,0,14" />
+
+        <TextBlock Text="Numero lotto prodotto (opzionale, generato automaticamente se vuoto)" Foreground="{StaticResource TextSecondaryBrush}" FontSize="12.5" Margin="0,0,0,5" />
+        <TextBox x:Name="ProductLotNumberBox" Margin="0,0,0,14" />
 
         <TextBlock x:Name="ErrorText" Foreground="{StaticResource DangerBrush}" TextWrapping="Wrap" Margin="0,0,0,10" />
 

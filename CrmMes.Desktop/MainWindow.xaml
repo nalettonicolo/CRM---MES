@@ -130,6 +130,18 @@
                                     <TextBlock Text="Commesse" Margin="6,0,0,0" />
                                 </StackPanel>
                             </RadioButton>
+                            <RadioButton x:Name="NavMaterialLots" Style="{StaticResource NavItem}" GroupName="Nav" Tag="9" Checked="NavItem_Checked">
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock Text="&#xE8AB;" FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets" FontSize="16" Width="24" />
+                                    <TextBlock Text="Lotti materiali" Margin="6,0,0,0" />
+                                </StackPanel>
+                            </RadioButton>
+                            <RadioButton x:Name="NavDashboard" Style="{StaticResource NavItem}" GroupName="Nav" Tag="10" Checked="NavItem_Checked">
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock Text="&#xE9D9;" FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets" FontSize="16" Width="24" />
+                                    <TextBlock Text="Cruscotto" Margin="6,0,0,0" />
+                                </StackPanel>
+                            </RadioButton>
                         </StackPanel>
                     </DockPanel>
                 </Border>
@@ -462,7 +474,8 @@
                                         <ListView.View>
                                             <GridView>
                                                 <GridViewColumn Header="Codice" DisplayMemberBinding="{Binding Code}" Width="150" />
-                                                <GridViewColumn Header="Prodotto" DisplayMemberBinding="{Binding ProductName}" Width="180" />
+                                                <GridViewColumn Header="Lotto" DisplayMemberBinding="{Binding ProductLotNumber}" Width="140" />
+                                                <GridViewColumn Header="Prodotto" DisplayMemberBinding="{Binding ProductName}" Width="150" />
                                                 <GridViewColumn Header="Quantità" DisplayMemberBinding="{Binding Quantity}" Width="80" />
                                                 <GridViewColumn Header="Stato" Width="110">
                                                     <GridViewColumn.CellTemplate>
@@ -498,6 +511,77 @@
                                     <Button x:Name="ReleaseWorkOrderButton" Content="Rilascia" Width="110" Height="36" Margin="0,0,10,0" Click="ReleaseWorkOrderButton_Click" IsEnabled="False" />
                                     <Button x:Name="CancelWorkOrderButton" Style="{StaticResource DangerButton}" Content="Annulla selezionata" Width="160" Height="36" Click="CancelWorkOrderButton_Click" IsEnabled="False" />
                                 </StackPanel>
+                            </Grid>
+                        </TabItem>
+
+                        <TabItem Header="Lotti materiali">
+                            <Grid>
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto" />
+                                    <RowDefinition Height="*" />
+                                    <RowDefinition Height="Auto" />
+                                </Grid.RowDefinitions>
+                                <DockPanel Grid.Row="0" Margin="0,0,0,14">
+                                    <Button DockPanel.Dock="Right" Content="Nuovo lotto" Width="130" Height="36" Click="NewMaterialLotButton_Click" />
+                                    <Button DockPanel.Dock="Right" Style="{StaticResource SecondaryButton}" Content="Aggiorna" Width="100" Height="36" Margin="0,0,10,0" Click="RefreshMaterialLotsButton_Click" />
+                                    <TextBlock Text="Lotti materiali: tracciabilità delle giacenze in ingresso" VerticalAlignment="Center" Foreground="{StaticResource TextSecondaryBrush}" />
+                                </DockPanel>
+                                <Border Grid.Row="1" Style="{StaticResource CardBorder}" Padding="4">
+                                    <ListView x:Name="MaterialLotsList" SelectionChanged="MaterialLotsList_SelectionChanged" MouseDoubleClick="MaterialLotsList_MouseDoubleClick">
+                                        <ListView.View>
+                                            <GridView>
+                                                <GridViewColumn Header="Materiale" DisplayMemberBinding="{Binding MaterialCode}" Width="160" />
+                                                <GridViewColumn Header="Lotto" DisplayMemberBinding="{Binding LotNumber}" Width="200" />
+                                                <GridViewColumn Header="Residuo" DisplayMemberBinding="{Binding Quantity}" Width="90" />
+                                                <GridViewColumn Header="Quantità iniziale" DisplayMemberBinding="{Binding InitialQuantity}" Width="120" />
+                                                <GridViewColumn Header="Ricevuto il" DisplayMemberBinding="{Binding ReceivedAt}" Width="150" />
+                                            </GridView>
+                                        </ListView.View>
+                                    </ListView>
+                                </Border>
+                                <StackPanel Grid.Row="2" Orientation="Horizontal" Margin="0,14,0,0">
+                                    <Button x:Name="OpenMaterialLotButton" Style="{StaticResource SecondaryButton}" Content="Apri (tracciabilità)" Width="160" Height="36" Click="OpenMaterialLotButton_Click" IsEnabled="False" />
+                                </StackPanel>
+                            </Grid>
+                        </TabItem>
+
+                        <TabItem Header="Cruscotto">
+                            <Grid>
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto" />
+                                    <RowDefinition Height="*" />
+                                </Grid.RowDefinitions>
+                                <DockPanel Grid.Row="0" Margin="0,0,0,14">
+                                    <Button DockPanel.Dock="Right" Style="{StaticResource SecondaryButton}" Content="Aggiorna" Width="100" Height="36" Click="RefreshDashboardButton_Click" />
+                                    <TextBlock Text="Avanzamento produzione negli ultimi 7 giorni" VerticalAlignment="Center" Foreground="{StaticResource TextSecondaryBrush}" />
+                                </DockPanel>
+                                <Border Grid.Row="1" Style="{StaticResource CardBorder}" Padding="20">
+                                    <StackPanel x:Name="DashboardPanelContent">
+                                        <TextBlock x:Name="DashboardStatusText" Text="Commesse per stato" FontWeight="SemiBold" Foreground="{StaticResource TextPrimaryBrush}" Margin="0,0,0,10" />
+                                        <ItemsControl x:Name="DashboardStatusList" Margin="0,0,0,20">
+                                            <ItemsControl.ItemTemplate>
+                                                <DataTemplate>
+                                                    <TextBlock Foreground="{StaticResource TextSecondaryBrush}" Margin="0,0,0,4">
+                                                        <TextBlock.Text>
+                                                            <MultiBinding StringFormat="{}{0}: {1}">
+                                                                <Binding Path="Key" />
+                                                                <Binding Path="Value" />
+                                                            </MultiBinding>
+                                                        </TextBlock.Text>
+                                                    </TextBlock>
+                                                </DataTemplate>
+                                            </ItemsControl.ItemTemplate>
+                                        </ItemsControl>
+                                        <TextBlock Text="Fasi completate nel periodo" Foreground="{StaticResource TextSecondaryBrush}" FontSize="11.5" />
+                                        <TextBlock x:Name="OperationsCompletedText" FontSize="20" FontWeight="SemiBold" Foreground="{StaticResource TextPrimaryBrush}" Margin="0,0,0,16" />
+                                        <TextBlock Text="Performance media (stimato/effettivo)" Foreground="{StaticResource TextSecondaryBrush}" FontSize="11.5" />
+                                        <TextBlock x:Name="AveragePerformanceText" FontSize="20" FontWeight="SemiBold" Foreground="{StaticResource TextPrimaryBrush}" Margin="0,0,0,16" />
+                                        <TextBlock Text="Commesse completate nel periodo" Foreground="{StaticResource TextSecondaryBrush}" FontSize="11.5" />
+                                        <TextBlock x:Name="WorkOrdersCompletedText" FontSize="20" FontWeight="SemiBold" Foreground="{StaticResource TextPrimaryBrush}" Margin="0,0,0,16" />
+                                        <TextBlock Text="Percentuale consegne puntuali" Foreground="{StaticResource TextSecondaryBrush}" FontSize="11.5" />
+                                        <TextBlock x:Name="OnTimeRateText" FontSize="20" FontWeight="SemiBold" Foreground="{StaticResource TextPrimaryBrush}" />
+                                    </StackPanel>
+                                </Border>
                             </Grid>
                         </TabItem>
 

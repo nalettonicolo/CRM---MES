@@ -20,6 +20,7 @@ public partial class MainWindow : Window
     private WithdrawalSlipSummaryDto? _selectedSlip;
     private ProductSummaryDto? _selectedProduct;
     private WorkOrderSummaryDto? _selectedWorkOrder;
+    private MaterialLotSummaryDto? _selectedMaterialLot;
 
     private bool _lowStockLoaded;
     private bool _missingLoaded;
@@ -29,6 +30,8 @@ public partial class MainWindow : Window
     private bool _usersLoaded;
     private bool _productsLoaded;
     private bool _workOrdersLoaded;
+    private bool _materialLotsLoaded;
+    private bool _dashboardLoaded;
 
     private static readonly Dictionary<int, string> PageTitles = new()
     {
@@ -41,6 +44,8 @@ public partial class MainWindow : Window
         [6] = "Utenti",
         [7] = "Prodotti",
         [8] = "Commesse",
+        [9] = "Lotti materiali",
+        [10] = "Cruscotto",
     };
 
     // TEMPORANEO: login disabilitato su richiesta per velocizzare i test.
@@ -226,6 +231,12 @@ public partial class MainWindow : Window
                 break;
             case "Commesse" when !_workOrdersLoaded:
                 await LoadWorkOrdersAsync();
+                break;
+            case "Lotti materiali" when !_materialLotsLoaded:
+                await LoadMaterialLotsAsync();
+                break;
+            case "Cruscotto" when !_dashboardLoaded:
+                await LoadDashboardAsync();
                 break;
         }
     }
@@ -532,6 +543,41 @@ public partial class MainWindow : Window
             await LoadWorkOrdersAsync();
         });
     }
+
+    private async void NewMaterialLotButton_Click(object sender, RoutedEventArgs e)
+    {
+        var dialog = new CreateMaterialLotWindow(_apiClient) { Owner = this };
+        if (dialog.ShowDialog() == true && dialog.Created)
+        {
+            await LoadMaterialLotsAsync();
+        }
+    }
+
+    private void MaterialLotsList_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        _selectedMaterialLot = MaterialLotsList.SelectedItem as MaterialLotSummaryDto;
+        OpenMaterialLotButton.IsEnabled = _selectedMaterialLot is not null;
+    }
+
+    private void MaterialLotsList_MouseDoubleClick(object sender, MouseButtonEventArgs e)
+    {
+        if (MaterialLotsList.SelectedItem is MaterialLotSummaryDto lot)
+        {
+            new MaterialLotDetailWindow(_apiClient, lot.Id) { Owner = this }.ShowDialog();
+        }
+    }
+
+    private void OpenMaterialLotButton_Click(object sender, RoutedEventArgs e)
+    {
+        if (_selectedMaterialLot is not null)
+        {
+            new MaterialLotDetailWindow(_apiClient, _selectedMaterialLot.Id) { Owner = this }.ShowDialog();
+        }
+    }
+
+    private async void RefreshMaterialLotsButton_Click(object sender, RoutedEventArgs e) => await LoadMaterialLotsAsync();
+
+    private async void RefreshDashboardButton_Click(object sender, RoutedEventArgs e) => await LoadDashboardAsync();
 
     private void WithdrawalSlipsList_SelectionChanged(object sender, SelectionChangedEventArgs e)
     {
@@ -890,5 +936,29 @@ public partial class MainWindow : Window
         EditWorkOrderButton.IsEnabled = false;
         ReleaseWorkOrderButton.IsEnabled = false;
         CancelWorkOrderButton.IsEnabled = false;
+    });
+
+    private Task LoadMaterialLotsAsync() => RunBusyAsync(string.Empty, async () =>
+    {
+        MaterialLotsList.ItemsSource = await _apiClient.GetMaterialLotsAsync();
+        _materialLotsLoaded = true;
+        _selectedMaterialLot = null;
+        OpenMaterialLotButton.IsEnabled = false;
+    });
+
+    private Task LoadDashboardAsync() => RunBusyAsync(string.Empty, async () =>
+    {
+        var dashboard = await _apiClient.GetWorkOrderDashboardAsync();
+        _dashboardLoaded = true;
+
+        DashboardStatusList.ItemsSource = dashboard.WorkOrdersByStatus;
+        OperationsCompletedText.Text = dashboard.OperationsCompletedInPeriod.ToString();
+        AveragePerformanceText.Text = dashboard.AveragePerformanceRatio.HasValue
+            ? dashboard.AveragePerformanceRatio.Value.ToString("P0")
+            : "-";
+        WorkOrdersCompletedText.Text = dashboard.WorkOrdersCompletedInPeriod.ToString();
+        OnTimeRateText.Text = dashboard.OnTimeCompletionRate.HasValue
+            ? dashboard.OnTimeCompletionRate.Value.ToString("P0")
+            : "-";
     });
 }

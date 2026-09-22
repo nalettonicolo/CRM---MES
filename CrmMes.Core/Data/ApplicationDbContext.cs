@@ -26,6 +26,8 @@ public class ApplicationDbContext : DbContext
     public DbSet<RoutingStep> RoutingSteps => Set<RoutingStep>();
     public DbSet<WorkOrder> WorkOrders => Set<WorkOrder>();
     public DbSet<WorkOrderOperation> WorkOrderOperations => Set<WorkOrderOperation>();
+    public DbSet<MaterialLot> MaterialLots => Set<MaterialLot>();
+    public DbSet<MaterialLotConsumption> MaterialLotConsumptions => Set<MaterialLotConsumption>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -165,6 +167,7 @@ public class ApplicationDbContext : DbContext
             entity.Property(w => w.CustomerReference).HasMaxLength(250);
             entity.Property(w => w.Status).HasMaxLength(50);
             entity.Property(w => w.Notes).HasMaxLength(1000);
+            entity.Property(w => w.ProductLotNumber).HasMaxLength(120);
             entity.HasIndex(w => w.Code).IsUnique();
             entity.HasOne(w => w.Product)
                 .WithMany()
@@ -185,6 +188,34 @@ public class ApplicationDbContext : DbContext
             entity.HasOne(o => o.WorkOrder)
                 .WithMany(w => w.Operations)
                 .HasForeignKey(o => o.WorkOrderId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<MaterialLot>(entity =>
+        {
+            entity.Property(l => l.MaterialCode).HasMaxLength(120);
+            entity.Property(l => l.LotNumber).HasMaxLength(120);
+            entity.Property(l => l.Notes).HasMaxLength(500);
+            entity.HasIndex(l => new { l.MaterialCode, l.LotNumber }).IsUnique();
+            entity.HasOne(l => l.Supplier)
+                .WithMany()
+                .HasForeignKey(l => l.SupplierId)
+                .OnDelete(DeleteBehavior.SetNull);
+            entity.HasOne(l => l.PurchaseOrder)
+                .WithMany()
+                .HasForeignKey(l => l.PurchaseOrderId)
+                .OnDelete(DeleteBehavior.SetNull);
+        });
+
+        modelBuilder.Entity<MaterialLotConsumption>(entity =>
+        {
+            entity.HasOne(c => c.MaterialLot)
+                .WithMany(l => l.Consumptions)
+                .HasForeignKey(c => c.MaterialLotId)
+                .OnDelete(DeleteBehavior.Cascade);
+            entity.HasOne(c => c.WithdrawalItem)
+                .WithMany()
+                .HasForeignKey(c => c.WithdrawalItemId)
                 .OnDelete(DeleteBehavior.Cascade);
         });
 

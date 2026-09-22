@@ -430,9 +430,9 @@ public sealed class ApiClient
 
     public async Task CreateWorkOrderAsync(
         Guid productId, decimal quantity, Guid? areaId, string? customerReference, DateTime? dueDate, string? notes,
-        CancellationToken cancellationToken = default)
+        string? productLotNumber = null, CancellationToken cancellationToken = default)
     {
-        var payload = new { productId, quantity, code = (string?)null, areaId, customerReference, dueDate, notes };
+        var payload = new { productId, quantity, code = (string?)null, areaId, customerReference, dueDate, notes, productLotNumber };
         using var response = await _httpClient.PostAsJsonAsync("api/work-orders", payload, cancellationToken);
         await EnsureSuccessAsync(response, cancellationToken);
     }
@@ -446,10 +446,87 @@ public sealed class ApiClient
         await EnsureSuccessAsync(response, cancellationToken);
     }
 
-    public async Task ReleaseWorkOrderAsync(Guid id, CancellationToken cancellationToken = default)
+    /// <summary>Releases a work order. If material availability is short and <paramref name="force"/>
+    /// is false, throws <see cref="MaterialShortfallException"/> instead of the generic error so the
+    /// caller can show the shortfall and offer to retry with force=true.</summary>
+    public async Task ReleaseWorkOrderAsync(Guid id, bool force = false, CancellationToken cancellationToken = default)
     {
-        using var response = await _httpClient.PostAsync($"api/work-orders/{id}/release", null, cancellationToken);
+        using var response = await _httpClient.PostAsync($"api/work-orders/{id}/release?force={force}", null, cancellationToken);
+        if (!force && response.StatusCode == HttpStatusCode.Conflict)
+        {
+            var body = await response.Content.ReadAsStringAsync(cancellationToken);
+            var availability = TryExtractAvailability(body);
+            if (availability is not null)
+            {
+                throw new MaterialShortfallException(availability);
+            }
+        }
+
         await EnsureSuccessAsync(response, cancellationToken);
+    }
+
+    public async Task<MaterialAvailabilityDto> CheckMaterialAvailabilityAsync(Guid workOrderId, CancellationToken cancellationToken = default)
+    {
+        using var response = await _httpClient.GetAsync($"api/work-orders/{workOrderId}/material-check", cancellationToken);
+        await EnsureSuccessAsync(response, cancellationToken);
+        return await response.Content.ReadFromJsonAsync<MaterialAvailabilityDto>(cancellationToken: cancellationToken)
+            ?? throw new InvalidOperationException("Risposta di verifica materiali non valida.");
+    }
+
+    public Task<IReadOnlyList<WorkOrderMaterialLotDto>> GetWorkOrderMaterialLotsAsync(Guid workOrderId, CancellationToken cancellationToken = default)
+        => GetAsync<WorkOrderMaterialLotDto>($"api/work-orders/{workOrderId}/material-lots", cancellationToken);
+
+    public async Task<WorkOrderDashboardDto> GetWorkOrderDashboardAsync(int days = 7, CancellationToken cancellationToken = default)
+    {
+        using var response = await _httpClient.GetAsync($"api/work-orders/dashboard?days={days}", cancellationToken);
+        await EnsureSuccessAsync(response, cancellationToken);
+        return await response.Content.ReadFromJsonAsync<WorkOrderDashboardDto>(cancellationToken: cancellationToken)
+            ?? throw new InvalidOperationException("Risposta cruscotto non valida.");
+    }
+
+    public Task<IReadOnlyList<MaterialLotSummaryDto>> GetMaterialLotsAsync(string? materialCode = null, bool onlyWithStock = false, CancellationToken cancellationToken = default)
+    {
+        var query = $"api/material-lots?onlyWithStock={onlyWithStock}";
+        if (!string.IsNullOrWhiteSpace(materialCode))
+        {
+            query += $"&materialCode={Uri.EscapeDataString(materialCode)}";
+        }
+
+        return GetAsync<MaterialLotSummaryDto>(query, cancellationToken);
+    }
+
+    public async Task<MaterialLotDetailDto> GetMaterialLotAsync(Guid id, CancellationToken cancellationToken = default)
+    {
+        using var response = await _httpClient.GetAsync($"api/material-lots/{id}", cancellationToken);
+        await EnsureSuccessAsync(response, cancellationToken);
+        return await response.Content.ReadFromJsonAsync<MaterialLotDetailDto>(cancellationToken: cancellationToken)
+            ?? throw new InvalidOperationException("Risposta lotto non valida.");
+    }
+
+    public async Task CreateMaterialLotAsync(string materialCode, string lotNumber, decimal quantity, string? notes, CancellationToken cancellationToken = default)
+    {
+        using var response = await _httpClient.PostAsJsonAsync(
+            "api/material-lots", new { materialCode, lotNumber, quantity, notes }, cancellationToken);
+        await EnsureSuccessAsync(response, cancellationToken);
+    }
+
+    private static MaterialAvailabilityDto? TryExtractAvailability(string body)
+    {
+        try
+        {
+            using var document = JsonDocument.Parse(body);
+            if (!document.RootElement.TryGetProperty("availability", out var availabilityElement))
+            {
+                return null;
+            }
+
+            return availabilityElement.Deserialize<MaterialAvailabilityDto>(
+                new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+        }
+        catch (JsonException)
+        {
+            return null;
+        }
     }
 
     public async Task CancelWorkOrderAsync(Guid id, CancellationToken cancellationToken = default)
@@ -650,6 +727,7 @@ public sealed record RoutingStepDto(Guid Id, int SequenceNumber, string Name, st
 public sealed record WorkOrderSummaryDto(
     Guid Id,
     string Code,
+    string ProductLotNumber,
     Guid ProductId,
     string ProductCode,
     string ProductName,
@@ -663,6 +741,7 @@ public sealed record WorkOrderSummaryDto(
 public sealed record WorkOrderDetailDto(
     Guid Id,
     string Code,
+    string ProductLotNumber,
     Guid ProductId,
     decimal Quantity,
     Guid? AreaId,
@@ -684,6 +763,64 @@ public sealed record WorkOrderOperationDto(
     decimal EstimatedMinutes,
     string Status,
     DateTime? StartedAt,
-    DateTime? CompletedAt);
+    DateTime? CompletedAt,
+    decimal? ActualMinutes,
+    decimal? PerformanceRatio);
 
 public sealed record WorkOrderWithdrawalSlipDto(Guid WithdrawalSlipId, string WithdrawalSlipCode);
+
+public sealed record MaterialAvailabilityLineDto(string MaterialCode, decimal Required, decimal Available, decimal Shortfall);
+
+public sealed record MaterialAvailabilityDto(bool IsAvailable, List<MaterialAvailabilityLineDto> Lines);
+
+public sealed class MaterialShortfallException(MaterialAvailabilityDto availability)
+    : Exception("Materiali insufficienti per questa commessa.")
+{
+    public MaterialAvailabilityDto Availability { get; } = availability;
+}
+
+public sealed record WorkOrderMaterialLotDto(
+    Guid MaterialLotId,
+    string MaterialCode,
+    string LotNumber,
+    decimal QuantityConsumed,
+    Guid WithdrawalSlipId,
+    string WithdrawalSlipCode);
+
+public sealed record WorkOrderDashboardDto(
+    int PeriodDays,
+    Dictionary<string, int> WorkOrdersByStatus,
+    int OperationsCompletedInPeriod,
+    decimal? AveragePerformanceRatio,
+    int WorkOrdersCompletedInPeriod,
+    decimal? OnTimeCompletionRate);
+
+public sealed record MaterialLotSummaryDto(
+    Guid Id,
+    string MaterialCode,
+    string LotNumber,
+    decimal Quantity,
+    decimal InitialQuantity,
+    Guid? SupplierId,
+    Guid? PurchaseOrderId,
+    DateTime ReceivedAt);
+
+public sealed record MaterialLotDetailDto(
+    Guid Id,
+    string MaterialCode,
+    string LotNumber,
+    decimal Quantity,
+    decimal InitialQuantity,
+    Guid? SupplierId,
+    Guid? PurchaseOrderId,
+    DateTime ReceivedAt,
+    string? Notes,
+    List<MaterialLotUsageDto> Usages);
+
+public sealed record MaterialLotUsageDto(
+    Guid ConsumptionId,
+    decimal Quantity,
+    DateTime ConsumedAt,
+    Guid WithdrawalSlipId,
+    string WithdrawalSlipCode,
+    Guid? WorkOrderId);

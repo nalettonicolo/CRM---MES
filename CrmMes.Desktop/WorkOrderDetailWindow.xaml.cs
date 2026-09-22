@@ -30,6 +30,7 @@ public partial class WorkOrderDetailWindow : Window
             var order = await _apiClient.GetWorkOrderAsync(_workOrderId);
 
             CodeText.Text = order.Code;
+            LotNumberText.Text = $"Lotto {order.ProductLotNumber}";
             StatusText.Text = order.Status;
             StatusPill.Background = (System.Windows.Media.Brush)StatusBrush.Convert(order.Status, typeof(System.Windows.Media.Brush), null, System.Globalization.CultureInfo.CurrentCulture)!;
             StatusText.Foreground = (System.Windows.Media.Brush)StatusBrush.Convert(order.Status, typeof(System.Windows.Media.Brush), "Foreground", System.Globalization.CultureInfo.CurrentCulture)!;
@@ -92,9 +93,55 @@ public partial class WorkOrderDetailWindow : Window
             await _apiClient.ReleaseWorkOrderAsync(_workOrderId);
             await ReloadAsync();
         }
+        catch (MaterialShortfallException shortfall)
+        {
+            var lines = string.Join("\n", shortfall.Availability.Lines
+                .Where(line => line.Shortfall > 0)
+                .Select(line => $"- {line.MaterialCode}: richiesti {line.Required}, disponibili {line.Available} (mancano {line.Shortfall})"));
+
+            var proceed = MessageBox.Show(
+                $"Materiali insufficienti per questa commessa:\n{lines}\n\nRilasciare comunque?",
+                "Materiali insufficienti", MessageBoxButton.YesNo, MessageBoxImage.Warning);
+            if (proceed != MessageBoxResult.Yes)
+            {
+                return;
+            }
+
+            try
+            {
+                await _apiClient.ReleaseWorkOrderAsync(_workOrderId, force: true);
+                await ReloadAsync();
+            }
+            catch (Exception exception)
+            {
+                ErrorText.Text = exception.Message;
+            }
+        }
         catch (Exception exception)
         {
             ErrorText.Text = exception.Message;
+        }
+    }
+
+    private async void Traceability_Click(object sender, RoutedEventArgs e)
+    {
+        try
+        {
+            var lots = await _apiClient.GetWorkOrderMaterialLotsAsync(_workOrderId);
+            if (lots.Count == 0)
+            {
+                MessageBox.Show(
+                    "Nessun lotto materiale ancora consumato da questa commessa (la distinta di prelievo generata dalla commessa deve essere chiusa perché lo scarico, e quindi il consumo dei lotti, avvenga).",
+                    "Tracciabilità materiali", MessageBoxButton.OK, MessageBoxImage.Information);
+                return;
+            }
+
+            var lines = lots.Select(lot => $"- {lot.MaterialCode} · lotto {lot.LotNumber}: {lot.QuantityConsumed} (distinta {lot.WithdrawalSlipCode})");
+            MessageBox.Show(string.Join("\n", lines), "Lotti materiali consumati", MessageBoxButton.OK, MessageBoxImage.Information);
+        }
+        catch (Exception exception)
+        {
+            MessageBox.Show(exception.Message, "Errore", MessageBoxButton.OK, MessageBoxImage.Warning);
         }
     }
 

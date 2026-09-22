@@ -34,7 +34,7 @@ flowchart LR
 - HSTS attivo fuori da Development.
 - Logging delle richieste HTTP (`UseHttpLogging`, metodo/percorso/stato/durata).
 - Compressione delle risposte (gzip) abilitata.
-- `CrmMes.Api.Tests`: 55 test di integrazione (xUnit + `WebApplicationFactory` + Sqlite in-memory, non toccano mai Neon) che coprono autenticazione, refresh token, bootstrap Admin, policy di autorizzazione per ruolo, ciclo distinte di prelievo (incluse le modifiche), sottoscorte, ciclo ordini fornitore (incluse le modifiche), import catalogo CSV/Excel, prodotti/distinta base/ciclo di lavoro e commesse. Eseguibili con `dotnet test CrmMes.Api.Tests`.
+- `CrmMes.Api.Tests`: 71 test di integrazione (xUnit + `WebApplicationFactory` + Sqlite in-memory, non toccano mai Neon) che coprono autenticazione, refresh token, bootstrap Admin, policy di autorizzazione per ruolo, ciclo distinte di prelievo (incluse le modifiche), sottoscorte, ciclo ordini fornitore (incluse le modifiche), import catalogo CSV/Excel, prodotti/distinta base/ciclo di lavoro, commesse, tracciabilità lotti materiali e verifica disponibilità/performance. Eseguibili con `dotnet test CrmMes.Api.Tests`.
 - Workflow GitHub Actions (`.github/workflows/build.yml`): build + test automatici su push/PR verso `main`.
 - Refresh token: login/registrazione restituiscono un access token di 30 minuti + un refresh token di 30 giorni (rotazione ad ogni uso, revoca su logout). Endpoint `POST /api/auth/refresh` e `POST /api/auth/logout`. Il client desktop rinnova automaticamente in background prima della scadenza.
 - Import catalogo Excel (`POST /api/supplier-catalog/import-excel`, libreria ClosedXML, MIT): stessa logica di upsert del CSV, condivisa tramite un metodo comune.
@@ -58,6 +58,9 @@ flowchart LR
 - **Ciclo di lavoro** (`RoutingStep`): fasi ordinate (numero sequenza, nome, descrizione, centro di lavoro testo libero, minuti stimati) collegate a un prodotto — il campo "centro di lavoro" è testo libero apposta per restare neutro rispetto al settore.
 - **Commesse** (`WorkOrder`): job di produzione (codice, prodotto, quantità, area opzionale, riferimento cliente, stato Draft/Released/InProgress/Completed/Cancelled, scadenza, note, timestamp di rilascio/completamento).
 - **Fasi di commessa** (`WorkOrderOperation`): scatto fotografico del ciclo di lavoro del prodotto preso al momento della creazione della commessa, così che modifiche successive al ciclo del prodotto non alterino retroattivamente commesse già in corso; ogni fase ha un proprio stato Pending/InProgress/Done con timestamp di avvio/completamento.
+- **Lotto prodotto** (`WorkOrder.ProductLotNumber`): identificativo di lotto/matricola dei beni finiti prodotti da una commessa (generato automaticamente se non specificato), il lato "prodotto finito" della tracciabilità.
+- **Lotti materiale** (`MaterialLot`): batch tracciabili di un materiale così come sono entrati in giacenza (ricezione ordine fornitore, giacenza iniziale dichiarata alla creazione del materiale, o carico manuale); tengono quantità residua e quantità iniziale, e il collegamento a fornitore/ordine d'acquisto quando noto.
+- **Consumo lotti** (`MaterialLotConsumption`): collegamento tra una riga di distinta di prelievo e i lotti da cui è stata effettivamente prelevata (FIFO, dal lotto più vecchio), il lato "materiale in ingresso" della tracciabilità — insieme a `ProductLotNumber` permette la genealogia in entrambe le direzioni (da un lotto materiale a cosa è stato costruito, da una commessa a quali lotti materiale ha consumato).
 
 ### API gia disponibili
 
@@ -90,7 +93,7 @@ flowchart LR
 - `GET /api/procurement/purchase-orders/{id}`
 - `PUT /api/procurement/purchase-orders/{id}`: modifica fornitore e righe, solo per ordini in bozza; riapre i materiali mancanti scollegati e ricollega quelli ancora referenziati
 - `POST /api/procurement/purchase-orders/{id}/confirm`: passaggio Draft -> Confirmed
-- `POST /api/procurement/purchase-orders/{id}/receive`: ricezione merce (anche parziale), scarico automatico del materiale mancante collegato e carico stock transazionale
+- `POST /api/procurement/purchase-orders/{id}/receive`: ricezione merce (anche parziale), scarico automatico del materiale mancante collegato e carico stock transazionale; ogni riga ricevuta genera anche un lotto materiale tracciabile (numero lotto opzionale, auto-generato se non indicato)
 - `POST /api/procurement/purchase-orders/{id}/cancel`: annullamento ordine, riapertura dei materiali mancanti collegati
 - `GET /api/supplier-catalog/search?q=...`
 - `POST /api/supplier-catalog/import-csv`
@@ -104,14 +107,20 @@ flowchart LR
 - `PUT /api/products/{id}/routing`: sostituisce l'intero ciclo di lavoro (assegna automaticamente il numero di sequenza in base all'ordine ricevuto)
 - `GET /api/work-orders?status=`
 - `GET /api/work-orders/{id}`
-- `POST /api/work-orders`: crea la commessa e scatta una fotografia del ciclo di lavoro del prodotto come fasi della commessa
+- `POST /api/work-orders`: crea la commessa, assegna un numero di lotto prodotto (auto-generato se non specificato) e scatta una fotografia del ciclo di lavoro del prodotto come fasi della commessa
 - `PUT /api/work-orders/{id}`: modifica quantità/area/riferimento/scadenza/note, solo per commesse in bozza
-- `POST /api/work-orders/{id}/release`: Draft -> Released
+- `GET /api/work-orders/{id}/material-check`: confronta la distinta base (scalata per la quantità di commessa) con la giacenza attuale, riga per riga; non blocca nulla, serve per avvisare prima del rilascio
+- `POST /api/work-orders/{id}/release?force=`: Draft -> Released; se la verifica materiali segnala una carenza, risponde 409 con il dettaglio a meno che `force=true`, nel qual caso rilascia comunque e lo registra nell'audit log
 - `POST /api/work-orders/{id}/cancel`: bloccato se già completata o annullata
 - `POST /api/work-orders/{id}/complete`: richiede tutte le fasi completate
 - `POST /api/work-orders/{id}/operations/{operationId}/start`: qualsiasi utente autenticato (operatore di reparto); alla prima fase avviata la commessa passa automaticamente a InProgress
-- `POST /api/work-orders/{id}/operations/{operationId}/complete`: qualsiasi utente autenticato
+- `POST /api/work-orders/{id}/operations/{operationId}/complete`: qualsiasi utente autenticato; la risposta include per ogni fase i minuti effettivi e il rapporto stimato/effettivo (performance) una volta completata
 - `POST /api/work-orders/{id}/generate-withdrawal-slip`: genera una distinta di prelievo dalla distinta base del prodotto, con quantità moltiplicate per la quantità di commessa; richiede un'area assegnata alla commessa
+- `GET /api/work-orders/{id}/material-lots`: tracciabilità all'indietro — tutti i lotti materiale consumati dalle distinte di prelievo generate da questa commessa
+- `GET /api/work-orders/dashboard?days=`: KPI aggregati sul periodo indicato (default 7 giorni) — commesse per stato, fasi completate, performance media stimato/effettivo, commesse completate, percentuale di consegne puntuali; primo passo verso una vista OEE, non ancora OEE completo (manca il tracciamento di fermi macchina e scarti/qualità)
+- `GET /api/material-lots?materialCode=&onlyWithStock=`
+- `GET /api/material-lots/{id}`: dettaglio lotto con la tracciabilità in avanti (quali distinte/commesse lo hanno consumato)
+- `POST /api/material-lots`: carico manuale di un lotto (correzioni, campioni, sotto-assemblati interni), aumenta la giacenza del materiale come farebbe una ricezione ordine
 
 ### Flusso verificato su Neon
 
@@ -186,6 +195,7 @@ Il prototipo è utile come riferimento funzionale, ma non deve essere usato come
 - Importazione distinta da file, stampe ed esportazione PDF/Excel delle liste: ancora da fare.
 - Configurazione URL API e gestione offline/connessione assente: ancora da fare (URL API fisso su localhost).
 - Prodotti (distinta base e ciclo di lavoro) e Commesse: schede da UI implementate. Prodotti: creazione, modifica nome/descrizione, disattivazione, editor a righe dinamiche per distinta base e ciclo di lavoro (`ProductDetailWindow`, sostituisce l'intera distinta/ciclo ad ogni salvataggio, coerente con l'endpoint "replace all" lato API). Commesse: creazione, modifica (solo in bozza), rilascio, annullamento da elenco; dettaglio commessa (`WorkOrderDetailWindow`) con avvio/completamento di ogni fase, completamento dell'intera commessa e generazione della distinta di prelievo dalla distinta base. Verificato end-to-end contro l'API reale (non solo i test): creazione prodotto, distinta base, ciclo di lavoro, commessa, rilascio, avanzamento fasi, completamento, generazione distinta con quantità scalate correttamente, e blocco della generazione su commessa completata.
+- Lotti materiali e cruscotto: schede da UI implementate. "Lotti materiali": elenco, carico manuale (`CreateMaterialLotWindow`), dettaglio con tracciabilità in avanti (`MaterialLotDetailWindow`, mostra quali distinte hanno consumato il lotto). "Cruscotto": KPI del periodo (commesse per stato, fasi completate, performance media, consegne puntuali). Nel dettaglio commessa: numero di lotto prodotto in intestazione, colonne minuti effettivi/performance per fase, pulsante "Tracciabilità materiali" (lotti consumati dalla commessa), e al rilascio con materiali insufficienti una finestra di conferma per procedere comunque (`force=true` lato API).
 
 ### Priorita 4: produzione
 
@@ -215,10 +225,10 @@ Il prototipo è utile come riferimento funzionale, ma non deve essere usato come
 | Cataloghi fornitori | CSV ed Excel operativi, ricerca operativa | Manca import PDF e connettori ufficiali Schneider/Pizzato |
 | Import documenti | Nel prototipo Node | Da portare nel backend reale |
 | Autenticazione | JWT, policy, bootstrap Admin e refresh token operativi | Nessuna lacuna nota |
-| Client Windows | Dashboard a schede con creazione/modifica/gestione per materiali, distinte, ordini fornitore, fornitori, aree, utenti, prodotti, commesse, import catalogo Excel | Mancano import distinta da file, stampe/export, gestione offline |
+| Client Windows | Dashboard a schede con creazione/modifica/gestione per materiali, distinte, ordini fornitore, fornitori, aree, utenti, prodotti, commesse, lotti materiali, cruscotto, import catalogo Excel | Mancano import distinta da file, stampe/export, gestione offline |
 | Auto-update | Implementato | Richiede release GitHub con asset previsto |
-| Nucleo produzione (MES) | Backend e client operativi: prodotti, distinta base, ciclo di lavoro, commesse con fasi tracciate, generazione distinta di prelievo da commessa; verificato end-to-end contro l'API reale su Neon | Manca tracciabilità lotti/matricole, centri di lavoro con capacità/pianificazione, qualità/NCM, OEE |
-| Test automatici | 55 test di integrazione API (xUnit, Sqlite in-memory) | Manca copertura sul client WPF |
+| Nucleo produzione (MES) | Backend e client operativi: prodotti, distinta base, ciclo di lavoro, commesse con fasi tracciate, generazione distinta di prelievo da commessa, tracciabilità lotti materiali (FIFO, genealogia in entrambe le direzioni), verifica disponibilità materiali con rilascio forzabile, performance per fase e cruscotto KPI; verificato end-to-end contro l'API reale su Neon | Manca tracciabilità a livello di singola matricola (solo lotto per l'intera commessa), centri di lavoro con capacità/pianificazione, qualità/NCM, OEE completo (servono fermi macchina e scarti/qualità, il cruscotto attuale copre solo la componente Performance) |
+| Test automatici | 71 test di integrazione API (xUnit, Sqlite in-memory) | Manca copertura sul client WPF |
 | CI | Build + test su GitHub Actions ad ogni push/PR | Manca deploy automatico |
 | Deploy produzione | Mancante | API attualmente locale; richiede una decisione su hosting/dominio |
 
@@ -229,4 +239,4 @@ Il prototipo è utile come riferimento funzionale, ma non deve essere usato come
 3. Valutare l'import PDF con un esempio reale di catalogo fornitore, per definire un formato di riferimento prima di implementarlo.
 4. Aggiungere test automatici anche sul client WPF, e più copertura sui casi limite dell'API (es. concorrenza su chiusura distinta/ricezione ordine).
 5. Importazione distinta da file esterno, stampe ed esportazione PDF/Excel dal client, gestione offline.
-6. Funzionalità MES avanzate non ancora iniziate (rimandate quando scelto il punto di partenza "Commessa + Distinta Base + Ciclo di lavoro"): tracciabilità lotti/matricole, centri di lavoro con capacità/pianificazione, modulo qualità/NCM, dashboard OEE/KPI, rilevazione manodopera oltre ai timestamp di inizio/fine fase.
+6. Funzionalità MES ancora fuori scope: centri di lavoro con vera capacità/pianificazione (oggi solo testo libero), modulo qualità/NCM, OEE completo (servono fermi macchina con causali e scarti/qualità — il cruscotto attuale copre solo Performance), tracciabilità a livello di singola matricola oltre al lotto di commessa, rilevazione manodopera oltre ai timestamp di inizio/fine fase.

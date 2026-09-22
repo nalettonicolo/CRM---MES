@@ -244,4 +244,138 @@ public class WorkOrdersTests : IClassFixture<AdminSeededApiTestFixture>
 
         Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
     }
+
+    [Fact]
+    public async Task MaterialCheck_WithSufficientStock_ReportsAvailable()
+    {
+        // BOM is 2 units of material per product unit; quantity 5 needs 10, stock is 100.
+        var (product, material) = await CreateProductWithRoutingAndBomAsync(materialStock: 100);
+        var createResponse = await _adminClient.PostAsJsonAsync(
+            "/api/work-orders", new CreateWorkOrderRequest(product.Id, 5, null, null, null, null, null));
+        var order = (await createResponse.Content.ReadFromJsonAsync<WorkOrderResponse>())!;
+
+        var availability = await _adminClient.GetFromJsonAsync<MaterialAvailabilityResponse>($"/api/work-orders/{order.Id}/material-check");
+
+        Assert.True(availability!.IsAvailable);
+        var line = Assert.Single(availability.Lines);
+        Assert.Equal(material.Code, line.MaterialCode);
+        Assert.Equal(10, line.Required);
+        Assert.Equal(0, line.Shortfall);
+    }
+
+    [Fact]
+    public async Task MaterialCheck_WithInsufficientStock_ReportsShortfall()
+    {
+        // BOM is 2 units per product unit; quantity 5 needs 10, but stock is only 3.
+        var (product, material) = await CreateProductWithRoutingAndBomAsync(materialStock: 3);
+        var createResponse = await _adminClient.PostAsJsonAsync(
+            "/api/work-orders", new CreateWorkOrderRequest(product.Id, 5, null, null, null, null, null));
+        var order = (await createResponse.Content.ReadFromJsonAsync<WorkOrderResponse>())!;
+
+        var availability = await _adminClient.GetFromJsonAsync<MaterialAvailabilityResponse>($"/api/work-orders/{order.Id}/material-check");
+
+        Assert.False(availability!.IsAvailable);
+        var line = Assert.Single(availability.Lines);
+        Assert.Equal(material.Code, line.MaterialCode);
+        Assert.Equal(10, line.Required);
+        Assert.Equal(3, line.Available);
+        Assert.Equal(7, line.Shortfall);
+    }
+
+    [Fact]
+    public async Task ReleaseWorkOrder_WithInsufficientMaterial_ReturnsConflictWithoutForce()
+    {
+        var (product, _) = await CreateProductWithRoutingAndBomAsync(materialStock: 1);
+        var createResponse = await _adminClient.PostAsJsonAsync(
+            "/api/work-orders", new CreateWorkOrderRequest(product.Id, 5, null, null, null, null, null));
+        var order = (await createResponse.Content.ReadFromJsonAsync<WorkOrderResponse>())!;
+
+        var releaseResponse = await _adminClient.PostAsync($"/api/work-orders/{order.Id}/release", null);
+
+        Assert.Equal(HttpStatusCode.Conflict, releaseResponse.StatusCode);
+
+        using var scope = _fixture.Factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+        var stillDraft = await db.WorkOrders.SingleAsync(o => o.Id == order.Id);
+        Assert.Equal("Draft", stillDraft.Status);
+    }
+
+    [Fact]
+    public async Task ReleaseWorkOrder_WithInsufficientMaterial_ForceTrue_ReleasesAnyway()
+    {
+        var (product, _) = await CreateProductWithRoutingAndBomAsync(materialStock: 1);
+        var createResponse = await _adminClient.PostAsJsonAsync(
+            "/api/work-orders", new CreateWorkOrderRequest(product.Id, 5, null, null, null, null, null));
+        var order = (await createResponse.Content.ReadFromJsonAsync<WorkOrderResponse>())!;
+
+        var releaseResponse = await _adminClient.PostAsync($"/api/work-orders/{order.Id}/release?force=true", null);
+
+        Assert.Equal(HttpStatusCode.OK, releaseResponse.StatusCode);
+        var released = (await releaseResponse.Content.ReadFromJsonAsync<WorkOrderResponse>())!;
+        Assert.Equal("Released", released.Status);
+    }
+
+    [Fact]
+    public async Task Operation_BeforeCompletion_HasNoActualMinutesOrPerformanceRatio()
+    {
+        var (product, _) = await CreateProductWithRoutingAndBomAsync(materialStock: 100);
+        var createResponse = await _adminClient.PostAsJsonAsync(
+            "/api/work-orders", new CreateWorkOrderRequest(product.Id, 1, null, null, null, null, null));
+        var order = (await createResponse.Content.ReadFromJsonAsync<WorkOrderResponse>())!;
+
+        Assert.All(order.Operations, op =>
+        {
+            Assert.Null(op.ActualMinutes);
+            Assert.Null(op.PerformanceRatio);
+        });
+    }
+
+    [Fact]
+    public async Task CompleteOperation_ComputesActualMinutesAndPerformanceRatio()
+    {
+        var (product, _) = await CreateProductWithRoutingAndBomAsync(materialStock: 100);
+        var createResponse = await _adminClient.PostAsJsonAsync(
+            "/api/work-orders", new CreateWorkOrderRequest(product.Id, 1, null, null, null, null, null));
+        var order = (await createResponse.Content.ReadFromJsonAsync<WorkOrderResponse>())!;
+        await _adminClient.PostAsync($"/api/work-orders/{order.Id}/release", null);
+
+        var firstOperationId = order.Operations[0].Id;
+        await _adminClient.PostAsync($"/api/work-orders/{order.Id}/operations/{firstOperationId}/start", null);
+        var completeResponse = await _adminClient.PostAsync($"/api/work-orders/{order.Id}/operations/{firstOperationId}/complete", null);
+        var updated = (await completeResponse.Content.ReadFromJsonAsync<WorkOrderResponse>())!;
+
+        var completedOperation = updated.Operations.Single(op => op.Id == firstOperationId);
+        Assert.NotNull(completedOperation.ActualMinutes);
+        Assert.True(completedOperation.ActualMinutes >= 0);
+        Assert.NotNull(completedOperation.PerformanceRatio);
+        Assert.True(completedOperation.PerformanceRatio > 0);
+    }
+
+    [Fact]
+    public async Task Dashboard_ReflectsCompletedWorkOrderAndOperation()
+    {
+        var (product, _) = await CreateProductWithRoutingAndBomAsync(materialStock: 100);
+        var createResponse = await _adminClient.PostAsJsonAsync(
+            "/api/work-orders", new CreateWorkOrderRequest(product.Id, 1, null, null, null, null, null));
+        var order = (await createResponse.Content.ReadFromJsonAsync<WorkOrderResponse>())!;
+        await _adminClient.PostAsync($"/api/work-orders/{order.Id}/release", null);
+
+        var detail = (await (await _adminClient.GetAsync($"/api/work-orders/{order.Id}")).Content.ReadFromJsonAsync<WorkOrderResponse>())!;
+        foreach (var operation in detail.Operations)
+        {
+            await _adminClient.PostAsync($"/api/work-orders/{order.Id}/operations/{operation.Id}/start", null);
+            await _adminClient.PostAsync($"/api/work-orders/{order.Id}/operations/{operation.Id}/complete", null);
+        }
+
+        await _adminClient.PostAsync($"/api/work-orders/{order.Id}/complete", null);
+
+        var dashboard = await _adminClient.GetFromJsonAsync<WorkOrderDashboardResponse>("/api/work-orders/dashboard?days=1");
+
+        Assert.NotNull(dashboard);
+        Assert.True(dashboard!.WorkOrdersByStatus.GetValueOrDefault("Completed", 0) >= 1);
+        Assert.True(dashboard.OperationsCompletedInPeriod >= detail.Operations.Count);
+        Assert.NotNull(dashboard.AveragePerformanceRatio);
+        Assert.True(dashboard.AveragePerformanceRatio > 0);
+        Assert.True(dashboard.WorkOrdersCompletedInPeriod >= 1);
+    }
 }

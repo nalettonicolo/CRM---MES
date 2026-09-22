@@ -322,10 +322,45 @@ public class WithdrawalSlipsController : ControllerBase
             return Conflict(new { message = "Stock insufficiente per uno o più materiali.", materials = unavailable });
         }
 
+        // Ordering before GroupBy isn't reliably preserved through SQL translation + materialization,
+        // so the lots are fetched first and grouped/ordered client-side to guarantee FIFO order.
+        var openLots = await _dbContext.MaterialLots
+            .Where(lot => codes.Contains(lot.MaterialCode) && lot.Quantity > 0)
+            .ToListAsync(cancellationToken);
+        var lotsByMaterial = openLots
+            .GroupBy(lot => lot.MaterialCode)
+            .ToDictionary(group => group.Key, group => group.OrderBy(lot => lot.ReceivedAt).ToList());
+
         foreach (var item in slip.Items)
         {
             materials[item.MaterialCode].Stock -= item.Quantity;
             item.IsMissing = false;
+
+            // Best-effort FIFO genealogy: consume oldest lots first. If the lot ledger for this
+            // material doesn't cover the full quantity (e.g. stock predates lot tracking), the
+            // remainder is simply not attributed to any lot — Material.Stock above is still the
+            // authoritative decrement, lots are additive traceability metadata on top of it.
+            var remaining = item.Quantity;
+            if (lotsByMaterial.TryGetValue(item.MaterialCode, out var lots))
+            {
+                foreach (var lot in lots)
+                {
+                    if (remaining <= 0)
+                    {
+                        break;
+                    }
+
+                    var consumed = Math.Min(remaining, lot.Quantity);
+                    lot.Quantity -= consumed;
+                    remaining -= consumed;
+                    _dbContext.MaterialLotConsumptions.Add(new MaterialLotConsumption
+                    {
+                        MaterialLotId = lot.Id,
+                        WithdrawalItemId = item.Id,
+                        Quantity = consumed
+                    });
+                }
+            }
         }
 
         slip.Status = "Closed";

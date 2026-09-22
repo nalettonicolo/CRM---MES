@@ -6,6 +6,12 @@ public class WorkOrder
 {
     public Guid Id { get; set; } = Guid.NewGuid();
     public string Code { get; set; } = string.Empty;
+
+    /// <summary>Batch/lot identifier for the finished goods this work order produces — the traceability
+    /// anchor a customer complaint or a recall would search by. All units from one work order share this
+    /// one lot number; per-unit serials are a separate, not-yet-built feature for products that need it.</summary>
+    public string ProductLotNumber { get; set; } = string.Empty;
+
     public Guid ProductId { get; set; }
     public Product Product { get; set; } = null!;
     public decimal Quantity { get; set; }

@@ -42,6 +42,7 @@ public class WorkOrdersController : ControllerBase
             .Select(order => new WorkOrderSummaryResponse(
                 order.Id,
                 order.Code,
+                order.ProductLotNumber,
                 order.ProductId,
                 order.Product.Code,
                 order.Product.Name,
@@ -99,6 +100,9 @@ public class WorkOrdersController : ControllerBase
             Code = string.IsNullOrWhiteSpace(request.Code)
                 ? $"WO-{DateTime.UtcNow:yyyyMMdd-HHmmss}-{Guid.NewGuid().ToString("N")[..6]}"
                 : request.Code.Trim(),
+            ProductLotNumber = string.IsNullOrWhiteSpace(request.ProductLotNumber)
+                ? $"LOT-{DateTime.UtcNow:yyyyMMdd-HHmmss}-{Guid.NewGuid().ToString("N")[..6]}"
+                : request.ProductLotNumber.Trim(),
             ProductId = product.Id,
             Quantity = request.Quantity,
             AreaId = request.AreaId,
@@ -180,9 +184,27 @@ public class WorkOrdersController : ControllerBase
         return Ok(ToResponse(order));
     }
 
+    /// <summary>Compares the product's bill of materials, scaled by this work order's quantity,
+    /// against current material stock. Read-only: lets the client warn the operator before release
+    /// without committing to anything (the "material readiness" check a false-availability start
+    /// would otherwise skip).</summary>
+    [HttpGet("{id:guid}/material-check")]
+    public async Task<ActionResult<MaterialAvailabilityResponse>> CheckMaterialAvailability(
+        Guid id, CancellationToken cancellationToken = default)
+    {
+        var order = await _dbContext.WorkOrders.AsNoTracking().SingleOrDefaultAsync(o => o.Id == id, cancellationToken);
+        if (order is null)
+        {
+            return NotFound();
+        }
+
+        return Ok(await BuildAvailabilityResponseAsync(order, cancellationToken));
+    }
+
     [Authorize(Policy = "Warehouse")]
     [HttpPost("{id:guid}/release")]
-    public async Task<ActionResult<WorkOrderResponse>> ReleaseWorkOrder(Guid id, CancellationToken cancellationToken = default)
+    public async Task<ActionResult<WorkOrderResponse>> ReleaseWorkOrder(
+        Guid id, [FromQuery] bool force = false, CancellationToken cancellationToken = default)
     {
         var order = await _dbContext.WorkOrders
             .Include(o => o.Operations)
@@ -198,6 +220,12 @@ public class WorkOrdersController : ControllerBase
             return Conflict(new { message = "Solo una commessa in bozza può essere rilasciata." });
         }
 
+        var availability = await BuildAvailabilityResponseAsync(order, cancellationToken);
+        if (!availability.IsAvailable && !force)
+        {
+            return Conflict(new { message = "Materiali insufficienti per coprire questa commessa.", availability });
+        }
+
         order.Status = "Released";
         order.ReleasedAt = DateTime.UtcNow;
         _dbContext.AuditLogs.Add(new AuditLog
@@ -206,11 +234,44 @@ public class WorkOrdersController : ControllerBase
             EntityType = "WorkOrder",
             EntityId = order.Id,
             UserName = GetCurrentUserName(),
-            Details = $"Commessa {order.Code} rilasciata in produzione."
+            Details = availability.IsAvailable
+                ? $"Commessa {order.Code} rilasciata in produzione."
+                : $"Commessa {order.Code} rilasciata in produzione nonostante materiali insufficienti (forzato dall'operatore)."
         });
 
         await _dbContext.SaveChangesAsync(cancellationToken);
         return Ok(ToResponse(order));
+    }
+
+    private async Task<MaterialAvailabilityResponse> BuildAvailabilityResponseAsync(WorkOrder order, CancellationToken cancellationToken)
+    {
+        var bomItems = await _dbContext.BillOfMaterialItems
+            .AsNoTracking()
+            .Where(item => item.ProductId == order.ProductId)
+            .ToListAsync(cancellationToken);
+
+        if (bomItems.Count == 0)
+        {
+            return new MaterialAvailabilityResponse(true, []);
+        }
+
+        var codes = bomItems.Select(item => item.MaterialCode).Distinct().ToArray();
+        var stockByCode = await _dbContext.Materials
+            .AsNoTracking()
+            .Where(material => codes.Contains(material.Code))
+            .ToDictionaryAsync(material => material.Code, material => material.Stock, cancellationToken);
+
+        var lines = bomItems
+            .Select(item =>
+            {
+                var required = item.Quantity * order.Quantity;
+                var available = stockByCode.GetValueOrDefault(item.MaterialCode, 0);
+                var shortfall = Math.Max(0, required - available);
+                return new MaterialAvailabilityLineResponse(item.MaterialCode, required, available, shortfall);
+            })
+            .ToList();
+
+        return new MaterialAvailabilityResponse(lines.All(line => line.Shortfall == 0), lines);
     }
 
     [Authorize(Policy = "Warehouse")]
@@ -423,6 +484,31 @@ public class WorkOrdersController : ControllerBase
         return Ok(new WorkOrderWithdrawalSlipResponse(slip.Id, slip.Code));
     }
 
+    /// <summary>Backward genealogy for this work order: every material lot consumed by any withdrawal
+    /// slip generated from it — "what batches of raw material went into this production run?".</summary>
+    [HttpGet("{id:guid}/material-lots")]
+    public async Task<ActionResult<IEnumerable<WorkOrderMaterialLotResponse>>> GetConsumedMaterialLots(
+        Guid id, CancellationToken cancellationToken = default)
+    {
+        if (!await _dbContext.WorkOrders.AnyAsync(o => o.Id == id, cancellationToken))
+        {
+            return NotFound();
+        }
+
+        var consumed = await (
+            from slip in _dbContext.WithdrawalSlips.AsNoTracking()
+            where slip.WorkOrderId == id
+            join item in _dbContext.WithdrawalItems.AsNoTracking() on slip.Id equals item.WithdrawalSlipId
+            join consumption in _dbContext.MaterialLotConsumptions.AsNoTracking() on item.Id equals consumption.WithdrawalItemId
+            join lot in _dbContext.MaterialLots.AsNoTracking() on consumption.MaterialLotId equals lot.Id
+            orderby lot.MaterialCode, consumption.CreatedAt
+            select new WorkOrderMaterialLotResponse(
+                lot.Id, lot.MaterialCode, lot.LotNumber, consumption.Quantity, slip.Id, slip.Code))
+            .ToListAsync(cancellationToken);
+
+        return Ok(consumed);
+    }
+
     private string? GetCurrentUserName() => User.FindFirstValue(ClaimTypes.Name);
 
     private Guid? GetCurrentUserId()
@@ -437,6 +523,7 @@ public class WorkOrdersController : ControllerBase
         return new WorkOrderResponse(
             order.Id,
             order.Code,
+            order.ProductLotNumber,
             order.ProductId,
             order.Quantity,
             order.AreaId,
@@ -451,8 +538,69 @@ public class WorkOrdersController : ControllerBase
                 .OrderBy(op => op.SequenceNumber)
                 .Select(op => new WorkOrderOperationResponse(
                     op.Id, op.SequenceNumber, op.Name, op.Description, op.WorkCenter,
-                    op.EstimatedMinutes, op.Status, op.StartedAt, op.CompletedAt))
+                    op.EstimatedMinutes, op.Status, op.StartedAt, op.CompletedAt,
+                    ActualMinutes(op), PerformanceRatio(op)))
                 .ToList());
+    }
+
+    /// <summary>Minutes actually spent on a finished operation, or null while it's still open — the raw
+    /// number a performance ratio is built from.</summary>
+    private static decimal? ActualMinutes(WorkOrderOperation operation) =>
+        operation.StartedAt.HasValue && operation.CompletedAt.HasValue
+            ? (decimal)(operation.CompletedAt.Value - operation.StartedAt.Value).TotalMinutes
+            : null;
+
+    /// <summary>EstimatedMinutes / ActualMinutes for a finished operation: above 1 means faster than
+    /// planned, below 1 means slower. This is the "Performance" component of OEE in isolation — full
+    /// OEE also needs downtime (Availability) and scrap (Quality) tracking, which this project doesn't
+    /// capture yet.</summary>
+    private static decimal? PerformanceRatio(WorkOrderOperation operation)
+    {
+        var actual = ActualMinutes(operation);
+        return actual is > 0 ? operation.EstimatedMinutes / actual.Value : null;
+    }
+
+    /// <summary>Aggregate KPIs across recent work orders: a first step toward real-time production
+    /// visibility. Deliberately not full OEE (Availability × Performance × Quality) — that needs
+    /// downtime-reason and scrap/quality capture this project doesn't have yet; this covers the
+    /// Performance component plus simple throughput/on-time counts.</summary>
+    [HttpGet("dashboard")]
+    public async Task<ActionResult<WorkOrderDashboardResponse>> GetDashboard(
+        [FromQuery] int days = 7, CancellationToken cancellationToken = default)
+    {
+        var since = DateTime.UtcNow.AddDays(-Math.Max(1, days));
+
+        var statusCounts = await _dbContext.WorkOrders
+            .AsNoTracking()
+            .GroupBy(order => order.Status)
+            .Select(group => new { Status = group.Key, Count = group.Count() })
+            .ToListAsync(cancellationToken);
+
+        var recentlyCompletedOperations = await _dbContext.WorkOrderOperations
+            .AsNoTracking()
+            .Where(op => op.Status == "Done" && op.CompletedAt >= since && op.StartedAt != null && op.CompletedAt != null)
+            .ToListAsync(cancellationToken);
+
+        var performanceRatios = recentlyCompletedOperations
+            .Select(op => PerformanceRatio(op))
+            .Where(ratio => ratio.HasValue)
+            .Select(ratio => ratio!.Value)
+            .ToList();
+
+        var completedOrders = await _dbContext.WorkOrders
+            .AsNoTracking()
+            .Where(order => order.Status == "Completed" && order.CompletedAt >= since)
+            .ToListAsync(cancellationToken);
+        var ordersWithDueDate = completedOrders.Where(order => order.DueDate.HasValue).ToList();
+        var onTimeCount = ordersWithDueDate.Count(order => order.CompletedAt <= order.DueDate);
+
+        return Ok(new WorkOrderDashboardResponse(
+            days,
+            statusCounts.ToDictionary(entry => entry.Status, entry => entry.Count),
+            recentlyCompletedOperations.Count,
+            performanceRatios.Count > 0 ? performanceRatios.Average() : null,
+            completedOrders.Count,
+            ordersWithDueDate.Count > 0 ? (decimal)onTimeCount / ordersWithDueDate.Count : null));
     }
 }
 
@@ -463,7 +611,8 @@ public sealed record CreateWorkOrderRequest(
     Guid? AreaId,
     string? CustomerReference,
     DateTime? DueDate,
-    string? Notes);
+    string? Notes,
+    string? ProductLotNumber = null);
 
 public sealed record EditWorkOrderRequest(
     decimal Quantity,
@@ -475,6 +624,7 @@ public sealed record EditWorkOrderRequest(
 public sealed record WorkOrderSummaryResponse(
     Guid Id,
     string Code,
+    string ProductLotNumber,
     Guid ProductId,
     string ProductCode,
     string ProductName,
@@ -488,6 +638,7 @@ public sealed record WorkOrderSummaryResponse(
 public sealed record WorkOrderResponse(
     Guid Id,
     string Code,
+    string ProductLotNumber,
     Guid ProductId,
     decimal Quantity,
     Guid? AreaId,
@@ -509,6 +660,28 @@ public sealed record WorkOrderOperationResponse(
     decimal EstimatedMinutes,
     string Status,
     DateTime? StartedAt,
-    DateTime? CompletedAt);
+    DateTime? CompletedAt,
+    decimal? ActualMinutes,
+    decimal? PerformanceRatio);
 
 public sealed record WorkOrderWithdrawalSlipResponse(Guid WithdrawalSlipId, string WithdrawalSlipCode);
+
+public sealed record WorkOrderDashboardResponse(
+    int PeriodDays,
+    IReadOnlyDictionary<string, int> WorkOrdersByStatus,
+    int OperationsCompletedInPeriod,
+    decimal? AveragePerformanceRatio,
+    int WorkOrdersCompletedInPeriod,
+    decimal? OnTimeCompletionRate);
+
+public sealed record MaterialAvailabilityLineResponse(string MaterialCode, decimal Required, decimal Available, decimal Shortfall);
+
+public sealed record MaterialAvailabilityResponse(bool IsAvailable, IReadOnlyList<MaterialAvailabilityLineResponse> Lines);
+
+public sealed record WorkOrderMaterialLotResponse(
+    Guid MaterialLotId,
+    string MaterialCode,
+    string LotNumber,
+    decimal QuantityConsumed,
+    Guid WithdrawalSlipId,
+    string WithdrawalSlipCode);
