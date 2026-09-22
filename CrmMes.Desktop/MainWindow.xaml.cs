@@ -18,6 +18,8 @@ public partial class MainWindow : Window
     private readonly DispatcherTimer _refreshTimer = new();
     private PurchaseOrderSummaryDto? _selectedOrder;
     private WithdrawalSlipSummaryDto? _selectedSlip;
+    private ProductSummaryDto? _selectedProduct;
+    private WorkOrderSummaryDto? _selectedWorkOrder;
 
     private bool _lowStockLoaded;
     private bool _missingLoaded;
@@ -25,6 +27,8 @@ public partial class MainWindow : Window
     private bool _ordersLoaded;
     private bool _areasLoaded;
     private bool _usersLoaded;
+    private bool _productsLoaded;
+    private bool _workOrdersLoaded;
 
     private static readonly Dictionary<int, string> PageTitles = new()
     {
@@ -35,6 +39,8 @@ public partial class MainWindow : Window
         [4] = "Ordini fornitore",
         [5] = "Aree",
         [6] = "Utenti",
+        [7] = "Prodotti",
+        [8] = "Commesse",
     };
 
     // TEMPORANEO: login disabilitato su richiesta per velocizzare i test.
@@ -215,6 +221,12 @@ public partial class MainWindow : Window
             case "Utenti" when !_usersLoaded:
                 await LoadUsersAsync();
                 break;
+            case "Prodotti" when !_productsLoaded:
+                await LoadProductsAsync();
+                break;
+            case "Commesse" when !_workOrdersLoaded:
+                await LoadWorkOrdersAsync();
+                break;
         }
     }
 
@@ -324,6 +336,201 @@ public partial class MainWindow : Window
         {
             await LoadUsersAsync();
         }
+    }
+
+    private async void NewProductButton_Click(object sender, RoutedEventArgs e)
+    {
+        var dialog = new CreateProductWindow(_apiClient) { Owner = this };
+        if (dialog.ShowDialog() == true && dialog.Created)
+        {
+            await LoadProductsAsync();
+        }
+    }
+
+    private void ProductsList_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        _selectedProduct = ProductsList.SelectedItem as ProductSummaryDto;
+        var hasSelection = _selectedProduct is not null;
+        OpenProductButton.IsEnabled = hasSelection;
+        EditProductButton.IsEnabled = hasSelection;
+    }
+
+    private void ProductsList_MouseDoubleClick(object sender, MouseButtonEventArgs e)
+    {
+        if (ProductsList.SelectedItem is ProductSummaryDto product)
+        {
+            _ = OpenProductDetailAsync(product.Id);
+        }
+    }
+
+    private async void OpenProductButton_Click(object sender, RoutedEventArgs e)
+    {
+        if (_selectedProduct is not null)
+        {
+            await OpenProductDetailAsync(_selectedProduct.Id);
+        }
+    }
+
+    private async Task OpenProductDetailAsync(Guid productId)
+    {
+        var dialog = new ProductDetailWindow(_apiClient, productId) { Owner = this };
+        dialog.ShowDialog();
+        if (dialog.Changed)
+        {
+            await LoadProductsAsync();
+        }
+    }
+
+    private async void EditProductButton_Click(object sender, RoutedEventArgs e)
+    {
+        if (_selectedProduct is null)
+        {
+            return;
+        }
+
+        try
+        {
+            var existing = await _apiClient.GetProductAsync(_selectedProduct.Id);
+            var dialog = new CreateProductWindow(_apiClient, existing) { Owner = this };
+            if (dialog.ShowDialog() == true && dialog.Created)
+            {
+                await LoadProductsAsync();
+            }
+        }
+        catch (Exception exception)
+        {
+            MessageBox.Show(exception.Message, "Errore", MessageBoxButton.OK, MessageBoxImage.Warning);
+        }
+    }
+
+    private async void NewWorkOrderButton_Click(object sender, RoutedEventArgs e)
+    {
+        IReadOnlyList<ProductSummaryDto> products;
+        IReadOnlyList<AreaDto> areas;
+        try
+        {
+            products = await _apiClient.GetProductsAsync();
+            areas = await _apiClient.GetAreasAsync();
+        }
+        catch (Exception exception)
+        {
+            MessageBox.Show(exception.Message, "Errore", MessageBoxButton.OK, MessageBoxImage.Warning);
+            return;
+        }
+
+        if (products.Count == 0)
+        {
+            MessageBox.Show("Crea prima almeno un prodotto.", "Nuova commessa", MessageBoxButton.OK, MessageBoxImage.Information);
+            return;
+        }
+
+        var dialog = new CreateWorkOrderWindow(_apiClient, products, areas) { Owner = this };
+        if (dialog.ShowDialog() == true && dialog.Created)
+        {
+            await LoadWorkOrdersAsync();
+        }
+    }
+
+    private void WorkOrdersList_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        _selectedWorkOrder = WorkOrdersList.SelectedItem as WorkOrderSummaryDto;
+        var hasSelection = _selectedWorkOrder is not null;
+        OpenWorkOrderButton.IsEnabled = hasSelection;
+        EditWorkOrderButton.IsEnabled = hasSelection && _selectedWorkOrder!.Status == "Draft";
+        ReleaseWorkOrderButton.IsEnabled = hasSelection && _selectedWorkOrder!.Status == "Draft";
+        CancelWorkOrderButton.IsEnabled = hasSelection && _selectedWorkOrder!.Status is not ("Completed" or "Cancelled");
+    }
+
+    private void WorkOrdersList_MouseDoubleClick(object sender, MouseButtonEventArgs e)
+    {
+        if (WorkOrdersList.SelectedItem is WorkOrderSummaryDto order)
+        {
+            _ = OpenWorkOrderDetailAsync(order.Id);
+        }
+    }
+
+    private async void OpenWorkOrderButton_Click(object sender, RoutedEventArgs e)
+    {
+        if (_selectedWorkOrder is not null)
+        {
+            await OpenWorkOrderDetailAsync(_selectedWorkOrder.Id);
+        }
+    }
+
+    private async Task OpenWorkOrderDetailAsync(Guid workOrderId)
+    {
+        try
+        {
+            var products = await _apiClient.GetProductsAsync(activeOnly: false);
+            var productNames = products.ToDictionary(product => product.Id, product => product.Name);
+
+            var dialog = new WorkOrderDetailWindow(_apiClient, workOrderId, productNames) { Owner = this };
+            dialog.ShowDialog();
+            await LoadWorkOrdersAsync();
+        }
+        catch (Exception exception)
+        {
+            MessageBox.Show(exception.Message, "Errore", MessageBoxButton.OK, MessageBoxImage.Warning);
+        }
+    }
+
+    private async void EditWorkOrderButton_Click(object sender, RoutedEventArgs e)
+    {
+        if (_selectedWorkOrder is null)
+        {
+            return;
+        }
+
+        try
+        {
+            var products = await _apiClient.GetProductsAsync();
+            var areas = await _apiClient.GetAreasAsync();
+            var existing = await _apiClient.GetWorkOrderAsync(_selectedWorkOrder.Id);
+            var dialog = new CreateWorkOrderWindow(_apiClient, products, areas, existing) { Owner = this };
+            if (dialog.ShowDialog() == true && dialog.Created)
+            {
+                await LoadWorkOrdersAsync();
+            }
+        }
+        catch (Exception exception)
+        {
+            MessageBox.Show(exception.Message, "Errore", MessageBoxButton.OK, MessageBoxImage.Warning);
+        }
+    }
+
+    private async void ReleaseWorkOrderButton_Click(object sender, RoutedEventArgs e)
+    {
+        if (_selectedWorkOrder is null)
+        {
+            return;
+        }
+
+        var workOrderId = _selectedWorkOrder.Id;
+        await RunBusyAsync("Rilascio in corso...", async () =>
+        {
+            await _apiClient.ReleaseWorkOrderAsync(workOrderId);
+            await LoadWorkOrdersAsync();
+        });
+    }
+
+    private async void CancelWorkOrderButton_Click(object sender, RoutedEventArgs e)
+    {
+        if (_selectedWorkOrder is null)
+        {
+            return;
+        }
+
+        if (MessageBox.Show($"Annullare la commessa {_selectedWorkOrder.Code}?", "Conferma", MessageBoxButton.YesNo, MessageBoxImage.Question) != MessageBoxResult.Yes)
+        {
+            return;
+        }
+
+        var workOrderId = _selectedWorkOrder.Id;
+        await RunBusyAsync("Annullamento in corso...", async () =>
+        {
+            await _apiClient.CancelWorkOrderAsync(workOrderId);
+            await LoadWorkOrdersAsync();
+        });
     }
 
     private void WithdrawalSlipsList_SelectionChanged(object sender, SelectionChangedEventArgs e)
@@ -467,6 +674,10 @@ public partial class MainWindow : Window
     private async void RefreshAreasButton_Click(object sender, RoutedEventArgs e) => await LoadAreasAsync();
 
     private async void RefreshUsersButton_Click(object sender, RoutedEventArgs e) => await LoadUsersAsync();
+
+    private async void RefreshProductsButton_Click(object sender, RoutedEventArgs e) => await LoadProductsAsync();
+
+    private async void RefreshWorkOrdersButton_Click(object sender, RoutedEventArgs e) => await LoadWorkOrdersAsync();
 
     private void PurchaseOrdersList_SelectionChanged(object sender, SelectionChangedEventArgs e)
     {
@@ -659,5 +870,25 @@ public partial class MainWindow : Window
     {
         UsersList.ItemsSource = await _apiClient.GetUsersAsync();
         _usersLoaded = true;
+    });
+
+    private Task LoadProductsAsync() => RunBusyAsync(string.Empty, async () =>
+    {
+        ProductsList.ItemsSource = await _apiClient.GetProductsAsync(activeOnly: false);
+        _productsLoaded = true;
+        _selectedProduct = null;
+        OpenProductButton.IsEnabled = false;
+        EditProductButton.IsEnabled = false;
+    });
+
+    private Task LoadWorkOrdersAsync() => RunBusyAsync(string.Empty, async () =>
+    {
+        WorkOrdersList.ItemsSource = await _apiClient.GetWorkOrdersAsync();
+        _workOrdersLoaded = true;
+        _selectedWorkOrder = null;
+        OpenWorkOrderButton.IsEnabled = false;
+        EditWorkOrderButton.IsEnabled = false;
+        ReleaseWorkOrderButton.IsEnabled = false;
+        CancelWorkOrderButton.IsEnabled = false;
     });
 }

@@ -346,6 +346,144 @@ public sealed class ApiClient
         await EnsureSuccessAsync(response, cancellationToken);
     }
 
+    public Task<IReadOnlyList<ProductSummaryDto>> GetProductsAsync(bool activeOnly = true, string? q = null, CancellationToken cancellationToken = default)
+    {
+        var query = $"api/products?activeOnly={activeOnly}";
+        if (!string.IsNullOrWhiteSpace(q))
+        {
+            query += $"&q={Uri.EscapeDataString(q)}";
+        }
+
+        return GetAsync<ProductSummaryDto>(query, cancellationToken);
+    }
+
+    public async Task<ProductDetailDto> GetProductAsync(Guid id, CancellationToken cancellationToken = default)
+    {
+        using var response = await _httpClient.GetAsync($"api/products/{id}", cancellationToken);
+        await EnsureSuccessAsync(response, cancellationToken);
+        return await response.Content.ReadFromJsonAsync<ProductDetailDto>(cancellationToken: cancellationToken)
+            ?? throw new InvalidOperationException("Risposta prodotto non valida.");
+    }
+
+    public async Task CreateProductAsync(string code, string name, string? description, CancellationToken cancellationToken = default)
+    {
+        using var response = await _httpClient.PostAsJsonAsync("api/products", new { code, name, description }, cancellationToken);
+        await EnsureSuccessAsync(response, cancellationToken);
+    }
+
+    public async Task EditProductAsync(Guid id, string name, string? description, CancellationToken cancellationToken = default)
+    {
+        using var response = await _httpClient.PutAsJsonAsync($"api/products/{id}", new { name, description }, cancellationToken);
+        await EnsureSuccessAsync(response, cancellationToken);
+    }
+
+    public async Task DeactivateProductAsync(Guid id, CancellationToken cancellationToken = default)
+    {
+        using var response = await _httpClient.DeleteAsync($"api/products/{id}", cancellationToken);
+        await EnsureSuccessAsync(response, cancellationToken);
+    }
+
+    public async Task ReplaceBillOfMaterialAsync(
+        Guid productId,
+        IReadOnlyList<(string MaterialCode, decimal Quantity, string? Notes)> items,
+        CancellationToken cancellationToken = default)
+    {
+        var payload = new
+        {
+            items = items.Select(item => new { materialCode = item.MaterialCode, quantity = item.Quantity, notes = item.Notes })
+        };
+        using var response = await _httpClient.PutAsJsonAsync($"api/products/{productId}/bom", payload, cancellationToken);
+        await EnsureSuccessAsync(response, cancellationToken);
+    }
+
+    public async Task ReplaceRoutingAsync(
+        Guid productId,
+        IReadOnlyList<(string Name, string? Description, string? WorkCenter, decimal EstimatedMinutes)> steps,
+        CancellationToken cancellationToken = default)
+    {
+        var payload = new
+        {
+            steps = steps.Select(step => new { name = step.Name, description = step.Description, workCenter = step.WorkCenter, estimatedMinutes = step.EstimatedMinutes })
+        };
+        using var response = await _httpClient.PutAsJsonAsync($"api/products/{productId}/routing", payload, cancellationToken);
+        await EnsureSuccessAsync(response, cancellationToken);
+    }
+
+    public Task<IReadOnlyList<WorkOrderSummaryDto>> GetWorkOrdersAsync(string? status = null, CancellationToken cancellationToken = default)
+    {
+        var query = "api/work-orders";
+        if (!string.IsNullOrWhiteSpace(status))
+        {
+            query += $"?status={Uri.EscapeDataString(status)}";
+        }
+
+        return GetAsync<WorkOrderSummaryDto>(query, cancellationToken);
+    }
+
+    public async Task<WorkOrderDetailDto> GetWorkOrderAsync(Guid id, CancellationToken cancellationToken = default)
+    {
+        using var response = await _httpClient.GetAsync($"api/work-orders/{id}", cancellationToken);
+        await EnsureSuccessAsync(response, cancellationToken);
+        return await response.Content.ReadFromJsonAsync<WorkOrderDetailDto>(cancellationToken: cancellationToken)
+            ?? throw new InvalidOperationException("Risposta commessa non valida.");
+    }
+
+    public async Task CreateWorkOrderAsync(
+        Guid productId, decimal quantity, Guid? areaId, string? customerReference, DateTime? dueDate, string? notes,
+        CancellationToken cancellationToken = default)
+    {
+        var payload = new { productId, quantity, code = (string?)null, areaId, customerReference, dueDate, notes };
+        using var response = await _httpClient.PostAsJsonAsync("api/work-orders", payload, cancellationToken);
+        await EnsureSuccessAsync(response, cancellationToken);
+    }
+
+    public async Task EditWorkOrderAsync(
+        Guid id, decimal quantity, Guid? areaId, string? customerReference, DateTime? dueDate, string? notes,
+        CancellationToken cancellationToken = default)
+    {
+        var payload = new { quantity, areaId, customerReference, dueDate, notes };
+        using var response = await _httpClient.PutAsJsonAsync($"api/work-orders/{id}", payload, cancellationToken);
+        await EnsureSuccessAsync(response, cancellationToken);
+    }
+
+    public async Task ReleaseWorkOrderAsync(Guid id, CancellationToken cancellationToken = default)
+    {
+        using var response = await _httpClient.PostAsync($"api/work-orders/{id}/release", null, cancellationToken);
+        await EnsureSuccessAsync(response, cancellationToken);
+    }
+
+    public async Task CancelWorkOrderAsync(Guid id, CancellationToken cancellationToken = default)
+    {
+        using var response = await _httpClient.PostAsync($"api/work-orders/{id}/cancel", null, cancellationToken);
+        await EnsureSuccessAsync(response, cancellationToken);
+    }
+
+    public async Task CompleteWorkOrderAsync(Guid id, CancellationToken cancellationToken = default)
+    {
+        using var response = await _httpClient.PostAsync($"api/work-orders/{id}/complete", null, cancellationToken);
+        await EnsureSuccessAsync(response, cancellationToken);
+    }
+
+    public async Task StartOperationAsync(Guid workOrderId, Guid operationId, CancellationToken cancellationToken = default)
+    {
+        using var response = await _httpClient.PostAsync($"api/work-orders/{workOrderId}/operations/{operationId}/start", null, cancellationToken);
+        await EnsureSuccessAsync(response, cancellationToken);
+    }
+
+    public async Task CompleteOperationAsync(Guid workOrderId, Guid operationId, CancellationToken cancellationToken = default)
+    {
+        using var response = await _httpClient.PostAsync($"api/work-orders/{workOrderId}/operations/{operationId}/complete", null, cancellationToken);
+        await EnsureSuccessAsync(response, cancellationToken);
+    }
+
+    public async Task<WorkOrderWithdrawalSlipDto> GenerateWithdrawalSlipAsync(Guid workOrderId, CancellationToken cancellationToken = default)
+    {
+        using var response = await _httpClient.PostAsync($"api/work-orders/{workOrderId}/generate-withdrawal-slip", null, cancellationToken);
+        await EnsureSuccessAsync(response, cancellationToken);
+        return await response.Content.ReadFromJsonAsync<WorkOrderWithdrawalSlipDto>(cancellationToken: cancellationToken)
+            ?? throw new InvalidOperationException("Risposta di generazione distinta non valida.");
+    }
+
     private async Task<IReadOnlyList<T>> GetAsync<T>(string path, CancellationToken cancellationToken)
     {
         using var response = await _httpClient.GetAsync(path, cancellationToken);
@@ -493,3 +631,59 @@ public sealed record UserRowDto(Guid Id, string Name, string Email, string Role,
 public sealed record SupplierDto(Guid Id, string Name, string Code, string? Email, string? Phone, bool IsActive);
 
 public sealed record ImportSummaryDto(int Imported, int CreatedMaterials, int CreatedLinks);
+
+public sealed record ProductSummaryDto(Guid Id, string Code, string Name, bool IsActive, int BomItemCount, int RoutingStepCount);
+
+public sealed record ProductDetailDto(
+    Guid Id,
+    string Code,
+    string Name,
+    string? Description,
+    bool IsActive,
+    List<BomItemDto> BillOfMaterial,
+    List<RoutingStepDto> RoutingSteps);
+
+public sealed record BomItemDto(Guid Id, string MaterialCode, decimal Quantity, string? Notes);
+
+public sealed record RoutingStepDto(Guid Id, int SequenceNumber, string Name, string? Description, string? WorkCenter, decimal EstimatedMinutes);
+
+public sealed record WorkOrderSummaryDto(
+    Guid Id,
+    string Code,
+    Guid ProductId,
+    string ProductCode,
+    string ProductName,
+    decimal Quantity,
+    string Status,
+    DateTime? DueDate,
+    DateTime CreatedAt,
+    int OperationCount,
+    int CompletedOperationCount);
+
+public sealed record WorkOrderDetailDto(
+    Guid Id,
+    string Code,
+    Guid ProductId,
+    decimal Quantity,
+    Guid? AreaId,
+    string? CustomerReference,
+    string Status,
+    DateTime? DueDate,
+    string? Notes,
+    DateTime CreatedAt,
+    DateTime? ReleasedAt,
+    DateTime? CompletedAt,
+    List<WorkOrderOperationDto> Operations);
+
+public sealed record WorkOrderOperationDto(
+    Guid Id,
+    int SequenceNumber,
+    string Name,
+    string? Description,
+    string? WorkCenter,
+    decimal EstimatedMinutes,
+    string Status,
+    DateTime? StartedAt,
+    DateTime? CompletedAt);
+
+public sealed record WorkOrderWithdrawalSlipDto(Guid WithdrawalSlipId, string WithdrawalSlipCode);

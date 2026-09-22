@@ -6,6 +6,8 @@
     <local:StatusToBrushConverter x:Key="StatusToBrush" />
     <local:BoolToTextConverter x:Key="BoolToText" />
     <local:BoolToBrushConverter x:Key="BoolToBrush" />
+    <local:OperationStatusToActionTextConverter x:Key="OperationStatusToActionText" />
+    <local:StatusNotEqualToVisibilityConverter x:Key="StatusNotEqualToVisibility" />
 
     <!-- Palette -->
     <SolidColorBrush x:Key="BackgroundBrush" Color="#F4F6F8" />

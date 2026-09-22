@@ -19,6 +19,11 @@ public sealed class StatusToBrushConverter : IValueConverter
         ["Resolved"] = ("#DCFCE7", "#15803D"),
         ["Closed"] = ("#DCFCE7", "#15803D"),
         ["Cancelled"] = ("#FEE2E2", "#B91C1C"),
+        ["Released"] = ("#DBEAFE", "#1D4ED8"),
+        ["InProgress"] = ("#FEF3C7", "#B45309"),
+        ["Completed"] = ("#DCFCE7", "#15803D"),
+        ["Pending"] = ("#E2E8F0", "#475569"),
+        ["Done"] = ("#DCFCE7", "#15803D"),
     };
 
     public object Convert(object? value, Type targetType, object? parameter, CultureInfo culture)
@@ -72,6 +77,35 @@ public sealed class BoolToBrushConverter : IValueConverter
 
         return new SolidColorBrush((Color)ColorConverter.ConvertFromString(hex));
     }
+
+    public object ConvertBack(object value, Type targetType, object? parameter, CultureInfo culture)
+        => throw new NotSupportedException();
+}
+
+/// <summary>Labels the action button for a work order operation: "Avvia" while Pending, "Completa"
+/// while InProgress, nothing once Done (the button is then hidden by <see cref="StatusNotEqualToVisibilityConverter"/>).</summary>
+public sealed class OperationStatusToActionTextConverter : IValueConverter
+{
+    public object Convert(object? value, Type targetType, object? parameter, CultureInfo culture)
+        => (value as string) switch
+        {
+            "Pending" => "Avvia",
+            "InProgress" => "Completa",
+            _ => string.Empty
+        };
+
+    public object ConvertBack(object value, Type targetType, object? parameter, CultureInfo culture)
+        => throw new NotSupportedException();
+}
+
+/// <summary>Collapses an element when the bound status string equals the converter parameter, e.g.
+/// hiding the start/complete button once an operation reaches "Done".</summary>
+public sealed class StatusNotEqualToVisibilityConverter : IValueConverter
+{
+    public object Convert(object? value, Type targetType, object? parameter, CultureInfo culture)
+        => string.Equals(value as string, parameter as string, StringComparison.OrdinalIgnoreCase)
+            ? System.Windows.Visibility.Collapsed
+            : System.Windows.Visibility.Visible;
 
     public object ConvertBack(object value, Type targetType, object? parameter, CultureInfo culture)
         => throw new NotSupportedException();

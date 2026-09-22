@@ -1,0 +1,103 @@
+<Window x:Class="CrmMes.Desktop.ProductDetailWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Prodotto" Height="780" Width="720"
+        WindowStartupLocation="CenterOwner" ResizeMode="CanResize" MinHeight="600" MinWidth="620"
+        Background="{StaticResource BackgroundBrush}">
+    <Grid Margin="24">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="1*" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="1*" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
+        <DockPanel Grid.Row="0" Margin="0,0,0,4">
+            <Border DockPanel.Dock="Right" x:Name="StatusPill" Style="{StaticResource Pill}" VerticalAlignment="Center">
+                <TextBlock x:Name="StatusText" Style="{StaticResource PillText}" />
+            </Border>
+            <TextBlock x:Name="CodeText" FontSize="20" FontWeight="SemiBold" Foreground="{StaticResource TextPrimaryBrush}" />
+        </DockPanel>
+
+        <TextBlock Grid.Row="1" x:Name="NameText" FontSize="13" Foreground="{StaticResource TextSecondaryBrush}" Margin="0,4,0,14" TextWrapping="Wrap" />
+
+        <TextBlock Grid.Row="2" Text="Distinta base" FontWeight="SemiBold" Foreground="{StaticResource TextPrimaryBrush}" Margin="0,0,0,8" />
+
+        <DockPanel Grid.Row="3" Margin="0,0,0,8">
+            <Button DockPanel.Dock="Right" Content="Aggiungi riga" Width="110" Click="AddBomItem_Click" />
+            <TextBox x:Name="BomNotesBox" DockPanel.Dock="Right" Width="120" Margin="0,0,10,0" Tag="Note (opz.)" />
+            <TextBox x:Name="BomQuantityBox" DockPanel.Dock="Right" Width="70" Margin="0,0,10,0" Text="1" />
+            <TextBox x:Name="BomMaterialCodeBox" Margin="0,0,10,0" Tag="Codice materiale" />
+        </DockPanel>
+
+        <Border Grid.Row="4" Style="{StaticResource CardBorder}" Padding="4" MinHeight="110">
+            <ListView x:Name="BomList">
+                <ListView.View>
+                    <GridView>
+                        <GridViewColumn Header="Codice materiale" DisplayMemberBinding="{Binding MaterialCode}" Width="180" />
+                        <GridViewColumn Header="Quantità" DisplayMemberBinding="{Binding Quantity}" Width="90" />
+                        <GridViewColumn Header="Note" DisplayMemberBinding="{Binding Notes}" Width="180" />
+                        <GridViewColumn Header="" Width="90">
+                            <GridViewColumn.CellTemplate>
+                                <DataTemplate>
+                                    <Button Content="Rimuovi" Style="{StaticResource SecondaryButton}" Height="28" Click="RemoveBomItem_Click" Tag="{Binding}" />
+                                </DataTemplate>
+                            </GridViewColumn.CellTemplate>
+                        </GridViewColumn>
+                    </GridView>
+                </ListView.View>
+            </ListView>
+        </Border>
+
+        <StackPanel Grid.Row="5" Orientation="Horizontal" Margin="0,8,0,18">
+            <Button x:Name="SaveBomButton" Content="Salva distinta base" Width="170" Height="34" Click="SaveBom_Click" />
+            <TextBlock x:Name="BomErrorText" Foreground="{StaticResource DangerBrush}" TextWrapping="Wrap" VerticalAlignment="Center" Margin="14,0,0,0" />
+        </StackPanel>
+
+        <TextBlock Grid.Row="6" Text="Ciclo di lavoro" FontWeight="SemiBold" Foreground="{StaticResource TextPrimaryBrush}" Margin="0,0,0,8" />
+
+        <DockPanel Grid.Row="7" Margin="0,0,0,8">
+            <Button DockPanel.Dock="Right" Content="Aggiungi fase" Width="110" Click="AddRoutingStep_Click" />
+            <TextBox x:Name="RoutingMinutesBox" DockPanel.Dock="Right" Width="70" Margin="0,0,10,0" Text="0" />
+            <TextBox x:Name="RoutingWorkCenterBox" DockPanel.Dock="Right" Width="130" Margin="0,0,10,0" Tag="Centro di lavoro (opz.)" />
+            <TextBox x:Name="RoutingNameBox" Margin="0,0,10,0" Tag="Nome fase" />
+        </DockPanel>
+
+        <Border Grid.Row="8" Style="{StaticResource CardBorder}" Padding="4" MinHeight="110">
+            <ListView x:Name="RoutingList">
+                <ListView.View>
+                    <GridView>
+                        <GridViewColumn Header="#" DisplayMemberBinding="{Binding Sequence}" Width="30" />
+                        <GridViewColumn Header="Fase" DisplayMemberBinding="{Binding Name}" Width="160" />
+                        <GridViewColumn Header="Centro di lavoro" DisplayMemberBinding="{Binding WorkCenter}" Width="150" />
+                        <GridViewColumn Header="Minuti" DisplayMemberBinding="{Binding EstimatedMinutes}" Width="70" />
+                        <GridViewColumn Header="" Width="90">
+                            <GridViewColumn.CellTemplate>
+                                <DataTemplate>
+                                    <Button Content="Rimuovi" Style="{StaticResource SecondaryButton}" Height="28" Click="RemoveRoutingStep_Click" Tag="{Binding}" />
+                                </DataTemplate>
+                            </GridViewColumn.CellTemplate>
+                        </GridViewColumn>
+                    </GridView>
+                </ListView.View>
+            </ListView>
+        </Border>
+
+        <StackPanel Grid.Row="9" Orientation="Horizontal" Margin="0,8,0,0">
+            <Button x:Name="SaveRoutingButton" Content="Salva ciclo di lavoro" Width="170" Height="34" Click="SaveRouting_Click" />
+            <TextBlock x:Name="RoutingErrorText" Foreground="{StaticResource DangerBrush}" TextWrapping="Wrap" VerticalAlignment="Center" Margin="14,0,0,0" />
+        </StackPanel>
+
+        <StackPanel Grid.Row="10" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,16,0,0">
+            <Button x:Name="DeactivateButton" Style="{StaticResource DangerButton}" Content="Disattiva prodotto" Width="150" Height="36" Margin="0,0,10,0" Click="Deactivate_Click" />
+            <Button Style="{StaticResource SecondaryButton}" Content="Chiudi" Width="100" Height="36" Click="Close_Click" />
+        </StackPanel>
+    </Grid>
+</Window>

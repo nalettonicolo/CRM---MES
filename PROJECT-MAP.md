@@ -185,6 +185,7 @@ Il prototipo è utile come riferimento funzionale, ma non deve essere usato come
 - Sessione con refresh token automatico in background (rinnovo silenzioso prima della scadenza dell'access token).
 - Importazione distinta da file, stampe ed esportazione PDF/Excel delle liste: ancora da fare.
 - Configurazione URL API e gestione offline/connessione assente: ancora da fare (URL API fisso su localhost).
+- Prodotti (distinta base e ciclo di lavoro) e Commesse: schede da UI implementate. Prodotti: creazione, modifica nome/descrizione, disattivazione, editor a righe dinamiche per distinta base e ciclo di lavoro (`ProductDetailWindow`, sostituisce l'intera distinta/ciclo ad ogni salvataggio, coerente con l'endpoint "replace all" lato API). Commesse: creazione, modifica (solo in bozza), rilascio, annullamento da elenco; dettaglio commessa (`WorkOrderDetailWindow`) con avvio/completamento di ogni fase, completamento dell'intera commessa e generazione della distinta di prelievo dalla distinta base. Verificato end-to-end contro l'API reale (non solo i test): creazione prodotto, distinta base, ciclo di lavoro, commessa, rilascio, avanzamento fasi, completamento, generazione distinta con quantità scalate correttamente, e blocco della generazione su commessa completata.
 
 ### Priorita 4: produzione
 
@@ -214,19 +215,18 @@ Il prototipo è utile come riferimento funzionale, ma non deve essere usato come
 | Cataloghi fornitori | CSV ed Excel operativi, ricerca operativa | Manca import PDF e connettori ufficiali Schneider/Pizzato |
 | Import documenti | Nel prototipo Node | Da portare nel backend reale |
 | Autenticazione | JWT, policy, bootstrap Admin e refresh token operativi | Nessuna lacuna nota |
-| Client Windows | Dashboard a schede con creazione/modifica/gestione per materiali, distinte, ordini fornitore, fornitori, aree, utenti, import catalogo Excel | Mancano import distinta da file, stampe/export, gestione offline; nessuna UI ancora per prodotti/commesse |
+| Client Windows | Dashboard a schede con creazione/modifica/gestione per materiali, distinte, ordini fornitore, fornitori, aree, utenti, prodotti, commesse, import catalogo Excel | Mancano import distinta da file, stampe/export, gestione offline |
 | Auto-update | Implementato | Richiede release GitHub con asset previsto |
-| Nucleo produzione (MES) | Backend operativo: prodotti, distinta base, ciclo di lavoro, commesse con fasi tracciate, generazione distinta di prelievo da commessa | Manca UI client, tracciabilità lotti/matricole, centri di lavoro con capacità/pianificazione, qualità/NCM, OEE |
+| Nucleo produzione (MES) | Backend e client operativi: prodotti, distinta base, ciclo di lavoro, commesse con fasi tracciate, generazione distinta di prelievo da commessa; verificato end-to-end contro l'API reale su Neon | Manca tracciabilità lotti/matricole, centri di lavoro con capacità/pianificazione, qualità/NCM, OEE |
 | Test automatici | 55 test di integrazione API (xUnit, Sqlite in-memory) | Manca copertura sul client WPF |
 | CI | Build + test su GitHub Actions ad ogni push/PR | Manca deploy automatico |
 | Deploy produzione | Mancante | API attualmente locale; richiede una decisione su hosting/dominio |
 
 ## Prossimo incremento consigliato
 
-1. UI client per il nucleo produzione: gestione prodotti (distinta base + ciclo di lavoro), creazione/rilascio/avanzamento commesse, generazione distinta di prelievo da commessa.
-2. Riattivare il login manuale nel client (`SkipLoginForTesting = false` in `MainWindow.xaml.cs`) prima di qualsiasi uso reale/condiviso dell'app.
-3. Decidere il provider di hosting per l'API (Azure, Railway, Fly.io, VPS...) per poter preparare Dockerfile/pipeline di deploy reale.
-4. Valutare l'import PDF con un esempio reale di catalogo fornitore, per definire un formato di riferimento prima di implementarlo.
-5. Aggiungere test automatici anche sul client WPF, e più copertura sui casi limite dell'API (es. concorrenza su chiusura distinta/ricezione ordine).
-6. Importazione distinta da file esterno, stampe ed esportazione PDF/Excel dal client, gestione offline.
-7. Funzionalità MES avanzate non ancora iniziate (rimandate quando scelto il punto di partenza "Commessa + Distinta Base + Ciclo di lavoro"): tracciabilità lotti/matricole, centri di lavoro con capacità/pianificazione, modulo qualità/NCM, dashboard OEE/KPI, rilevazione manodopera oltre ai timestamp di inizio/fine fase.
+1. Riattivare il login manuale nel client (`SkipLoginForTesting = false` in `MainWindow.xaml.cs`) prima di qualsiasi uso reale/condiviso dell'app.
+2. Decidere il provider di hosting per l'API (Azure, Railway, Fly.io, VPS...) per poter preparare Dockerfile/pipeline di deploy reale.
+3. Valutare l'import PDF con un esempio reale di catalogo fornitore, per definire un formato di riferimento prima di implementarlo.
+4. Aggiungere test automatici anche sul client WPF, e più copertura sui casi limite dell'API (es. concorrenza su chiusura distinta/ricezione ordine).
+5. Importazione distinta da file esterno, stampe ed esportazione PDF/Excel dal client, gestione offline.
+6. Funzionalità MES avanzate non ancora iniziate (rimandate quando scelto il punto di partenza "Commessa + Distinta Base + Ciclo di lavoro"): tracciabilità lotti/matricole, centri di lavoro con capacità/pianificazione, modulo qualità/NCM, dashboard OEE/KPI, rilevazione manodopera oltre ai timestamp di inizio/fine fase.
