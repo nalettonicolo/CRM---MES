@@ -26,6 +26,7 @@ public class ApplicationDbContext : DbContext
     public DbSet<RoutingStep> RoutingSteps => Set<RoutingStep>();
     public DbSet<WorkOrder> WorkOrders => Set<WorkOrder>();
     public DbSet<WorkOrderOperation> WorkOrderOperations => Set<WorkOrderOperation>();
+    public DbSet<OperationDowntime> OperationDowntimes => Set<OperationDowntime>();
     public DbSet<MaterialLot> MaterialLots => Set<MaterialLot>();
     public DbSet<MaterialLotConsumption> MaterialLotConsumptions => Set<MaterialLotConsumption>();
     public DbSet<WorkCenter> WorkCenters => Set<WorkCenter>();
@@ -189,6 +190,16 @@ public class ApplicationDbContext : DbContext
             entity.HasOne(o => o.WorkOrder)
                 .WithMany(w => w.Operations)
                 .HasForeignKey(o => o.WorkOrderId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<OperationDowntime>(entity =>
+        {
+            entity.Property(d => d.Reason).HasMaxLength(200);
+            entity.Property(d => d.Notes).HasMaxLength(1000);
+            entity.HasOne(d => d.Operation)
+                .WithMany()
+                .HasForeignKey(d => d.WorkOrderOperationId)
                 .OnDelete(DeleteBehavior.Cascade);
         });
 

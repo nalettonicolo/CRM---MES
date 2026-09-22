@@ -407,12 +407,108 @@ public class WorkOrdersController : ControllerBase
             return Conflict(new { message = "Solo una fase avviata può essere completata." });
         }
 
+        var hasOpenDowntime = await _dbContext.OperationDowntimes
+            .AnyAsync(d => d.WorkOrderOperationId == operationId && d.EndedAt == null, cancellationToken);
+        if (hasOpenDowntime)
+        {
+            return Conflict(new { message = "Questa fase ha un fermo macchina ancora aperto: chiudilo prima di completare la fase." });
+        }
+
         operation.Status = "Done";
         operation.CompletedAt = DateTime.UtcNow;
 
         await _dbContext.SaveChangesAsync(cancellationToken);
         return Ok(ToResponse(order));
     }
+
+    /// <summary>Logs the start of a machine stop during an operation — the Availability component of
+    /// OEE. Only one stop can be open at a time per operation; only a running (InProgress) operation can
+    /// have one, since a stop is something that interrupts work already underway.</summary>
+    [Authorize]
+    [HttpPost("{id:guid}/operations/{operationId:guid}/downtime/start")]
+    public async Task<ActionResult<OperationDowntimeResponse>> StartDowntime(
+        Guid id, Guid operationId, StartDowntimeRequest request, CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(request.Reason))
+        {
+            return BadRequest(new { message = "Indica il motivo del fermo." });
+        }
+
+        var operation = await _dbContext.WorkOrderOperations
+            .SingleOrDefaultAsync(op => op.Id == operationId && op.WorkOrderId == id, cancellationToken);
+        if (operation is null)
+        {
+            return NotFound();
+        }
+
+        if (operation.Status != "InProgress")
+        {
+            return Conflict(new { message = "Si può registrare un fermo solo su una fase avviata." });
+        }
+
+        var alreadyOpen = await _dbContext.OperationDowntimes
+            .AnyAsync(d => d.WorkOrderOperationId == operationId && d.EndedAt == null, cancellationToken);
+        if (alreadyOpen)
+        {
+            return Conflict(new { message = "C'è già un fermo aperto per questa fase." });
+        }
+
+        var downtime = new OperationDowntime
+        {
+            WorkOrderOperationId = operationId,
+            Reason = request.Reason.Trim(),
+            Notes = string.IsNullOrWhiteSpace(request.Notes) ? null : request.Notes.Trim()
+        };
+
+        _dbContext.OperationDowntimes.Add(downtime);
+        await _dbContext.SaveChangesAsync(cancellationToken);
+
+        return Ok(ToDowntimeResponse(downtime));
+    }
+
+    [Authorize]
+    [HttpPost("{id:guid}/operations/{operationId:guid}/downtime/{downtimeId:guid}/end")]
+    public async Task<ActionResult<OperationDowntimeResponse>> EndDowntime(
+        Guid id, Guid operationId, Guid downtimeId, CancellationToken cancellationToken = default)
+    {
+        var downtime = await _dbContext.OperationDowntimes
+            .SingleOrDefaultAsync(d => d.Id == downtimeId && d.WorkOrderOperationId == operationId, cancellationToken);
+        if (downtime is null)
+        {
+            return NotFound();
+        }
+
+        if (downtime.EndedAt is not null)
+        {
+            return Conflict(new { message = "Questo fermo è già stato chiuso." });
+        }
+
+        downtime.EndedAt = DateTime.UtcNow;
+        await _dbContext.SaveChangesAsync(cancellationToken);
+
+        return Ok(ToDowntimeResponse(downtime));
+    }
+
+    [HttpGet("{id:guid}/operations/{operationId:guid}/downtimes")]
+    public async Task<ActionResult<IEnumerable<OperationDowntimeResponse>>> GetDowntimes(
+        Guid id, Guid operationId, CancellationToken cancellationToken = default)
+    {
+        var downtimes = await _dbContext.OperationDowntimes
+            .AsNoTracking()
+            .Where(d => d.WorkOrderOperationId == operationId)
+            .OrderByDescending(d => d.StartedAt)
+            .ToListAsync(cancellationToken);
+
+        return Ok(downtimes.Select(ToDowntimeResponse));
+    }
+
+    private static OperationDowntimeResponse ToDowntimeResponse(OperationDowntime downtime) => new(
+        downtime.Id,
+        downtime.Reason,
+        downtime.Notes,
+        downtime.StartedAt,
+        downtime.EndedAt,
+        downtime.EndedAt.HasValue ? (decimal)(downtime.EndedAt.Value - downtime.StartedAt).TotalMinutes : null);
 
     /// <summary>Day-granularity finite-capacity forward scheduler: assigns each still-open operation
     /// (skips ones already Done) to the earliest calendar day(s) where its work center — matched by name
@@ -732,13 +828,29 @@ public class WorkOrdersController : ControllerBase
         var ordersWithDueDate = completedOrders.Where(order => order.DueDate.HasValue).ToList();
         var onTimeCount = ordersWithDueDate.Count(order => order.CompletedAt <= order.DueDate);
 
+        // Availability (OEE): gross running time of recently completed phases minus the machine stops
+        // logged against those same phases. Together with Performance (above), this covers two of OEE's
+        // three components — Quality/scrap still isn't tracked, so this is not yet full OEE.
+        var recentOperationIds = recentlyCompletedOperations.Select(op => op.Id).ToHashSet();
+        var closedDowntimes = await _dbContext.OperationDowntimes
+            .AsNoTracking()
+            .Where(downtime => recentOperationIds.Contains(downtime.WorkOrderOperationId) && downtime.EndedAt != null)
+            .ToListAsync(cancellationToken);
+        var totalDowntimeMinutes = closedDowntimes.Sum(downtime => (decimal)(downtime.EndedAt!.Value - downtime.StartedAt).TotalMinutes);
+        var totalGrossMinutes = recentlyCompletedOperations.Sum(op => (decimal)(op.CompletedAt!.Value - op.StartedAt!.Value).TotalMinutes);
+        var availabilityRatio = totalGrossMinutes > 0
+            ? Math.Max(0, (totalGrossMinutes - totalDowntimeMinutes) / totalGrossMinutes)
+            : (decimal?)null;
+
         return Ok(new WorkOrderDashboardResponse(
             days,
             statusCounts.ToDictionary(entry => entry.Status, entry => entry.Count),
             recentlyCompletedOperations.Count,
             performanceRatios.Count > 0 ? performanceRatios.Average() : null,
             completedOrders.Count,
-            ordersWithDueDate.Count > 0 ? (decimal)onTimeCount / ordersWithDueDate.Count : null));
+            ordersWithDueDate.Count > 0 ? (decimal)onTimeCount / ordersWithDueDate.Count : null,
+            totalDowntimeMinutes,
+            availabilityRatio));
     }
 }
 
@@ -812,7 +924,9 @@ public sealed record WorkOrderDashboardResponse(
     int OperationsCompletedInPeriod,
     decimal? AveragePerformanceRatio,
     int WorkOrdersCompletedInPeriod,
-    decimal? OnTimeCompletionRate);
+    decimal? OnTimeCompletionRate,
+    decimal TotalDowntimeMinutes,
+    decimal? AvailabilityRatio);
 
 public sealed record MaterialAvailabilityLineResponse(string MaterialCode, decimal Required, decimal Available, decimal Shortfall);
 
@@ -825,3 +939,13 @@ public sealed record WorkOrderMaterialLotResponse(
     decimal QuantityConsumed,
     Guid WithdrawalSlipId,
     string WithdrawalSlipCode);
+
+public sealed record StartDowntimeRequest(string Reason, string? Notes);
+
+public sealed record OperationDowntimeResponse(
+    Guid Id,
+    string Reason,
+    string? Notes,
+    DateTime StartedAt,
+    DateTime? EndedAt,
+    decimal? DurationMinutes);

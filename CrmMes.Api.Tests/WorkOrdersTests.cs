@@ -514,4 +514,159 @@ public class WorkOrdersTests : IClassFixture<AdminSeededApiTestFixture>
         var assembly = scheduled.Operations.Single(op => op.Id == assemblyId);
         Assert.Null(assembly.PlannedStartAt);
     }
+
+    private async Task<(Guid WorkOrderId, Guid OperationId)> CreateAndStartFirstOperationAsync()
+    {
+        var (product, _) = await CreateProductWithRoutingAndBomAsync(materialStock: 100);
+        var createResponse = await _adminClient.PostAsJsonAsync(
+            "/api/work-orders", new CreateWorkOrderRequest(product.Id, 1, null, null, null, null, null));
+        var order = (await createResponse.Content.ReadFromJsonAsync<WorkOrderResponse>())!;
+        await _adminClient.PostAsync($"/api/work-orders/{order.Id}/release", null);
+        var operationId = order.Operations.OrderBy(op => op.SequenceNumber).First().Id;
+        await _adminClient.PostAsync($"/api/work-orders/{order.Id}/operations/{operationId}/start", null);
+        return (order.Id, operationId);
+    }
+
+    [Fact]
+    public async Task StartDowntime_OnInProgressOperation_Succeeds()
+    {
+        var (workOrderId, operationId) = await CreateAndStartFirstOperationAsync();
+
+        var response = await _adminClient.PostAsJsonAsync(
+            $"/api/work-orders/{workOrderId}/operations/{operationId}/downtime/start",
+            new StartDowntimeRequest("Guasto macchina", "Da verificare"));
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var downtime = await response.Content.ReadFromJsonAsync<OperationDowntimeResponse>();
+        Assert.Equal("Guasto macchina", downtime!.Reason);
+        Assert.Null(downtime.EndedAt);
+        Assert.Null(downtime.DurationMinutes);
+    }
+
+    [Fact]
+    public async Task StartDowntime_OnPendingOperation_ReturnsConflict()
+    {
+        var (product, _) = await CreateProductWithRoutingAndBomAsync(materialStock: 100);
+        var createResponse = await _adminClient.PostAsJsonAsync(
+            "/api/work-orders", new CreateWorkOrderRequest(product.Id, 1, null, null, null, null, null));
+        var order = (await createResponse.Content.ReadFromJsonAsync<WorkOrderResponse>())!;
+        var operationId = order.Operations.OrderBy(op => op.SequenceNumber).First().Id;
+
+        var response = await _adminClient.PostAsJsonAsync(
+            $"/api/work-orders/{order.Id}/operations/{operationId}/downtime/start",
+            new StartDowntimeRequest("Guasto", null));
+
+        Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task StartDowntime_WhenAlreadyOpen_ReturnsConflict()
+    {
+        var (workOrderId, operationId) = await CreateAndStartFirstOperationAsync();
+        await _adminClient.PostAsJsonAsync(
+            $"/api/work-orders/{workOrderId}/operations/{operationId}/downtime/start",
+            new StartDowntimeRequest("Guasto macchina", null));
+
+        var response = await _adminClient.PostAsJsonAsync(
+            $"/api/work-orders/{workOrderId}/operations/{operationId}/downtime/start",
+            new StartDowntimeRequest("Un altro motivo", null));
+
+        Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task EndDowntime_ClosesAndComputesDuration()
+    {
+        var (workOrderId, operationId) = await CreateAndStartFirstOperationAsync();
+        var startResponse = await _adminClient.PostAsJsonAsync(
+            $"/api/work-orders/{workOrderId}/operations/{operationId}/downtime/start",
+            new StartDowntimeRequest("Guasto macchina", null));
+        var downtime = (await startResponse.Content.ReadFromJsonAsync<OperationDowntimeResponse>())!;
+
+        var endResponse = await _adminClient.PostAsync(
+            $"/api/work-orders/{workOrderId}/operations/{operationId}/downtime/{downtime.Id}/end", null);
+
+        Assert.Equal(HttpStatusCode.OK, endResponse.StatusCode);
+        var closed = (await endResponse.Content.ReadFromJsonAsync<OperationDowntimeResponse>())!;
+        Assert.NotNull(closed.EndedAt);
+        Assert.NotNull(closed.DurationMinutes);
+        Assert.True(closed.DurationMinutes >= 0);
+    }
+
+    [Fact]
+    public async Task EndDowntime_AlreadyClosed_ReturnsConflict()
+    {
+        var (workOrderId, operationId) = await CreateAndStartFirstOperationAsync();
+        var startResponse = await _adminClient.PostAsJsonAsync(
+            $"/api/work-orders/{workOrderId}/operations/{operationId}/downtime/start",
+            new StartDowntimeRequest("Guasto macchina", null));
+        var downtime = (await startResponse.Content.ReadFromJsonAsync<OperationDowntimeResponse>())!;
+        await _adminClient.PostAsync($"/api/work-orders/{workOrderId}/operations/{operationId}/downtime/{downtime.Id}/end", null);
+
+        var response = await _adminClient.PostAsync($"/api/work-orders/{workOrderId}/operations/{operationId}/downtime/{downtime.Id}/end", null);
+
+        Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task CompleteOperation_WithOpenDowntime_ReturnsConflict()
+    {
+        var (workOrderId, operationId) = await CreateAndStartFirstOperationAsync();
+        await _adminClient.PostAsJsonAsync(
+            $"/api/work-orders/{workOrderId}/operations/{operationId}/downtime/start",
+            new StartDowntimeRequest("Guasto macchina", null));
+
+        var response = await _adminClient.PostAsync($"/api/work-orders/{workOrderId}/operations/{operationId}/complete", null);
+
+        Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task CompleteOperation_AfterClosingDowntime_Succeeds()
+    {
+        var (workOrderId, operationId) = await CreateAndStartFirstOperationAsync();
+        var startResponse = await _adminClient.PostAsJsonAsync(
+            $"/api/work-orders/{workOrderId}/operations/{operationId}/downtime/start",
+            new StartDowntimeRequest("Guasto macchina", null));
+        var downtime = (await startResponse.Content.ReadFromJsonAsync<OperationDowntimeResponse>())!;
+        await _adminClient.PostAsync($"/api/work-orders/{workOrderId}/operations/{operationId}/downtime/{downtime.Id}/end", null);
+
+        var response = await _adminClient.PostAsync($"/api/work-orders/{workOrderId}/operations/{operationId}/complete", null);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task GetDowntimes_ListsRecordedStops()
+    {
+        var (workOrderId, operationId) = await CreateAndStartFirstOperationAsync();
+        await _adminClient.PostAsJsonAsync(
+            $"/api/work-orders/{workOrderId}/operations/{operationId}/downtime/start",
+            new StartDowntimeRequest("Guasto macchina", "Nota"));
+
+        var downtimes = await _adminClient.GetFromJsonAsync<List<OperationDowntimeResponse>>(
+            $"/api/work-orders/{workOrderId}/operations/{operationId}/downtimes");
+
+        Assert.Single(downtimes!);
+        Assert.Equal("Guasto macchina", downtimes![0].Reason);
+    }
+
+    [Fact]
+    public async Task Dashboard_ReflectsDowntimeAndAvailabilityRatio()
+    {
+        var (workOrderId, operationId) = await CreateAndStartFirstOperationAsync();
+        var startResponse = await _adminClient.PostAsJsonAsync(
+            $"/api/work-orders/{workOrderId}/operations/{operationId}/downtime/start",
+            new StartDowntimeRequest("Guasto macchina", null));
+        var downtime = (await startResponse.Content.ReadFromJsonAsync<OperationDowntimeResponse>())!;
+        await _adminClient.PostAsync($"/api/work-orders/{workOrderId}/operations/{operationId}/downtime/{downtime.Id}/end", null);
+        await _adminClient.PostAsync($"/api/work-orders/{workOrderId}/operations/{operationId}/complete", null);
+
+        var dashboard = await _adminClient.GetFromJsonAsync<WorkOrderDashboardResponse>("/api/work-orders/dashboard?days=1");
+
+        Assert.NotNull(dashboard);
+        Assert.True(dashboard!.TotalDowntimeMinutes >= 0);
+        Assert.NotNull(dashboard.AvailabilityRatio);
+        Assert.InRange(dashboard.AvailabilityRatio!.Value, 0m, 1m);
+    }
 }

@@ -86,6 +86,18 @@ public partial class WorkOrderDetailWindow : Window
         }
     }
 
+    private async void Downtimes_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is not FrameworkElement { Tag: WorkOrderOperationDto operation })
+        {
+            return;
+        }
+
+        var window = new OperationDowntimesWindow(_apiClient, _workOrderId, operation.Id, operation.Name) { Owner = this };
+        window.ShowDialog();
+        await ReloadAsync();
+    }
+
     private async void Release_Click(object sender, RoutedEventArgs e)
     {
         ErrorText.Text = string.Empty;

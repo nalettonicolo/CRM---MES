@@ -1,0 +1,55 @@
+<Window x:Class="CrmMes.Desktop.OperationDowntimesWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:local="clr-namespace:CrmMes.Desktop"
+        Title="Fermi macchina" Icon="Assets/logo.ico" Height="560" Width="640"
+        WindowStartupLocation="CenterOwner" ResizeMode="CanResize" MinHeight="440" MinWidth="560"
+        Background="{StaticResource BackgroundBrush}">
+    <Grid Margin="24">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+
+        <StackPanel Grid.Row="0">
+            <TextBlock Text="F E R M I   M A C C H I N A" Style="{StaticResource MicroLabel}" Foreground="{StaticResource PrimaryBrush}" />
+            <TextBlock x:Name="OperationNameText" Style="{StaticResource EditorialTitle}" FontSize="26" Margin="0,0,0,4" />
+        </StackPanel>
+
+        <StackPanel x:Name="OpenDowntimePanel" Grid.Row="1" Orientation="Horizontal" Margin="0,14,0,0" Visibility="Collapsed">
+            <TextBlock x:Name="OpenDowntimeText" VerticalAlignment="Center" Foreground="{StaticResource DangerBrush}" FontWeight="SemiBold" TextWrapping="Wrap" />
+            <Button x:Name="EndDowntimeButton" Style="{StaticResource DangerButton}" Content="Chiudi fermo" Width="130" Height="34" Margin="14,0,0,0" Click="EndDowntime_Click" />
+        </StackPanel>
+
+        <StackPanel x:Name="NewDowntimePanel" Grid.Row="2" Margin="0,16,0,0">
+            <TextBlock Text="Segnala un nuovo fermo" FontWeight="SemiBold" Foreground="{StaticResource TextPrimaryBrush}" Margin="0,0,0,8" />
+            <TextBlock Text="Motivo (es. Guasto macchina, Attesa materiale, Cambio utensile)" Foreground="{StaticResource TextSecondaryBrush}" FontSize="11" Margin="0,0,0,4" />
+            <DockPanel Margin="0,0,0,8">
+                <Button DockPanel.Dock="Right" Content="Segnala fermo" Width="130" Height="34" Margin="10,0,0,0" Click="StartDowntime_Click" />
+                <TextBox x:Name="ReasonBox" />
+            </DockPanel>
+            <TextBlock Text="Note (opzionale)" Foreground="{StaticResource TextSecondaryBrush}" FontSize="11" Margin="0,0,0,4" />
+            <TextBox x:Name="NotesBox" Height="60" TextWrapping="Wrap" AcceptsReturn="True" VerticalScrollBarVisibility="Auto" />
+            <TextBlock x:Name="ErrorText" Foreground="{StaticResource DangerBrush}" TextWrapping="Wrap" Margin="0,8,0,0" />
+        </StackPanel>
+
+        <TextBlock Grid.Row="3" Text="Storico" FontWeight="SemiBold" Foreground="{StaticResource TextPrimaryBrush}" Margin="0,18,0,8" />
+
+        <Border Grid.Row="4" Style="{StaticResource CardBorder}" Padding="4">
+            <ListView x:Name="DowntimesList">
+                <ListView.View>
+                    <GridView>
+                        <GridViewColumn Header="Motivo" DisplayMemberBinding="{Binding Reason}" Width="150" />
+                        <GridViewColumn Header="Note" DisplayMemberBinding="{Binding Notes}" Width="150" />
+                        <GridViewColumn Header="Iniziato" DisplayMemberBinding="{Binding StartedAt, StringFormat={}{0:g}}" Width="120" />
+                        <GridViewColumn Header="Chiuso" DisplayMemberBinding="{Binding EndedAt, StringFormat={}{0:g}}" Width="120" />
+                        <GridViewColumn Header="Minuti" DisplayMemberBinding="{Binding DurationMinutes, StringFormat={}{0:0.0}}" Width="70" />
+                    </GridView>
+                </ListView.View>
+            </ListView>
+        </Border>
+    </Grid>
+</Window>
