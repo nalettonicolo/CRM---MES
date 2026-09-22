@@ -1,11 +1,12 @@
 <Window x:Class="CrmMes.Desktop.SettingsWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="Impostazioni" Icon="Assets/logo.ico" Height="300" Width="460"
+        Title="Impostazioni" Icon="Assets/logo.ico" Height="360" Width="460"
         WindowStartupLocation="CenterOwner" ResizeMode="NoResize"
         Background="{StaticResource BackgroundBrush}">
     <Grid Margin="24">
         <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
@@ -23,11 +24,9 @@
             <TextBox x:Name="ApiUrlBox" />
         </DockPanel>
 
-        <StackPanel Grid.Row="4" VerticalAlignment="Bottom">
-            <TextBlock x:Name="TestResultText" Margin="0,14,0,0" TextWrapping="Wrap" />
-        </StackPanel>
+        <TextBlock Grid.Row="4" x:Name="TestResultText" Margin="0,14,0,0" TextWrapping="Wrap" />
 
-        <StackPanel Grid.Row="5" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,16,0,0">
+        <StackPanel Grid.Row="6" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,16,0,0">
             <Button x:Name="TestButton" Style="{StaticResource SecondaryButton}" Content="Verifica connessione" Width="150" Height="36" Click="TestButton_Click" Margin="0,0,10,0" />
             <Button x:Name="SaveButton" Content="Salva e riavvia connessione" Width="190" Height="36" Click="SaveButton_Click" />
         </StackPanel>
