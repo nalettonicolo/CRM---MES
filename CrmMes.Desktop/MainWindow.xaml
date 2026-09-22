@@ -28,8 +28,8 @@
                     <ColumnDefinition Width="Auto" />
                 </Grid.ColumnDefinitions>
                 <StackPanel Grid.Column="0" Orientation="Horizontal" Margin="16,0,0,0" VerticalAlignment="Center">
-                    <Image Source="Assets/logo.png" Width="20" Height="20" VerticalAlignment="Center" />
-                    <TextBlock Text="Nicolò - MES" Margin="10,0,0,0" Foreground="{StaticResource TitleBarTextBrush}" FontSize="12.5" FontWeight="SemiBold" VerticalAlignment="Center" />
+                    <Image Source="Assets/logo.png" Width="18" Height="18" VerticalAlignment="Center" />
+                    <TextBlock Text="N I C O L Ò   ·   M E S" Margin="12,0,0,0" Foreground="{StaticResource TitleBarTextBrush}" FontSize="11" FontWeight="Bold" VerticalAlignment="Center" />
                 </StackPanel>
                 <StackPanel Grid.Column="1" Orientation="Horizontal">
                     <Button x:Name="MinimizeButton" Style="{StaticResource CaptionButton}" Content="&#xE921;" Click="MinimizeButton_Click" WindowChrome.IsHitTestVisibleInChrome="True" />
@@ -41,18 +41,21 @@
 
         <Grid Grid.Row="1">
             <!-- Login -->
-            <Grid x:Name="LoginPanel" Visibility="Visible" HorizontalAlignment="Center" VerticalAlignment="Center" Width="360">
-                <Border Style="{StaticResource CardBorder}" Padding="28">
+            <Grid x:Name="LoginPanel" Visibility="Visible" HorizontalAlignment="Center" VerticalAlignment="Center" Width="380">
+                <!-- Oversized watermark numeral behind the card — pure typographic decoration, no data -->
+                <TextBlock Text="01" FontSize="220" FontWeight="Black" Foreground="{StaticResource SurfaceRaisedBrush}"
+                           HorizontalAlignment="Right" VerticalAlignment="Top" Margin="0,-150,-40,0" />
+                <Border Style="{StaticResource CardBorder}" Padding="32,30">
                     <StackPanel>
-                        <TextBlock Text="Accesso" FontSize="24" FontWeight="SemiBold" Foreground="{StaticResource TextPrimaryBrush}" />
-                        <TextBlock Text="Accedi al gestionale" Margin="0,6,0,22" Foreground="{StaticResource TextSecondaryBrush}" />
-                        <TextBlock Text="Email" Margin="0,0,0,5" Foreground="{StaticResource TextSecondaryBrush}" FontSize="12.5" />
+                        <TextBlock Text="A C C E S S O" Style="{StaticResource MicroLabel}" Foreground="{StaticResource PrimaryBrush}" Margin="0,0,0,4" />
+                        <TextBlock Text="Accedi" FontSize="34" FontWeight="Black" Foreground="{StaticResource TextPrimaryBrush}" Margin="0,0,0,24" />
+                        <TextBlock Text="Email" Margin="0,0,0,5" Foreground="{StaticResource TextSecondaryBrush}" FontSize="11" />
                         <TextBox x:Name="EmailBox" />
-                        <TextBlock Text="Password" Margin="0,16,0,5" Foreground="{StaticResource TextSecondaryBrush}" FontSize="12.5" />
+                        <TextBlock Text="Password" Margin="0,18,0,5" Foreground="{StaticResource TextSecondaryBrush}" FontSize="11" />
                         <PasswordBox x:Name="PasswordBox" />
-                        <Button x:Name="LoginButton" Content="Accedi" Height="38" Margin="0,22,0,0" Click="LoginButton_Click" IsEnabled="False" />
+                        <Button x:Name="LoginButton" Content="ACCEDI →" Height="42" Margin="0,26,0,0" Click="LoginButton_Click" IsEnabled="False" />
                         <TextBlock x:Name="LoginError" Margin="0,12,0,0" Foreground="{StaticResource DangerBrush}" TextWrapping="Wrap" />
-                        <Button x:Name="LoginSettingsButton" Style="{StaticResource SidebarLinkButton}" Content="Impostazioni server" Foreground="{StaticResource TextSecondaryBrush}" HorizontalAlignment="Center" Margin="0,14,0,0" Click="SettingsButton_Click" />
+                        <Button x:Name="LoginSettingsButton" Style="{StaticResource SidebarLinkButton}" Content="Impostazioni server" Foreground="{StaticResource TextMutedBrush}" HorizontalAlignment="Center" Margin="0,18,0,0" Click="SettingsButton_Click" />
                     </StackPanel>
                 </Border>
             </Grid>
@@ -60,25 +63,31 @@
             <!-- Dashboard -->
             <Grid x:Name="DashboardPanel" Visibility="Collapsed">
                 <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="222" />
+                    <ColumnDefinition Width="228" />
                     <ColumnDefinition Width="*" />
                 </Grid.ColumnDefinitions>
 
-                <!-- Sidebar -->
-                <Border Grid.Column="0" Background="{StaticResource SidebarBgBrush}">
+                <!-- Navigation dock: detached from the window edges (floating), not a flush structural
+                     column — a deliberate break from the fixed-sidebar SaaS convention. -->
+                <Border Grid.Column="0" Background="{StaticResource SidebarBgBrush}" BorderBrush="{StaticResource SidebarBorderBrush}" BorderThickness="1" Margin="14,18,0,18">
                     <DockPanel>
-                        <Border DockPanel.Dock="Bottom" BorderBrush="{StaticResource SidebarBorderBrush}" BorderThickness="0,1,0,0" Padding="16,14">
+                        <Border DockPanel.Dock="Bottom" BorderBrush="{StaticResource SidebarBorderBrush}" BorderThickness="0,1,0,0" Padding="18,16">
                             <StackPanel>
-                                <Border Background="{StaticResource SuccessBgBrush}" CornerRadius="5" Padding="10,6" HorizontalAlignment="Left">
-                                    <TextBlock x:Name="ConnectionStatus" Text="Connessione..." Foreground="{StaticResource SuccessTextBrush}" FontWeight="SemiBold" FontSize="11.5" />
-                                </Border>
-                                <TextBlock x:Name="BusyIndicator" Text="" Foreground="{StaticResource SidebarTextBrush}" FontStyle="Italic" FontSize="11.5" Margin="0,8,0,0" />
+                                <StackPanel Orientation="Horizontal">
+                                    <Border Width="6" Height="6" Background="{StaticResource PrimaryBrush}" Margin="0,0,8,0">
+                                        <Border.Effect>
+                                            <DropShadowEffect Color="#D6FF3F" Opacity="1" BlurRadius="8" ShadowDepth="0" />
+                                        </Border.Effect>
+                                    </Border>
+                                    <TextBlock x:Name="ConnectionStatus" Text="Connessione..." Foreground="{StaticResource TextPrimaryBrush}" FontWeight="Bold" FontSize="11" VerticalAlignment="Center" />
+                                </StackPanel>
+                                <TextBlock x:Name="BusyIndicator" Text="" Foreground="{StaticResource TextMutedBrush}" FontStyle="Italic" FontSize="11" Margin="0,8,0,0" />
                                 <Button x:Name="UpdateButton" Style="{StaticResource SidebarLinkButton}" Content="Controlla aggiornamenti" Margin="0,10,0,0" Click="UpdateButton_Click" />
                                 <Button x:Name="SidebarSettingsButton" Style="{StaticResource SidebarLinkButton}" Content="Impostazioni server" Margin="0,6,0,0" Click="SettingsButton_Click" Visibility="Collapsed" />
                             </StackPanel>
                         </Border>
                         <StackPanel Margin="0,10,0,0">
-                            <Expander Style="{StaticResource NavSectionExpander}" Header="MAGAZZINO">
+                            <Expander Style="{StaticResource NavSectionExpander}" Header="M A G A Z Z I N O">
                                 <StackPanel>
                                     <RadioButton x:Name="NavMaterials" Style="{StaticResource NavItem}" GroupName="Nav" Tag="0" Checked="NavItem_Checked">
                                         <StackPanel Orientation="Horizontal">
@@ -113,7 +122,7 @@
                                 </StackPanel>
                             </Expander>
 
-                            <Expander Style="{StaticResource NavSectionExpander}" Header="ACQUISTI">
+                            <Expander Style="{StaticResource NavSectionExpander}" Header="A C Q U I S T I">
                                 <StackPanel>
                                     <RadioButton x:Name="NavOrders" Style="{StaticResource NavItem}" GroupName="Nav" Tag="4" Checked="NavItem_Checked">
                                         <StackPanel Orientation="Horizontal">
@@ -124,7 +133,7 @@
                                 </StackPanel>
                             </Expander>
 
-                            <Expander Style="{StaticResource NavSectionExpander}" Header="PRODUZIONE">
+                            <Expander Style="{StaticResource NavSectionExpander}" Header="P R O D U Z I O N E">
                                 <StackPanel>
                                     <RadioButton x:Name="NavProducts" Style="{StaticResource NavItem}" GroupName="Nav" Tag="7" Checked="NavItem_Checked">
                                         <StackPanel Orientation="Horizontal">
@@ -153,7 +162,7 @@
                                 </StackPanel>
                             </Expander>
 
-                            <Expander Style="{StaticResource NavSectionExpander}" Header="AMMINISTRAZIONE">
+                            <Expander Style="{StaticResource NavSectionExpander}" Header="A M M I N I S T R A Z I O N E">
                                 <StackPanel>
                                     <RadioButton x:Name="NavAreas" Style="{StaticResource NavItem}" GroupName="Nav" Tag="5" Checked="NavItem_Checked">
                                         <StackPanel Orientation="Horizontal">
@@ -174,15 +183,18 @@
                 </Border>
 
                 <!-- Content -->
-                <Grid Grid.Column="1" Margin="32,26,32,28">
+                <Grid Grid.Column="1" Margin="40,30,36,28">
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto" />
                         <RowDefinition Height="*" />
                     </Grid.RowDefinitions>
 
-                    <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="0,0,0,20">
-                        <TextBlock x:Name="PageTitle" Text="Materiali" FontSize="22" FontWeight="SemiBold" Foreground="{StaticResource TextPrimaryBrush}" VerticalAlignment="Center" />
-                        <local:HelpIcon x:Name="PageHelpIcon" Margin="10,4,0,0" />
+                    <StackPanel Grid.Row="0" Margin="0,0,0,26">
+                        <TextBlock x:Name="PageEyebrow" Text="M A G A Z Z I N O" Style="{StaticResource MicroLabel}" Foreground="{StaticResource PrimaryBrush}" Margin="2,0,0,-6" />
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock x:Name="PageTitle" Text="Materiali" Style="{StaticResource EditorialTitle}" VerticalAlignment="Center" />
+                            <local:HelpIcon x:Name="PageHelpIcon" Margin="12,10,0,0" VerticalAlignment="Top" />
+                        </StackPanel>
                     </StackPanel>
 
                     <TabControl Grid.Row="1" x:Name="MainTabs" SelectionChanged="MainTabs_SelectionChanged">

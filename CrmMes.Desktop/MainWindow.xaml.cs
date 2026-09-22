@@ -51,6 +51,22 @@ public partial class MainWindow : Window
         [11] = "Centri di lavoro",
     };
 
+    private static readonly Dictionary<int, string> PageEyebrows = new()
+    {
+        [0] = "M A G A Z Z I N O",
+        [1] = "M A G A Z Z I N O",
+        [2] = "M A G A Z Z I N O",
+        [3] = "M A G A Z Z I N O",
+        [9] = "M A G A Z Z I N O",
+        [4] = "A C Q U I S T I",
+        [7] = "P R O D U Z I O N E",
+        [8] = "P R O D U Z I O N E",
+        [10] = "P R O D U Z I O N E",
+        [11] = "P R O D U Z I O N E",
+        [5] = "A M M I N I S T R A Z I O N E",
+        [6] = "A M M I N I S T R A Z I O N E",
+    };
+
     private static readonly Dictionary<int, string> PageHelpTexts = new()
     {
         [0] = "Elenco dei materiali a magazzino: codice, descrizione, unità di misura, giacenza. Da qui si crea un nuovo materiale, si cerca per codice/descrizione e si importa un catalogo Excel di un fornitore.",
@@ -144,6 +160,7 @@ public partial class MainWindow : Window
 
         MainTabs.SelectedIndex = index;
         PageTitle.Text = PageTitles.GetValueOrDefault(index, string.Empty);
+        PageEyebrow.Text = PageEyebrows.GetValueOrDefault(index, string.Empty);
         PageHelpIcon.Text = PageHelpTexts.GetValueOrDefault(index, string.Empty);
     }
 

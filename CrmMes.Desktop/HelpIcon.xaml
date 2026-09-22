@@ -10,10 +10,16 @@
         <Button.Template>
             <ControlTemplate TargetType="Button">
                 <Grid>
-                    <Ellipse Fill="#E2E8F0" Stroke="#94A3B8" StrokeThickness="1" />
-                    <TextBlock Text="?" FontSize="10.5" FontWeight="Bold" Foreground="#475569"
+                    <Ellipse x:Name="Ring" Fill="Transparent" Stroke="{StaticResource TextMutedBrush}" StrokeThickness="1" />
+                    <TextBlock x:Name="Mark" Text="?" FontSize="10" FontWeight="Bold" Foreground="{StaticResource TextMutedBrush}"
                                HorizontalAlignment="Center" VerticalAlignment="Center" />
                 </Grid>
+                <ControlTemplate.Triggers>
+                    <Trigger Property="IsMouseOver" Value="True">
+                        <Setter TargetName="Ring" Property="Stroke" Value="{StaticResource PrimaryBrush}" />
+                        <Setter TargetName="Mark" Property="Foreground" Value="{StaticResource PrimaryBrush}" />
+                    </Trigger>
+                </ControlTemplate.Triggers>
             </ControlTemplate>
         </Button.Template>
     </Button>

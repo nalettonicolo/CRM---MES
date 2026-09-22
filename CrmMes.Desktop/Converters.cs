@@ -4,33 +4,39 @@ using System.Windows.Media;
 
 namespace CrmMes.Desktop;
 
-/// <summary>Maps a workflow status string (Draft, Confirmed, Received, Open, ...) to a pill background/foreground brush.</summary>
+/// <summary>Maps a workflow status string (Draft, Confirmed, Received, Open, ...) to the telemetry-style
+/// status tag's color. There is no background fill in this design language (see the "Pill" style) — every
+/// status reads as colored text against the panel, like a terminal readout, not a colored badge.</summary>
 public sealed class StatusToBrushConverter : IValueConverter
 {
-    private static readonly Dictionary<string, (string Bg, string Fg)> Palette = new(StringComparer.OrdinalIgnoreCase)
+    private static readonly Dictionary<string, string> Palette = new(StringComparer.OrdinalIgnoreCase)
     {
-        ["Draft"] = ("#E2E8F0", "#475569"),
-        ["Open"] = ("#FEF3C7", "#B45309"),
-        ["Ordered"] = ("#DBEAFE", "#1D4ED8"),
-        ["Ready"] = ("#DBEAFE", "#1D4ED8"),
-        ["Confirmed"] = ("#DBEAFE", "#1D4ED8"),
-        ["PartiallyReceived"] = ("#FEF3C7", "#B45309"),
-        ["Received"] = ("#DCFCE7", "#15803D"),
-        ["Resolved"] = ("#DCFCE7", "#15803D"),
-        ["Closed"] = ("#DCFCE7", "#15803D"),
-        ["Cancelled"] = ("#FEE2E2", "#B91C1C"),
-        ["Released"] = ("#DBEAFE", "#1D4ED8"),
-        ["InProgress"] = ("#FEF3C7", "#B45309"),
-        ["Completed"] = ("#DCFCE7", "#15803D"),
-        ["Pending"] = ("#E2E8F0", "#475569"),
-        ["Done"] = ("#DCFCE7", "#15803D"),
+        ["Draft"] = "#8C8C92",
+        ["Pending"] = "#8C8C92",
+        ["Open"] = "#FFB84D",
+        ["PartiallyReceived"] = "#FFB84D",
+        ["InProgress"] = "#FFB84D",
+        ["Ordered"] = "#D6FF3F",
+        ["Ready"] = "#D6FF3F",
+        ["Confirmed"] = "#D6FF3F",
+        ["Released"] = "#D6FF3F",
+        ["Received"] = "#7CE0A8",
+        ["Resolved"] = "#7CE0A8",
+        ["Closed"] = "#7CE0A8",
+        ["Completed"] = "#7CE0A8",
+        ["Done"] = "#7CE0A8",
+        ["Cancelled"] = "#FF5C5C",
     };
 
     public object Convert(object? value, Type targetType, object? parameter, CultureInfo culture)
     {
+        if (parameter as string != "Foreground")
+        {
+            return Brushes.Transparent;
+        }
+
         var key = value as string ?? string.Empty;
-        var (bg, fg) = Palette.TryGetValue(key, out var colors) ? colors : ("#F1F5F9", "#475569");
-        var hex = parameter as string == "Foreground" ? fg : bg;
+        var hex = Palette.TryGetValue(key, out var color) ? color : "#8C8C92";
         return new SolidColorBrush((Color)ColorConverter.ConvertFromString(hex));
     }
 
@@ -86,7 +92,8 @@ public sealed class BoolToTextConverter : IValueConverter
         => throw new NotSupportedException();
 }
 
-/// <summary>Picks a pill brush for a boolean value. Parameter "warning" makes true render amber instead of green.</summary>
+/// <summary>Picks the status-tag color for a boolean value. No fill (see "Pill" style) — only the text
+/// color changes. Parameter "warning" makes true render amber instead of lime.</summary>
 public sealed class BoolToBrushConverter : IValueConverter
 {
     public object Convert(object? value, Type targetType, object? parameter, CultureInfo culture)
@@ -95,20 +102,12 @@ public sealed class BoolToBrushConverter : IValueConverter
         var isForeground = parameter is string p && p.Contains("Foreground");
         var warning = parameter is string wp && wp.Contains("warning");
 
-        string hex;
-        if (!isTrue)
+        if (!isForeground)
         {
-            hex = isForeground ? "#64748B" : "#F1F5F9";
-        }
-        else if (warning)
-        {
-            hex = isForeground ? "#B45309" : "#FEF3C7";
-        }
-        else
-        {
-            hex = isForeground ? "#15803D" : "#DCFCE7";
+            return Brushes.Transparent;
         }
 
+        var hex = !isTrue ? "#8C8C92" : warning ? "#FFB84D" : "#D6FF3F";
         return new SolidColorBrush((Color)ColorConverter.ConvertFromString(hex));
     }
 
