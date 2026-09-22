@@ -1,0 +1,25 @@
+name: Keep API awake
+
+# Render's Free plan spins the service down after ~15 minutes of inactivity; the next real request
+# then waits 30-60s for a cold start. This pings /health every 10 minutes so the instance never sits
+# idle long enough to spin down. It costs nothing (GitHub Actions free minutes, a health check has no
+# side effects) and needs no third-party account.
+#
+# Limitation: GitHub's cron scheduler is best-effort, not exact-interval - under load it can run a few
+# minutes late, and it's automatically disabled if this repository goes 60 days without any commit.
+on:
+  schedule:
+    - cron: "*/10 * * * *"
+  workflow_dispatch:
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping /health
+        run: |
+          status=$(curl -s -o /dev/null -w "%{http_code}" https://crmmes-api.onrender.com/health)
+          echo "Health check responded with HTTP $status"
+          if [ "$status" != "200" ]; then
+            echo "::warning::API health check did not return 200 (got $status) - service may be cold-starting or down."
+          fi
