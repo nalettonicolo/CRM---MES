@@ -18,13 +18,18 @@ public sealed class ClientSettings
 
     public string ApiBaseUrl { get; set; } = DefaultApiBaseUrl;
 
-    public static ClientSettings Load()
+    public static ClientSettings Load() => Load(SettingsPath);
+
+    /// <summary>Test seam: lets CrmMes.Desktop.Tests exercise the load/parse/fallback logic against a
+    /// temp file instead of the real user profile, so a test run can never clobber someone's actual
+    /// saved server address.</summary>
+    internal static ClientSettings Load(string path)
     {
         try
         {
-            if (File.Exists(SettingsPath))
+            if (File.Exists(path))
             {
-                var json = File.ReadAllText(SettingsPath);
+                var json = File.ReadAllText(path);
                 var settings = JsonSerializer.Deserialize<ClientSettings>(json);
                 if (settings is not null && !string.IsNullOrWhiteSpace(settings.ApiBaseUrl))
                 {
@@ -40,12 +45,15 @@ public sealed class ClientSettings
         return new ClientSettings();
     }
 
-    public void Save()
+    public void Save() => Save(SettingsPath);
+
+    /// <summary>Test seam, see <see cref="Load(string)"/>.</summary>
+    internal void Save(string path)
     {
-        var directory = Path.GetDirectoryName(SettingsPath)!;
+        var directory = Path.GetDirectoryName(path)!;
         Directory.CreateDirectory(directory);
         var json = JsonSerializer.Serialize(this, new JsonSerializerOptions { WriteIndented = true });
-        File.WriteAllText(SettingsPath, json);
+        File.WriteAllText(path, json);
     }
 
     public bool IsLocalHost()

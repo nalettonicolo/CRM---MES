@@ -23,12 +23,17 @@ jobs:
       - name: Build
         run: dotnet build CrmMes.sln --no-restore --configuration Release
 
-      - name: Test
+      - name: Test API
         run: dotnet test CrmMes.Api.Tests/CrmMes.Api.Tests.csproj --no-build --configuration Release --logger "trx;LogFileName=test-results.trx"
+
+      - name: Test Desktop client
+        run: dotnet test CrmMes.Desktop.Tests/CrmMes.Desktop.Tests.csproj --no-build --configuration Release --logger "trx;LogFileName=test-results.trx"
 
       - name: Publish test results
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: test-results
-          path: CrmMes.Api.Tests/TestResults/test-results.trx
+          path: |
+            CrmMes.Api.Tests/TestResults/test-results.trx
+            CrmMes.Desktop.Tests/TestResults/test-results.trx

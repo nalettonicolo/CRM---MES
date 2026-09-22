@@ -17,4 +17,8 @@
     <Resource Include="Assets\logo-64.png" />
   </ItemGroup>
 
+  <ItemGroup>
+    <InternalsVisibleTo Include="CrmMes.Desktop.Tests" />
+  </ItemGroup>
+
 </Project>
