@@ -1,3 +1,4 @@
+using CrmMes.Api.Services;
 using CrmMes.Core.Data;
 using CrmMes.Core.Models;
 using Microsoft.AspNetCore.Authorization;
@@ -13,10 +14,12 @@ namespace CrmMes.Api.Controllers;
 public class WithdrawalSlipsController : ControllerBase
 {
     private readonly ApplicationDbContext _dbContext;
+    private readonly WithdrawalItemBuilder _itemBuilder;
 
-    public WithdrawalSlipsController(ApplicationDbContext dbContext)
+    public WithdrawalSlipsController(ApplicationDbContext dbContext, WithdrawalItemBuilder itemBuilder)
     {
         _dbContext = dbContext;
+        _itemBuilder = itemBuilder;
     }
 
     [Authorize]
@@ -114,10 +117,11 @@ public class WithdrawalSlipsController : ControllerBase
             AreaId = request.AreaId,
             RequestedByUserId = request.RequestedByUserId,
             Notes = string.IsNullOrWhiteSpace(request.Notes) ? null : request.Notes.Trim(),
+            WorkOrderId = request.WorkOrderId,
             Status = "Draft"
         };
 
-        foreach (var item in await BuildItemsWithMissingTrackingAsync(slip.Id, request.Items, cancellationToken))
+        foreach (var item in await _itemBuilder.BuildAsync(slip.Id, request.Items, cancellationToken))
         {
             slip.Items.Add(item);
         }
@@ -189,7 +193,7 @@ public class WithdrawalSlipsController : ControllerBase
             slip.Items.Remove(item);
         }
 
-        foreach (var item in await BuildItemsWithMissingTrackingAsync(slip.Id, request.Items, cancellationToken))
+        foreach (var item in await _itemBuilder.BuildAsync(slip.Id, request.Items, cancellationToken))
         {
             slip.Items.Add(item);
         }
@@ -207,59 +211,6 @@ public class WithdrawalSlipsController : ControllerBase
 
         await _dbContext.SaveChangesAsync(cancellationToken);
         return Ok(ToResponse(slip));
-    }
-
-    /// <summary>Builds withdrawal items from the request, matching each against the active material
-    /// catalog, and registers a MissingMaterial for every line that can't be fully covered by stock.</summary>
-    private async Task<List<WithdrawalItem>> BuildItemsWithMissingTrackingAsync(
-        Guid slipId,
-        IReadOnlyList<CreateWithdrawalSlipItemRequest> requestItems,
-        CancellationToken cancellationToken)
-    {
-        var requestedCodes = requestItems
-            .Select(item => item.MaterialCode.Trim())
-            .Distinct(StringComparer.OrdinalIgnoreCase)
-            .ToArray();
-
-        var catalogMaterials = await _dbContext.Materials
-            .AsNoTracking()
-            .Where(material => material.IsActive && requestedCodes.Contains(material.Code))
-            .ToDictionaryAsync(material => material.Code, StringComparer.OrdinalIgnoreCase, cancellationToken);
-
-        var items = new List<WithdrawalItem>();
-        foreach (var requestItem in requestItems)
-        {
-            var code = requestItem.MaterialCode.Trim();
-            var catalogMaterial = catalogMaterials.GetValueOrDefault(code);
-            var item = new WithdrawalItem
-            {
-                MaterialCode = code,
-                Description = catalogMaterial?.Name ?? requestItem.Description?.Trim() ?? "Materiale non catalogato",
-                Quantity = requestItem.Quantity,
-                Unit = catalogMaterial?.Unit ?? (string.IsNullOrWhiteSpace(requestItem.Unit) ? "pz" : requestItem.Unit.Trim()),
-                IsMissing = catalogMaterial is null || catalogMaterial.Stock < requestItem.Quantity
-            };
-            // Explicitly marks the item Added. Without this, attaching a brand-new item to an
-            // *already tracked* parent (the edit path) makes EF Core's change detection assume it
-            // already exists in the database (its Guid Id looks like a real key, not a "new" default
-            // value) and emit an UPDATE instead of an INSERT, which affects 0 rows and throws.
-            _dbContext.WithdrawalItems.Add(item);
-            items.Add(item);
-
-            if (item.IsMissing)
-            {
-                _dbContext.MissingMaterials.Add(new MissingMaterial
-                {
-                    WithdrawalSlipId = slipId,
-                    MaterialCode = item.MaterialCode,
-                    Quantity = item.Quantity,
-                    Source = catalogMaterials.ContainsKey(item.MaterialCode) ? "Stock" : "Catalog",
-                    Status = "Open"
-                });
-            }
-        }
-
-        return items;
     }
 
     [Authorize]
@@ -486,6 +437,7 @@ public class WithdrawalSlipsController : ControllerBase
             slip.Code,
             slip.AreaId,
             slip.RequestedByUserId,
+            slip.WorkOrderId,
             slip.Status,
             slip.Notes,
             slip.CreatedAt,
@@ -504,7 +456,8 @@ public sealed record CreateWithdrawalSlipRequest(
     Guid RequestedByUserId,
     string? Code,
     string? Notes,
-    List<CreateWithdrawalSlipItemRequest> Items);
+    List<CreateWithdrawalSlipItemRequest> Items,
+    Guid? WorkOrderId = null);
 
 public sealed record CreateWithdrawalSlipItemRequest(
     string MaterialCode,
@@ -521,6 +474,7 @@ public sealed record WithdrawalSlipResponse(
     string Code,
     Guid AreaId,
     Guid RequestedByUserId,
+    Guid? WorkOrderId,
     string Status,
     string? Notes,
     DateTime CreatedAt,

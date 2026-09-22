@@ -62,6 +62,7 @@ builder.Services.AddAuthorization(options =>
     options.AddPolicy("PurchasingOrWarehouse", policy => policy.RequireRole("Admin", "Purchasing", "Warehouse"));
 });
 builder.Services.AddSingleton<IPasswordHasher<CrmMes.Core.Models.User>, PasswordHasher<CrmMes.Core.Models.User>>();
+builder.Services.AddScoped<CrmMes.Api.Services.WithdrawalItemBuilder>();
 
 var connectionString = Environment.GetEnvironmentVariable("NEON_DATABASE_URL")
     ?? Environment.GetEnvironmentVariable("DATABASE_URL")

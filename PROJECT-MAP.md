@@ -1,6 +1,6 @@
 # Mappa progetto Gestionale Elettrico
 
-Aggiornata: 2026-09-18
+Aggiornata: 2026-09-22
 
 ## Visione architetturale
 
@@ -28,13 +28,13 @@ flowchart LR
 - Swagger disponibile in ambiente Development.
 - Health check disponibile su `GET /health`.
 - Connessione Neon PostgreSQL configurata tramite User Secrets.
-- Migrazioni EF Core applicate a Neon: `InitialCreate`, `AddUserAuthentication`, `AddPurchaseOrderReceiving`, `AddLowStockReordering`.
+- Migrazioni EF Core applicate a Neon: `InitialCreate`, `AddUserAuthentication`, `AddPurchaseOrderReceiving`, `AddLowStockReordering`, `AddProductionCore` (nucleo MES: prodotti, distinta base, ciclo di lavoro, commesse).
 - Build verificata con 0 errori e 0 warning su tutti i 4 progetti (`CrmMes.Api`, `CrmMes.Core`, `CrmMes.Desktop`, `CrmMes.Api.Tests`).
 - Gestione errori centralizzata: `UseExceptionHandler()` + `AddProblemDetails()` (risposte RFC 9110 uniformi; dettaglio dell'eccezione incluso solo in ambiente Development).
 - HSTS attivo fuori da Development.
 - Logging delle richieste HTTP (`UseHttpLogging`, metodo/percorso/stato/durata).
 - Compressione delle risposte (gzip) abilitata.
-- `CrmMes.Api.Tests`: 38 test di integrazione (xUnit + `WebApplicationFactory` + Sqlite in-memory, non toccano mai Neon) che coprono autenticazione, refresh token, bootstrap Admin, policy di autorizzazione per ruolo, ciclo distinte di prelievo (incluse le modifiche), sottoscorte, ciclo ordini fornitore (incluse le modifiche) e import catalogo CSV/Excel. Eseguibili con `dotnet test CrmMes.Api.Tests`.
+- `CrmMes.Api.Tests`: 55 test di integrazione (xUnit + `WebApplicationFactory` + Sqlite in-memory, non toccano mai Neon) che coprono autenticazione, refresh token, bootstrap Admin, policy di autorizzazione per ruolo, ciclo distinte di prelievo (incluse le modifiche), sottoscorte, ciclo ordini fornitore (incluse le modifiche), import catalogo CSV/Excel, prodotti/distinta base/ciclo di lavoro e commesse. Eseguibili con `dotnet test CrmMes.Api.Tests`.
 - Workflow GitHub Actions (`.github/workflows/build.yml`): build + test automatici su push/PR verso `main`.
 - Refresh token: login/registrazione restituiscono un access token di 30 minuti + un refresh token di 30 giorni (rotazione ad ogni uso, revoca su logout). Endpoint `POST /api/auth/refresh` e `POST /api/auth/logout`. Il client desktop rinnova automaticamente in background prima della scadenza.
 - Import catalogo Excel (`POST /api/supplier-catalog/import-excel`, libreria ClosedXML, MIT): stessa logica di upsert del CSV, condivisa tramite un metodo comune.
@@ -46,13 +46,18 @@ flowchart LR
 - Materiali.
 - Fornitori.
 - Relazione materiale-fornitore.
-- Distinte di prelievo.
+- Distinte di prelievo: collegamento opzionale `WorkOrderId` alla commessa che le ha generate.
 - Righe distinta.
 - Materiali mancanti: `WithdrawalSlipId` reso opzionale per supportare richieste generate da sottoscorta senza distinta di origine.
 - Ordini di acquisto: aggiunti `ConfirmedAt` e `ReceivedAt`.
 - Righe ordine di acquisto: aggiunti `ReceivedQuantity` e collegamento opzionale a `MissingMaterial`.
 - Log di audit.
 - Refresh token: tabella dedicata con hash del token (mai salvato in chiaro), scadenza, revoca e collegamento al token successivo (rotazione).
+- **Prodotti** (`Product`): anagrafica di cosa si produce, volutamente generica/multisettore (codice, nome, descrizione, attivo/disattivo) — non specifica ai quadri elettrici, applicabile a qualsiasi settore manifatturiero.
+- **Distinta base** (`BillOfMaterialItem`): righe materiale+quantità+note collegate a un prodotto, per codice materiale (stesso pattern delle righe distinta di prelievo).
+- **Ciclo di lavoro** (`RoutingStep`): fasi ordinate (numero sequenza, nome, descrizione, centro di lavoro testo libero, minuti stimati) collegate a un prodotto — il campo "centro di lavoro" è testo libero apposta per restare neutro rispetto al settore.
+- **Commesse** (`WorkOrder`): job di produzione (codice, prodotto, quantità, area opzionale, riferimento cliente, stato Draft/Released/InProgress/Completed/Cancelled, scadenza, note, timestamp di rilascio/completamento).
+- **Fasi di commessa** (`WorkOrderOperation`): scatto fotografico del ciclo di lavoro del prodotto preso al momento della creazione della commessa, così che modifiche successive al ciclo del prodotto non alterino retroattivamente commesse già in corso; ogni fase ha un proprio stato Pending/InProgress/Done con timestamp di avvio/completamento.
 
 ### API gia disponibili
 
@@ -90,6 +95,23 @@ flowchart LR
 - `GET /api/supplier-catalog/search?q=...`
 - `POST /api/supplier-catalog/import-csv`
 - `POST /api/supplier-catalog/import-excel`: stessa logica del CSV, per file .xlsx
+- `GET /api/products?activeOnly=&q=`
+- `GET /api/products/{id}`: dettaglio con distinta base e ciclo di lavoro
+- `POST /api/products`
+- `PUT /api/products/{id}`
+- `DELETE /api/products/{id}`: disattivazione logica
+- `PUT /api/products/{id}/bom`: sostituisce l'intera distinta base (valida che tutti i codici materiale esistano e siano attivi)
+- `PUT /api/products/{id}/routing`: sostituisce l'intero ciclo di lavoro (assegna automaticamente il numero di sequenza in base all'ordine ricevuto)
+- `GET /api/work-orders?status=`
+- `GET /api/work-orders/{id}`
+- `POST /api/work-orders`: crea la commessa e scatta una fotografia del ciclo di lavoro del prodotto come fasi della commessa
+- `PUT /api/work-orders/{id}`: modifica quantità/area/riferimento/scadenza/note, solo per commesse in bozza
+- `POST /api/work-orders/{id}/release`: Draft -> Released
+- `POST /api/work-orders/{id}/cancel`: bloccato se già completata o annullata
+- `POST /api/work-orders/{id}/complete`: richiede tutte le fasi completate
+- `POST /api/work-orders/{id}/operations/{operationId}/start`: qualsiasi utente autenticato (operatore di reparto); alla prima fase avviata la commessa passa automaticamente a InProgress
+- `POST /api/work-orders/{id}/operations/{operationId}/complete`: qualsiasi utente autenticato
+- `POST /api/work-orders/{id}/generate-withdrawal-slip`: genera una distinta di prelievo dalla distinta base del prodotto, con quantità moltiplicate per la quantità di commessa; richiede un'area assegnata alla commessa
 
 ### Flusso verificato su Neon
 
@@ -135,6 +157,7 @@ Il prototipo è utile come riferimento funzionale, ma non deve essere usato come
 - Codici auto-generati di distinte e ordini fornitore (`DP-...`, `OD-...`) ora includono un suffisso casuale: il solo timestamp al secondo poteva generare codici duplicati se due venivano creati nello stesso secondo (violazione del vincolo di unicità), scoperto scrivendo i test di integrazione.
 - Refresh token implementato: access token ridotto da 8 ore a 30 minuti, refresh token di 30 giorni con rotazione a ogni utilizzo e revoca su logout.
 - Bug corretto scrivendo i test: aggiungere una riga a una distinta/ordine già esistente durante una modifica veniva registrato come "aggiornamento" invece che "nuova riga" da Entity Framework, causando un errore. Interessava solo il percorso di modifica, non quello di creazione.
+- Bug correlato corretto scrivendo i test su prodotti: registrare esplicitamente la nuova riga sia sul `DbSet` sia sulla collezione di navigazione del genitore già tracciato (fix del bug precedente) duplicava la riga in memoria, perché Entity Framework la collega già da solo alla collezione quando viene aggiunta al `DbSet`. Ora, per il genitore già tracciato con la collezione caricata, basta l'aggiunta al `DbSet` (visto in `ProductsController.ReplaceBillOfMaterial`/`ReplaceRouting`).
 
 ### Priorita 2: import e cataloghi
 
@@ -191,16 +214,19 @@ Il prototipo è utile come riferimento funzionale, ma non deve essere usato come
 | Cataloghi fornitori | CSV ed Excel operativi, ricerca operativa | Manca import PDF e connettori ufficiali Schneider/Pizzato |
 | Import documenti | Nel prototipo Node | Da portare nel backend reale |
 | Autenticazione | JWT, policy, bootstrap Admin e refresh token operativi | Nessuna lacuna nota |
-| Client Windows | Dashboard a schede con creazione/modifica/gestione per materiali, distinte, ordini fornitore, fornitori, aree, utenti, import catalogo Excel | Mancano import distinta da file, stampe/export, gestione offline |
+| Client Windows | Dashboard a schede con creazione/modifica/gestione per materiali, distinte, ordini fornitore, fornitori, aree, utenti, import catalogo Excel | Mancano import distinta da file, stampe/export, gestione offline; nessuna UI ancora per prodotti/commesse |
 | Auto-update | Implementato | Richiede release GitHub con asset previsto |
-| Test automatici | 38 test di integrazione API (xUnit, Sqlite in-memory) | Manca copertura sul client WPF |
+| Nucleo produzione (MES) | Backend operativo: prodotti, distinta base, ciclo di lavoro, commesse con fasi tracciate, generazione distinta di prelievo da commessa | Manca UI client, tracciabilità lotti/matricole, centri di lavoro con capacità/pianificazione, qualità/NCM, OEE |
+| Test automatici | 55 test di integrazione API (xUnit, Sqlite in-memory) | Manca copertura sul client WPF |
 | CI | Build + test su GitHub Actions ad ogni push/PR | Manca deploy automatico |
 | Deploy produzione | Mancante | API attualmente locale; richiede una decisione su hosting/dominio |
 
 ## Prossimo incremento consigliato
 
-1. Riattivare il login manuale nel client (`SkipLoginForTesting = false` in `MainWindow.xaml.cs`) prima di qualsiasi uso reale/condiviso dell'app.
-2. Decidere il provider di hosting per l'API (Azure, Railway, Fly.io, VPS...) per poter preparare Dockerfile/pipeline di deploy reale.
-3. Valutare l'import PDF con un esempio reale di catalogo fornitore, per definire un formato di riferimento prima di implementarlo.
-4. Aggiungere test automatici anche sul client WPF, e più copertura sui casi limite dell'API (es. concorrenza su chiusura distinta/ricezione ordine).
-5. Importazione distinta da file esterno, stampe ed esportazione PDF/Excel dal client, gestione offline.
+1. UI client per il nucleo produzione: gestione prodotti (distinta base + ciclo di lavoro), creazione/rilascio/avanzamento commesse, generazione distinta di prelievo da commessa.
+2. Riattivare il login manuale nel client (`SkipLoginForTesting = false` in `MainWindow.xaml.cs`) prima di qualsiasi uso reale/condiviso dell'app.
+3. Decidere il provider di hosting per l'API (Azure, Railway, Fly.io, VPS...) per poter preparare Dockerfile/pipeline di deploy reale.
+4. Valutare l'import PDF con un esempio reale di catalogo fornitore, per definire un formato di riferimento prima di implementarlo.
+5. Aggiungere test automatici anche sul client WPF, e più copertura sui casi limite dell'API (es. concorrenza su chiusura distinta/ricezione ordine).
+6. Importazione distinta da file esterno, stampe ed esportazione PDF/Excel dal client, gestione offline.
+7. Funzionalità MES avanzate non ancora iniziate (rimandate quando scelto il punto di partenza "Commessa + Distinta Base + Ciclo di lavoro"): tracciabilità lotti/matricole, centri di lavoro con capacità/pianificazione, modulo qualità/NCM, dashboard OEE/KPI, rilevazione manodopera oltre ai timestamp di inizio/fine fase.

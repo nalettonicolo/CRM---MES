@@ -21,6 +21,11 @@ public class ApplicationDbContext : DbContext
     public DbSet<PurchaseOrderItem> PurchaseOrderItems => Set<PurchaseOrderItem>();
     public DbSet<AuditLog> AuditLogs => Set<AuditLog>();
     public DbSet<RefreshToken> RefreshTokens => Set<RefreshToken>();
+    public DbSet<Product> Products => Set<Product>();
+    public DbSet<BillOfMaterialItem> BillOfMaterialItems => Set<BillOfMaterialItem>();
+    public DbSet<RoutingStep> RoutingSteps => Set<RoutingStep>();
+    public DbSet<WorkOrder> WorkOrders => Set<WorkOrder>();
+    public DbSet<WorkOrderOperation> WorkOrderOperations => Set<WorkOrderOperation>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -68,6 +73,10 @@ public class ApplicationDbContext : DbContext
             entity.Property(w => w.Code).HasMaxLength(80);
             entity.Property(w => w.Status).HasMaxLength(50);
             entity.HasIndex(w => w.Code).IsUnique();
+            entity.HasOne(w => w.WorkOrder)
+                .WithMany()
+                .HasForeignKey(w => w.WorkOrderId)
+                .OnDelete(DeleteBehavior.SetNull);
         });
 
         modelBuilder.Entity<WithdrawalItem>(entity =>
@@ -118,6 +127,64 @@ public class ApplicationDbContext : DbContext
             entity.HasOne(rt => rt.User)
                 .WithMany()
                 .HasForeignKey(rt => rt.UserId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<Product>(entity =>
+        {
+            entity.Property(p => p.Code).HasMaxLength(100);
+            entity.Property(p => p.Name).HasMaxLength(250);
+            entity.Property(p => p.Description).HasMaxLength(1000);
+            entity.HasIndex(p => p.Code).IsUnique();
+        });
+
+        modelBuilder.Entity<BillOfMaterialItem>(entity =>
+        {
+            entity.Property(b => b.MaterialCode).HasMaxLength(120);
+            entity.Property(b => b.Notes).HasMaxLength(500);
+            entity.HasOne(b => b.Product)
+                .WithMany(p => p.BillOfMaterial)
+                .HasForeignKey(b => b.ProductId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<RoutingStep>(entity =>
+        {
+            entity.Property(r => r.Name).HasMaxLength(200);
+            entity.Property(r => r.Description).HasMaxLength(1000);
+            entity.Property(r => r.WorkCenter).HasMaxLength(200);
+            entity.HasOne(r => r.Product)
+                .WithMany(p => p.RoutingSteps)
+                .HasForeignKey(r => r.ProductId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<WorkOrder>(entity =>
+        {
+            entity.Property(w => w.Code).HasMaxLength(80);
+            entity.Property(w => w.CustomerReference).HasMaxLength(250);
+            entity.Property(w => w.Status).HasMaxLength(50);
+            entity.Property(w => w.Notes).HasMaxLength(1000);
+            entity.HasIndex(w => w.Code).IsUnique();
+            entity.HasOne(w => w.Product)
+                .WithMany()
+                .HasForeignKey(w => w.ProductId)
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne(w => w.Area)
+                .WithMany()
+                .HasForeignKey(w => w.AreaId)
+                .OnDelete(DeleteBehavior.SetNull);
+        });
+
+        modelBuilder.Entity<WorkOrderOperation>(entity =>
+        {
+            entity.Property(o => o.Name).HasMaxLength(200);
+            entity.Property(o => o.Description).HasMaxLength(1000);
+            entity.Property(o => o.WorkCenter).HasMaxLength(200);
+            entity.Property(o => o.Status).HasMaxLength(50);
+            entity.HasOne(o => o.WorkOrder)
+                .WithMany(w => w.Operations)
+                .HasForeignKey(o => o.WorkOrderId)
                 .OnDelete(DeleteBehavior.Cascade);
         });
 

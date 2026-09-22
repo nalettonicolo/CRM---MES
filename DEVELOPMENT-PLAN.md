@@ -1,6 +1,6 @@
 # Piano d'attacco sviluppo
 
-Aggiornato: 2026-09-18
+Aggiornato: 2026-09-22
 
 ## Obiettivo
 
@@ -79,6 +79,23 @@ Obiettivo: rendere i flussi utilizzabili dagli operatori.
 
 Risultato: applicazione WPF nativa pronta per il lavoro quotidiano.
 
+### Fase 5bis - Nucleo produzione (MES)
+
+Obiettivo: portare il gestionale al livello degli strumenti MES di mercato (ISA-95: ordini di produzione, distinta base, ciclo di lavoro), restando volutamente generico per settore invece di legarsi solo al quadro elettrico, così da poter essere personalizzato per qualunque tipo di manifattura.
+
+- Anagrafica prodotto (`Product`): cosa si produce, con distinta base e ciclo di lavoro propri.
+- Distinta base (`BillOfMaterialItem`): righe materiale+quantità collegate al prodotto, sullo stesso pattern per codice materiale già usato dalle distinte di prelievo; sostituzione completa validata contro il catalogo materiali attivo.
+- Ciclo di lavoro (`RoutingStep`): fasi ordinate con centro di lavoro a testo libero (deliberatamente neutro, non specifico al settore elettrico) e minuti stimati; sostituzione completa con numerazione di sequenza automatica.
+- Commesse (`WorkOrder`): job di produzione con stati `Draft` -> `Released` -> `InProgress` -> `Completed` (più `Cancelled`); alla creazione le fasi del ciclo di lavoro del prodotto vengono fotografate come `WorkOrderOperation` proprie della commessa, così che una modifica successiva al ciclo del prodotto non alteri retroattivamente una commessa già in corso.
+- Avanzamento fasi (`start`/`complete` per operatore di reparto, qualunque ruolo autenticato): la prima fase avviata porta automaticamente la commessa a `InProgress`; il completamento della commessa richiede tutte le fasi `Done`.
+- Generazione distinta di prelievo da commessa (`POST /api/work-orders/{id}/generate-withdrawal-slip`): scala le quantità della distinta base per la quantità di commessa, richiede un'area assegnata.
+- 17 nuovi test di integrazione (prodotti + commesse), portando il totale a 55; bug scoperto e corretto scrivendo i test di sostituzione distinta base/ciclo di lavoro: la doppia registrazione (sul `DbSet` e sulla collezione di navigazione) duplicava le righe in memoria perché Entity Framework collega già da solo la nuova riga alla collezione del genitore tracciato.
+- Migrazione `AddProductionCore` applicata a Neon.
+
+Risultato: il gestionale copre anche il cuore della produzione (cosa costruire, con cosa, in che fasi, chi sta lavorando su cosa), non solo magazzino e acquisti.
+
+Ancora fuori scope, rimandato quando è stato scelto questo punto di partenza: tracciabilità lotti/matricole, centri di lavoro con capacità e pianificazione vera, qualità/non conformità, OEE/KPI, rilevazione manodopera oltre ai timestamp di inizio/fine fase, UI client per questo nucleo.
+
 ### Fase 6 - Produzione
 
 Obiettivo: pubblicare il sistema in modo gestibile.
@@ -87,7 +104,7 @@ Obiettivo: pubblicare il sistema in modo gestibile.
 - Segreti fuori dal repository.
 - Backup e monitoraggio Neon.
 - Logging centralizzato: richieste HTTP loggate (`UseHttpLogging`); manca un sink esterno per la produzione.
-- Test automatici implementati (38 test di integrazione API); CI implementata (build + test su GitHub Actions ad ogni push/PR); manca ancora il deploy automatico (richiede una decisione sul provider di hosting).
+- Test automatici implementati (55 test di integrazione API); CI implementata (build + test su GitHub Actions ad ogni push/PR); manca ancora il deploy automatico (richiede una decisione sul provider di hosting).
 - Auto-update da release GitHub implementato.
 - Installer Windows e firma digitale ancora da implementare.
 
@@ -105,4 +122,4 @@ Ogni incremento deve includere:
 
 ## Prossimo incremento
 
-Fondamenta enterprise completate: bootstrap Admin, refresh token, audit log esteso alle distinte, gestione errori centralizzata, logging HTTP, modifica righe per distinte/ordini in bozza, import catalogo Excel, 38 test di integrazione automatici e pipeline CI su GitHub Actions. Il client WPF copre creazione, modifica e gestione di stato per le entità principali. Prossimi passi: riattivare il login manuale prima di un uso reale, decidere il provider di hosting per preparare un deploy di produzione reale, valutare l'import PDF con un esempio concreto di catalogo fornitore.
+Fondamenta enterprise completate: bootstrap Admin, refresh token, audit log esteso alle distinte, gestione errori centralizzata, logging HTTP, modifica righe per distinte/ordini in bozza, import catalogo Excel, pipeline CI su GitHub Actions. Nucleo produzione (MES) aggiunto lato backend: prodotti, distinta base, ciclo di lavoro, commesse con fasi tracciate e generazione distinta di prelievo da commessa, generico per settore; 55 test di integrazione automatici. Il client WPF copre creazione, modifica e gestione di stato per le entità di magazzino/acquisti, ma non ha ancora schermate per prodotti/commesse. Prossimi passi: costruire la UI client per il nucleo produzione, riattivare il login manuale prima di un uso reale, decidere il provider di hosting per preparare un deploy di produzione reale, valutare l'import PDF con un esempio concreto di catalogo fornitore.
