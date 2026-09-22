@@ -5,7 +5,7 @@
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:local="clr-namespace:CrmMes.Desktop"
         mc:Ignorable="d"
-        Title="Gestionale Elettrico" Icon="Assets/logo.ico" Height="720" Width="1240"
+        Title="Nicolò - MES" Icon="Assets/logo.ico" Height="720" Width="1240"
         MinHeight="580" MinWidth="1000"
         WindowStyle="None" AllowsTransparency="False" ResizeMode="CanResize"
         StateChanged="Window_StateChanged"
@@ -29,7 +29,7 @@
                 </Grid.ColumnDefinitions>
                 <StackPanel Grid.Column="0" Orientation="Horizontal" Margin="16,0,0,0" VerticalAlignment="Center">
                     <Image Source="Assets/logo.png" Width="20" Height="20" VerticalAlignment="Center" />
-                    <TextBlock Text="Gestionale Elettrico" Margin="10,0,0,0" Foreground="{StaticResource TitleBarTextBrush}" FontSize="12.5" FontWeight="SemiBold" VerticalAlignment="Center" />
+                    <TextBlock Text="Nicolò - MES" Margin="10,0,0,0" Foreground="{StaticResource TitleBarTextBrush}" FontSize="12.5" FontWeight="SemiBold" VerticalAlignment="Center" />
                 </StackPanel>
                 <StackPanel Grid.Column="1" Orientation="Horizontal">
                     <Button x:Name="MinimizeButton" Style="{StaticResource CaptionButton}" Content="&#xE921;" Click="MinimizeButton_Click" WindowChrome.IsHitTestVisibleInChrome="True" />

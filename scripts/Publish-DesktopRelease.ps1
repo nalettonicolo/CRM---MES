@@ -20,7 +20,7 @@ dotnet publish $project -c $Configuration -r win-x64 --self-contained true -p:Pu
 Compress-Archive -Path (Join-Path $output '*') -DestinationPath $asset -Force
 
 if (Get-Command gh -ErrorAction SilentlyContinue) {
-    gh release create $tag $asset --title "Gestionale Elettrico $tag" --generate-notes
+    gh release create $tag $asset --title "Nicolò - MES $tag" --generate-notes
     Write-Output "Release pubblicata: $tag"
 }
 else {
