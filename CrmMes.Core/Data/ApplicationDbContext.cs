@@ -28,6 +28,7 @@ public class ApplicationDbContext : DbContext
     public DbSet<WorkOrderOperation> WorkOrderOperations => Set<WorkOrderOperation>();
     public DbSet<MaterialLot> MaterialLots => Set<MaterialLot>();
     public DbSet<MaterialLotConsumption> MaterialLotConsumptions => Set<MaterialLotConsumption>();
+    public DbSet<WorkCenter> WorkCenters => Set<WorkCenter>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -217,6 +218,14 @@ public class ApplicationDbContext : DbContext
                 .WithMany()
                 .HasForeignKey(c => c.WithdrawalItemId)
                 .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<WorkCenter>(entity =>
+        {
+            entity.Property(w => w.Code).HasMaxLength(50);
+            entity.Property(w => w.Name).HasMaxLength(200);
+            entity.Property(w => w.Description).HasMaxLength(500);
+            entity.HasIndex(w => w.Code).IsUnique();
         });
 
         // Sqlite has no native decimal type and can't ORDER BY / compare the TEXT it stores decimals as.

@@ -1,5 +1,8 @@
 using System.Net;
+using System.Net.Http.Headers;
 using System.Net.Http.Json;
+using System.Text;
+using ClosedXML.Excel;
 using CrmMes.Api.Controllers;
 
 namespace CrmMes.Api.Tests;
@@ -143,5 +146,83 @@ public class ProductsTests : IClassFixture<AdminSeededApiTestFixture>
         Assert.Equal(3, updated!.RoutingSteps.Count);
         Assert.Equal([1, 2, 3], updated.RoutingSteps.Select(step => step.SequenceNumber));
         Assert.Equal("Collaudo", updated.RoutingSteps[2].Name);
+    }
+
+    private static MultipartFormDataContent BuildFileContent(byte[] bytes, string fileName, string contentType)
+    {
+        var content = new MultipartFormDataContent();
+        var fileContent = new ByteArrayContent(bytes);
+        fileContent.Headers.ContentType = new MediaTypeHeaderValue(contentType);
+        content.Add(fileContent, "file", fileName);
+        return content;
+    }
+
+    [Fact]
+    public async Task ImportBillOfMaterial_FromCsv_ReplacesBom()
+    {
+        var product = await CreateProductAsync();
+        var materialA = await CreateMaterialAsync();
+        var materialB = await CreateMaterialAsync();
+        var csv = "materialCode,quantity,notes\n" +
+                   $"{materialA.Code},3,nota A\n" +
+                   $"{materialB.Code},1.5,\n";
+        using var content = BuildFileContent(Encoding.UTF8.GetBytes(csv), "distinta.csv", "text/csv");
+
+        var response = await _adminClient.PostAsync($"/api/products/{product.Id}/bom/import", content);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var updated = await response.Content.ReadFromJsonAsync<ProductResponse>();
+        Assert.Equal(2, updated!.BillOfMaterial.Count);
+        Assert.Contains(updated.BillOfMaterial, item => item.MaterialCode == materialA.Code && item.Quantity == 3 && item.Notes == "nota A");
+    }
+
+    [Fact]
+    public async Task ImportBillOfMaterial_FromExcel_ReplacesBom()
+    {
+        var product = await CreateProductAsync();
+        var materialA = await CreateMaterialAsync();
+
+        using var workbook = new XLWorkbook();
+        var worksheet = workbook.Worksheets.Add("Distinta");
+        worksheet.Cell(1, 1).Value = "materialCode";
+        worksheet.Cell(1, 2).Value = "quantity";
+        worksheet.Cell(1, 3).Value = "notes";
+        worksheet.Cell(2, 1).Value = materialA.Code;
+        worksheet.Cell(2, 2).Value = 4;
+        worksheet.Cell(2, 3).Value = "riga excel";
+        using var stream = new MemoryStream();
+        workbook.SaveAs(stream);
+
+        using var content = BuildFileContent(stream.ToArray(), "distinta.xlsx", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+        var response = await _adminClient.PostAsync($"/api/products/{product.Id}/bom/import", content);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var updated = await response.Content.ReadFromJsonAsync<ProductResponse>();
+        Assert.Single(updated!.BillOfMaterial);
+        Assert.Equal(materialA.Code, updated.BillOfMaterial[0].MaterialCode);
+        Assert.Equal(4, updated.BillOfMaterial[0].Quantity);
+    }
+
+    [Fact]
+    public async Task ImportBillOfMaterial_WithUnknownMaterialCode_ReturnsBadRequest()
+    {
+        var product = await CreateProductAsync();
+        var csv = "materialCode,quantity\nCODICE-INESISTENTE,1\n";
+        using var content = BuildFileContent(Encoding.UTF8.GetBytes(csv), "distinta.csv", "text/csv");
+
+        var response = await _adminClient.PostAsync($"/api/products/{product.Id}/bom/import", content);
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task ImportBillOfMaterial_EmptyFile_ReturnsBadRequest()
+    {
+        var product = await CreateProductAsync();
+        using var content = BuildFileContent(Encoding.UTF8.GetBytes("materialCode,quantity\n"), "distinta.csv", "text/csv");
+
+        var response = await _adminClient.PostAsync($"/api/products/{product.Id}/bom/import", content);
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
     }
 }

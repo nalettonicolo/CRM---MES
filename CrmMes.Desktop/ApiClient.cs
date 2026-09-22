@@ -9,16 +9,32 @@ namespace CrmMes.Desktop;
 
 public sealed class ApiClient
 {
-    private readonly HttpClient _httpClient = new()
+    private readonly HttpClient _httpClient = new();
+
+    public Uri BaseAddress => _httpClient.BaseAddress!;
+
+    public ApiClient()
     {
-        BaseAddress = new Uri("http://localhost:5092/")
-    };
+        SetBaseUrl(ClientSettings.DefaultApiBaseUrl);
+    }
+
+    /// <summary>Ripunta il client a un nuovo indirizzo API (es. dopo un cambio nelle impostazioni).</summary>
+    public void SetBaseUrl(string baseUrl)
+    {
+        _httpClient.BaseAddress = new Uri(baseUrl.EndsWith('/') ? baseUrl : baseUrl + "/");
+    }
 
     public async Task<bool> EnsureLocalApiAsync(CancellationToken cancellationToken = default)
     {
         if (await TryHealthAsync(cancellationToken))
         {
             return true;
+        }
+
+        if (!_httpClient.BaseAddress!.IsLoopback)
+        {
+            // Indirizzo remoto configurato esplicitamente: non ha senso tentare di avviare un'API locale.
+            return false;
         }
 
         var apiPath = Path.GetFullPath(Path.Combine(
@@ -334,6 +350,27 @@ public sealed class ApiClient
         await EnsureSuccessAsync(response, cancellationToken);
     }
 
+    public Task<IReadOnlyList<WorkCenterDto>> GetWorkCentersAsync(CancellationToken cancellationToken = default)
+        => GetAsync<WorkCenterDto>("api/work-centers", cancellationToken);
+
+    public Task<IReadOnlyList<WorkCenterLoadDto>> GetWorkCenterLoadAsync(CancellationToken cancellationToken = default)
+        => GetAsync<WorkCenterLoadDto>("api/work-centers/load", cancellationToken);
+
+    public async Task CreateWorkCenterAsync(string code, string name, decimal dailyCapacityMinutes, CancellationToken cancellationToken = default)
+    {
+        using var response = await _httpClient.PostAsJsonAsync(
+            "api/work-centers",
+            new { code, name, description = (string?)null, dailyCapacityMinutes },
+            cancellationToken);
+        await EnsureSuccessAsync(response, cancellationToken);
+    }
+
+    public async Task DeactivateWorkCenterAsync(Guid id, CancellationToken cancellationToken = default)
+    {
+        using var response = await _httpClient.DeleteAsync($"api/work-centers/{id}", cancellationToken);
+        await EnsureSuccessAsync(response, cancellationToken);
+    }
+
     public async Task CreateAreaAsync(string name, string code, CancellationToken cancellationToken = default)
     {
         using var response = await _httpClient.PostAsJsonAsync("api/areas", new { name, code }, cancellationToken);
@@ -380,6 +417,20 @@ public sealed class ApiClient
     public async Task DeactivateProductAsync(Guid id, CancellationToken cancellationToken = default)
     {
         using var response = await _httpClient.DeleteAsync($"api/products/{id}", cancellationToken);
+        await EnsureSuccessAsync(response, cancellationToken);
+    }
+
+    public async Task ImportBillOfMaterialAsync(Guid productId, string filePath, CancellationToken cancellationToken = default)
+    {
+        using var content = new MultipartFormDataContent();
+        await using var stream = File.OpenRead(filePath);
+        using var fileContent = new StreamContent(stream);
+        var extension = Path.GetExtension(filePath).ToLowerInvariant();
+        fileContent.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue(
+            extension == ".csv" ? "text/csv" : "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+        content.Add(fileContent, "file", Path.GetFileName(filePath));
+
+        using var response = await _httpClient.PostAsync($"api/products/{productId}/bom/import", content, cancellationToken);
         await EnsureSuccessAsync(response, cancellationToken);
     }
 
@@ -702,6 +753,17 @@ public sealed record PurchaseOrderItemDto(
     Guid? MissingMaterialId);
 
 public sealed record AreaDto(Guid Id, string Name, string Code, bool IsActive, DateTime CreatedAt);
+
+public sealed record WorkCenterDto(Guid Id, string Code, string Name, string? Description, decimal DailyCapacityMinutes, bool IsActive);
+
+public sealed record WorkCenterLoadDto(
+    Guid? Id,
+    string? Code,
+    string Name,
+    decimal? DailyCapacityMinutes,
+    decimal PendingMinutes,
+    int OpenOperations,
+    decimal? BacklogDays);
 
 public sealed record UserRowDto(Guid Id, string Name, string Email, string Role, bool IsActive, DateTime CreatedAt);
 

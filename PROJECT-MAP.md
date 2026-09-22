@@ -1,6 +1,6 @@
 # Mappa progetto Gestionale Elettrico
 
-Aggiornata: 2026-09-22
+Aggiornata: 2026-09-22 (seconda revisione: URL API configurabile, import distinta base da file, centri di lavoro con carico indicativo, preparazione hosting gratuito Render.com)
 
 ## Visione architetturale
 
@@ -28,13 +28,13 @@ flowchart LR
 - Swagger disponibile in ambiente Development.
 - Health check disponibile su `GET /health`.
 - Connessione Neon PostgreSQL configurata tramite User Secrets.
-- Migrazioni EF Core applicate a Neon: `InitialCreate`, `AddUserAuthentication`, `AddPurchaseOrderReceiving`, `AddLowStockReordering`, `AddProductionCore` (nucleo MES: prodotti, distinta base, ciclo di lavoro, commesse).
+- Migrazioni EF Core applicate a Neon: `InitialCreate`, `AddUserAuthentication`, `AddPurchaseOrderReceiving`, `AddLowStockReordering`, `AddProductionCore` (nucleo MES: prodotti, distinta base, ciclo di lavoro, commesse), `AddMaterialLotTraceability`, `AddWorkCenters`.
 - Build verificata con 0 errori e 0 warning su tutti i 4 progetti (`CrmMes.Api`, `CrmMes.Core`, `CrmMes.Desktop`, `CrmMes.Api.Tests`).
 - Gestione errori centralizzata: `UseExceptionHandler()` + `AddProblemDetails()` (risposte RFC 9110 uniformi; dettaglio dell'eccezione incluso solo in ambiente Development).
 - HSTS attivo fuori da Development.
 - Logging delle richieste HTTP (`UseHttpLogging`, metodo/percorso/stato/durata).
 - Compressione delle risposte (gzip) abilitata.
-- `CrmMes.Api.Tests`: 71 test di integrazione (xUnit + `WebApplicationFactory` + Sqlite in-memory, non toccano mai Neon) che coprono autenticazione, refresh token, bootstrap Admin, policy di autorizzazione per ruolo, ciclo distinte di prelievo (incluse le modifiche), sottoscorte, ciclo ordini fornitore (incluse le modifiche), import catalogo CSV/Excel, prodotti/distinta base/ciclo di lavoro, commesse, tracciabilità lotti materiali e verifica disponibilità/performance. Eseguibili con `dotnet test CrmMes.Api.Tests`.
+- `CrmMes.Api.Tests`: 81 test di integrazione (xUnit + `WebApplicationFactory` + Sqlite in-memory, non toccano mai Neon) che coprono autenticazione, refresh token, bootstrap Admin, policy di autorizzazione per ruolo, ciclo distinte di prelievo (incluse le modifiche), sottoscorte, ciclo ordini fornitore (incluse le modifiche), import catalogo CSV/Excel, prodotti/distinta base/ciclo di lavoro (incluso import distinta da file CSV/Excel), commesse, tracciabilità lotti materiali, verifica disponibilità/performance, e centri di lavoro con carico. Eseguibili con `dotnet test CrmMes.Api.Tests`.
 - Workflow GitHub Actions (`.github/workflows/build.yml`): build + test automatici su push/PR verso `main`.
 - Refresh token: login/registrazione restituiscono un access token di 30 minuti + un refresh token di 30 giorni (rotazione ad ogni uso, revoca su logout). Endpoint `POST /api/auth/refresh` e `POST /api/auth/logout`. Il client desktop rinnova automaticamente in background prima della scadenza.
 - Import catalogo Excel (`POST /api/supplier-catalog/import-excel`, libreria ClosedXML, MIT): stessa logica di upsert del CSV, condivisa tramite un metodo comune.
@@ -61,6 +61,7 @@ flowchart LR
 - **Lotto prodotto** (`WorkOrder.ProductLotNumber`): identificativo di lotto/matricola dei beni finiti prodotti da una commessa (generato automaticamente se non specificato), il lato "prodotto finito" della tracciabilità.
 - **Lotti materiale** (`MaterialLot`): batch tracciabili di un materiale così come sono entrati in giacenza (ricezione ordine fornitore, giacenza iniziale dichiarata alla creazione del materiale, o carico manuale); tengono quantità residua e quantità iniziale, e il collegamento a fornitore/ordine d'acquisto quando noto.
 - **Consumo lotti** (`MaterialLotConsumption`): collegamento tra una riga di distinta di prelievo e i lotti da cui è stata effettivamente prelevata (FIFO, dal lotto più vecchio), il lato "materiale in ingresso" della tracciabilità — insieme a `ProductLotNumber` permette la genealogia in entrambe le direzioni (da un lotto materiale a cosa è stato costruito, da una commessa a quali lotti materiale ha consumato).
+- **Centri di lavoro** (`WorkCenter`): anagrafica opzionale di reparti/linee (codice, nome, capacità minuti/giorno, attivo/disattivo). Il campo "centro di lavoro" su `RoutingStep`/`WorkOrderOperation` resta testo libero (nessun obbligo di censire un centro per usare il sistema); quando un nome coincide con un `WorkCenter` registrato, il carico viene confrontato con la sua capacità.
 
 ### API gia disponibili
 
@@ -104,6 +105,7 @@ flowchart LR
 - `PUT /api/products/{id}`
 - `DELETE /api/products/{id}`: disattivazione logica
 - `PUT /api/products/{id}/bom`: sostituisce l'intera distinta base (valida che tutti i codici materiale esistano e siano attivi)
+- `POST /api/products/{id}/bom/import`: importa la distinta base da file Excel (.xlsx) o CSV (colonne materialCode, quantity, notes), stessa validazione e logica "replace all" dell'endpoint manuale sopra
 - `PUT /api/products/{id}/routing`: sostituisce l'intero ciclo di lavoro (assegna automaticamente il numero di sequenza in base all'ordine ricevuto)
 - `GET /api/work-orders?status=`
 - `GET /api/work-orders/{id}`
@@ -121,6 +123,11 @@ flowchart LR
 - `GET /api/material-lots?materialCode=&onlyWithStock=`
 - `GET /api/material-lots/{id}`: dettaglio lotto con la tracciabilità in avanti (quali distinte/commesse lo hanno consumato)
 - `POST /api/material-lots`: carico manuale di un lotto (correzioni, campioni, sotto-assemblati interni), aumenta la giacenza del materiale come farebbe una ricezione ordine
+- `GET /api/work-centers?activeOnly=`
+- `POST /api/work-centers`
+- `PUT /api/work-centers/{id}`
+- `DELETE /api/work-centers/{id}`: disattivazione logica
+- `GET /api/work-centers/load`: per ogni centro registrato, minuti in attesa (fasi Pending/InProgress su commesse Released/InProgress il cui campo "centro di lavoro" combacia per nome) confrontati con la capacità giornaliera, più i centri usati sul campo ma non ancora censiti; indicativo (giorni di arretrato), non una pianificazione a calendario
 
 ### Flusso verificato su Neon
 
@@ -192,21 +199,25 @@ Il prototipo è utile come riferimento funzionale, ma non deve essere usato come
 - Aree e utenti: creazione da UI implementata (creazione utente richiede ora ruolo e password).
 - Importazione catalogo Excel da UI implementata (pulsante "Importa catalogo Excel" nella scheda Materiali).
 - Sessione con refresh token automatico in background (rinnovo silenzioso prima della scadenza dell'access token).
-- Importazione distinta da file, stampe ed esportazione PDF/Excel delle liste: ancora da fare.
-- Configurazione URL API e gestione offline/connessione assente: ancora da fare (URL API fisso su localhost).
-- Prodotti (distinta base e ciclo di lavoro) e Commesse: schede da UI implementate. Prodotti: creazione, modifica nome/descrizione, disattivazione, editor a righe dinamiche per distinta base e ciclo di lavoro (`ProductDetailWindow`, sostituisce l'intera distinta/ciclo ad ogni salvataggio, coerente con l'endpoint "replace all" lato API). Commesse: creazione, modifica (solo in bozza), rilascio, annullamento da elenco; dettaglio commessa (`WorkOrderDetailWindow`) con avvio/completamento di ogni fase, completamento dell'intera commessa e generazione della distinta di prelievo dalla distinta base. Verificato end-to-end contro l'API reale (non solo i test): creazione prodotto, distinta base, ciclo di lavoro, commessa, rilascio, avanzamento fasi, completamento, generazione distinta con quantità scalate correttamente, e blocco della generazione su commessa completata.
+- Importazione distinta base da file Excel/CSV: implementata (pulsante "Importa da file..." in `ProductDetailWindow`, chiama `POST /api/products/{id}/bom/import`).
+- Stampe ed esportazione PDF/Excel delle liste: ancora da fare.
+- Configurazione URL API: implementata. Impostazioni persistite in `%LOCALAPPDATA%\CrmMes\settings.json` (classe `ClientSettings`), finestra `SettingsWindow` (pulsante "Impostazioni server" nel pannello di login e nella sidebar) con verifica connessione prima di salvare. L'auto-avvio dell'API locale (`EnsureLocalApiAsync`) ora scatta solo se l'indirizzo configurato è `localhost`, non quando punta a un server remoto.
+- Gestione offline/connessione assente: gestione base implementata — `RunBusyAsync` intercetta `HttpRequestException` e mostra un messaggio dedicato con l'indirizzo del server configurato, invece dell'errore generico; non è una coda di sincronizzazione offline (il client resta comunque online-only).
+- Prodotti (distinta base e ciclo di lavoro) e Commesse: schede da UI implementate. Prodotti: creazione, modifica nome/descrizione, disattivazione, editor a righe dinamiche per distinta base e ciclo di lavoro (`ProductDetailWindow`, sostituisce l'intera distinta/ciclo ad ogni salvataggio, coerente con l'endpoint "replace all" lato API), più import da file. Commesse: creazione, modifica (solo in bozza), rilascio, annullamento da elenco; dettaglio commessa (`WorkOrderDetailWindow`) con avvio/completamento di ogni fase, completamento dell'intera commessa e generazione della distinta di prelievo dalla distinta base. Verificato end-to-end contro l'API reale (non solo i test): creazione prodotto, distinta base, ciclo di lavoro, commessa, rilascio, avanzamento fasi, completamento, generazione distinta con quantità scalate correttamente, e blocco della generazione su commessa completata.
 - Lotti materiali e cruscotto: schede da UI implementate. "Lotti materiali": elenco, carico manuale (`CreateMaterialLotWindow`), dettaglio con tracciabilità in avanti (`MaterialLotDetailWindow`, mostra quali distinte hanno consumato il lotto). "Cruscotto": KPI del periodo (commesse per stato, fasi completate, performance media, consegne puntuali). Nel dettaglio commessa: numero di lotto prodotto in intestazione, colonne minuti effettivi/performance per fase, pulsante "Tracciabilità materiali" (lotti consumati dalla commessa), e al rilascio con materiali insufficienti una finestra di conferma per procedere comunque (`force=true` lato API).
+- Centri di lavoro: scheda da UI implementata. Elenco centri registrati con creazione/disattivazione inline (codice, nome, capacità minuti/giorno), e tabella "carico" (minuti in attesa, operazioni aperte, giorni di arretrato indicativo) sotto, incluse le voci non censite usate solo come testo libero sul ciclo di lavoro.
 
 ### Priorita 4: produzione
 
-- Preparati (non testati con una build Docker reale, perché Docker non è installato in questo ambiente): `CrmMes.Api/Dockerfile` (multi-stage, .NET 8), `docker-compose.yml` e `.env.example` alla radice del repo, per eseguire l'API in container puntando comunque al database Neon reale. Nessun hosting scelto ancora: opzioni valutate Railway/Fly.io (più semplici, deploy diretto da Dockerfile), Azure App Service (se serve integrazione con altri servizi Microsoft), o un VPS proprio (più controllo, più manutenzione).
-- Hosting pubblico dell’API.
-- HTTPS e dominio (HSTS già attivo lato codice, manca il dominio/certificato reale).
-- Gestione segreti nel provider di hosting.
+- Hosting scelto: **Render.com, piano Free** (nessun costo; l'API "si spegne" dopo ~15 minuti di inattività e la prima richiesta dopo una pausa impiega 30-60 secondi per risvegliarsi — cold start, non un problema di affidabilità). Preparato `render.yaml` alla radice del repo (Blueprint): basta creare un account Render, collegare questo repository GitHub, e Render costruisce `CrmMes.Api/Dockerfile` automaticamente. I due secret (`NEON_DATABASE_URL`, `CRM_MES_JWT_KEY`) vanno impostati a mano nella dashboard Render (il blueprint li dichiara ma non li valorizza).
+- `CrmMes.Api/Dockerfile` reso portabile: la porta di ascolto ora legge `$PORT` (con fallback a 8080 per l'uso locale via `docker-compose.yml`), perché Render assegna la porta dinamicamente. Non ancora testato con una build Docker reale in questo ambiente (Docker non installato qui); la build va verificata al primo deploy reale su Render.
+- Il client desktop deve puntare all'URL pubblico una volta noto: usare "Impostazioni server" nel client (vedi Priorità 3) per configurarlo, nessuna modifica di codice necessaria.
+- HTTPS e dominio: Render fornisce automaticamente un sottodominio HTTPS (`*.onrender.com`) per il piano Free; un dominio personalizzato richiede un piano a pagamento.
+- Gestione segreti nel provider di hosting: da fare al momento del deploy (dashboard Render).
 - Backup e monitoraggio Neon.
 - Logging centralizzato: richieste HTTP già loggate (`UseHttpLogging`), manca un sink esterno (es. aggregatore log) per la produzione.
-- Pipeline CI/CD: build + test automatici su GitHub Actions implementati (`.github/workflows/build.yml`); manca ancora il deploy automatico.
-- Test automatici API e integrazione database: implementati, 23 test su database Sqlite in-memory isolato (mai contro Neon).
+- Pipeline CI/CD: build + test automatici su GitHub Actions implementati (`.github/workflows/build.yml`); Render può fare auto-deploy ad ogni push su `main` una volta collegato il repository (impostazione nella sua dashboard, non nel codice).
+- Test automatici API e integrazione database: implementati, 81 test su database Sqlite in-memory isolato (mai contro Neon).
 - Installer Windows e aggiornamenti dell’applicazione.
 - Pubblicazione release con asset `CrmMes.Desktop-win-x64.zip`.
 
@@ -225,18 +236,18 @@ Il prototipo è utile come riferimento funzionale, ma non deve essere usato come
 | Cataloghi fornitori | CSV ed Excel operativi, ricerca operativa | Manca import PDF e connettori ufficiali Schneider/Pizzato |
 | Import documenti | Nel prototipo Node | Da portare nel backend reale |
 | Autenticazione | JWT, policy, bootstrap Admin e refresh token operativi | Nessuna lacuna nota |
-| Client Windows | Dashboard a schede con creazione/modifica/gestione per materiali, distinte, ordini fornitore, fornitori, aree, utenti, prodotti, commesse, lotti materiali, cruscotto, import catalogo Excel | Mancano import distinta da file, stampe/export, gestione offline |
+| Client Windows | Dashboard a schede con creazione/modifica/gestione per materiali, distinte, ordini fornitore, fornitori, aree, utenti, prodotti, commesse, lotti materiali, cruscotto, centri di lavoro, import catalogo Excel, import distinta base da file, URL API configurabile | Mancano stampe/export PDF-Excel delle liste, gestione offline vera (coda di sincronizzazione) |
 | Auto-update | Implementato | Richiede release GitHub con asset previsto |
-| Nucleo produzione (MES) | Backend e client operativi: prodotti, distinta base, ciclo di lavoro, commesse con fasi tracciate, generazione distinta di prelievo da commessa, tracciabilità lotti materiali (FIFO, genealogia in entrambe le direzioni), verifica disponibilità materiali con rilascio forzabile, performance per fase e cruscotto KPI; verificato end-to-end contro l'API reale su Neon | Manca tracciabilità a livello di singola matricola (solo lotto per l'intera commessa), centri di lavoro con capacità/pianificazione, qualità/NCM, OEE completo (servono fermi macchina e scarti/qualità, il cruscotto attuale copre solo la componente Performance) |
-| Test automatici | 71 test di integrazione API (xUnit, Sqlite in-memory) | Manca copertura sul client WPF |
-| CI | Build + test su GitHub Actions ad ogni push/PR | Manca deploy automatico |
-| Deploy produzione | Mancante | API attualmente locale; richiede una decisione su hosting/dominio |
+| Nucleo produzione (MES) | Backend e client operativi: prodotti, distinta base (incl. import da file), ciclo di lavoro, commesse con fasi tracciate, generazione distinta di prelievo da commessa, tracciabilità lotti materiali (FIFO, genealogia in entrambe le direzioni), verifica disponibilità materiali con rilascio forzabile, performance per fase, cruscotto KPI, centri di lavoro con carico indicativo rispetto alla capacità; verificato end-to-end contro l'API reale su Neon | Manca tracciabilità a livello di singola matricola (solo lotto per l'intera commessa), pianificazione a calendario vera (il carico centri di lavoro è indicativo, non schedula per data), qualità/NCM, OEE completo (servono fermi macchina e scarti/qualità, il cruscotto attuale copre solo la componente Performance) |
+| Test automatici | 81 test di integrazione API (xUnit, Sqlite in-memory) | Manca copertura sul client WPF |
+| CI | Build + test su GitHub Actions ad ogni push/PR | Manca deploy automatico (Render può farlo una volta collegato il repo) |
+| Deploy produzione | Provider scelto (Render.com, piano Free) e `render.yaml` pronto | Nessun deploy ancora eseguito: serve creare l'account Render e collegare il repository (azione dell'utente, non eseguibile da qui) |
 
 ## Prossimo incremento consigliato
 
-1. Riattivare il login manuale nel client (`SkipLoginForTesting = false` in `MainWindow.xaml.cs`) prima di qualsiasi uso reale/condiviso dell'app.
-2. Decidere il provider di hosting per l'API (Azure, Railway, Fly.io, VPS...) per poter preparare Dockerfile/pipeline di deploy reale.
+1. Creare un account Render.com (piano Free) e collegare questo repository per il primo deploy reale dell'API, seguendo `render.yaml`; poi puntare il client all'URL pubblico ottenuto tramite "Impostazioni server".
+2. Riattivare il login manuale nel client (`SkipLoginForTesting = false` in `MainWindow.xaml.cs`) prima di qualsiasi uso reale/condiviso dell'app.
 3. Valutare l'import PDF con un esempio reale di catalogo fornitore, per definire un formato di riferimento prima di implementarlo.
 4. Aggiungere test automatici anche sul client WPF, e più copertura sui casi limite dell'API (es. concorrenza su chiusura distinta/ricezione ordine).
-5. Importazione distinta da file esterno, stampe ed esportazione PDF/Excel dal client, gestione offline.
-6. Funzionalità MES ancora fuori scope: centri di lavoro con vera capacità/pianificazione (oggi solo testo libero), modulo qualità/NCM, OEE completo (servono fermi macchina con causali e scarti/qualità — il cruscotto attuale copre solo Performance), tracciabilità a livello di singola matricola oltre al lotto di commessa, rilevazione manodopera oltre ai timestamp di inizio/fine fase.
+5. Stampe ed esportazione PDF/Excel delle liste dal client, gestione offline vera (coda di sincronizzazione, oggi c'è solo un messaggio d'errore chiaro quando il server non è raggiungibile).
+6. Funzionalità MES ancora fuori scope: pianificazione a calendario vera per i centri di lavoro (oggi solo un confronto carico/capacità indicativo, senza date), modulo qualità/NCM, OEE completo (servono fermi macchina con causali e scarti/qualità — il cruscotto attuale copre solo Performance), tracciabilità a livello di singola matricola oltre al lotto di commessa, rilevazione manodopera oltre ai timestamp di inizio/fine fase.

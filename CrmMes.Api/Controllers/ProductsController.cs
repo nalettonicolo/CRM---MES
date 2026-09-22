@@ -1,4 +1,6 @@
+using System.Globalization;
 using System.Security.Claims;
+using ClosedXML.Excel;
 using CrmMes.Core.Data;
 using CrmMes.Core.Models;
 using Microsoft.AspNetCore.Authorization;
@@ -157,14 +159,54 @@ public class ProductsController : ControllerBase
     public async Task<ActionResult<ProductResponse>> ReplaceBillOfMaterial(
         Guid id,
         ReplaceBillOfMaterialRequest request,
+        CancellationToken cancellationToken = default) =>
+        await ReplaceBillOfMaterialCoreAsync(id, request.Items, cancellationToken);
+
+    /// <summary>Imports the bill of material for a product from an .xlsx or .csv file (columns:
+    /// materialCode, quantity, notes) and replaces its current BOM, reusing the same validation
+    /// and replace logic as the manual JSON endpoint above.</summary>
+    [Authorize(Policy = "Warehouse")]
+    [HttpPost("{id:guid}/bom/import")]
+    [RequestSizeLimit(10_000_000)]
+    public async Task<ActionResult<ProductResponse>> ImportBillOfMaterial(
+        Guid id,
+        IFormFile file,
         CancellationToken cancellationToken = default)
     {
-        if (request.Items is null || request.Items.Count == 0)
+        if (file is null || file.Length == 0)
+        {
+            return BadRequest(new { message = "Selezionare un file Excel (.xlsx) o CSV non vuoto." });
+        }
+
+        List<BillOfMaterialItemRequest> items;
+        try
+        {
+            items = ParseBillOfMaterialFile(file);
+        }
+        catch (Exception exception)
+        {
+            return BadRequest(new { message = $"Impossibile leggere il file: {exception.Message}" });
+        }
+
+        if (items.Count == 0)
+        {
+            return BadRequest(new { message = "Il file non contiene righe valide. Colonne richieste: materialCode, quantity (opzionale: notes)." });
+        }
+
+        return await ReplaceBillOfMaterialCoreAsync(id, items, cancellationToken);
+    }
+
+    private async Task<ActionResult<ProductResponse>> ReplaceBillOfMaterialCoreAsync(
+        Guid id,
+        List<BillOfMaterialItemRequest>? items,
+        CancellationToken cancellationToken)
+    {
+        if (items is null || items.Count == 0)
         {
             return BadRequest(new { message = "La distinta base deve contenere almeno una riga." });
         }
 
-        if (request.Items.Any(item => string.IsNullOrWhiteSpace(item.MaterialCode) || item.Quantity <= 0))
+        if (items.Any(item => string.IsNullOrWhiteSpace(item.MaterialCode) || item.Quantity <= 0))
         {
             return BadRequest(new { message = "Ogni riga deve avere codice materiale e quantità maggiore di zero." });
         }
@@ -179,7 +221,7 @@ public class ProductsController : ControllerBase
             return NotFound();
         }
 
-        var codes = request.Items.Select(item => item.MaterialCode.Trim()).Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
+        var codes = items.Select(item => item.MaterialCode.Trim()).Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
         var knownCodes = await _dbContext.Materials
             .Where(material => material.IsActive && codes.Contains(material.Code))
             .Select(material => material.Code)
@@ -196,7 +238,7 @@ public class ProductsController : ControllerBase
             product.BillOfMaterial.Remove(item);
         }
 
-        foreach (var requestItem in request.Items)
+        foreach (var requestItem in items)
         {
             var item = new BillOfMaterialItem
             {
@@ -214,6 +256,102 @@ public class ProductsController : ControllerBase
         await _dbContext.SaveChangesAsync(cancellationToken);
         return Ok(ToResponse(product));
     }
+
+    private static List<BillOfMaterialItemRequest> ParseBillOfMaterialFile(IFormFile file)
+    {
+        var extension = Path.GetExtension(file.FileName).ToLowerInvariant();
+        using var stream = file.OpenReadStream();
+        return extension switch
+        {
+            ".csv" => ParseBillOfMaterialCsv(stream),
+            _ => ParseBillOfMaterialExcel(stream)
+        };
+    }
+
+    private static List<BillOfMaterialItemRequest> ParseBillOfMaterialExcel(Stream stream)
+    {
+        using var workbook = new XLWorkbook(stream);
+        var worksheet = workbook.Worksheets.FirstOrDefault();
+        var lastRow = worksheet?.LastRowUsed();
+        if (worksheet is null || lastRow is null)
+        {
+            return [];
+        }
+
+        var headers = ParseBomHeaders(worksheet.Row(1).CellsUsed().Select(cell => cell.GetString()).ToList());
+        var items = new List<BillOfMaterialItemRequest>();
+        for (var rowNumber = 2; rowNumber <= lastRow.RowNumber(); rowNumber++)
+        {
+            var row = worksheet.Row(rowNumber);
+            if (row.IsEmpty() || !headers.TryGetValue("materialcode", out var codeColumn))
+            {
+                continue;
+            }
+
+            var materialCode = row.Cell(codeColumn + 1).GetString().Trim();
+            if (string.IsNullOrWhiteSpace(materialCode))
+            {
+                continue;
+            }
+
+            var quantity = headers.TryGetValue("quantity", out var qtyColumn)
+                ? ParseDecimal(row.Cell(qtyColumn + 1).GetString())
+                : 0;
+            var notes = headers.TryGetValue("notes", out var notesColumn) ? row.Cell(notesColumn + 1).GetString() : null;
+
+            items.Add(new BillOfMaterialItemRequest(materialCode, quantity, notes));
+        }
+
+        return items;
+    }
+
+    private static List<BillOfMaterialItemRequest> ParseBillOfMaterialCsv(Stream stream)
+    {
+        using var reader = new StreamReader(stream);
+        var headerLine = reader.ReadLine();
+        if (string.IsNullOrWhiteSpace(headerLine))
+        {
+            return [];
+        }
+
+        var headers = ParseBomHeaders(headerLine.Split(',').Select(value => value.Trim()).ToList());
+        var items = new List<BillOfMaterialItemRequest>();
+        string? line;
+        while ((line = reader.ReadLine()) is not null)
+        {
+            if (string.IsNullOrWhiteSpace(line) || !headers.TryGetValue("materialcode", out var codeColumn))
+            {
+                continue;
+            }
+
+            var values = line.Split(',');
+            var materialCode = codeColumn < values.Length ? values[codeColumn].Trim() : string.Empty;
+            if (string.IsNullOrWhiteSpace(materialCode))
+            {
+                continue;
+            }
+
+            var quantity = headers.TryGetValue("quantity", out var qtyColumn) && qtyColumn < values.Length
+                ? ParseDecimal(values[qtyColumn])
+                : 0;
+            var notes = headers.TryGetValue("notes", out var notesColumn) && notesColumn < values.Length
+                ? values[notesColumn].Trim()
+                : null;
+
+            items.Add(new BillOfMaterialItemRequest(materialCode, quantity, notes));
+        }
+
+        return items;
+    }
+
+    private static Dictionary<string, int> ParseBomHeaders(IReadOnlyList<string> headerValues) =>
+        headerValues
+            .Select((value, index) => new { Key = value.Trim().ToLowerInvariant(), index })
+            .Where(item => !string.IsNullOrEmpty(item.Key))
+            .ToDictionary(item => item.Key, item => item.index);
+
+    private static decimal ParseDecimal(string value) =>
+        decimal.TryParse(value, NumberStyles.Any, CultureInfo.InvariantCulture, out var result) ? result : 0;
 
     [Authorize(Policy = "Warehouse")]
     [HttpPut("{id:guid}/routing")]

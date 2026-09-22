@@ -114,15 +114,30 @@ Risultato: i tre gap più citati dalla ricerca di mercato sono chiusi a un primo
 
 Obiettivo: pubblicare il sistema in modo gestibile.
 
-- Hosting API con HTTPS (HSTS già attivo lato codice, manca hosting/dominio reale).
-- Segreti fuori dal repository.
+- Hosting API con HTTPS: **provider scelto, Render.com piano Free** (gratuito; cold start di 30-60s dopo ~15 minuti di inattività, HTTPS incluso sul sottodominio `*.onrender.com`). Blueprint `render.yaml` pronto alla radice del repo; manca solo l'account Render e il collegamento del repository (azione dell'utente).
+- `CrmMes.Api/Dockerfile` reso portabile: ascolta su `$PORT` con fallback a 8080, perché Render assegna la porta dinamicamente.
+- Segreti fuori dal repository: già così (User Secrets in locale); da impostare nella dashboard Render al primo deploy.
 - Backup e monitoraggio Neon.
 - Logging centralizzato: richieste HTTP loggate (`UseHttpLogging`); manca un sink esterno per la produzione.
-- Test automatici implementati (71 test di integrazione API); CI implementata (build + test su GitHub Actions ad ogni push/PR); manca ancora il deploy automatico (richiede una decisione sul provider di hosting).
+- Test automatici implementati (81 test di integrazione API); CI implementata (build + test su GitHub Actions ad ogni push/PR); il deploy automatico può essere abilitato lato Render una volta collegato il repository.
 - Auto-update da release GitHub implementato.
 - Installer Windows e firma digitale ancora da implementare.
 
-Risultato: sistema distribuibile e manutenibile.
+Risultato: sistema pronto per il primo deploy reale; manca solo l'azione dell'utente di creare l'account Render e collegare il repository.
+
+### Fase 6bis - URL API configurabile, import distinta da file, centri di lavoro
+
+Obiettivo: completare i tre punti rimasti aperti del client Windows e preparare la produzione gratuita, così l'app non resta vincolata a `localhost` e la distinta base non va più ricopiata a mano riga per riga.
+
+- **URL API configurabile**: `ClientSettings` (nuovo file) persiste l'indirizzo dell'API in `%LOCALAPPDATA%\CrmMes\settings.json`. Nuova finestra `SettingsWindow` (pulsante "Impostazioni server" nel pannello di login e nella sidebar) con verifica di connessione prima di salvare. `ApiClient.EnsureLocalApiAsync` ora tenta l'auto-avvio dell'API locale solo se l'indirizzo configurato è `localhost` — puntare a un server remoto non prova più ad avviare un eseguibile locale inesistente.
+- **Gestione errori di connessione**: `RunBusyAsync` nel client intercetta `HttpRequestException` e mostra un messaggio dedicato con l'indirizzo del server configurato, invece dell'errore tecnico generico. Non è una coda di sincronizzazione offline — il client resta online-only, ma almeno l'errore è comprensibile.
+- **Import distinta base da file** (`POST /api/products/{id}/bom/import`): Excel (.xlsx, ClosedXML) o CSV, colonne `materialCode`, `quantity`, `notes` (case-insensitive); stessa validazione e logica "replace all" dell'endpoint manuale `PUT .../bom`, fattorizzata in un metodo privato condiviso. Pulsante "Importa da file..." in `ProductDetailWindow`.
+- **Centri di lavoro** (`WorkCenter`, nuovo modello + `WorkCentersController`): anagrafica opzionale di reparti/linee con capacità in minuti/giorno. Deliberatamente non obbligatoria: il campo "centro di lavoro" su `RoutingStep`/`WorkOrderOperation` resta testo libero. `GET /api/work-centers/load` confronta, per nome, i minuti delle fasi ancora aperte (Pending/InProgress su commesse Released/InProgress) con la capacità registrata, dando un arretrato indicativo in giorni — non una pianificazione a calendario (le operazioni non hanno una data pianificata, solo stime in minuti). Nuova scheda "Centri di lavoro" nel client: elenco con creazione/disattivazione inline, più la tabella di carico.
+- 10 nuovi test di integrazione (4 import distinta, 6 centri di lavoro), portando il totale a 81.
+- Migrazione `AddWorkCenters` applicata a Neon.
+- Verificato end-to-end contro l'API reale su Neon via curl: creazione/disattivazione centro di lavoro, carico che riflette correttamente minuti e giorni di arretrato, import CSV che sostituisce la distinta base di un prodotto reale. Client desktop avviato e rimasto reattivo con le nuove schede.
+
+Risultato: i tre punti aperti del client (URL configurabile, import distinta, centri di lavoro con carico) sono chiusi a un primo livello utilizzabile; l'hosting gratuito è pronto da attivare.
 
 ## Regola di avanzamento
 
@@ -136,4 +151,4 @@ Ogni incremento deve includere:
 
 ## Prossimo incremento
 
-Fondamenta enterprise completate: bootstrap Admin, refresh token, audit log esteso alle distinte, gestione errori centralizzata, logging HTTP, modifica righe per distinte/ordini in bozza, import catalogo Excel, pipeline CI su GitHub Actions. Nucleo produzione (MES) completo backend + client: prodotti, distinta base, ciclo di lavoro, commesse con fasi tracciate, generazione distinta di prelievo da commessa, tracciabilità lotti materiali con genealogia bidirezionale, verifica disponibilità materiali con rilascio forzabile, performance per fase e cruscotto KPI — generico per settore; 71 test di integrazione automatici più verifica end-to-end manuale contro l'API reale su Neon. Il client WPF ora copre creazione, modifica e gestione di stato per tutte le entità, incluse prodotti, commesse, lotti materiali e cruscotto. Prossimi passi: riattivare il login manuale prima di un uso reale, decidere il provider di hosting per preparare un deploy di produzione reale, valutare l'import PDF con un esempio concreto di catalogo fornitore, aggiungere test automatici sul client WPF; più avanti, se richiesto: centri di lavoro con capacità/pianificazione vera, qualità/NCM, OEE completo (fermi macchina + scarti), tracciabilità per singola matricola.
+Fondamenta enterprise completate: bootstrap Admin, refresh token, audit log esteso alle distinte, gestione errori centralizzata, logging HTTP, modifica righe per distinte/ordini in bozza, import catalogo Excel, pipeline CI su GitHub Actions. Nucleo produzione (MES) completo backend + client: prodotti (con import distinta da file), distinta base, ciclo di lavoro, commesse con fasi tracciate, generazione distinta di prelievo da commessa, tracciabilità lotti materiali con genealogia bidirezionale, verifica disponibilità materiali con rilascio forzabile, performance per fase, cruscotto KPI, centri di lavoro con carico indicativo — generico per settore; 81 test di integrazione automatici più verifica end-to-end manuale contro l'API reale su Neon. Il client WPF ora copre creazione, modifica e gestione di stato per tutte le entità, con URL del server configurabile invece che fisso su localhost. Hosting gratuito scelto (Render.com) e pronto da attivare (`render.yaml`). Prossimi passi: creare l'account Render e collegare il repository per il primo deploy reale, riattivare il login manuale prima di un uso reale/condiviso, valutare l'import PDF con un esempio concreto di catalogo fornitore, aggiungere test automatici sul client WPF, stampe/export PDF-Excel dal client; più avanti, se richiesto: pianificazione a calendario vera per i centri di lavoro, qualità/NCM, OEE completo (fermi macchina + scarti), tracciabilità per singola matricola.

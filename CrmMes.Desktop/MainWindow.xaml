@@ -52,6 +52,7 @@
                         <PasswordBox x:Name="PasswordBox" />
                         <Button x:Name="LoginButton" Content="Accedi" Height="38" Margin="0,22,0,0" Click="LoginButton_Click" IsEnabled="False" />
                         <TextBlock x:Name="LoginError" Margin="0,12,0,0" Foreground="{StaticResource DangerBrush}" TextWrapping="Wrap" />
+                        <Button x:Name="LoginSettingsButton" Style="{StaticResource SidebarLinkButton}" Content="Impostazioni server" Foreground="{StaticResource TextSecondaryBrush}" HorizontalAlignment="Center" Margin="0,14,0,0" Click="SettingsButton_Click" />
                     </StackPanel>
                 </Border>
             </Grid>
@@ -73,6 +74,7 @@
                                 </Border>
                                 <TextBlock x:Name="BusyIndicator" Text="" Foreground="{StaticResource SidebarTextBrush}" FontStyle="Italic" FontSize="11.5" Margin="0,8,0,0" />
                                 <Button x:Name="UpdateButton" Style="{StaticResource SidebarLinkButton}" Content="Controlla aggiornamenti" Margin="0,10,0,0" Click="UpdateButton_Click" />
+                                <Button x:Name="SidebarSettingsButton" Style="{StaticResource SidebarLinkButton}" Content="Impostazioni server" Margin="0,6,0,0" Click="SettingsButton_Click" />
                             </StackPanel>
                         </Border>
                         <StackPanel Margin="0,18,0,0">
@@ -140,6 +142,12 @@
                                 <StackPanel Orientation="Horizontal">
                                     <TextBlock Text="&#xE9D9;" FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets" FontSize="16" Width="24" />
                                     <TextBlock Text="Cruscotto" Margin="6,0,0,0" />
+                                </StackPanel>
+                            </RadioButton>
+                            <RadioButton x:Name="NavWorkCenters" Style="{StaticResource NavItem}" GroupName="Nav" Tag="11" Checked="NavItem_Checked">
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock Text="&#xE8B7;" FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets" FontSize="16" Width="24" />
+                                    <TextBlock Text="Centri di lavoro" Margin="6,0,0,0" />
                                 </StackPanel>
                             </RadioButton>
                         </StackPanel>
@@ -581,6 +589,61 @@
                                         <TextBlock Text="Percentuale consegne puntuali" Foreground="{StaticResource TextSecondaryBrush}" FontSize="11.5" />
                                         <TextBlock x:Name="OnTimeRateText" FontSize="20" FontWeight="SemiBold" Foreground="{StaticResource TextPrimaryBrush}" />
                                     </StackPanel>
+                                </Border>
+                            </Grid>
+                        </TabItem>
+
+                        <TabItem Header="Centri di lavoro">
+                            <Grid>
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto" />
+                                    <RowDefinition Height="Auto" />
+                                    <RowDefinition Height="1*" />
+                                    <RowDefinition Height="Auto" />
+                                    <RowDefinition Height="1*" />
+                                </Grid.RowDefinitions>
+
+                                <DockPanel Grid.Row="0" Margin="0,0,0,8">
+                                    <Button DockPanel.Dock="Right" Content="Aggiungi" Width="100" Click="AddWorkCenter_Click" />
+                                    <TextBox x:Name="WorkCenterCapacityBox" DockPanel.Dock="Right" Width="110" Margin="0,0,10,0" Tag="Capacità min/giorno" Text="480" />
+                                    <TextBox x:Name="WorkCenterNameBox" DockPanel.Dock="Right" Width="180" Margin="0,0,10,0" Tag="Nome centro" />
+                                    <TextBox x:Name="WorkCenterCodeBox" Margin="0,0,10,0" Tag="Codice" />
+                                </DockPanel>
+                                <TextBlock Grid.Row="1" x:Name="WorkCenterErrorText" Foreground="{StaticResource DangerBrush}" TextWrapping="Wrap" Margin="0,0,0,8" />
+
+                                <Border Grid.Row="2" Style="{StaticResource CardBorder}" Padding="4" MinHeight="110">
+                                    <ListView x:Name="WorkCentersList">
+                                        <ListView.View>
+                                            <GridView>
+                                                <GridViewColumn Header="Codice" DisplayMemberBinding="{Binding Code}" Width="120" />
+                                                <GridViewColumn Header="Nome" DisplayMemberBinding="{Binding Name}" Width="220" />
+                                                <GridViewColumn Header="Capacità min/giorno" DisplayMemberBinding="{Binding DailyCapacityMinutes}" Width="140" />
+                                                <GridViewColumn Header="" Width="100">
+                                                    <GridViewColumn.CellTemplate>
+                                                        <DataTemplate>
+                                                            <Button Content="Disattiva" Style="{StaticResource SecondaryButton}" Height="28" Click="DeactivateWorkCenter_Click" Tag="{Binding}" />
+                                                        </DataTemplate>
+                                                    </GridViewColumn.CellTemplate>
+                                                </GridViewColumn>
+                                            </GridView>
+                                        </ListView.View>
+                                    </ListView>
+                                </Border>
+
+                                <TextBlock Grid.Row="3" Text="Carico rispetto alla capacità (indicativo, non una pianificazione a calendario)" FontWeight="SemiBold" Foreground="{StaticResource TextPrimaryBrush}" Margin="0,18,0,8" />
+
+                                <Border Grid.Row="4" Style="{StaticResource CardBorder}" Padding="4" MinHeight="110">
+                                    <ListView x:Name="WorkCenterLoadList">
+                                        <ListView.View>
+                                            <GridView>
+                                                <GridViewColumn Header="Centro" DisplayMemberBinding="{Binding Name}" Width="200" />
+                                                <GridViewColumn Header="Capacità min/giorno" DisplayMemberBinding="{Binding DailyCapacityMinutes}" Width="140" />
+                                                <GridViewColumn Header="Minuti in attesa" DisplayMemberBinding="{Binding PendingMinutes}" Width="120" />
+                                                <GridViewColumn Header="Operazioni aperte" DisplayMemberBinding="{Binding OpenOperations}" Width="120" />
+                                                <GridViewColumn Header="Giorni di arretrato" DisplayMemberBinding="{Binding BacklogDays}" Width="130" />
+                                            </GridView>
+                                        </ListView.View>
+                                    </ListView>
                                 </Border>
                             </Grid>
                         </TabItem>

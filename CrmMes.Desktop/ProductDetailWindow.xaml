@@ -58,6 +58,7 @@
 
         <StackPanel Grid.Row="5" Orientation="Horizontal" Margin="0,8,0,18">
             <Button x:Name="SaveBomButton" Content="Salva distinta base" Width="170" Height="34" Click="SaveBom_Click" />
+            <Button x:Name="ImportBomButton" Style="{StaticResource SecondaryButton}" Content="Importa da file..." Width="150" Height="34" Margin="10,0,0,0" Click="ImportBom_Click" />
             <TextBlock x:Name="BomErrorText" Foreground="{StaticResource DangerBrush}" TextWrapping="Wrap" VerticalAlignment="Center" Margin="14,0,0,0" />
         </StackPanel>
 

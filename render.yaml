@@ -1,0 +1,23 @@
+# Blueprint per il deploy gratuito di CrmMes.Api su Render.com (https://render.com).
+# Uso:
+#   1. Crea un account Render (piano Free) e collega questo repository GitHub.
+#   2. In Render: New -> Blueprint -> seleziona il repo. Render legge questo file automaticamente.
+#   3. Imposta i due secret (NEON_DATABASE_URL, CRM_MES_JWT_KEY) nella dashboard del servizio,
+#      Render non li legge da qui perché sono segreti (sync: false).
+#   4. Il piano Free "spegne" il servizio dopo ~15 minuti di inattività: la prima richiesta dopo
+#      una pausa impiega 30-60 secondi per svegliarsi (cold start). Nessun costo se non lo usi.
+services:
+  - type: web
+    name: crmmes-api
+    runtime: docker
+    plan: free
+    dockerfilePath: ./CrmMes.Api/Dockerfile
+    dockerContext: .
+    healthCheckPath: /health
+    envVars:
+      - key: ASPNETCORE_ENVIRONMENT
+        value: Production
+      - key: NEON_DATABASE_URL
+        sync: false
+      - key: CRM_MES_JWT_KEY
+        sync: false

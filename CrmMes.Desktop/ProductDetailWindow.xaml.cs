@@ -116,6 +116,37 @@ public partial class ProductDetailWindow : Window
         }
     }
 
+    private async void ImportBom_Click(object sender, RoutedEventArgs e)
+    {
+        var dialog = new Microsoft.Win32.OpenFileDialog
+        {
+            Filter = "File distinta base (*.xlsx;*.csv)|*.xlsx;*.csv",
+            Title = "Importa distinta base"
+        };
+        if (dialog.ShowDialog() != true)
+        {
+            return;
+        }
+
+        ImportBomButton.IsEnabled = false;
+        try
+        {
+            await _apiClient.ImportBillOfMaterialAsync(_productId, dialog.FileName);
+            Changed = true;
+            BomErrorText.Text = string.Empty;
+            await ReloadAsync();
+            MessageBox.Show("Distinta base importata correttamente.", "Import completato", MessageBoxButton.OK, MessageBoxImage.Information);
+        }
+        catch (Exception exception)
+        {
+            BomErrorText.Text = exception.Message;
+        }
+        finally
+        {
+            ImportBomButton.IsEnabled = true;
+        }
+    }
+
     private void AddRoutingStep_Click(object sender, RoutedEventArgs e)
     {
         var name = RoutingNameBox.Text.Trim();

@@ -32,6 +32,7 @@ public partial class MainWindow : Window
     private bool _workOrdersLoaded;
     private bool _materialLotsLoaded;
     private bool _dashboardLoaded;
+    private bool _workCentersLoaded;
 
     private static readonly Dictionary<int, string> PageTitles = new()
     {
@@ -46,6 +47,7 @@ public partial class MainWindow : Window
         [8] = "Commesse",
         [9] = "Lotti materiali",
         [10] = "Cruscotto",
+        [11] = "Centri di lavoro",
     };
 
     // TEMPORANEO: login disabilitato su richiesta per velocizzare i test.
@@ -128,6 +130,22 @@ public partial class MainWindow : Window
     }
 
     private async void MainWindow_Loaded(object sender, RoutedEventArgs e)
+    {
+        _apiClient.SetBaseUrl(ClientSettings.Load().ApiBaseUrl);
+        await ConnectAsync();
+    }
+
+    private async void SettingsButton_Click(object sender, RoutedEventArgs e)
+    {
+        var window = new SettingsWindow(_apiClient) { Owner = this };
+        window.ShowDialog();
+        if (window.SettingsChanged)
+        {
+            await ConnectAsync();
+        }
+    }
+
+    private async Task ConnectAsync()
     {
         try
         {
@@ -237,6 +255,9 @@ public partial class MainWindow : Window
                 break;
             case "Cruscotto" when !_dashboardLoaded:
                 await LoadDashboardAsync();
+                break;
+            case "Centri di lavoro" when !_workCentersLoaded:
+                await LoadWorkCentersAsync();
                 break;
         }
     }
@@ -854,6 +875,16 @@ public partial class MainWindow : Window
         {
             await action();
         }
+        catch (System.Net.Http.HttpRequestException)
+        {
+            ConnectionStatus.Text = "Connessione persa";
+            MessageBox.Show(
+                $"Impossibile raggiungere il server all'indirizzo {_apiClient.BaseAddress}.\n" +
+                "Verifica la connessione di rete o l'indirizzo configurato in Impostazioni.",
+                "Connessione al server non disponibile",
+                MessageBoxButton.OK,
+                MessageBoxImage.Warning);
+        }
         catch (Exception exception)
         {
             MessageBox.Show(exception.Message, "Errore", MessageBoxButton.OK, MessageBoxImage.Warning);
@@ -961,4 +992,60 @@ public partial class MainWindow : Window
             ? dashboard.OnTimeCompletionRate.Value.ToString("P0")
             : "-";
     });
+
+    private Task LoadWorkCentersAsync() => RunBusyAsync(string.Empty, async () =>
+    {
+        WorkCentersList.ItemsSource = await _apiClient.GetWorkCentersAsync();
+        WorkCenterLoadList.ItemsSource = await _apiClient.GetWorkCenterLoadAsync();
+        _workCentersLoaded = true;
+    });
+
+    private async void AddWorkCenter_Click(object sender, RoutedEventArgs e)
+    {
+        var code = WorkCenterCodeBox.Text.Trim();
+        var name = WorkCenterNameBox.Text.Trim();
+        if (string.IsNullOrWhiteSpace(code) || string.IsNullOrWhiteSpace(name) ||
+            !decimal.TryParse(WorkCenterCapacityBox.Text, out var capacity) || capacity < 0)
+        {
+            WorkCenterErrorText.Text = "Inserisci codice, nome e una capacità giornaliera valida.";
+            return;
+        }
+
+        try
+        {
+            await _apiClient.CreateWorkCenterAsync(code, name, capacity);
+            WorkCenterErrorText.Text = string.Empty;
+            WorkCenterCodeBox.Text = string.Empty;
+            WorkCenterNameBox.Text = string.Empty;
+            WorkCenterCapacityBox.Text = "480";
+            await LoadWorkCentersAsync();
+        }
+        catch (Exception exception)
+        {
+            WorkCenterErrorText.Text = exception.Message;
+        }
+    }
+
+    private async void DeactivateWorkCenter_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is not FrameworkElement { Tag: WorkCenterDto workCenter })
+        {
+            return;
+        }
+
+        if (MessageBox.Show($"Disattivare il centro di lavoro {workCenter.Name}?", "Conferma", MessageBoxButton.YesNo, MessageBoxImage.Question) != MessageBoxResult.Yes)
+        {
+            return;
+        }
+
+        try
+        {
+            await _apiClient.DeactivateWorkCenterAsync(workCenter.Id);
+            await LoadWorkCentersAsync();
+        }
+        catch (Exception exception)
+        {
+            MessageBox.Show(exception.Message, "Errore", MessageBoxButton.OK, MessageBoxImage.Warning);
+        }
+    }
 }

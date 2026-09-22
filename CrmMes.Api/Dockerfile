@@ -18,7 +18,8 @@ WORKDIR /app
 COPY --from=build /app/publish .
 
 ENV ASPNETCORE_ENVIRONMENT=Production
-ENV ASPNETCORE_URLS=http://+:8080
 EXPOSE 8080
 
-ENTRYPOINT ["dotnet", "CrmMes.Api.dll"]
+# La porta è configurabile via $PORT (Render e altri host la impostano automaticamente);
+# 8080 resta il default per l'uso locale con docker-compose.
+ENTRYPOINT ["sh", "-c", "ASPNETCORE_URLS=http://+:${PORT:-8080} dotnet CrmMes.Api.dll"]
