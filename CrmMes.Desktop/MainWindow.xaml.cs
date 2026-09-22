@@ -400,6 +400,29 @@ public partial class MainWindow : Window
         });
     }
 
+    private async void ImportCatalogPdfButton_Click(object sender, RoutedEventArgs e)
+    {
+        var dialog = new Microsoft.Win32.OpenFileDialog
+        {
+            Filter = "File PDF (*.pdf)|*.pdf",
+            Title = "Importa catalogo fornitore (PDF)"
+        };
+
+        if (dialog.ShowDialog(this) != true)
+        {
+            return;
+        }
+
+        await RunBusyAsync("Importazione catalogo PDF in corso...", async () =>
+        {
+            var summary = await _apiClient.ImportCatalogPdfAsync(dialog.FileName);
+            MessageBox.Show(
+                $"Righe importate: {summary.Imported}\nMateriali creati: {summary.CreatedMaterials}\nCollegamenti catalogo creati: {summary.CreatedLinks}",
+                "Importazione completata", MessageBoxButton.OK, MessageBoxImage.Information);
+            await SearchMaterialsAsync();
+        });
+    }
+
     private async void NewMaterialButton_Click(object sender, RoutedEventArgs e)
     {
         var dialog = new CreateMaterialWindow(_apiClient) { Owner = this };

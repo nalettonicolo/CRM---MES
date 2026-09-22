@@ -252,6 +252,23 @@ public sealed class ApiClient
             ?? throw new InvalidOperationException("Risposta di importazione non valida.");
     }
 
+    /// <summary>Best-effort: works only for a PDF whose catalog is a simple text table with a
+    /// recognizable header row — see the server-side XML doc on the endpoint for what it can't handle
+    /// (scanned PDFs, complex graphic layouts).</summary>
+    public async Task<ImportSummaryDto> ImportCatalogPdfAsync(string filePath, CancellationToken cancellationToken = default)
+    {
+        using var content = new MultipartFormDataContent();
+        await using var stream = File.OpenRead(filePath);
+        using var fileContent = new StreamContent(stream);
+        fileContent.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue("application/pdf");
+        content.Add(fileContent, "file", Path.GetFileName(filePath));
+
+        using var response = await _httpClient.PostAsync("api/supplier-catalog/import-pdf", content, cancellationToken);
+        await EnsureSuccessAsync(response, cancellationToken);
+        return await response.Content.ReadFromJsonAsync<ImportSummaryDto>(cancellationToken: cancellationToken)
+            ?? throw new InvalidOperationException("Risposta di importazione non valida.");
+    }
+
     public async Task CreateWithdrawalSlipAsync(
         Guid areaId,
         Guid requestedByUserId,

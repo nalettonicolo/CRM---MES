@@ -1,11 +1,13 @@
 using System.Globalization;
 using System.Runtime.CompilerServices;
+using System.Text.RegularExpressions;
 using ClosedXML.Excel;
 using CrmMes.Core.Data;
 using CrmMes.Core.Models;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using UglyToad.PdfPig;
 
 namespace CrmMes.Api.Controllers;
 
@@ -124,6 +126,130 @@ public class SupplierCatalogController : ControllerBase
         await transaction.CommitAsync(cancellationToken);
 
         return Ok(summary);
+    }
+
+    /// <summary>Best-effort text-table import: works for a PDF whose catalog page is a simple text
+    /// table (a header row matching the same required columns as the CSV/Excel import, columns visually
+    /// separated by whitespace) — not for scanned/image PDFs (no OCR) or catalogs with a complex graphic
+    /// layout (multi-column brochures, merged cells, etc.), which is what most real supplier catalogs
+    /// (Schneider, Pizzato...) actually look like. This was built without a real sample catalog to test
+    /// against — treat it as a starting point to tune once one is available, not a finished parser.</summary>
+    [HttpPost("import-pdf")]
+    [RequestSizeLimit(25_000_000)]
+    public async Task<IActionResult> ImportPdf(
+        IFormFile file,
+        CancellationToken cancellationToken = default)
+    {
+        if (file is null || file.Length == 0)
+        {
+            return BadRequest(new { message = "Selezionare un file PDF non vuoto." });
+        }
+
+        List<string> lines;
+        try
+        {
+            using var stream = file.OpenReadStream();
+            lines = ExtractTextLines(stream);
+        }
+        catch (Exception exception)
+        {
+            return BadRequest(new { message = $"Impossibile leggere il PDF: {exception.Message}" });
+        }
+
+        Dictionary<string, int>? headers = null;
+        var headerLineIndex = -1;
+        for (var i = 0; i < lines.Count; i++)
+        {
+            var candidate = ParseHeaders(SplitPdfColumns(lines[i]));
+            if (RequiredColumns.All(candidate.ContainsKey))
+            {
+                headers = candidate;
+                headerLineIndex = i;
+                break;
+            }
+        }
+
+        if (headers is null)
+        {
+            return BadRequest(new
+            {
+                message = "Non è stata trovata una riga di intestazione con le colonne richieste (supplierCode, " +
+                    "supplierName, code, name, partNumber) separate da spazi. L'estrazione da PDF funziona solo per " +
+                    "tabelle testuali semplici: non per PDF scansionati (serve OCR, non supportato) né per cataloghi " +
+                    "con impaginazione grafica complessa."
+            });
+        }
+
+        var dataLines = lines.Skip(headerLineIndex + 1).Where(line => !string.IsNullOrWhiteSpace(line));
+
+        await using var transaction = await _dbContext.Database.BeginTransactionAsync(cancellationToken);
+        var summary = await ImportRowsAsync(ReadPdfRows(dataLines, headers), cancellationToken);
+        await transaction.CommitAsync(cancellationToken);
+
+        return Ok(summary);
+    }
+
+    /// <summary>Reconstructs text lines from a PDF's words, grouping by vertical position (same row) and
+    /// ordering by horizontal position within a row, inserting extra spacing where a visual gap between
+    /// words is wide enough to likely be a column boundary rather than a word boundary.</summary>
+    private static List<string> ExtractTextLines(Stream pdfStream)
+    {
+        using var document = PdfDocument.Open(pdfStream);
+        var lines = new List<string>();
+
+        foreach (var page in document.GetPages())
+        {
+            var words = page.GetWords().ToList();
+            if (words.Count == 0)
+            {
+                continue;
+            }
+
+            var rows = words
+                .GroupBy(word => Math.Round(word.BoundingBox.Bottom / 3) * 3)
+                .OrderByDescending(group => group.Key);
+
+            foreach (var row in rows)
+            {
+                var ordered = row.OrderBy(word => word.BoundingBox.Left).ToList();
+                var builder = new System.Text.StringBuilder();
+                double? previousRight = null;
+
+                foreach (var word in ordered)
+                {
+                    if (previousRight.HasValue)
+                    {
+                        var gap = word.BoundingBox.Left - previousRight.Value;
+                        builder.Append(gap > 8 ? "   " : " ");
+                    }
+
+                    builder.Append(word.Text);
+                    previousRight = word.BoundingBox.Right;
+                }
+
+                lines.Add(builder.ToString());
+            }
+        }
+
+        return lines;
+    }
+
+    private static List<string> SplitPdfColumns(string line) =>
+        Regex.Split(line.Trim(), @"\s{2,}").Where(value => !string.IsNullOrWhiteSpace(value)).ToList();
+
+    private static async IAsyncEnumerable<IReadOnlyDictionary<string, string>> ReadPdfRows(
+        IEnumerable<string> dataLines,
+        IReadOnlyDictionary<string, int> headers)
+    {
+        foreach (var line in dataLines)
+        {
+            var values = SplitPdfColumns(line);
+            yield return headers.ToDictionary(
+                header => header.Key,
+                header => header.Value < values.Count ? values[header.Value] : string.Empty);
+        }
+
+        await Task.CompletedTask;
     }
 
     private static Dictionary<string, int> ParseHeaders(IReadOnlyList<string> headerValues)
