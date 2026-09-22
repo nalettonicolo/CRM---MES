@@ -22,7 +22,7 @@
     <SolidColorBrush x:Key="BackgroundBrush" Color="#0A0A0B" />
     <SolidColorBrush x:Key="SurfaceBrush" Color="#141416" />
     <SolidColorBrush x:Key="SurfaceRaisedBrush" Color="#1B1B1E" />
-    <SolidColorBrush x:Key="BorderBrush0" Color="#28282C" />
+    <SolidColorBrush x:Key="BorderBrush0" Color="#35353B" />
     <SolidColorBrush x:Key="TextPrimaryBrush" Color="#F3F3EF" />
     <SolidColorBrush x:Key="TextSecondaryBrush" Color="#8C8C92" />
     <SolidColorBrush x:Key="TextMutedBrush" Color="#5A5A60" />
