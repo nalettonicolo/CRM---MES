@@ -221,6 +221,14 @@
                                     <Button DockPanel.Dock="Right" Content="Nuovo materiale" Width="140" Height="36" Click="NewMaterialButton_Click" />
                                     <Button DockPanel.Dock="Right" Style="{StaticResource SecondaryButton}" Content="Importa catalogo Excel" Width="170" Height="36" Margin="0,0,10,0" Click="ImportCatalogButton_Click" />
                                     <Button DockPanel.Dock="Right" Style="{StaticResource SecondaryButton}" Content="Cerca" Width="90" Height="36" Margin="0,0,10,0" Click="SearchButton_Click" />
+                                    <Button DockPanel.Dock="Right" Style="{StaticResource SecondaryButton}" Content="Esporta ▾" Width="90" Height="36" Margin="0,0,10,0" Click="ExportMenuButton_Click">
+                                        <Button.ContextMenu>
+                                            <ContextMenu Placement="Bottom">
+                                                <MenuItem Header="Esporta in Excel (.xlsx)" Click="ExportMaterialsExcel_Click" />
+                                                <MenuItem Header="Esporta in PDF" Click="ExportMaterialsPdf_Click" />
+                                            </ContextMenu>
+                                        </Button.ContextMenu>
+                                    </Button>
                                     <TextBox x:Name="SearchBox" Margin="0,0,12,0" Text="" KeyDown="SearchBox_KeyDown" />
                                 </DockPanel>
                                 <Border Grid.Row="1" Style="{StaticResource CardBorder}" Padding="4">

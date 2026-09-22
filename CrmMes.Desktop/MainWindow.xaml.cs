@@ -314,6 +314,69 @@ public partial class MainWindow : Window
         }
     }
 
+    private void ExportMenuButton_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is Button { ContextMenu: not null } button)
+        {
+            button.ContextMenu.PlacementTarget = button;
+            button.ContextMenu.IsOpen = true;
+        }
+    }
+
+    /// <summary>Shared save-and-export flow: asks where to save, runs the export, reports the result.
+    /// Reused by every screen's "Esporta" menu — see <see cref="ListExporter"/>.</summary>
+    private void ExportList(string title, string defaultFileName, IReadOnlyList<ExportColumn> columns, IEnumerable<object>? rows, bool asPdf)
+    {
+        if (rows is null || !rows.Any())
+        {
+            MessageBox.Show("Non c'è nulla da esportare: la lista è vuota.", "Esporta", MessageBoxButton.OK, MessageBoxImage.Information);
+            return;
+        }
+
+        var dialog = new Microsoft.Win32.SaveFileDialog
+        {
+            FileName = defaultFileName,
+            Filter = asPdf ? "File PDF (*.pdf)|*.pdf" : "File Excel (*.xlsx)|*.xlsx"
+        };
+        if (dialog.ShowDialog(this) != true)
+        {
+            return;
+        }
+
+        try
+        {
+            if (asPdf)
+            {
+                ListExporter.ExportToPdf(title, columns, rows, dialog.FileName);
+            }
+            else
+            {
+                ListExporter.ExportToExcel(title, columns, rows, dialog.FileName);
+            }
+
+            MessageBox.Show($"Esportazione completata:\n{dialog.FileName}", "Esporta", MessageBoxButton.OK, MessageBoxImage.Information);
+        }
+        catch (Exception exception)
+        {
+            MessageBox.Show($"Impossibile esportare: {exception.Message}", "Errore", MessageBoxButton.OK, MessageBoxImage.Warning);
+        }
+    }
+
+    private static readonly ExportColumn[] MaterialExportColumns =
+    [
+        new("Codice", row => ((MaterialDto)row).Code),
+        new("Descrizione", row => ((MaterialDto)row).Name),
+        new("Unità", row => ((MaterialDto)row).Unit),
+        new("Giacenza", row => ((MaterialDto)row).Stock.ToString("0.##")),
+        new("Sotto scorta", row => ((MaterialDto)row).BelowMinimum ? "Sì" : "No"),
+    ];
+
+    private void ExportMaterialsExcel_Click(object sender, RoutedEventArgs e) =>
+        ExportList("Materiali", "materiali.xlsx", MaterialExportColumns, MaterialsList.ItemsSource?.Cast<object>(), asPdf: false);
+
+    private void ExportMaterialsPdf_Click(object sender, RoutedEventArgs e) =>
+        ExportList("Materiali", "materiali.pdf", MaterialExportColumns, MaterialsList.ItemsSource?.Cast<object>(), asPdf: true);
+
     private async void ImportCatalogButton_Click(object sender, RoutedEventArgs e)
     {
         var dialog = new Microsoft.Win32.OpenFileDialog
