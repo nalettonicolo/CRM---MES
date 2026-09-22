@@ -50,6 +50,22 @@ public partial class MainWindow : Window
         [11] = "Centri di lavoro",
     };
 
+    private static readonly Dictionary<int, string> PageHelpTexts = new()
+    {
+        [0] = "Elenco dei materiali a magazzino: codice, descrizione, unità di misura, giacenza. Da qui si crea un nuovo materiale, si cerca per codice/descrizione e si importa un catalogo Excel di un fornitore.",
+        [1] = "Materiali la cui giacenza è scesa sotto la scorta minima impostata. \"Scansiona\" crea automaticamente una richiesta di materiale mancante per ciascuno di quelli non ancora richiesti.",
+        [2] = "Materiali richiesti ma non ancora disponibili: generati automaticamente chiudendo una distinta di prelievo che porta un materiale sotto scorta, oppure dallo scan sottoscorte. Restano aperti finché non arrivano da un ordine fornitore.",
+        [3] = "Documenti di prelievo materiale da magazzino verso un'area (es. reparto produzione). Bozza -> Pronta -> Chiusa (scarica davvero la giacenza) oppure Annullata. Solo le distinte in bozza si possono modificare.",
+        [4] = "Ordini di acquisto verso i fornitori. Bozza -> Confermato -> ricevuto (anche parzialmente). Ricevere un ordine carica la giacenza e crea un lotto materiale tracciabile per ogni riga.",
+        [5] = "Aree/reparti dell'azienda a cui è possibile destinare una distinta di prelievo o assegnare una commessa.",
+        [6] = "Utenti abilitati ad accedere al gestionale, con il rispettivo ruolo (Admin, Warehouse, Purchasing, Operator). Solo un Admin può crearne di nuovi.",
+        [7] = "Anagrafica dei prodotti che si costruiscono: distinta base (materiali necessari) e ciclo di lavoro (fasi di produzione). Da qui si genera automaticamente la struttura di ogni nuova commessa.",
+        [8] = "Commesse di produzione: quantità da costruire di un prodotto, con le fasi del ciclo di lavoro tracciate una per una (avvio/completamento, minuti effettivi, performance). Rilasciare una commessa verifica la disponibilità dei materiali.",
+        [9] = "Tracciabilità dei lotti materiale: ogni ingresso di giacenza (ricezione ordine, carico manuale) genera un lotto. Il consumo nelle distinte di prelievo avviene FIFO dal lotto più vecchio; aprendo un lotto si vede dove è stato usato.",
+        [10] = "Indicatori aggregati sulle commesse degli ultimi giorni: quante per stato, fasi completate, performance media (minuti stimati/effettivi), percentuale di consegne puntuali. Copre solo la componente \"Performance\", non un OEE completo.",
+        [11] = "Anagrafica dei centri di lavoro (reparti/linee) con la loro capacità produttiva giornaliera in minuti, e il confronto con il carico di lavoro attualmente in attesa su ciascuno. È una stima di arretrato, non una pianificazione a calendario con date precise.",
+    };
+
     // TEMPORANEO: login disabilitato su richiesta per velocizzare i test.
     // Per riattivare il login manuale: impostare SkipLoginForTesting a false.
     private const bool SkipLoginForTesting = true;
@@ -127,6 +143,7 @@ public partial class MainWindow : Window
 
         MainTabs.SelectedIndex = index;
         PageTitle.Text = PageTitles.GetValueOrDefault(index, string.Empty);
+        PageHelpIcon.Text = PageHelpTexts.GetValueOrDefault(index, string.Empty);
     }
 
     private async void MainWindow_Loaded(object sender, RoutedEventArgs e)

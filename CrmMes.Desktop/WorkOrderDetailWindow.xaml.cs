@@ -31,7 +31,7 @@ public partial class WorkOrderDetailWindow : Window
 
             CodeText.Text = order.Code;
             LotNumberText.Text = $"Lotto {order.ProductLotNumber}";
-            StatusText.Text = order.Status;
+            StatusText.Text = StatusToItalianTextConverter.Translate(order.Status);
             StatusPill.Background = (System.Windows.Media.Brush)StatusBrush.Convert(order.Status, typeof(System.Windows.Media.Brush), null, System.Globalization.CultureInfo.CurrentCulture)!;
             StatusText.Foreground = (System.Windows.Media.Brush)StatusBrush.Convert(order.Status, typeof(System.Windows.Media.Brush), "Foreground", System.Globalization.CultureInfo.CurrentCulture)!;
 
@@ -44,6 +44,7 @@ public partial class WorkOrderDetailWindow : Window
 
             OperationsList.ItemsSource = order.Operations;
 
+            ScheduleButton.IsEnabled = order.Status is not ("Completed" or "Cancelled");
             ReleaseButton.IsEnabled = order.Status == "Draft";
             CompleteButton.IsEnabled = order.Status is "Released" or "InProgress";
             GenerateSlipButton.IsEnabled = order.Status is not ("Completed" or "Cancelled");
@@ -116,6 +117,20 @@ public partial class WorkOrderDetailWindow : Window
             {
                 ErrorText.Text = exception.Message;
             }
+        }
+        catch (Exception exception)
+        {
+            ErrorText.Text = exception.Message;
+        }
+    }
+
+    private async void Schedule_Click(object sender, RoutedEventArgs e)
+    {
+        ErrorText.Text = string.Empty;
+        try
+        {
+            await _apiClient.ScheduleWorkOrderAsync(_workOrderId);
+            await ReloadAsync();
         }
         catch (Exception exception)
         {

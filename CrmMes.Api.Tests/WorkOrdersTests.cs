@@ -378,4 +378,140 @@ public class WorkOrdersTests : IClassFixture<AdminSeededApiTestFixture>
         Assert.True(dashboard.AveragePerformanceRatio > 0);
         Assert.True(dashboard.WorkOrdersCompletedInPeriod >= 1);
     }
+
+    private async Task<Guid> CreateWorkCenterAsync(string name, decimal dailyCapacityMinutes)
+    {
+        var response = await _adminClient.PostAsJsonAsync(
+            "/api/work-centers",
+            new CreateWorkCenterRequest($"WC-{Guid.NewGuid():N}"[..12], name, null, dailyCapacityMinutes));
+        response.EnsureSuccessStatusCode();
+        return (await response.Content.ReadFromJsonAsync<WorkCenterResponse>())!.Id;
+    }
+
+    /// <summary>A product whose routing steps use caller-supplied, normally GUID-suffixed work center
+    /// names — unlike <see cref="CreateProductWithRoutingAndBomAsync"/>'s fixed "Linea 1"/"Banco prova",
+    /// so scheduling tests can each use their own work center name and stay isolated from one another
+    /// despite sharing one Sqlite database for the whole test class.</summary>
+    private async Task<ProductResponse> CreateProductWithCustomRoutingAsync(
+        decimal materialStock, params (string WorkCenter, decimal EstimatedMinutes)[] steps)
+    {
+        var productResponse = await _adminClient.PostAsJsonAsync(
+            "/api/products",
+            new CreateProductRequest($"PROD-{Guid.NewGuid():N}"[..12], "Prodotto scheduling", null));
+        var product = (await productResponse.Content.ReadFromJsonAsync<ProductResponse>())!;
+
+        var material = await CreateMaterialAsync(materialStock);
+        await _adminClient.PutAsJsonAsync(
+            $"/api/products/{product.Id}/bom",
+            new ReplaceBillOfMaterialRequest([new BillOfMaterialItemRequest(material.Code, 1, null)]));
+
+        var routingResponse = await _adminClient.PutAsJsonAsync(
+            $"/api/products/{product.Id}/routing",
+            new ReplaceRoutingRequest(steps
+                .Select((step, index) => new RoutingStepRequest($"Fase {index + 1}", null, step.WorkCenter, step.EstimatedMinutes))
+                .ToList()));
+        return (await routingResponse.Content.ReadFromJsonAsync<ProductResponse>())!;
+    }
+
+    [Fact]
+    public async Task ScheduleWorkOrder_UnregisteredWorkCenters_AssignsOneOperationPerDayInSequence()
+    {
+        var suffix = Guid.NewGuid().ToString("N")[..8];
+        var product = await CreateProductWithCustomRoutingAsync(
+            materialStock: 100,
+            ($"Linea-{suffix}", 60),
+            ($"Banco-{suffix}", 15));
+        var createResponse = await _adminClient.PostAsJsonAsync(
+            "/api/work-orders", new CreateWorkOrderRequest(product.Id, 1, null, null, null, null, null));
+        var order = (await createResponse.Content.ReadFromJsonAsync<WorkOrderResponse>())!;
+        var startFrom = new DateTime(2027, 3, 1, 0, 0, 0, DateTimeKind.Utc);
+
+        var response = await _adminClient.PostAsync($"/api/work-orders/{order.Id}/schedule?startFrom={startFrom:O}", null);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var scheduled = (await response.Content.ReadFromJsonAsync<WorkOrderResponse>())!;
+        var step1 = scheduled.Operations.Single(op => op.SequenceNumber == 1);
+        var step2 = scheduled.Operations.Single(op => op.SequenceNumber == 2);
+
+        Assert.Equal(startFrom.Date, step1.PlannedStartAt!.Value.Date);
+        Assert.Equal(startFrom.Date, step1.PlannedEndAt!.Value.Date);
+        Assert.Equal(startFrom.Date.AddDays(1), step2.PlannedStartAt!.Value.Date);
+    }
+
+    [Fact]
+    public async Task ScheduleWorkOrder_OperationLongerThanDailyCapacity_SpillsOverToNextDay()
+    {
+        var workCenterName = $"Linea-{Guid.NewGuid():N}"[..16];
+        var product = await CreateProductWithCustomRoutingAsync(materialStock: 100, (workCenterName, 60));
+        await CreateWorkCenterAsync(workCenterName, dailyCapacityMinutes: 30); // step needs 60 minutes
+        var createResponse = await _adminClient.PostAsJsonAsync(
+            "/api/work-orders", new CreateWorkOrderRequest(product.Id, 1, null, null, null, null, null));
+        var order = (await createResponse.Content.ReadFromJsonAsync<WorkOrderResponse>())!;
+        var startFrom = new DateTime(2027, 3, 8, 0, 0, 0, DateTimeKind.Utc);
+
+        var response = await _adminClient.PostAsync($"/api/work-orders/{order.Id}/schedule?startFrom={startFrom:O}", null);
+
+        var scheduled = (await response.Content.ReadFromJsonAsync<WorkOrderResponse>())!;
+        var step = scheduled.Operations.Single();
+
+        Assert.Equal(startFrom.Date, step.PlannedStartAt!.Value.Date);
+        Assert.Equal(startFrom.Date.AddDays(1), step.PlannedEndAt!.Value.Date);
+    }
+
+    [Fact]
+    public async Task ScheduleWorkOrder_SharedWorkCenterAcrossOrders_DoesNotDoubleBookCapacity()
+    {
+        var workCenterName = $"Linea-{Guid.NewGuid():N}"[..16];
+        var productA = await CreateProductWithCustomRoutingAsync(materialStock: 100, (workCenterName, 60));
+        var productB = await CreateProductWithCustomRoutingAsync(materialStock: 100, (workCenterName, 60));
+        await CreateWorkCenterAsync(workCenterName, dailyCapacityMinutes: 60); // exactly one 60-minute step per day
+        var startFrom = new DateTime(2027, 3, 15, 0, 0, 0, DateTimeKind.Utc);
+
+        var orderAResponse = await _adminClient.PostAsJsonAsync(
+            "/api/work-orders", new CreateWorkOrderRequest(productA.Id, 1, null, null, null, null, null));
+        var orderA = (await orderAResponse.Content.ReadFromJsonAsync<WorkOrderResponse>())!;
+        await _adminClient.PostAsync($"/api/work-orders/{orderA.Id}/schedule?startFrom={startFrom:O}", null);
+
+        var orderBResponse = await _adminClient.PostAsJsonAsync(
+            "/api/work-orders", new CreateWorkOrderRequest(productB.Id, 1, null, null, null, null, null));
+        var orderB = (await orderBResponse.Content.ReadFromJsonAsync<WorkOrderResponse>())!;
+        var scheduleBResponse = await _adminClient.PostAsync($"/api/work-orders/{orderB.Id}/schedule?startFrom={startFrom:O}", null);
+        var scheduledB = (await scheduleBResponse.Content.ReadFromJsonAsync<WorkOrderResponse>())!;
+
+        var stepB = scheduledB.Operations.Single();
+        Assert.Equal(startFrom.Date.AddDays(1), stepB.PlannedStartAt!.Value.Date);
+    }
+
+    [Fact]
+    public async Task ScheduleWorkOrder_CompletedOrCancelled_ReturnsConflict()
+    {
+        var (product, _) = await CreateProductWithRoutingAndBomAsync(materialStock: 100);
+        var createResponse = await _adminClient.PostAsJsonAsync(
+            "/api/work-orders", new CreateWorkOrderRequest(product.Id, 1, null, null, null, null, null));
+        var order = (await createResponse.Content.ReadFromJsonAsync<WorkOrderResponse>())!;
+        await _adminClient.PostAsync($"/api/work-orders/{order.Id}/cancel", null);
+
+        var response = await _adminClient.PostAsync($"/api/work-orders/{order.Id}/schedule", null);
+
+        Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task ScheduleWorkOrder_SkipsAlreadyDoneOperations()
+    {
+        var (product, _) = await CreateProductWithRoutingAndBomAsync(materialStock: 100);
+        var createResponse = await _adminClient.PostAsJsonAsync(
+            "/api/work-orders", new CreateWorkOrderRequest(product.Id, 1, null, null, null, null, null));
+        var order = (await createResponse.Content.ReadFromJsonAsync<WorkOrderResponse>())!;
+        await _adminClient.PostAsync($"/api/work-orders/{order.Id}/release", null);
+        var assemblyId = order.Operations.OrderBy(op => op.SequenceNumber).First().Id;
+        await _adminClient.PostAsync($"/api/work-orders/{order.Id}/operations/{assemblyId}/start", null);
+        await _adminClient.PostAsync($"/api/work-orders/{order.Id}/operations/{assemblyId}/complete", null);
+
+        var response = await _adminClient.PostAsync($"/api/work-orders/{order.Id}/schedule", null);
+        var scheduled = (await response.Content.ReadFromJsonAsync<WorkOrderResponse>())!;
+
+        var assembly = scheduled.Operations.Single(op => op.Id == assemblyId);
+        Assert.Null(assembly.PlannedStartAt);
+    }
 }

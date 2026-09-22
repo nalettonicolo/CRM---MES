@@ -414,6 +414,144 @@ public class WorkOrdersController : ControllerBase
         return Ok(ToResponse(order));
     }
 
+    /// <summary>Day-granularity finite-capacity forward scheduler: assigns each still-open operation
+    /// (skips ones already Done) to the earliest calendar day(s) where its work center — matched by name
+    /// against the registered <see cref="WorkCenter"/> catalog — has spare daily capacity, accounting for
+    /// everything else already scheduled there across every work order, and respecting the routing's
+    /// sequence (an operation can't start before the previous one in the same work order ends). Operations
+    /// on a work center with no registered capacity (or none matching by name) are placed on the earliest
+    /// available day with no capacity check — unconstrained, not blocked. This assigns whole days, not
+    /// specific times, and is not a drag-and-drop Gantt — just enough to know which day(s) a phase should
+    /// land on and to avoid over-booking a work center across orders.</summary>
+    [Authorize(Policy = "Warehouse")]
+    [HttpPost("{id:guid}/schedule")]
+    public async Task<ActionResult<WorkOrderResponse>> ScheduleWorkOrder(
+        Guid id,
+        [FromQuery] DateTime? startFrom = null,
+        CancellationToken cancellationToken = default)
+    {
+        var order = await _dbContext.WorkOrders
+            .Include(o => o.Operations)
+            .SingleOrDefaultAsync(o => o.Id == id, cancellationToken);
+
+        if (order is null)
+        {
+            return NotFound();
+        }
+
+        if (order.Status is "Completed" or "Cancelled")
+        {
+            return Conflict(new { message = "Non si può pianificare una commessa completata o annullata." });
+        }
+
+        var operationsToSchedule = order.Operations
+            .Where(op => op.Status != "Done")
+            .OrderBy(op => op.SequenceNumber)
+            .ToList();
+
+        if (operationsToSchedule.Count == 0)
+        {
+            return Ok(ToResponse(order));
+        }
+
+        // Grouped rather than ToDictionaryAsync: only Code is unique on WorkCenter, so two active
+        // records can share a Name (e.g. renamed duplicates) — take the first instead of crashing.
+        var workCentersByName = (await _dbContext.WorkCenters
+                .AsNoTracking()
+                .Where(w => w.IsActive)
+                .ToListAsync(cancellationToken))
+            .GroupBy(w => w.Name, StringComparer.OrdinalIgnoreCase)
+            .ToDictionary(group => group.Key, group => group.First(), StringComparer.OrdinalIgnoreCase);
+
+        // Everything else already scheduled anywhere in the shop (other orders, or other open operations
+        // of this one that a previous schedule run already placed), spread evenly across its planned days,
+        // so a new run doesn't double-book a work center's daily capacity.
+        var otherScheduled = await _dbContext.WorkOrderOperations
+            .AsNoTracking()
+            .Where(op => op.WorkOrderId != id &&
+                         op.Status != "Done" &&
+                         op.PlannedStartAt != null && op.PlannedEndAt != null &&
+                         op.WorkCenter != null && op.WorkCenter != "")
+            .Select(op => new { op.WorkCenter, op.PlannedStartAt, op.PlannedEndAt, op.EstimatedMinutes })
+            .ToListAsync(cancellationToken);
+
+        var committed = new Dictionary<string, Dictionary<DateOnly, decimal>>(StringComparer.OrdinalIgnoreCase);
+        foreach (var scheduled in otherScheduled)
+        {
+            var startDay = DateOnly.FromDateTime(scheduled.PlannedStartAt!.Value);
+            var endDay = DateOnly.FromDateTime(scheduled.PlannedEndAt!.Value);
+            var spanDays = endDay.DayNumber - startDay.DayNumber + 1;
+            var perDay = scheduled.EstimatedMinutes / spanDays;
+
+            if (!committed.TryGetValue(scheduled.WorkCenter!, out var byDay))
+            {
+                byDay = new Dictionary<DateOnly, decimal>();
+                committed[scheduled.WorkCenter!] = byDay;
+            }
+
+            for (var day = startDay; day <= endDay; day = day.AddDays(1))
+            {
+                byDay[day] = byDay.GetValueOrDefault(day) + perDay;
+            }
+        }
+
+        var earliestDay = DateOnly.FromDateTime((startFrom ?? DateTime.UtcNow).Date);
+
+        foreach (var operation in operationsToSchedule)
+        {
+            var workCenter = operation.WorkCenter is not null && workCentersByName.TryGetValue(operation.WorkCenter, out var match)
+                ? match
+                : null;
+
+            DateOnly startDay;
+            DateOnly endDay;
+
+            if (workCenter is null || workCenter.DailyCapacityMinutes <= 0)
+            {
+                startDay = earliestDay;
+                endDay = earliestDay;
+            }
+            else
+            {
+                if (!committed.TryGetValue(workCenter.Name, out var byDay))
+                {
+                    byDay = new Dictionary<DateOnly, decimal>();
+                    committed[workCenter.Name] = byDay;
+                }
+
+                var remaining = operation.EstimatedMinutes;
+                var day = earliestDay;
+                DateOnly? firstDay = null;
+                var lastDay = earliestDay;
+                while (remaining > 0)
+                {
+                    var used = byDay.GetValueOrDefault(day);
+                    var available = workCenter.DailyCapacityMinutes - used;
+                    if (available > 0)
+                    {
+                        firstDay ??= day;
+                        var consumed = Math.Min(available, remaining);
+                        byDay[day] = used + consumed;
+                        remaining -= consumed;
+                        lastDay = day;
+                    }
+
+                    day = day.AddDays(1);
+                }
+
+                startDay = firstDay ?? earliestDay;
+                endDay = lastDay;
+            }
+
+            operation.PlannedStartAt = DateTime.SpecifyKind(startDay.ToDateTime(TimeOnly.MinValue), DateTimeKind.Utc);
+            operation.PlannedEndAt = DateTime.SpecifyKind(endDay.ToDateTime(TimeOnly.MinValue), DateTimeKind.Utc);
+            earliestDay = endDay.AddDays(1);
+        }
+
+        await _dbContext.SaveChangesAsync(cancellationToken);
+        return Ok(ToResponse(order));
+    }
+
     [Authorize(Policy = "Warehouse")]
     [HttpPost("{id:guid}/generate-withdrawal-slip")]
     public async Task<ActionResult<WorkOrderWithdrawalSlipResponse>> GenerateWithdrawalSlip(
@@ -539,7 +677,7 @@ public class WorkOrdersController : ControllerBase
                 .Select(op => new WorkOrderOperationResponse(
                     op.Id, op.SequenceNumber, op.Name, op.Description, op.WorkCenter,
                     op.EstimatedMinutes, op.Status, op.StartedAt, op.CompletedAt,
-                    ActualMinutes(op), PerformanceRatio(op)))
+                    ActualMinutes(op), PerformanceRatio(op), op.PlannedStartAt, op.PlannedEndAt))
                 .ToList());
     }
 
@@ -662,7 +800,9 @@ public sealed record WorkOrderOperationResponse(
     DateTime? StartedAt,
     DateTime? CompletedAt,
     decimal? ActualMinutes,
-    decimal? PerformanceRatio);
+    decimal? PerformanceRatio,
+    DateTime? PlannedStartAt,
+    DateTime? PlannedEndAt);
 
 public sealed record WorkOrderWithdrawalSlipResponse(Guid WithdrawalSlipId, string WithdrawalSlipCode);
 

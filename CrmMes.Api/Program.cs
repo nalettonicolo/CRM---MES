@@ -82,6 +82,7 @@ builder.Services.AddDbContext<ApplicationDbContext>(options =>
 var app = builder.Build();
 
 app.UseExceptionHandler();
+app.UseStaticFiles(); // serves wwwroot/favicon.ico, picked up automatically by the browser and by Swagger UI
 
 if (app.Environment.IsDevelopment())
 {

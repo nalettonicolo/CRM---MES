@@ -516,6 +516,16 @@ public sealed class ApiClient
         await EnsureSuccessAsync(response, cancellationToken);
     }
 
+    /// <summary>Runs the day-granularity finite-capacity scheduler for this work order's still-open
+    /// operations. See the server-side XML doc on the endpoint for what "day-granularity" and "finite
+    /// capacity" mean here — this is not a drag-and-drop Gantt, just enough to know which day(s) a phase
+    /// should land on given each work center's registered capacity.</summary>
+    public async Task ScheduleWorkOrderAsync(Guid id, CancellationToken cancellationToken = default)
+    {
+        using var response = await _httpClient.PostAsync($"api/work-orders/{id}/schedule", null, cancellationToken);
+        await EnsureSuccessAsync(response, cancellationToken);
+    }
+
     public async Task<MaterialAvailabilityDto> CheckMaterialAvailabilityAsync(Guid workOrderId, CancellationToken cancellationToken = default)
     {
         using var response = await _httpClient.GetAsync($"api/work-orders/{workOrderId}/material-check", cancellationToken);
@@ -827,7 +837,9 @@ public sealed record WorkOrderOperationDto(
     DateTime? StartedAt,
     DateTime? CompletedAt,
     decimal? ActualMinutes,
-    decimal? PerformanceRatio);
+    decimal? PerformanceRatio,
+    DateTime? PlannedStartAt,
+    DateTime? PlannedEndAt);
 
 public sealed record WorkOrderWithdrawalSlipDto(Guid WithdrawalSlipId, string WithdrawalSlipCode);
 

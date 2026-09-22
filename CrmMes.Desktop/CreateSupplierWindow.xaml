@@ -1,7 +1,7 @@
 <Window x:Class="CrmMes.Desktop.CreateSupplierWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="Nuovo fornitore" Height="460" Width="420"
+        Title="Nuovo fornitore" Icon="Assets/logo.ico" Height="460" Width="420"
         WindowStartupLocation="CenterOwner" ResizeMode="NoResize"
         Background="{StaticResource BackgroundBrush}">
     <StackPanel Margin="24">

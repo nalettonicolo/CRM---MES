@@ -16,5 +16,13 @@ public class WorkOrderOperation
     public string Status { get; set; } = "Pending";
     public DateTime? StartedAt { get; set; }
     public DateTime? CompletedAt { get; set; }
+
+    /// <summary>Day-level finite-capacity plan produced by <c>POST /api/work-orders/{id}/schedule</c> —
+    /// which calendar day(s) this operation is expected to run on, given its work center's registered
+    /// daily capacity and everything else already scheduled there. Null until a schedule run covers it;
+    /// this is a day-granularity plan, not a minute-precise timeline.</summary>
+    public DateTime? PlannedStartAt { get; set; }
+    public DateTime? PlannedEndAt { get; set; }
+
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 }

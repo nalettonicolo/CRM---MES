@@ -1,7 +1,7 @@
 <Window x:Class="CrmMes.Desktop.CreateWithdrawalSlipWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="Nuova distinta di prelievo" Height="560" Width="520"
+        Title="Nuova distinta di prelievo" Icon="Assets/logo.ico" Height="560" Width="520"
         WindowStartupLocation="CenterOwner" ResizeMode="NoResize"
         Background="{StaticResource BackgroundBrush}">
     <Grid Margin="24">

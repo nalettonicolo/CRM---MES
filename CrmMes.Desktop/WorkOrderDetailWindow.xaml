@@ -1,7 +1,8 @@
 <Window x:Class="CrmMes.Desktop.WorkOrderDetailWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="Commessa" Height="640" Width="860"
+        xmlns:local="clr-namespace:CrmMes.Desktop"
+        Title="Commessa" Icon="Assets/logo.ico" Height="640" Width="860"
         WindowStartupLocation="CenterOwner" ResizeMode="CanResize" MinHeight="480" MinWidth="740"
         Background="{StaticResource BackgroundBrush}">
     <Grid Margin="24">
@@ -19,6 +20,8 @@
                 <TextBlock x:Name="StatusText" Style="{StaticResource PillText}" />
             </Border>
             <TextBlock x:Name="CodeText" FontSize="20" FontWeight="SemiBold" Foreground="{StaticResource TextPrimaryBrush}" />
+            <local:HelpIcon Margin="8,4,0,0"
+                             Text="Dettaglio di una commessa di produzione. Rilascia verifica la disponibilità dei materiali della distinta base (se manca qualcosa, chiede conferma prima di procedere comunque). Pianifica assegna a ogni fase ancora aperta il giorno (o i giorni) in cui dovrebbe essere eseguita, in base alla capacità giornaliera registrata per il suo centro di lavoro — è una stima a livello di giorno, non un orario preciso. Ogni fase si avvia e si completa singolarmente; a fine fase il sistema calcola i minuti effettivi e il rapporto stimato/effettivo (performance)." />
             <TextBlock x:Name="LotNumberText" FontSize="12.5" Foreground="{StaticResource TextSecondaryBrush}" Margin="12,4,0,0" VerticalAlignment="Center" />
         </DockPanel>
 
@@ -71,13 +74,15 @@
                             <GridViewColumn.CellTemplate>
                                 <DataTemplate>
                                     <Border Style="{StaticResource Pill}" Background="{Binding Status, Converter={StaticResource StatusToBrush}}">
-                                        <TextBlock Style="{StaticResource PillText}" Text="{Binding Status}" Foreground="{Binding Status, Converter={StaticResource StatusToBrush}, ConverterParameter=Foreground}" />
+                                        <TextBlock Style="{StaticResource PillText}" Text="{Binding Status, Converter={StaticResource StatusToItalianText}}" Foreground="{Binding Status, Converter={StaticResource StatusToBrush}, ConverterParameter=Foreground}" />
                                     </Border>
                                 </DataTemplate>
                             </GridViewColumn.CellTemplate>
                         </GridViewColumn>
                         <GridViewColumn Header="Min. effettivi" DisplayMemberBinding="{Binding ActualMinutes, StringFormat={}{0:0.0}}" Width="90" />
                         <GridViewColumn Header="Performance" DisplayMemberBinding="{Binding PerformanceRatio, StringFormat={}{0:P0}}" Width="90" />
+                        <GridViewColumn Header="Pianificato dal" DisplayMemberBinding="{Binding PlannedStartAt, StringFormat={}{0:d}}" Width="100" />
+                        <GridViewColumn Header="al" DisplayMemberBinding="{Binding PlannedEndAt, StringFormat={}{0:d}}" Width="90" />
                         <GridViewColumn Header="" Width="90">
                             <GridViewColumn.CellTemplate>
                                 <DataTemplate>
@@ -96,6 +101,7 @@
 
         <StackPanel Grid.Row="5" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,16,0,0">
             <Button x:Name="TraceabilityButton" Style="{StaticResource SecondaryButton}" Content="Tracciabilità materiali" Width="160" Height="36" Margin="0,0,10,0" Click="Traceability_Click" />
+            <Button x:Name="ScheduleButton" Style="{StaticResource SecondaryButton}" Content="Pianifica" Width="110" Height="36" Margin="0,0,10,0" Click="Schedule_Click" />
             <Button x:Name="ReleaseButton" Content="Rilascia" Width="110" Height="36" Margin="0,0,10,0" Click="Release_Click" />
             <Button x:Name="CompleteButton" Content="Completa" Width="110" Height="36" Margin="0,0,10,0" Click="Complete_Click" />
             <Button x:Name="GenerateSlipButton" Style="{StaticResource SecondaryButton}" Content="Genera distinta" Width="140" Height="36" Margin="0,0,10,0" Click="GenerateSlip_Click" />

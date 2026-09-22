@@ -5,7 +5,7 @@
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:local="clr-namespace:CrmMes.Desktop"
         mc:Ignorable="d"
-        Title="Gestionale Elettrico" Height="720" Width="1240"
+        Title="Gestionale Elettrico" Icon="Assets/logo.ico" Height="720" Width="1240"
         MinHeight="580" MinWidth="1000"
         WindowStyle="None" AllowsTransparency="False" ResizeMode="CanResize"
         StateChanged="Window_StateChanged"
@@ -28,7 +28,7 @@
                     <ColumnDefinition Width="Auto" />
                 </Grid.ColumnDefinitions>
                 <StackPanel Grid.Column="0" Orientation="Horizontal" Margin="16,0,0,0" VerticalAlignment="Center">
-                    <TextBlock Text="&#xE945;" FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets" FontSize="14" Foreground="{StaticResource PrimaryBrush}" VerticalAlignment="Center" />
+                    <Image Source="Assets/logo.png" Width="20" Height="20" VerticalAlignment="Center" />
                     <TextBlock Text="Gestionale Elettrico" Margin="10,0,0,0" Foreground="{StaticResource TitleBarTextBrush}" FontSize="12.5" FontWeight="SemiBold" VerticalAlignment="Center" />
                 </StackPanel>
                 <StackPanel Grid.Column="1" Orientation="Horizontal">
@@ -77,79 +77,98 @@
                                 <Button x:Name="SidebarSettingsButton" Style="{StaticResource SidebarLinkButton}" Content="Impostazioni server" Margin="0,6,0,0" Click="SettingsButton_Click" />
                             </StackPanel>
                         </Border>
-                        <StackPanel Margin="0,18,0,0">
-                            <RadioButton x:Name="NavMaterials" Style="{StaticResource NavItem}" GroupName="Nav" Tag="0" Checked="NavItem_Checked">
-                                <StackPanel Orientation="Horizontal">
-                                    <TextBlock Text="&#xE7B8;" FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets" FontSize="16" Width="24" />
-                                    <TextBlock Text="Materiali" Margin="6,0,0,0" />
+                        <StackPanel Margin="0,10,0,0">
+                            <Expander Style="{StaticResource NavSectionExpander}" Header="MAGAZZINO">
+                                <StackPanel>
+                                    <RadioButton x:Name="NavMaterials" Style="{StaticResource NavItem}" GroupName="Nav" Tag="0" Checked="NavItem_Checked">
+                                        <StackPanel Orientation="Horizontal">
+                                            <TextBlock Text="&#xE7B8;" FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets" FontSize="16" Width="24" />
+                                            <TextBlock Text="Materiali" Margin="6,0,0,0" />
+                                        </StackPanel>
+                                    </RadioButton>
+                                    <RadioButton x:Name="NavLowStock" Style="{StaticResource NavItem}" GroupName="Nav" Tag="1" Checked="NavItem_Checked">
+                                        <StackPanel Orientation="Horizontal">
+                                            <TextBlock Text="&#xE7BA;" FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets" FontSize="16" Width="24" />
+                                            <TextBlock Text="Sotto scorta" Margin="6,0,0,0" />
+                                        </StackPanel>
+                                    </RadioButton>
+                                    <RadioButton x:Name="NavMissing" Style="{StaticResource NavItem}" GroupName="Nav" Tag="2" Checked="NavItem_Checked">
+                                        <StackPanel Orientation="Horizontal">
+                                            <TextBlock Text="&#xE8FD;" FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets" FontSize="16" Width="24" />
+                                            <TextBlock Text="Materiali mancanti" Margin="6,0,0,0" />
+                                        </StackPanel>
+                                    </RadioButton>
+                                    <RadioButton x:Name="NavSlips" Style="{StaticResource NavItem}" GroupName="Nav" Tag="3" Checked="NavItem_Checked">
+                                        <StackPanel Orientation="Horizontal">
+                                            <TextBlock Text="&#xE70F;" FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets" FontSize="16" Width="24" />
+                                            <TextBlock Text="Distinte di prelievo" Margin="6,0,0,0" />
+                                        </StackPanel>
+                                    </RadioButton>
+                                    <RadioButton x:Name="NavMaterialLots" Style="{StaticResource NavItem}" GroupName="Nav" Tag="9" Checked="NavItem_Checked">
+                                        <StackPanel Orientation="Horizontal">
+                                            <TextBlock Text="&#xE8AB;" FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets" FontSize="16" Width="24" />
+                                            <TextBlock Text="Lotti materiali" Margin="6,0,0,0" />
+                                        </StackPanel>
+                                    </RadioButton>
                                 </StackPanel>
-                            </RadioButton>
-                            <RadioButton x:Name="NavLowStock" Style="{StaticResource NavItem}" GroupName="Nav" Tag="1" Checked="NavItem_Checked">
-                                <StackPanel Orientation="Horizontal">
-                                    <TextBlock Text="&#xE7BA;" FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets" FontSize="16" Width="24" />
-                                    <TextBlock Text="Sotto scorta" Margin="6,0,0,0" />
+                            </Expander>
+
+                            <Expander Style="{StaticResource NavSectionExpander}" Header="ACQUISTI">
+                                <StackPanel>
+                                    <RadioButton x:Name="NavOrders" Style="{StaticResource NavItem}" GroupName="Nav" Tag="4" Checked="NavItem_Checked">
+                                        <StackPanel Orientation="Horizontal">
+                                            <TextBlock Text="&#xE7BF;" FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets" FontSize="16" Width="24" />
+                                            <TextBlock Text="Ordini fornitore" Margin="6,0,0,0" />
+                                        </StackPanel>
+                                    </RadioButton>
                                 </StackPanel>
-                            </RadioButton>
-                            <RadioButton x:Name="NavMissing" Style="{StaticResource NavItem}" GroupName="Nav" Tag="2" Checked="NavItem_Checked">
-                                <StackPanel Orientation="Horizontal">
-                                    <TextBlock Text="&#xE8FD;" FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets" FontSize="16" Width="24" />
-                                    <TextBlock Text="Materiali mancanti" Margin="6,0,0,0" />
+                            </Expander>
+
+                            <Expander Style="{StaticResource NavSectionExpander}" Header="PRODUZIONE">
+                                <StackPanel>
+                                    <RadioButton x:Name="NavProducts" Style="{StaticResource NavItem}" GroupName="Nav" Tag="7" Checked="NavItem_Checked">
+                                        <StackPanel Orientation="Horizontal">
+                                            <TextBlock Text="&#xE7C3;" FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets" FontSize="16" Width="24" />
+                                            <TextBlock Text="Prodotti" Margin="6,0,0,0" />
+                                        </StackPanel>
+                                    </RadioButton>
+                                    <RadioButton x:Name="NavWorkOrders" Style="{StaticResource NavItem}" GroupName="Nav" Tag="8" Checked="NavItem_Checked">
+                                        <StackPanel Orientation="Horizontal">
+                                            <TextBlock Text="&#xE73E;" FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets" FontSize="16" Width="24" />
+                                            <TextBlock Text="Commesse" Margin="6,0,0,0" />
+                                        </StackPanel>
+                                    </RadioButton>
+                                    <RadioButton x:Name="NavWorkCenters" Style="{StaticResource NavItem}" GroupName="Nav" Tag="11" Checked="NavItem_Checked">
+                                        <StackPanel Orientation="Horizontal">
+                                            <TextBlock Text="&#xE8B7;" FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets" FontSize="16" Width="24" />
+                                            <TextBlock Text="Centri di lavoro" Margin="6,0,0,0" />
+                                        </StackPanel>
+                                    </RadioButton>
+                                    <RadioButton x:Name="NavDashboard" Style="{StaticResource NavItem}" GroupName="Nav" Tag="10" Checked="NavItem_Checked">
+                                        <StackPanel Orientation="Horizontal">
+                                            <TextBlock Text="&#xE9D9;" FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets" FontSize="16" Width="24" />
+                                            <TextBlock Text="Cruscotto" Margin="6,0,0,0" />
+                                        </StackPanel>
+                                    </RadioButton>
                                 </StackPanel>
-                            </RadioButton>
-                            <RadioButton x:Name="NavSlips" Style="{StaticResource NavItem}" GroupName="Nav" Tag="3" Checked="NavItem_Checked">
-                                <StackPanel Orientation="Horizontal">
-                                    <TextBlock Text="&#xE70F;" FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets" FontSize="16" Width="24" />
-                                    <TextBlock Text="Distinte di prelievo" Margin="6,0,0,0" />
+                            </Expander>
+
+                            <Expander Style="{StaticResource NavSectionExpander}" Header="AMMINISTRAZIONE">
+                                <StackPanel>
+                                    <RadioButton x:Name="NavAreas" Style="{StaticResource NavItem}" GroupName="Nav" Tag="5" Checked="NavItem_Checked">
+                                        <StackPanel Orientation="Horizontal">
+                                            <TextBlock Text="&#xE774;" FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets" FontSize="16" Width="24" />
+                                            <TextBlock Text="Aree" Margin="6,0,0,0" />
+                                        </StackPanel>
+                                    </RadioButton>
+                                    <RadioButton x:Name="NavUsers" Style="{StaticResource NavItem}" GroupName="Nav" Tag="6" Checked="NavItem_Checked">
+                                        <StackPanel Orientation="Horizontal">
+                                            <TextBlock Text="&#xE716;" FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets" FontSize="16" Width="24" />
+                                            <TextBlock Text="Utenti" Margin="6,0,0,0" />
+                                        </StackPanel>
+                                    </RadioButton>
                                 </StackPanel>
-                            </RadioButton>
-                            <RadioButton x:Name="NavOrders" Style="{StaticResource NavItem}" GroupName="Nav" Tag="4" Checked="NavItem_Checked">
-                                <StackPanel Orientation="Horizontal">
-                                    <TextBlock Text="&#xE7BF;" FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets" FontSize="16" Width="24" />
-                                    <TextBlock Text="Ordini fornitore" Margin="6,0,0,0" />
-                                </StackPanel>
-                            </RadioButton>
-                            <RadioButton x:Name="NavAreas" Style="{StaticResource NavItem}" GroupName="Nav" Tag="5" Checked="NavItem_Checked">
-                                <StackPanel Orientation="Horizontal">
-                                    <TextBlock Text="&#xE774;" FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets" FontSize="16" Width="24" />
-                                    <TextBlock Text="Aree" Margin="6,0,0,0" />
-                                </StackPanel>
-                            </RadioButton>
-                            <RadioButton x:Name="NavUsers" Style="{StaticResource NavItem}" GroupName="Nav" Tag="6" Checked="NavItem_Checked">
-                                <StackPanel Orientation="Horizontal">
-                                    <TextBlock Text="&#xE716;" FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets" FontSize="16" Width="24" />
-                                    <TextBlock Text="Utenti" Margin="6,0,0,0" />
-                                </StackPanel>
-                            </RadioButton>
-                            <RadioButton x:Name="NavProducts" Style="{StaticResource NavItem}" GroupName="Nav" Tag="7" Checked="NavItem_Checked">
-                                <StackPanel Orientation="Horizontal">
-                                    <TextBlock Text="&#xE7C3;" FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets" FontSize="16" Width="24" />
-                                    <TextBlock Text="Prodotti" Margin="6,0,0,0" />
-                                </StackPanel>
-                            </RadioButton>
-                            <RadioButton x:Name="NavWorkOrders" Style="{StaticResource NavItem}" GroupName="Nav" Tag="8" Checked="NavItem_Checked">
-                                <StackPanel Orientation="Horizontal">
-                                    <TextBlock Text="&#xE73E;" FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets" FontSize="16" Width="24" />
-                                    <TextBlock Text="Commesse" Margin="6,0,0,0" />
-                                </StackPanel>
-                            </RadioButton>
-                            <RadioButton x:Name="NavMaterialLots" Style="{StaticResource NavItem}" GroupName="Nav" Tag="9" Checked="NavItem_Checked">
-                                <StackPanel Orientation="Horizontal">
-                                    <TextBlock Text="&#xE8AB;" FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets" FontSize="16" Width="24" />
-                                    <TextBlock Text="Lotti materiali" Margin="6,0,0,0" />
-                                </StackPanel>
-                            </RadioButton>
-                            <RadioButton x:Name="NavDashboard" Style="{StaticResource NavItem}" GroupName="Nav" Tag="10" Checked="NavItem_Checked">
-                                <StackPanel Orientation="Horizontal">
-                                    <TextBlock Text="&#xE9D9;" FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets" FontSize="16" Width="24" />
-                                    <TextBlock Text="Cruscotto" Margin="6,0,0,0" />
-                                </StackPanel>
-                            </RadioButton>
-                            <RadioButton x:Name="NavWorkCenters" Style="{StaticResource NavItem}" GroupName="Nav" Tag="11" Checked="NavItem_Checked">
-                                <StackPanel Orientation="Horizontal">
-                                    <TextBlock Text="&#xE8B7;" FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets" FontSize="16" Width="24" />
-                                    <TextBlock Text="Centri di lavoro" Margin="6,0,0,0" />
-                                </StackPanel>
-                            </RadioButton>
+                            </Expander>
                         </StackPanel>
                     </DockPanel>
                 </Border>
@@ -161,7 +180,10 @@
                         <RowDefinition Height="*" />
                     </Grid.RowDefinitions>
 
-                    <TextBlock Grid.Row="0" x:Name="PageTitle" Text="Materiali" FontSize="22" FontWeight="SemiBold" Foreground="{StaticResource TextPrimaryBrush}" Margin="0,0,0,20" />
+                    <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="0,0,0,20">
+                        <TextBlock x:Name="PageTitle" Text="Materiali" FontSize="22" FontWeight="SemiBold" Foreground="{StaticResource TextPrimaryBrush}" VerticalAlignment="Center" />
+                        <local:HelpIcon x:Name="PageHelpIcon" Margin="10,4,0,0" />
+                    </StackPanel>
 
                     <TabControl Grid.Row="1" x:Name="MainTabs" SelectionChanged="MainTabs_SelectionChanged">
 
@@ -258,7 +280,7 @@
                                                     <GridViewColumn.CellTemplate>
                                                         <DataTemplate>
                                                             <Border Style="{StaticResource Pill}" Background="{Binding Status, Converter={StaticResource StatusToBrush}}">
-                                                                <TextBlock Style="{StaticResource PillText}" Text="{Binding Status}" Foreground="{Binding Status, Converter={StaticResource StatusToBrush}, ConverterParameter=Foreground}" />
+                                                                <TextBlock Style="{StaticResource PillText}" Text="{Binding Status, Converter={StaticResource StatusToItalianText}}" Foreground="{Binding Status, Converter={StaticResource StatusToBrush}, ConverterParameter=Foreground}" />
                                                             </Border>
                                                         </DataTemplate>
                                                     </GridViewColumn.CellTemplate>
@@ -292,7 +314,7 @@
                                                     <GridViewColumn.CellTemplate>
                                                         <DataTemplate>
                                                             <Border Style="{StaticResource Pill}" Background="{Binding Status, Converter={StaticResource StatusToBrush}}">
-                                                                <TextBlock Style="{StaticResource PillText}" Text="{Binding Status}" Foreground="{Binding Status, Converter={StaticResource StatusToBrush}, ConverterParameter=Foreground}" />
+                                                                <TextBlock Style="{StaticResource PillText}" Text="{Binding Status, Converter={StaticResource StatusToItalianText}}" Foreground="{Binding Status, Converter={StaticResource StatusToBrush}, ConverterParameter=Foreground}" />
                                                             </Border>
                                                         </DataTemplate>
                                                     </GridViewColumn.CellTemplate>
@@ -336,7 +358,7 @@
                                                     <GridViewColumn.CellTemplate>
                                                         <DataTemplate>
                                                             <Border Style="{StaticResource Pill}" Background="{Binding Status, Converter={StaticResource StatusToBrush}}">
-                                                                <TextBlock Style="{StaticResource PillText}" Text="{Binding Status}" Foreground="{Binding Status, Converter={StaticResource StatusToBrush}, ConverterParameter=Foreground}" />
+                                                                <TextBlock Style="{StaticResource PillText}" Text="{Binding Status, Converter={StaticResource StatusToItalianText}}" Foreground="{Binding Status, Converter={StaticResource StatusToBrush}, ConverterParameter=Foreground}" />
                                                             </Border>
                                                         </DataTemplate>
                                                     </GridViewColumn.CellTemplate>
@@ -489,7 +511,7 @@
                                                     <GridViewColumn.CellTemplate>
                                                         <DataTemplate>
                                                             <Border Style="{StaticResource Pill}" Background="{Binding Status, Converter={StaticResource StatusToBrush}}">
-                                                                <TextBlock Style="{StaticResource PillText}" Text="{Binding Status}" Foreground="{Binding Status, Converter={StaticResource StatusToBrush}, ConverterParameter=Foreground}" />
+                                                                <TextBlock Style="{StaticResource PillText}" Text="{Binding Status, Converter={StaticResource StatusToItalianText}}" Foreground="{Binding Status, Converter={StaticResource StatusToBrush}, ConverterParameter=Foreground}" />
                                                             </Border>
                                                         </DataTemplate>
                                                     </GridViewColumn.CellTemplate>
@@ -605,6 +627,8 @@
 
                                 <DockPanel Grid.Row="0" Margin="0,0,0,8">
                                     <Button DockPanel.Dock="Right" Content="Aggiungi" Width="100" Click="AddWorkCenter_Click" />
+                                    <local:HelpIcon DockPanel.Dock="Right" Margin="0,0,10,0"
+                                                     Text="Codice: identificativo univoco del centro (es. LINEA-1). Nome: come compare nel ciclo di lavoro dei prodotti — deve coincidere esattamente con il testo del campo &quot;centro di lavoro&quot; inserito lì, altrimenti il carico non viene associato. Capacità min/giorno: minuti di produzione disponibili in un giorno lavorativo (es. un turno da 8 ore = 480)." />
                                     <TextBox x:Name="WorkCenterCapacityBox" DockPanel.Dock="Right" Width="110" Margin="0,0,10,0" Tag="Capacità min/giorno" Text="480" />
                                     <TextBox x:Name="WorkCenterNameBox" DockPanel.Dock="Right" Width="180" Margin="0,0,10,0" Tag="Nome centro" />
                                     <TextBox x:Name="WorkCenterCodeBox" Margin="0,0,10,0" Tag="Codice" />
@@ -630,7 +654,11 @@
                                     </ListView>
                                 </Border>
 
-                                <TextBlock Grid.Row="3" Text="Carico rispetto alla capacità (indicativo, non una pianificazione a calendario)" FontWeight="SemiBold" Foreground="{StaticResource TextPrimaryBrush}" Margin="0,18,0,8" />
+                                <StackPanel Grid.Row="3" Orientation="Horizontal" Margin="0,18,0,8">
+                                    <TextBlock Text="Carico rispetto alla capacità (indicativo, non una pianificazione a calendario)" FontWeight="SemiBold" Foreground="{StaticResource TextPrimaryBrush}" VerticalAlignment="Center" />
+                                    <local:HelpIcon Margin="8,2,0,0"
+                                                     Text="Minuti in attesa: somma dei minuti stimati delle fasi non ancora completate (In attesa o In corso) su commesse rilasciate, per questo centro. Operazioni aperte: quante fasi sono in coda. Giorni di arretrato: minuti in attesa diviso capacità giornaliera — una stima di quanti giorni servirebbero per smaltire la coda, non una data precisa. I centri senza capacità registrata compaiono comunque se usati nel ciclo di lavoro, ma senza calcolo dei giorni di arretrato." />
+                                </StackPanel>
 
                                 <Border Grid.Row="4" Style="{StaticResource CardBorder}" Padding="4" MinHeight="110">
                                     <ListView x:Name="WorkCenterLoadList">

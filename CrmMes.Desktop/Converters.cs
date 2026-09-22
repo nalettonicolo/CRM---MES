@@ -38,6 +38,40 @@ public sealed class StatusToBrushConverter : IValueConverter
         => throw new NotSupportedException();
 }
 
+/// <summary>Translates a workflow status string (as stored/returned by the API, always in English:
+/// Draft, Released, Done, ...) to the Italian label shown in the UI. Centralized here so every pill,
+/// column and detail header stays consistent instead of each screen inventing its own text.</summary>
+public sealed class StatusToItalianTextConverter : IValueConverter
+{
+    private static readonly Dictionary<string, string> Labels = new(StringComparer.OrdinalIgnoreCase)
+    {
+        ["Draft"] = "Bozza",
+        ["Open"] = "Aperto",
+        ["Ordered"] = "Ordinato",
+        ["Ready"] = "Pronta",
+        ["Confirmed"] = "Confermato",
+        ["PartiallyReceived"] = "Ricevuto parzialmente",
+        ["Received"] = "Ricevuto",
+        ["Resolved"] = "Risolto",
+        ["Closed"] = "Chiusa",
+        ["Cancelled"] = "Annullata",
+        ["Released"] = "Rilasciata",
+        ["InProgress"] = "In corso",
+        ["Completed"] = "Completata",
+        ["Pending"] = "In attesa",
+        ["Done"] = "Completata",
+    };
+
+    public static string Translate(string? status) =>
+        status is not null && Labels.TryGetValue(status, out var label) ? label : status ?? string.Empty;
+
+    public object Convert(object? value, Type targetType, object? parameter, CultureInfo culture)
+        => Translate(value as string);
+
+    public object ConvertBack(object value, Type targetType, object? parameter, CultureInfo culture)
+        => throw new NotSupportedException();
+}
+
 /// <summary>Renders a boolean as a short localized label, e.g. true/false -> "Sì"/"No". Parameter: "TrueText|FalseText".</summary>
 public sealed class BoolToTextConverter : IValueConverter
 {

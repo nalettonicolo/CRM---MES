@@ -31,7 +31,7 @@ public partial class WithdrawalSlipDetailWindow : Window
             var slip = await _apiClient.GetWithdrawalSlipAsync(_slipId);
 
             CodeText.Text = slip.Code;
-            StatusText.Text = slip.Status;
+            StatusText.Text = StatusToItalianTextConverter.Translate(slip.Status);
             StatusPill.Background = (System.Windows.Media.Brush)StatusBrush.Convert(slip.Status, typeof(System.Windows.Media.Brush), null, System.Globalization.CultureInfo.CurrentCulture)!;
             StatusText.Foreground = (System.Windows.Media.Brush)StatusBrush.Convert(slip.Status, typeof(System.Windows.Media.Brush), "Foreground", System.Globalization.CultureInfo.CurrentCulture)!;
 

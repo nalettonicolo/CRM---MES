@@ -1,7 +1,7 @@
 <Window x:Class="CrmMes.Desktop.CreatePurchaseOrderWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="Nuovo ordine fornitore" Height="560" Width="560"
+        Title="Nuovo ordine fornitore" Icon="Assets/logo.ico" Height="560" Width="560"
         WindowStartupLocation="CenterOwner" ResizeMode="NoResize"
         Background="{StaticResource BackgroundBrush}">
     <Grid Margin="24">
