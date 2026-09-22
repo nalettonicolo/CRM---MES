@@ -11,59 +11,61 @@
     <local:StatusNotEqualToVisibilityConverter x:Key="StatusNotEqualToVisibility" />
 
     <!-- ===================================================================
-         DESIGN SYSTEM — "Voltage": monocromo quasi-nero editoriale con un
-         solo accento neon (lime elettrico). Un solo colore ha il diritto di
-         urlare; tutto il resto e' silenzioso, spigoli vivi, niente ombre
-         morbide da SaaS. Vedi la nota in fondo a MainWindow.xaml per i
-         concetti guida.
+         DESIGN SYSTEM — "Fusione": sintesi delle tre direzioni provate.
+         Dock di navigazione scuro (l'occhio non ci sosta a lungo) + area di
+         lavoro color carta calda, non bianco/grigio neutro da SaaS, dove le
+         tabelle si leggono per ore senza affaticare. Titoli in serif
+         editoriale, un solo accento ambra usato con parsimonia, angoli
+         morbidi, bordi a 1px ad alto contrasto invece di ombre. Vedi la nota
+         in fondo a MainWindow.xaml per i concetti guida.
          =================================================================== -->
 
-    <!-- Base -->
-    <SolidColorBrush x:Key="BackgroundBrush" Color="#0A0A0B" />
-    <SolidColorBrush x:Key="SurfaceBrush" Color="#141416" />
-    <SolidColorBrush x:Key="SurfaceRaisedBrush" Color="#1B1B1E" />
-    <SolidColorBrush x:Key="BorderBrush0" Color="#35353B" />
-    <SolidColorBrush x:Key="TextPrimaryBrush" Color="#F3F3EF" />
-    <SolidColorBrush x:Key="TextSecondaryBrush" Color="#8C8C92" />
-    <SolidColorBrush x:Key="TextMutedBrush" Color="#5A5A60" />
+    <!-- Base: carta calda, non bianco puro -->
+    <SolidColorBrush x:Key="BackgroundBrush" Color="#F5EFDF" />
+    <SolidColorBrush x:Key="SurfaceBrush" Color="#FFFFFF" />
+    <SolidColorBrush x:Key="SurfaceRaisedBrush" Color="#FBF6EC" />
+    <SolidColorBrush x:Key="BorderBrush0" Color="#E7DBBA" />
+    <SolidColorBrush x:Key="TextPrimaryBrush" Color="#2B2620" />
+    <SolidColorBrush x:Key="TextSecondaryBrush" Color="#8C7F6A" />
+    <SolidColorBrush x:Key="TextMutedBrush" Color="#A79883" />
 
-    <!-- The one accent: electric lime. "Elettrico" is not a metaphor here. -->
-    <SolidColorBrush x:Key="PrimaryBrush" Color="#D6FF3F" />
-    <SolidColorBrush x:Key="PrimaryHoverBrush" Color="#C2E838" />
-    <SolidColorBrush x:Key="PrimaryPressedBrush" Color="#A8CC2C" />
-    <SolidColorBrush x:Key="PrimaryDisabledBrush" Color="#3A3D28" />
-    <SolidColorBrush x:Key="PrimarySoftBrush" Color="#1C2008" />
-    <!-- Text painted ON TOP of the lime accent needs near-black, not white -->
-    <SolidColorBrush x:Key="OnAccentTextBrush" Color="#0A0A0B" />
+    <!-- The one accent: warm amber/voltage. -->
+    <SolidColorBrush x:Key="PrimaryBrush" Color="#D98C2B" />
+    <SolidColorBrush x:Key="PrimaryHoverBrush" Color="#C57821" />
+    <SolidColorBrush x:Key="PrimaryPressedBrush" Color="#A8661A" />
+    <SolidColorBrush x:Key="PrimaryDisabledBrush" Color="#EBDFC4" />
+    <SolidColorBrush x:Key="PrimarySoftBrush" Color="#FBF0DC" />
+    <!-- Text painted ON TOP of the amber accent needs near-black, not white -->
+    <SolidColorBrush x:Key="OnAccentTextBrush" Color="#211605" />
 
-    <SolidColorBrush x:Key="SuccessBgBrush" Color="#132018" />
-    <SolidColorBrush x:Key="SuccessTextBrush" Color="#7CE0A8" />
+    <SolidColorBrush x:Key="SuccessBgBrush" Color="#EAF3EA" />
+    <SolidColorBrush x:Key="SuccessTextBrush" Color="#3D7A4C" />
 
-    <SolidColorBrush x:Key="DangerBrush" Color="#FF5C5C" />
-    <SolidColorBrush x:Key="DangerHoverBrush" Color="#E44747" />
+    <SolidColorBrush x:Key="DangerBrush" Color="#C0392B" />
+    <SolidColorBrush x:Key="DangerHoverBrush" Color="#A5301F" />
 
-    <SolidColorBrush x:Key="OutlineBgBrush" Color="Transparent" />
-    <SolidColorBrush x:Key="OutlineBorderBrush" Color="#33333A" />
-    <SolidColorBrush x:Key="OutlineHoverBgBrush" Color="#1C1C1F" />
+    <SolidColorBrush x:Key="OutlineBgBrush" Color="#FFFFFF" />
+    <SolidColorBrush x:Key="OutlineBorderBrush" Color="#DECFB0" />
+    <SolidColorBrush x:Key="OutlineHoverBgBrush" Color="#FFF8EC" />
 
-    <SolidColorBrush x:Key="RowHoverBrush" Color="#19191C" />
-    <SolidColorBrush x:Key="RowAlternateBrush" Color="#111113" />
-    <SolidColorBrush x:Key="RowSelectedBrush" Color="#1C2008" />
-    <SolidColorBrush x:Key="HeaderBgBrush" Color="#0A0A0B" />
+    <SolidColorBrush x:Key="RowHoverBrush" Color="#FCF8EF" />
+    <SolidColorBrush x:Key="RowAlternateBrush" Color="#FAF5E9" />
+    <SolidColorBrush x:Key="RowSelectedBrush" Color="#FBF0DC" />
+    <SolidColorBrush x:Key="HeaderBgBrush" Color="#FFFFFF" />
 
-    <!-- Sidebar / dock -->
-    <SolidColorBrush x:Key="SidebarBgBrush" Color="#101012" />
-    <SolidColorBrush x:Key="SidebarActiveBgBrush" Color="#1A1A1D" />
-    <SolidColorBrush x:Key="SidebarHoverBgBrush" Color="#161618" />
-    <SolidColorBrush x:Key="SidebarTextBrush" Color="#797980" />
-    <SolidColorBrush x:Key="SidebarTextActiveBrush" Color="#F3F3EF" />
-    <SolidColorBrush x:Key="SidebarBorderBrush" Color="#232326" />
+    <!-- Sidebar / dock: stays dark on purpose — the only dark surface left -->
+    <SolidColorBrush x:Key="SidebarBgBrush" Color="#131316" />
+    <SolidColorBrush x:Key="SidebarActiveBgBrush" Color="#232329" />
+    <SolidColorBrush x:Key="SidebarHoverBgBrush" Color="#1C1C21" />
+    <SolidColorBrush x:Key="SidebarTextBrush" Color="#A9A9B1" />
+    <SolidColorBrush x:Key="SidebarTextActiveBrush" Color="#F2F2EF" />
+    <SolidColorBrush x:Key="SidebarBorderBrush" Color="#26262C" />
 
-    <!-- Title bar -->
-    <SolidColorBrush x:Key="TitleBarBgBrush" Color="#0A0A0B" />
-    <SolidColorBrush x:Key="TitleBarTextBrush" Color="#F3F3EF" />
-    <SolidColorBrush x:Key="TitleBarHoverBrush" Color="#1C1C1F" />
-    <SolidColorBrush x:Key="TitleBarCloseHoverBrush" Color="#FF5C5C" />
+    <!-- Title bar: matches the dark dock -->
+    <SolidColorBrush x:Key="TitleBarBgBrush" Color="#131316" />
+    <SolidColorBrush x:Key="TitleBarTextBrush" Color="#F2F2EF" />
+    <SolidColorBrush x:Key="TitleBarHoverBrush" Color="#232329" />
+    <SolidColorBrush x:Key="TitleBarCloseHoverBrush" Color="#C0392B" />
 
     <!-- Window default font -->
     <Style TargetType="Window">
@@ -76,10 +78,12 @@
         <Setter Property="TextOptions.TextFormattingMode" Value="Display" />
     </Style>
 
-    <!-- Oversized editorial page title, e.g. "Materiali" at the top of a screen -->
+    <!-- Oversized editorial page title, e.g. "Materiali" at the top of a screen. Serif — the one
+         deliberate typographic flourish borrowed from the "Editoriale caldo" direction. -->
     <Style x:Key="EditorialTitle" TargetType="TextBlock">
-        <Setter Property="FontSize" Value="44" />
-        <Setter Property="FontWeight" Value="Black" />
+        <Setter Property="FontFamily" Value="Georgia" />
+        <Setter Property="FontSize" Value="34" />
+        <Setter Property="FontWeight" Value="Bold" />
         <Setter Property="Foreground" Value="{StaticResource TextPrimaryBrush}" />
         <Setter Property="Margin" Value="0,0,0,0" />
     </Style>
@@ -104,7 +108,7 @@
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="Button">
-                    <Border x:Name="Bg" Background="{TemplateBinding Background}" SnapsToDevicePixels="True">
+                    <Border x:Name="Bg" Background="{TemplateBinding Background}" CornerRadius="6" SnapsToDevicePixels="True">
                         <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" Margin="10,0" />
                     </Border>
                     <ControlTemplate.Triggers>
@@ -136,7 +140,7 @@
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="Button">
-                    <Border x:Name="Bg" Background="{TemplateBinding Background}" BorderBrush="{StaticResource OutlineBorderBrush}" BorderThickness="1" SnapsToDevicePixels="True">
+                    <Border x:Name="Bg" Background="{TemplateBinding Background}" BorderBrush="{StaticResource OutlineBorderBrush}" BorderThickness="1" CornerRadius="6" SnapsToDevicePixels="True">
                         <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" Margin="10,0" />
                     </Border>
                     <ControlTemplate.Triggers>
@@ -161,7 +165,7 @@
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="Button">
-                    <Border x:Name="Bg" Background="{TemplateBinding Background}" BorderBrush="{StaticResource DangerBrush}" BorderThickness="1" SnapsToDevicePixels="True">
+                    <Border x:Name="Bg" Background="{TemplateBinding Background}" BorderBrush="{StaticResource DangerBrush}" BorderThickness="1" CornerRadius="6" SnapsToDevicePixels="True">
                         <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" Margin="10,0" TextElement.Foreground="{StaticResource DangerBrush}" />
                     </Border>
                     <ControlTemplate.Triggers>
@@ -185,7 +189,7 @@
         <Setter Property="Background" Value="{StaticResource SurfaceBrush}" />
         <Setter Property="Foreground" Value="{StaticResource TextPrimaryBrush}" />
         <Setter Property="BorderBrush" Value="{StaticResource OutlineBorderBrush}" />
-        <Setter Property="BorderThickness" Value="0,0,0,1" />
+        <Setter Property="BorderThickness" Value="1" />
         <Setter Property="Padding" Value="12,9" />
         <Setter Property="FontSize" Value="13" />
         <Setter Property="VerticalContentAlignment" Value="Center" />
@@ -194,7 +198,7 @@
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="TextBox">
-                    <Border x:Name="Bd" Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}" Padding="{TemplateBinding Padding}" SnapsToDevicePixels="True">
+                    <Border x:Name="Bd" Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}" CornerRadius="6" Padding="{TemplateBinding Padding}" SnapsToDevicePixels="True">
                         <ScrollViewer x:Name="PART_ContentHost" VerticalScrollBarVisibility="Hidden" HorizontalScrollBarVisibility="Hidden" />
                     </Border>
                     <ControlTemplate.Triggers>
@@ -215,7 +219,7 @@
         <Setter Property="Background" Value="{StaticResource SurfaceBrush}" />
         <Setter Property="Foreground" Value="{StaticResource TextPrimaryBrush}" />
         <Setter Property="BorderBrush" Value="{StaticResource OutlineBorderBrush}" />
-        <Setter Property="BorderThickness" Value="0,0,0,1" />
+        <Setter Property="BorderThickness" Value="1" />
         <Setter Property="Padding" Value="12,9" />
         <Setter Property="FontSize" Value="13" />
         <Setter Property="VerticalContentAlignment" Value="Center" />
@@ -223,7 +227,7 @@
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="PasswordBox">
-                    <Border x:Name="Bd" Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}" Padding="{TemplateBinding Padding}" SnapsToDevicePixels="True">
+                    <Border x:Name="Bd" Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}" CornerRadius="6" Padding="{TemplateBinding Padding}" SnapsToDevicePixels="True">
                         <ScrollViewer x:Name="PART_ContentHost" VerticalScrollBarVisibility="Hidden" HorizontalScrollBarVisibility="Hidden" />
                     </Border>
                     <ControlTemplate.Triggers>
@@ -321,12 +325,12 @@
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="RadioButton">
-                    <Border x:Name="Bg" Margin="10,1,10,1" Background="Transparent" SnapsToDevicePixels="True">
+                    <Border x:Name="Bg" Margin="10,1,10,1" CornerRadius="6" Background="Transparent" SnapsToDevicePixels="True">
                         <Grid>
                             <Border x:Name="Indicator" Width="2" HorizontalAlignment="Left"
                                     Background="{StaticResource PrimaryBrush}" Opacity="0">
                                 <Border.Effect>
-                                    <DropShadowEffect Color="#D6FF3F" Opacity="0.9" BlurRadius="10" ShadowDepth="0" />
+                                    <DropShadowEffect Color="#D98C2B" Opacity="0.9" BlurRadius="10" ShadowDepth="0" />
                                 </Border.Effect>
                             </Border>
                             <ContentPresenter Margin="16,0,10,0" VerticalAlignment="Center" />
@@ -435,7 +439,7 @@
         <Setter Property="Background" Value="{StaticResource SurfaceBrush}" />
         <Setter Property="BorderBrush" Value="{StaticResource BorderBrush0}" />
         <Setter Property="BorderThickness" Value="1" />
-        <Setter Property="CornerRadius" Value="0" />
+        <Setter Property="CornerRadius" Value="8" />
     </Style>
 
     <!-- ListView / GridView -->

@@ -11,21 +11,21 @@ public sealed class StatusToBrushConverter : IValueConverter
 {
     private static readonly Dictionary<string, string> Palette = new(StringComparer.OrdinalIgnoreCase)
     {
-        ["Draft"] = "#8C8C92",
-        ["Pending"] = "#8C8C92",
-        ["Open"] = "#FFB84D",
-        ["PartiallyReceived"] = "#FFB84D",
-        ["InProgress"] = "#FFB84D",
-        ["Ordered"] = "#D6FF3F",
-        ["Ready"] = "#D6FF3F",
-        ["Confirmed"] = "#D6FF3F",
-        ["Released"] = "#D6FF3F",
-        ["Received"] = "#7CE0A8",
-        ["Resolved"] = "#7CE0A8",
-        ["Closed"] = "#7CE0A8",
-        ["Completed"] = "#7CE0A8",
-        ["Done"] = "#7CE0A8",
-        ["Cancelled"] = "#FF5C5C",
+        ["Draft"] = "#8C7F6A",
+        ["Pending"] = "#8C7F6A",
+        ["Open"] = "#C57821",
+        ["PartiallyReceived"] = "#C57821",
+        ["InProgress"] = "#C57821",
+        ["Ordered"] = "#B36F1B",
+        ["Ready"] = "#B36F1B",
+        ["Confirmed"] = "#B36F1B",
+        ["Released"] = "#B36F1B",
+        ["Received"] = "#3D7A4C",
+        ["Resolved"] = "#3D7A4C",
+        ["Closed"] = "#3D7A4C",
+        ["Completed"] = "#3D7A4C",
+        ["Done"] = "#3D7A4C",
+        ["Cancelled"] = "#C0392B",
     };
 
     public object Convert(object? value, Type targetType, object? parameter, CultureInfo culture)
@@ -36,7 +36,7 @@ public sealed class StatusToBrushConverter : IValueConverter
         }
 
         var key = value as string ?? string.Empty;
-        var hex = Palette.TryGetValue(key, out var color) ? color : "#8C8C92";
+        var hex = Palette.TryGetValue(key, out var color) ? color : "#8C7F6A";
         return new SolidColorBrush((Color)ColorConverter.ConvertFromString(hex));
     }
 
@@ -107,7 +107,7 @@ public sealed class BoolToBrushConverter : IValueConverter
             return Brushes.Transparent;
         }
 
-        var hex = !isTrue ? "#8C8C92" : warning ? "#FFB84D" : "#D6FF3F";
+        var hex = !isTrue ? "#8C7F6A" : warning ? "#C57821" : "#B36F1B";
         return new SolidColorBrush((Color)ColorConverter.ConvertFromString(hex));
     }
 

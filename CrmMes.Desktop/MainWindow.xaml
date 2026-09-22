@@ -76,7 +76,7 @@
                                 <StackPanel Orientation="Horizontal">
                                     <Border Width="6" Height="6" Background="{StaticResource PrimaryBrush}" Margin="0,0,8,0">
                                         <Border.Effect>
-                                            <DropShadowEffect Color="#D6FF3F" Opacity="1" BlurRadius="8" ShadowDepth="0" />
+                                            <DropShadowEffect Color="#D98C2B" Opacity="1" BlurRadius="8" ShadowDepth="0" />
                                         </Border.Effect>
                                     </Border>
                                     <TextBlock x:Name="ConnectionStatus" Text="Connessione..." Foreground="{StaticResource TextPrimaryBrush}" FontWeight="Bold" FontSize="11" VerticalAlignment="Center" />
