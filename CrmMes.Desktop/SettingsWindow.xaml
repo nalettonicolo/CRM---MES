@@ -19,8 +19,8 @@
 
         <TextBlock Grid.Row="2" Text="URL API" Foreground="{StaticResource TextSecondaryBrush}" FontSize="12.5" Margin="0,0,0,5" />
         <DockPanel Grid.Row="3">
-            <Button DockPanel.Dock="Right" Style="{StaticResource SecondaryButton}" Content="Incolla" Width="80" Height="34" Margin="10,0,0,0" Click="Paste_Click" />
-            <TextBox x:Name="ApiUrlBox" Height="34" />
+            <Button DockPanel.Dock="Right" Style="{StaticResource SecondaryButton}" Content="Incolla" Width="80" Margin="10,0,0,0" Click="Paste_Click" />
+            <TextBox x:Name="ApiUrlBox" />
         </DockPanel>
 
         <StackPanel Grid.Row="4" VerticalAlignment="Bottom">
