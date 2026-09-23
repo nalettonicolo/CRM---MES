@@ -16,4 +16,10 @@ public class OperationDowntime
     /// <summary>Null while the stop is still ongoing. An operation can't be completed while it has an
     /// open downtime — see WorkOrdersController.CompleteOperation.</summary>
     public DateTime? EndedAt { get; set; }
+
+    /// <summary>Name of the operator who reported/closed this stop, as identified by PIN at the
+    /// shop-floor terminal — free text, not a user FK, same rationale as WorkOrderOperation's
+    /// StartedBy/CompletedBy. Null when the action came from the office client.</summary>
+    public string? ReportedBy { get; set; }
+    public string? ClosedBy { get; set; }
 }

@@ -358,7 +358,7 @@ public class WorkOrdersController : ControllerBase
     [Authorize]
     [HttpPost("{id:guid}/operations/{operationId:guid}/start")]
     public async Task<ActionResult<WorkOrderResponse>> StartOperation(
-        Guid id, Guid operationId, CancellationToken cancellationToken = default)
+        Guid id, Guid operationId, [FromQuery] string? operatorName = null, CancellationToken cancellationToken = default)
     {
         var order = await _dbContext.WorkOrders
             .Include(o => o.Operations)
@@ -387,6 +387,7 @@ public class WorkOrdersController : ControllerBase
 
         operation.Status = "InProgress";
         operation.StartedAt = DateTime.UtcNow;
+        operation.StartedBy = string.IsNullOrWhiteSpace(operatorName) ? null : operatorName.Trim();
         if (order.Status == "Released")
         {
             order.Status = "InProgress";
@@ -399,7 +400,7 @@ public class WorkOrdersController : ControllerBase
     [Authorize]
     [HttpPost("{id:guid}/operations/{operationId:guid}/complete")]
     public async Task<ActionResult<WorkOrderResponse>> CompleteOperation(
-        Guid id, Guid operationId, CancellationToken cancellationToken = default)
+        Guid id, Guid operationId, [FromQuery] string? operatorName = null, CancellationToken cancellationToken = default)
     {
         var order = await _dbContext.WorkOrders
             .Include(o => o.Operations)
@@ -430,6 +431,7 @@ public class WorkOrdersController : ControllerBase
 
         operation.Status = "Done";
         operation.CompletedAt = DateTime.UtcNow;
+        operation.CompletedBy = string.IsNullOrWhiteSpace(operatorName) ? null : operatorName.Trim();
 
         await _dbContext.SaveChangesAsync(cancellationToken);
         return Ok(ToResponse(order));
@@ -441,7 +443,7 @@ public class WorkOrdersController : ControllerBase
     [Authorize]
     [HttpPost("{id:guid}/operations/{operationId:guid}/downtime/start")]
     public async Task<ActionResult<OperationDowntimeResponse>> StartDowntime(
-        Guid id, Guid operationId, StartDowntimeRequest request, CancellationToken cancellationToken = default)
+        Guid id, Guid operationId, StartDowntimeRequest request, [FromQuery] string? operatorName = null, CancellationToken cancellationToken = default)
     {
         if (string.IsNullOrWhiteSpace(request.Reason))
         {
@@ -471,7 +473,8 @@ public class WorkOrdersController : ControllerBase
         {
             WorkOrderOperationId = operationId,
             Reason = request.Reason.Trim(),
-            Notes = string.IsNullOrWhiteSpace(request.Notes) ? null : request.Notes.Trim()
+            Notes = string.IsNullOrWhiteSpace(request.Notes) ? null : request.Notes.Trim(),
+            ReportedBy = string.IsNullOrWhiteSpace(operatorName) ? null : operatorName.Trim()
         };
 
         _dbContext.OperationDowntimes.Add(downtime);
@@ -483,7 +486,7 @@ public class WorkOrdersController : ControllerBase
     [Authorize]
     [HttpPost("{id:guid}/operations/{operationId:guid}/downtime/{downtimeId:guid}/end")]
     public async Task<ActionResult<OperationDowntimeResponse>> EndDowntime(
-        Guid id, Guid operationId, Guid downtimeId, CancellationToken cancellationToken = default)
+        Guid id, Guid operationId, Guid downtimeId, [FromQuery] string? operatorName = null, CancellationToken cancellationToken = default)
     {
         var downtime = await _dbContext.OperationDowntimes
             .SingleOrDefaultAsync(d => d.Id == downtimeId && d.WorkOrderOperationId == operationId, cancellationToken);
@@ -498,6 +501,7 @@ public class WorkOrdersController : ControllerBase
         }
 
         downtime.EndedAt = DateTime.UtcNow;
+        downtime.ClosedBy = string.IsNullOrWhiteSpace(operatorName) ? null : operatorName.Trim();
         await _dbContext.SaveChangesAsync(cancellationToken);
 
         return Ok(ToDowntimeResponse(downtime));
@@ -522,7 +526,9 @@ public class WorkOrdersController : ControllerBase
         downtime.Notes,
         downtime.StartedAt,
         downtime.EndedAt,
-        downtime.EndedAt.HasValue ? (decimal)(downtime.EndedAt.Value - downtime.StartedAt).TotalMinutes : null);
+        downtime.EndedAt.HasValue ? (decimal)(downtime.EndedAt.Value - downtime.StartedAt).TotalMinutes : null,
+        downtime.ReportedBy,
+        downtime.ClosedBy);
 
     /// <summary>Logs a quality defect found during or after an operation — the Quality component of
     /// OEE. Unlike a downtime this isn't a start/end interval, just a point-in-time record of what was
@@ -531,7 +537,7 @@ public class WorkOrdersController : ControllerBase
     [Authorize]
     [HttpPost("{id:guid}/operations/{operationId:guid}/non-conformities")]
     public async Task<ActionResult<NonConformityResponse>> RegisterNonConformity(
-        Guid id, Guid operationId, RegisterNonConformityRequest request, CancellationToken cancellationToken = default)
+        Guid id, Guid operationId, RegisterNonConformityRequest request, [FromQuery] string? operatorName = null, CancellationToken cancellationToken = default)
     {
         if (string.IsNullOrWhiteSpace(request.Description))
         {
@@ -560,7 +566,8 @@ public class WorkOrdersController : ControllerBase
             WorkOrderOperationId = operationId,
             Description = request.Description.Trim(),
             ScrapQuantity = request.ScrapQuantity,
-            Notes = string.IsNullOrWhiteSpace(request.Notes) ? null : request.Notes.Trim()
+            Notes = string.IsNullOrWhiteSpace(request.Notes) ? null : request.Notes.Trim(),
+            ReportedBy = string.IsNullOrWhiteSpace(operatorName) ? null : operatorName.Trim()
         };
 
         _dbContext.NonConformities.Add(nonConformity);
@@ -587,7 +594,8 @@ public class WorkOrdersController : ControllerBase
         nonConformity.Description,
         nonConformity.ScrapQuantity,
         nonConformity.Notes,
-        nonConformity.DetectedAt);
+        nonConformity.DetectedAt,
+        nonConformity.ReportedBy);
 
     /// <summary>Day-granularity finite-capacity forward scheduler: assigns each still-open operation
     /// (skips ones already Done) to the earliest calendar day(s) where its work center — matched by name
@@ -852,7 +860,8 @@ public class WorkOrdersController : ControllerBase
                 .Select(op => new WorkOrderOperationResponse(
                     op.Id, op.SequenceNumber, op.Name, op.Description, op.WorkCenter,
                     op.EstimatedMinutes, op.Status, op.StartedAt, op.CompletedAt,
-                    ActualMinutes(op), PerformanceRatio(op), op.PlannedStartAt, op.PlannedEndAt))
+                    ActualMinutes(op), PerformanceRatio(op), op.PlannedStartAt, op.PlannedEndAt,
+                    op.StartedBy, op.CompletedBy))
                 .ToList());
     }
 
@@ -1018,7 +1027,9 @@ public sealed record WorkOrderOperationResponse(
     decimal? ActualMinutes,
     decimal? PerformanceRatio,
     DateTime? PlannedStartAt,
-    DateTime? PlannedEndAt);
+    DateTime? PlannedEndAt,
+    string? StartedBy,
+    string? CompletedBy);
 
 public sealed record WorkOrderWithdrawalSlipResponse(Guid WithdrawalSlipId, string WithdrawalSlipCode);
 
@@ -1055,7 +1066,9 @@ public sealed record OperationDowntimeResponse(
     string? Notes,
     DateTime StartedAt,
     DateTime? EndedAt,
-    decimal? DurationMinutes);
+    decimal? DurationMinutes,
+    string? ReportedBy,
+    string? ClosedBy);
 
 public sealed record RegisterNonConformityRequest(string Description, decimal ScrapQuantity, string? Notes);
 
@@ -1064,4 +1077,5 @@ public sealed record NonConformityResponse(
     string Description,
     decimal ScrapQuantity,
     string? Notes,
-    DateTime DetectedAt);
+    DateTime DetectedAt,
+    string? ReportedBy);

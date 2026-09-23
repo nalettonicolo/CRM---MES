@@ -50,6 +50,7 @@
                         <GridViewColumn Header="Note" DisplayMemberBinding="{Binding Notes}" Width="150" />
                         <GridViewColumn Header="Quantità" DisplayMemberBinding="{Binding ScrapQuantity}" Width="80" />
                         <GridViewColumn Header="Rilevata" DisplayMemberBinding="{Binding DetectedAt, StringFormat={}{0:g}}" Width="130" />
+                        <GridViewColumn Header="Segnalata da" DisplayMemberBinding="{Binding ReportedBy}" Width="110" />
                     </GridView>
                 </ListView.View>
             </ListView>

@@ -461,10 +461,11 @@
                                 <DockPanel Grid.Row="0" Margin="0,0,0,14">
                                     <Button DockPanel.Dock="Right" Content="Nuovo utente" Width="130" Height="36" Click="NewUserButton_Click" />
                                     <Button DockPanel.Dock="Right" Style="{StaticResource SecondaryButton}" Content="Aggiorna" Width="100" Height="36" Margin="0,0,10,0" Click="RefreshUsersButton_Click" />
+                                    <Button DockPanel.Dock="Right" x:Name="SetPinButton" Style="{StaticResource SecondaryButton}" Content="Imposta PIN terminale" Width="170" Height="36" Margin="0,0,10,0" Click="SetPinButton_Click" IsEnabled="False" />
                                     <TextBlock Text="Utenti registrati" VerticalAlignment="Center" Foreground="{StaticResource TextSecondaryBrush}" />
                                 </DockPanel>
                                 <Border Grid.Row="1" Style="{StaticResource CardBorder}" Padding="4">
-                                    <ListView x:Name="UsersList">
+                                    <ListView x:Name="UsersList" SelectionChanged="UsersList_SelectionChanged">
                                         <ListView.View>
                                             <GridView>
                                                 <GridViewColumn Header="Nome" DisplayMemberBinding="{Binding Name}" Width="200" />

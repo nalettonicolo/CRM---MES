@@ -47,6 +47,8 @@
                         <GridViewColumn Header="Iniziato" DisplayMemberBinding="{Binding StartedAt, StringFormat={}{0:g}}" Width="120" />
                         <GridViewColumn Header="Chiuso" DisplayMemberBinding="{Binding EndedAt, StringFormat={}{0:g}}" Width="120" />
                         <GridViewColumn Header="Minuti" DisplayMemberBinding="{Binding DurationMinutes, StringFormat={}{0:0.0}}" Width="70" />
+                        <GridViewColumn Header="Segnalato da" DisplayMemberBinding="{Binding ReportedBy}" Width="110" />
+                        <GridViewColumn Header="Chiuso da" DisplayMemberBinding="{Binding ClosedBy}" Width="110" />
                     </GridView>
                 </ListView.View>
             </ListView>

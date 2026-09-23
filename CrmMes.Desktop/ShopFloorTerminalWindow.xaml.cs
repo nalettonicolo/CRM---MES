@@ -3,15 +3,17 @@ using System.Windows.Input;
 
 namespace CrmMes.Desktop;
 
-/// <summary>A simplified, large-type kiosk view for the shop floor: an operator scans (or types) the
-/// work order code printed on the job's <see cref="WorkOrderLabelWindow"/> label, then starts/completes
-/// the next open phase, or logs a downtime/non-conformity against it — without navigating the full
-/// office client. A barcode/QR scanner reads as a keyboard (types the code, then Enter), so this needs
-/// no special hardware integration, just a focused text box.</summary>
+/// <summary>A simplified, large-type kiosk view for the shop floor: an operator first identifies
+/// themselves with a short PIN (so every action taken here is attributable — "chi ha fatto cosa"),
+/// then scans (or types) the work order code printed on the job's <see cref="WorkOrderLabelWindow"/>
+/// label, and starts/completes the next open phase or logs a downtime/non-conformity against it —
+/// without navigating the full office client. A barcode/QR scanner reads as a keyboard (types the
+/// code, then Enter), so this needs no special hardware integration, just a focused text box.</summary>
 public partial class ShopFloorTerminalWindow : Window
 {
     private readonly ApiClient _apiClient;
     private static readonly StatusToBrushConverter StatusBrush = new();
+    private string? _operatorName;
     private WorkOrderDetailDto? _order;
     private WorkOrderOperationDto? _activeOperation;
 
@@ -19,7 +21,66 @@ public partial class ShopFloorTerminalWindow : Window
     {
         InitializeComponent();
         _apiClient = apiClient;
-        Loaded += (_, _) => ScanBox.Focus();
+        Loaded += (_, _) => PinBox.Focus();
+    }
+
+    private async void PinBox_KeyDown(object sender, KeyEventArgs e)
+    {
+        if (e.Key == Key.Enter)
+        {
+            await IdentifyAsync();
+        }
+    }
+
+    private async void Identify_Click(object sender, RoutedEventArgs e) => await IdentifyAsync();
+
+    private async Task IdentifyAsync()
+    {
+        var pin = PinBox.Password;
+        if (string.IsNullOrWhiteSpace(pin))
+        {
+            return;
+        }
+
+        GateErrorText.Text = string.Empty;
+        try
+        {
+            var operatorDto = await _apiClient.IdentifyOperatorByPinAsync(pin);
+            _operatorName = operatorDto.Name;
+            OperatorNameText.Text = operatorDto.Name;
+            PinBox.Password = string.Empty;
+
+            TitleText.Text = "Scansiona o digita il codice commessa";
+            OperatorGatePanel.Visibility = Visibility.Collapsed;
+            OperatorBar.Visibility = Visibility.Visible;
+            ScanPanel.Visibility = Visibility.Visible;
+            ScanBox.Focus();
+        }
+        catch (Exception exception)
+        {
+            GateErrorText.Text = exception.Message;
+        }
+        finally
+        {
+            PinBox.Focus();
+        }
+    }
+
+    private void ChangeOperator_Click(object sender, RoutedEventArgs e)
+    {
+        _operatorName = null;
+        _order = null;
+        _activeOperation = null;
+
+        TitleText.Text = "Chi sei? Inserisci il PIN operatore";
+        OperatorBar.Visibility = Visibility.Collapsed;
+        ScanPanel.Visibility = Visibility.Collapsed;
+        JobPanel.Visibility = Visibility.Collapsed;
+        ErrorText.Text = string.Empty;
+        GateErrorText.Text = string.Empty;
+        ScanBox.Text = string.Empty;
+        OperatorGatePanel.Visibility = Visibility.Visible;
+        PinBox.Focus();
     }
 
     private async void ScanBox_KeyDown(object sender, KeyEventArgs e)
@@ -121,11 +182,11 @@ public partial class ShopFloorTerminalWindow : Window
         {
             if (_activeOperation.Status == "Pending")
             {
-                await _apiClient.StartOperationAsync(_order.Id, _activeOperation.Id);
+                await _apiClient.StartOperationAsync(_order.Id, _activeOperation.Id, _operatorName);
             }
             else
             {
-                await _apiClient.CompleteOperationAsync(_order.Id, _activeOperation.Id);
+                await _apiClient.CompleteOperationAsync(_order.Id, _activeOperation.Id, _operatorName);
             }
 
             await RefreshAsync();
@@ -154,7 +215,7 @@ public partial class ShopFloorTerminalWindow : Window
             return;
         }
 
-        var window = new OperationDowntimesWindow(_apiClient, _order.Id, _activeOperation.Id, _activeOperation.Name) { Owner = this };
+        var window = new OperationDowntimesWindow(_apiClient, _order.Id, _activeOperation.Id, _activeOperation.Name, _operatorName) { Owner = this };
         window.ShowDialog();
         await RefreshAsync();
     }
@@ -166,7 +227,7 @@ public partial class ShopFloorTerminalWindow : Window
             return;
         }
 
-        var window = new NonConformitiesWindow(_apiClient, _order.Id, _activeOperation.Id, _activeOperation.Name) { Owner = this };
+        var window = new NonConformitiesWindow(_apiClient, _order.Id, _activeOperation.Id, _activeOperation.Name, _operatorName) { Owner = this };
         window.ShowDialog();
         await RefreshAsync();
     }

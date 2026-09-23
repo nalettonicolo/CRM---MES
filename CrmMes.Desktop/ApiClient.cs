@@ -634,47 +634,74 @@ public sealed class ApiClient
         await EnsureSuccessAsync(response, cancellationToken);
     }
 
-    public async Task StartOperationAsync(Guid workOrderId, Guid operationId, CancellationToken cancellationToken = default)
+    public async Task StartOperationAsync(Guid workOrderId, Guid operationId, string? operatorName = null, CancellationToken cancellationToken = default)
     {
-        using var response = await _httpClient.PostAsync($"api/work-orders/{workOrderId}/operations/{operationId}/start", null, cancellationToken);
+        using var response = await _httpClient.PostAsync(
+            $"api/work-orders/{workOrderId}/operations/{operationId}/start{OperatorQuery(operatorName)}", null, cancellationToken);
         await EnsureSuccessAsync(response, cancellationToken);
     }
 
-    public async Task CompleteOperationAsync(Guid workOrderId, Guid operationId, CancellationToken cancellationToken = default)
+    public async Task CompleteOperationAsync(Guid workOrderId, Guid operationId, string? operatorName = null, CancellationToken cancellationToken = default)
     {
-        using var response = await _httpClient.PostAsync($"api/work-orders/{workOrderId}/operations/{operationId}/complete", null, cancellationToken);
+        using var response = await _httpClient.PostAsync(
+            $"api/work-orders/{workOrderId}/operations/{operationId}/complete{OperatorQuery(operatorName)}", null, cancellationToken);
         await EnsureSuccessAsync(response, cancellationToken);
     }
 
     public Task<IReadOnlyList<OperationDowntimeDto>> GetOperationDowntimesAsync(Guid workOrderId, Guid operationId, CancellationToken cancellationToken = default)
         => GetAsync<OperationDowntimeDto>($"api/work-orders/{workOrderId}/operations/{operationId}/downtimes", cancellationToken);
 
-    public async Task<OperationDowntimeDto> StartDowntimeAsync(Guid workOrderId, Guid operationId, string reason, string? notes, CancellationToken cancellationToken = default)
+    public async Task<OperationDowntimeDto> StartDowntimeAsync(Guid workOrderId, Guid operationId, string reason, string? notes, string? operatorName = null, CancellationToken cancellationToken = default)
     {
         using var response = await _httpClient.PostAsJsonAsync(
-            $"api/work-orders/{workOrderId}/operations/{operationId}/downtime/start", new { reason, notes }, cancellationToken);
+            $"api/work-orders/{workOrderId}/operations/{operationId}/downtime/start{OperatorQuery(operatorName)}", new { reason, notes }, cancellationToken);
         await EnsureSuccessAsync(response, cancellationToken);
         return await response.Content.ReadFromJsonAsync<OperationDowntimeDto>(cancellationToken: cancellationToken)
             ?? throw new InvalidOperationException("Risposta fermo non valida.");
     }
 
-    public async Task EndDowntimeAsync(Guid workOrderId, Guid operationId, Guid downtimeId, CancellationToken cancellationToken = default)
+    /// <summary>Query string for the optional operator-attribution parameter every terminal-triggered
+    /// action forwards to the API, so it can log who (as identified by PIN) did what — empty when no
+    /// operator is known, e.g. an action from the office client.</summary>
+    private static string OperatorQuery(string? operatorName) =>
+        string.IsNullOrWhiteSpace(operatorName) ? string.Empty : $"?operatorName={Uri.EscapeDataString(operatorName)}";
+
+    public async Task EndDowntimeAsync(Guid workOrderId, Guid operationId, Guid downtimeId, string? operatorName = null, CancellationToken cancellationToken = default)
     {
         using var response = await _httpClient.PostAsync(
-            $"api/work-orders/{workOrderId}/operations/{operationId}/downtime/{downtimeId}/end", null, cancellationToken);
+            $"api/work-orders/{workOrderId}/operations/{operationId}/downtime/{downtimeId}/end{OperatorQuery(operatorName)}", null, cancellationToken);
         await EnsureSuccessAsync(response, cancellationToken);
     }
 
     public Task<IReadOnlyList<NonConformityDto>> GetNonConformitiesAsync(Guid workOrderId, Guid operationId, CancellationToken cancellationToken = default)
         => GetAsync<NonConformityDto>($"api/work-orders/{workOrderId}/operations/{operationId}/non-conformities", cancellationToken);
 
-    public async Task<NonConformityDto> RegisterNonConformityAsync(Guid workOrderId, Guid operationId, string description, decimal scrapQuantity, string? notes, CancellationToken cancellationToken = default)
+    public async Task<NonConformityDto> RegisterNonConformityAsync(Guid workOrderId, Guid operationId, string description, decimal scrapQuantity, string? notes, string? operatorName = null, CancellationToken cancellationToken = default)
     {
         using var response = await _httpClient.PostAsJsonAsync(
-            $"api/work-orders/{workOrderId}/operations/{operationId}/non-conformities", new { description, scrapQuantity, notes }, cancellationToken);
+            $"api/work-orders/{workOrderId}/operations/{operationId}/non-conformities{OperatorQuery(operatorName)}", new { description, scrapQuantity, notes }, cancellationToken);
         await EnsureSuccessAsync(response, cancellationToken);
         return await response.Content.ReadFromJsonAsync<NonConformityDto>(cancellationToken: cancellationToken)
             ?? throw new InvalidOperationException("Risposta non conformità non valida.");
+    }
+
+    public async Task<IdentifyOperatorDto> IdentifyOperatorByPinAsync(string pin, CancellationToken cancellationToken = default)
+    {
+        using var response = await _httpClient.PostAsJsonAsync("api/users/identify-by-pin", new { pin }, cancellationToken);
+        if (response.StatusCode == HttpStatusCode.NotFound)
+        {
+            throw new InvalidOperationException("PIN non riconosciuto.");
+        }
+
+        await EnsureSuccessAsync(response, cancellationToken);
+        return await response.Content.ReadFromJsonAsync<IdentifyOperatorDto>(cancellationToken: cancellationToken)
+            ?? throw new InvalidOperationException("Risposta identificazione non valida.");
+    }
+
+    public async Task SetUserPinAsync(Guid userId, string pin, CancellationToken cancellationToken = default)
+    {
+        using var response = await _httpClient.PutAsJsonAsync($"api/users/{userId}/pin", new { pin }, cancellationToken);
+        await EnsureSuccessAsync(response, cancellationToken);
     }
 
     public async Task<WorkOrderWithdrawalSlipDto> GenerateWithdrawalSlipAsync(Guid workOrderId, CancellationToken cancellationToken = default)
@@ -902,13 +929,17 @@ public sealed record WorkOrderOperationDto(
     decimal? ActualMinutes,
     decimal? PerformanceRatio,
     DateTime? PlannedStartAt,
-    DateTime? PlannedEndAt);
+    DateTime? PlannedEndAt,
+    string? StartedBy,
+    string? CompletedBy);
 
 public sealed record WorkOrderWithdrawalSlipDto(Guid WithdrawalSlipId, string WithdrawalSlipCode);
 
-public sealed record OperationDowntimeDto(Guid Id, string Reason, string? Notes, DateTime StartedAt, DateTime? EndedAt, decimal? DurationMinutes);
+public sealed record OperationDowntimeDto(Guid Id, string Reason, string? Notes, DateTime StartedAt, DateTime? EndedAt, decimal? DurationMinutes, string? ReportedBy, string? ClosedBy);
 
-public sealed record NonConformityDto(Guid Id, string Description, decimal ScrapQuantity, string? Notes, DateTime DetectedAt);
+public sealed record NonConformityDto(Guid Id, string Description, decimal ScrapQuantity, string? Notes, DateTime DetectedAt, string? ReportedBy);
+
+public sealed record IdentifyOperatorDto(Guid Id, string Name);
 
 public sealed record MaterialAvailabilityLineDto(string MaterialCode, decimal Required, decimal Available, decimal Shortfall);
 

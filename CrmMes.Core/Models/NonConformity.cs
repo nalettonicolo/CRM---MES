@@ -15,4 +15,9 @@ public class NonConformity
     public decimal ScrapQuantity { get; set; }
     public string? Notes { get; set; }
     public DateTime DetectedAt { get; set; } = DateTime.UtcNow;
+
+    /// <summary>Name of the operator who reported this defect, as identified by PIN at the shop-floor
+    /// terminal — free text, not a user FK, same rationale as WorkOrderOperation's StartedBy/CompletedBy.
+    /// Null when the action came from the office client.</summary>
+    public string? ReportedBy { get; set; }
 }

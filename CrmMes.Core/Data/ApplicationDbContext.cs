@@ -43,6 +43,7 @@ public class ApplicationDbContext : DbContext
             entity.Property(u => u.Email).HasMaxLength(200);
             entity.Property(u => u.Role).HasMaxLength(50);
             entity.Property(u => u.PasswordHash).HasMaxLength(500);
+            entity.Property(u => u.PinHash).HasMaxLength(500);
         });
 
         modelBuilder.Entity<Area>(entity =>
@@ -188,6 +189,8 @@ public class ApplicationDbContext : DbContext
             entity.Property(o => o.Description).HasMaxLength(1000);
             entity.Property(o => o.WorkCenter).HasMaxLength(200);
             entity.Property(o => o.Status).HasMaxLength(50);
+            entity.Property(o => o.StartedBy).HasMaxLength(200);
+            entity.Property(o => o.CompletedBy).HasMaxLength(200);
             entity.HasOne(o => o.WorkOrder)
                 .WithMany(w => w.Operations)
                 .HasForeignKey(o => o.WorkOrderId)
@@ -198,6 +201,8 @@ public class ApplicationDbContext : DbContext
         {
             entity.Property(d => d.Reason).HasMaxLength(200);
             entity.Property(d => d.Notes).HasMaxLength(1000);
+            entity.Property(d => d.ReportedBy).HasMaxLength(200);
+            entity.Property(d => d.ClosedBy).HasMaxLength(200);
             entity.HasOne(d => d.Operation)
                 .WithMany()
                 .HasForeignKey(d => d.WorkOrderOperationId)
@@ -208,6 +213,7 @@ public class ApplicationDbContext : DbContext
         {
             entity.Property(n => n.Description).HasMaxLength(200);
             entity.Property(n => n.Notes).HasMaxLength(1000);
+            entity.Property(n => n.ReportedBy).HasMaxLength(200);
             entity.HasOne(n => n.Operation)
                 .WithMany()
                 .HasForeignKey(n => n.WorkOrderOperationId)

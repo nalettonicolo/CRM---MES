@@ -514,6 +514,22 @@ public partial class MainWindow : Window
         }
     }
 
+    private void UsersList_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        SetPinButton.IsEnabled = UsersList.SelectedItem is UserRowDto;
+    }
+
+    private void SetPinButton_Click(object sender, RoutedEventArgs e)
+    {
+        if (UsersList.SelectedItem is not UserRowDto user)
+        {
+            return;
+        }
+
+        var dialog = new SetUserPinWindow(_apiClient, user.Id, user.Name) { Owner = this };
+        dialog.ShowDialog();
+    }
+
     private async void NewProductButton_Click(object sender, RoutedEventArgs e)
     {
         var dialog = new CreateProductWindow(_apiClient) { Owner = this };

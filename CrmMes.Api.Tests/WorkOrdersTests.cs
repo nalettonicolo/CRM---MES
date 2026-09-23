@@ -772,6 +772,60 @@ public class WorkOrdersTests : IClassFixture<AdminSeededApiTestFixture>
     }
 
     [Fact]
+    public async Task StartAndCompleteOperation_WithOperatorName_AttributesActions()
+    {
+        var (product, _) = await CreateProductWithRoutingAndBomAsync(materialStock: 100);
+        var createResponse = await _adminClient.PostAsJsonAsync(
+            "/api/work-orders", new CreateWorkOrderRequest(product.Id, 1, null, null, null, null, null));
+        var order = (await createResponse.Content.ReadFromJsonAsync<WorkOrderResponse>())!;
+        await _adminClient.PostAsync($"/api/work-orders/{order.Id}/release", null);
+        var operationId = order.Operations.OrderBy(op => op.SequenceNumber).First().Id;
+
+        var startResponse = await _adminClient.PostAsync(
+            $"/api/work-orders/{order.Id}/operations/{operationId}/start?operatorName=Mario%20Rossi", null);
+        var afterStart = (await startResponse.Content.ReadFromJsonAsync<WorkOrderResponse>())!;
+        Assert.Equal("Mario Rossi", afterStart.Operations.Single(op => op.Id == operationId).StartedBy);
+
+        var completeResponse = await _adminClient.PostAsync(
+            $"/api/work-orders/{order.Id}/operations/{operationId}/complete?operatorName=Luigi%20Verdi", null);
+        var afterComplete = (await completeResponse.Content.ReadFromJsonAsync<WorkOrderResponse>())!;
+        var completedOperation = afterComplete.Operations.Single(op => op.Id == operationId);
+        Assert.Equal("Mario Rossi", completedOperation.StartedBy);
+        Assert.Equal("Luigi Verdi", completedOperation.CompletedBy);
+    }
+
+    [Fact]
+    public async Task StartDowntimeAndEndDowntime_WithOperatorName_AttributesActions()
+    {
+        var (workOrderId, operationId) = await CreateAndStartFirstOperationAsync();
+
+        var startResponse = await _adminClient.PostAsJsonAsync(
+            $"/api/work-orders/{workOrderId}/operations/{operationId}/downtime/start?operatorName=Mario%20Rossi",
+            new StartDowntimeRequest("Guasto macchina", null));
+        var downtime = (await startResponse.Content.ReadFromJsonAsync<OperationDowntimeResponse>())!;
+        Assert.Equal("Mario Rossi", downtime.ReportedBy);
+
+        var endResponse = await _adminClient.PostAsync(
+            $"/api/work-orders/{workOrderId}/operations/{operationId}/downtime/{downtime.Id}/end?operatorName=Luigi%20Verdi", null);
+        var closed = (await endResponse.Content.ReadFromJsonAsync<OperationDowntimeResponse>())!;
+        Assert.Equal("Mario Rossi", closed.ReportedBy);
+        Assert.Equal("Luigi Verdi", closed.ClosedBy);
+    }
+
+    [Fact]
+    public async Task RegisterNonConformity_WithOperatorName_AttributesAction()
+    {
+        var (workOrderId, operationId) = await CreateAndStartFirstOperationAsync();
+
+        var response = await _adminClient.PostAsJsonAsync(
+            $"/api/work-orders/{workOrderId}/operations/{operationId}/non-conformities?operatorName=Mario%20Rossi",
+            new RegisterNonConformityRequest("Fuori tolleranza", 1, null));
+
+        var nonConformity = await response.Content.ReadFromJsonAsync<NonConformityResponse>();
+        Assert.Equal("Mario Rossi", nonConformity!.ReportedBy);
+    }
+
+    [Fact]
     public async Task GetWorkOrderByCode_ReturnsMatchingOrder()
     {
         var (product, _) = await CreateProductWithRoutingAndBomAsync(materialStock: 100);

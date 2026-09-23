@@ -17,6 +17,12 @@ public class WorkOrderOperation
     public DateTime? StartedAt { get; set; }
     public DateTime? CompletedAt { get; set; }
 
+    /// <summary>Name of the operator who started/completed this phase, as identified by PIN at the
+    /// shop-floor terminal — free text, not a user FK, since the office client doesn't require operator
+    /// identification. Null when the action came from the office client instead of the terminal.</summary>
+    public string? StartedBy { get; set; }
+    public string? CompletedBy { get; set; }
+
     /// <summary>Day-level finite-capacity plan produced by <c>POST /api/work-orders/{id}/schedule</c> —
     /// which calendar day(s) this operation is expected to run on, given its work center's registered
     /// daily capacity and everything else already scheduled there. Null until a schedule run covers it;

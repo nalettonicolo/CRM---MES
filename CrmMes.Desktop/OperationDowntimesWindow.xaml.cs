@@ -7,14 +7,16 @@ public partial class OperationDowntimesWindow : Window
     private readonly ApiClient _apiClient;
     private readonly Guid _workOrderId;
     private readonly Guid _operationId;
+    private readonly string? _operatorName;
     private OperationDowntimeDto? _openDowntime;
 
-    public OperationDowntimesWindow(ApiClient apiClient, Guid workOrderId, Guid operationId, string operationName)
+    public OperationDowntimesWindow(ApiClient apiClient, Guid workOrderId, Guid operationId, string operationName, string? operatorName = null)
     {
         InitializeComponent();
         _apiClient = apiClient;
         _workOrderId = workOrderId;
         _operationId = operationId;
+        _operatorName = operatorName;
         OperationNameText.Text = operationName;
         Loaded += OperationDowntimesWindow_Loaded;
     }
@@ -58,7 +60,7 @@ public partial class OperationDowntimesWindow : Window
 
         try
         {
-            await _apiClient.StartDowntimeAsync(_workOrderId, _operationId, reason, string.IsNullOrWhiteSpace(NotesBox.Text) ? null : NotesBox.Text.Trim());
+            await _apiClient.StartDowntimeAsync(_workOrderId, _operationId, reason, string.IsNullOrWhiteSpace(NotesBox.Text) ? null : NotesBox.Text.Trim(), _operatorName);
             ReasonBox.Text = string.Empty;
             NotesBox.Text = string.Empty;
             ErrorText.Text = string.Empty;
@@ -79,7 +81,7 @@ public partial class OperationDowntimesWindow : Window
 
         try
         {
-            await _apiClient.EndDowntimeAsync(_workOrderId, _operationId, _openDowntime.Id);
+            await _apiClient.EndDowntimeAsync(_workOrderId, _operationId, _openDowntime.Id, _operatorName);
             await ReloadAsync();
         }
         catch (Exception exception)

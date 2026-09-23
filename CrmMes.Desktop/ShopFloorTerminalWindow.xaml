@@ -9,78 +9,107 @@
             <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
             <RowDefinition Height="*" />
         </Grid.RowDefinitions>
 
         <StackPanel Grid.Row="0">
             <TextBlock Text="T E R M I N A L E   D I   R E P A R T O" Style="{StaticResource MicroLabel}" Foreground="{StaticResource PrimaryBrush}" />
-            <TextBlock Text="Scansiona o digita il codice commessa" Style="{StaticResource EditorialTitle}" FontSize="30" Margin="0,0,0,4" />
+            <TextBlock x:Name="TitleText" Text="Chi sei? Inserisci il PIN operatore" Style="{StaticResource EditorialTitle}" FontSize="30" Margin="0,0,0,4" />
         </StackPanel>
 
-        <DockPanel Grid.Row="1" Margin="0,18,0,0">
+        <!-- Operator identification gate: shown until a PIN resolves to an active operator. -->
+        <StackPanel Grid.Row="1" x:Name="OperatorGatePanel" Margin="0,18,0,0">
+            <DockPanel>
+                <Button DockPanel.Dock="Right" x:Name="IdentifyButton" Content="Accedi" Width="140" Height="56" FontSize="20" Margin="12,0,0,0" Click="Identify_Click" />
+                <PasswordBox x:Name="PinBox" FontSize="26" Height="56" VerticalContentAlignment="Center" KeyDown="PinBox_KeyDown" />
+            </DockPanel>
+            <TextBlock x:Name="GateErrorText" Foreground="{StaticResource DangerBrush}" FontSize="15" TextWrapping="Wrap" Margin="0,10,0,0" />
+        </StackPanel>
+
+        <!-- Persistent operator bar: shown once identified, replaces the gate. -->
+        <DockPanel Grid.Row="2" x:Name="OperatorBar" Visibility="Collapsed" Margin="0,4,0,0">
+            <Button DockPanel.Dock="Right" Style="{StaticResource SecondaryButton}" Content="Cambia operatore" Width="150" Height="32" Click="ChangeOperator_Click" />
+            <TextBlock Foreground="{StaticResource TextSecondaryBrush}" VerticalAlignment="Center">
+                <Run Text="Operatore:" />
+                <Run x:Name="OperatorNameText" FontWeight="SemiBold" Foreground="{StaticResource TextPrimaryBrush}" />
+            </TextBlock>
+        </DockPanel>
+
+        <!-- Scan box: shown once an operator is identified. -->
+        <DockPanel Grid.Row="3" x:Name="ScanPanel" Visibility="Collapsed" Margin="0,18,0,0">
             <Button DockPanel.Dock="Right" x:Name="ScanButton" Content="Cerca" Width="140" Height="56" FontSize="20" Margin="12,0,0,0" Click="Scan_Click" />
             <TextBox x:Name="ScanBox" FontSize="26" Height="56" VerticalContentAlignment="Center" KeyDown="ScanBox_KeyDown" />
         </DockPanel>
 
-        <TextBlock Grid.Row="2" x:Name="ErrorText" Foreground="{StaticResource DangerBrush}" FontSize="15" TextWrapping="Wrap" Margin="0,10,0,0" />
-
-        <Grid Grid.Row="3" x:Name="JobPanel" Visibility="Collapsed" Margin="0,18,0,0">
+        <Grid Grid.Row="4">
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto" />
-                <RowDefinition Height="Auto" />
                 <RowDefinition Height="*" />
-                <RowDefinition Height="Auto" />
             </Grid.RowDefinitions>
 
-            <Border Grid.Row="0" Style="{StaticResource CardBorder}" Padding="18">
-                <Grid>
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="*" />
-                        <ColumnDefinition Width="Auto" />
-                    </Grid.ColumnDefinitions>
-                    <StackPanel Grid.Column="0">
-                        <TextBlock x:Name="JobCodeText" FontSize="22" FontWeight="Bold" Foreground="{StaticResource TextPrimaryBrush}" />
-                        <TextBlock x:Name="JobProductText" FontSize="15" Foreground="{StaticResource TextSecondaryBrush}" Margin="0,4,0,0" />
-                        <TextBlock x:Name="JobLotText" FontSize="12.5" Foreground="{StaticResource TextSecondaryBrush}" />
-                    </StackPanel>
-                    <Border Grid.Column="1" x:Name="JobStatusPill" Style="{StaticResource Pill}" VerticalAlignment="Top">
-                        <TextBlock x:Name="JobStatusText" Style="{StaticResource PillText}" />
-                    </Border>
-                </Grid>
-            </Border>
+            <TextBlock Grid.Row="0" x:Name="ErrorText" Foreground="{StaticResource DangerBrush}" FontSize="15" TextWrapping="Wrap" Margin="0,10,0,0" />
 
-            <TextBlock Grid.Row="1" Text="Fasi" FontWeight="SemiBold" Foreground="{StaticResource TextPrimaryBrush}" Margin="0,18,0,8" />
+            <Grid Grid.Row="1" x:Name="JobPanel" Visibility="Collapsed" Margin="0,18,0,0">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="*" />
+                    <RowDefinition Height="Auto" />
+                </Grid.RowDefinitions>
 
-            <Border Grid.Row="2" Style="{StaticResource CardBorder}" Padding="4" MaxHeight="220">
-                <ListView x:Name="OperationsList">
-                    <ListView.View>
-                        <GridView>
-                            <GridViewColumn Header="#" DisplayMemberBinding="{Binding SequenceNumber}" Width="34" />
-                            <GridViewColumn Header="Fase" DisplayMemberBinding="{Binding Name}" Width="220" />
-                            <GridViewColumn Header="Centro di lavoro" DisplayMemberBinding="{Binding WorkCenter}" Width="160" />
-                            <GridViewColumn Header="Stato" Width="120">
-                                <GridViewColumn.CellTemplate>
-                                    <DataTemplate>
-                                        <Border Style="{StaticResource Pill}" Background="{Binding Status, Converter={StaticResource StatusToBrush}}">
-                                            <TextBlock Style="{StaticResource PillText}" Text="{Binding Status, Converter={StaticResource StatusToItalianText}}" Foreground="{Binding Status, Converter={StaticResource StatusToBrush}, ConverterParameter=Foreground}" />
-                                        </Border>
-                                    </DataTemplate>
-                                </GridViewColumn.CellTemplate>
-                            </GridViewColumn>
-                        </GridView>
-                    </ListView.View>
-                </ListView>
-            </Border>
+                <Border Grid.Row="0" Style="{StaticResource CardBorder}" Padding="18">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <StackPanel Grid.Column="0">
+                            <TextBlock x:Name="JobCodeText" FontSize="22" FontWeight="Bold" Foreground="{StaticResource TextPrimaryBrush}" />
+                            <TextBlock x:Name="JobProductText" FontSize="15" Foreground="{StaticResource TextSecondaryBrush}" Margin="0,4,0,0" />
+                            <TextBlock x:Name="JobLotText" FontSize="12.5" Foreground="{StaticResource TextSecondaryBrush}" />
+                        </StackPanel>
+                        <Border Grid.Column="1" x:Name="JobStatusPill" Style="{StaticResource Pill}" VerticalAlignment="Top">
+                            <TextBlock x:Name="JobStatusText" Style="{StaticResource PillText}" />
+                        </Border>
+                    </Grid>
+                </Border>
 
-            <StackPanel Grid.Row="3" Margin="0,20,0,0">
-                <TextBlock x:Name="ActiveOperationText" FontSize="15" Foreground="{StaticResource TextSecondaryBrush}" Margin="0,0,0,10" TextWrapping="Wrap" />
-                <UniformGrid Columns="2" Rows="2">
-                    <Button x:Name="ActionButton" Height="72" FontSize="22" Margin="0,0,10,10" Click="Action_Click" />
-                    <Button x:Name="DowntimeButton" Style="{StaticResource SecondaryButton}" Content="Segnala fermo" Height="72" FontSize="20" Margin="0,0,0,10" Click="Downtime_Click" />
-                    <Button x:Name="NonConformityButton" Style="{StaticResource SecondaryButton}" Content="Segnala non conformità" Height="72" FontSize="20" Margin="0,10,10,0" Click="NonConformity_Click" />
-                    <Button x:Name="NewScanButton" Style="{StaticResource SecondaryButton}" Content="Nuova scansione" Height="72" FontSize="20" Margin="0,10,0,0" Click="NewScan_Click" />
-                </UniformGrid>
-            </StackPanel>
+                <TextBlock Grid.Row="1" Text="Fasi" FontWeight="SemiBold" Foreground="{StaticResource TextPrimaryBrush}" Margin="0,18,0,8" />
+
+                <Border Grid.Row="2" Style="{StaticResource CardBorder}" Padding="4" MaxHeight="220">
+                    <ListView x:Name="OperationsList">
+                        <ListView.View>
+                            <GridView>
+                                <GridViewColumn Header="#" DisplayMemberBinding="{Binding SequenceNumber}" Width="34" />
+                                <GridViewColumn Header="Fase" DisplayMemberBinding="{Binding Name}" Width="200" />
+                                <GridViewColumn Header="Centro di lavoro" DisplayMemberBinding="{Binding WorkCenter}" Width="140" />
+                                <GridViewColumn Header="Stato" Width="110">
+                                    <GridViewColumn.CellTemplate>
+                                        <DataTemplate>
+                                            <Border Style="{StaticResource Pill}" Background="{Binding Status, Converter={StaticResource StatusToBrush}}">
+                                                <TextBlock Style="{StaticResource PillText}" Text="{Binding Status, Converter={StaticResource StatusToItalianText}}" Foreground="{Binding Status, Converter={StaticResource StatusToBrush}, ConverterParameter=Foreground}" />
+                                            </Border>
+                                        </DataTemplate>
+                                    </GridViewColumn.CellTemplate>
+                                </GridViewColumn>
+                                <GridViewColumn Header="Avviata da" DisplayMemberBinding="{Binding StartedBy}" Width="110" />
+                                <GridViewColumn Header="Completata da" DisplayMemberBinding="{Binding CompletedBy}" Width="110" />
+                            </GridView>
+                        </ListView.View>
+                    </ListView>
+                </Border>
+
+                <StackPanel Grid.Row="3" Margin="0,20,0,0">
+                    <TextBlock x:Name="ActiveOperationText" FontSize="15" Foreground="{StaticResource TextSecondaryBrush}" Margin="0,0,0,10" TextWrapping="Wrap" />
+                    <UniformGrid Columns="2" Rows="2">
+                        <Button x:Name="ActionButton" Height="72" FontSize="22" Margin="0,0,10,10" Click="Action_Click" />
+                        <Button x:Name="DowntimeButton" Style="{StaticResource SecondaryButton}" Content="Segnala fermo" Height="72" FontSize="20" Margin="0,0,0,10" Click="Downtime_Click" />
+                        <Button x:Name="NonConformityButton" Style="{StaticResource SecondaryButton}" Content="Segnala non conformità" Height="72" FontSize="20" Margin="0,10,10,0" Click="NonConformity_Click" />
+                        <Button x:Name="NewScanButton" Style="{StaticResource SecondaryButton}" Content="Nuova scansione" Height="72" FontSize="20" Margin="0,10,0,0" Click="NewScan_Click" />
+                    </UniformGrid>
+                </StackPanel>
+            </Grid>
         </Grid>
     </Grid>
 </Window>
