@@ -1,3 +1,7 @@
+using System.Net;
+using System.Net.Http.Json;
+using CrmMes.Api.Controllers;
+
 namespace CrmMes.Api.Tests;
 
 /// <summary>
@@ -33,11 +37,13 @@ public class AuthBootstrapTests : IAsyncLifetime
     }
 
     [Fact]
-    public async Task Register_SecondUser_BecomesOperator()
+    public async Task Register_SecondUser_IsRejected()
     {
         await TestAuth.RegisterAsync(_client, "Uno", "uno-op@test.local", "Password123!");
-        var second = await TestAuth.RegisterAsync(_client, "Due", "due-op@test.local", "Password123!");
 
-        Assert.Equal("Operator", second.Role);
+        var response = await _client.PostAsJsonAsync(
+            "/api/auth/register", new RegisterRequest("Due", "due-op@test.local", "Password123!"));
+
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
     }
 }

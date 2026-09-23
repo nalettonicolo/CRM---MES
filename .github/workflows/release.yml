@@ -85,8 +85,21 @@ jobs:
         shell: pwsh
         run: Compress-Archive -Path publish\* -DestinationPath CrmMes.Desktop-win-x64.zip
 
+      # Fino a quando l'eseguibile non è firmato digitalmente (serve un certificato di code-signing a
+      # pagamento, vedi lo step "Sign executables" sopra), questo checksum è l'unica verifica di
+      # integrità disponibile per l'auto-update: UpdateService lo scarica insieme allo zip e rifiuta
+      # di installare se non corrisponde, così un download corrotto o un asset sostituito senza
+      # ricalcolare anche questo file non passano inosservati.
+      - name: Compute release checksum
+        shell: pwsh
+        run: |
+          $hash = Get-FileHash -Path CrmMes.Desktop-win-x64.zip -Algorithm SHA256
+          $hash.Hash | Out-File -FilePath CrmMes.Desktop-win-x64.zip.sha256 -Encoding ascii -NoNewline
+
       - name: Publish GitHub release
         uses: softprops/action-gh-release@v2
         with:
-          files: CrmMes.Desktop-win-x64.zip
+          files: |
+            CrmMes.Desktop-win-x64.zip
+            CrmMes.Desktop-win-x64.zip.sha256
           generate_release_notes: true

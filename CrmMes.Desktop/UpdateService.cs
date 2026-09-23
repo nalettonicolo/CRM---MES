@@ -3,6 +3,7 @@ using System.IO;
 using System.Net.Http;
 using System.Net.Http.Json;
 using System.Reflection;
+using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json.Serialization;
 
@@ -12,6 +13,7 @@ public sealed class UpdateService
 {
     private const string ReleasesEndpoint = "https://api.github.com/repos/nalettonicolo/CRM---MES/releases/latest";
     private const string AssetName = "CrmMes.Desktop-win-x64.zip";
+    private const string ChecksumAssetName = AssetName + ".sha256";
     private readonly HttpClient _httpClient = new();
 
     public UpdateService()
@@ -31,7 +33,10 @@ public sealed class UpdateService
 
         var versionText = release.TagName.TrimStart('v', 'V');
         return Version.TryParse(versionText, out var version) && version > CurrentVersion
-            ? new ReleaseInfo(version, release.TagName, release.Name, release.Body, release.Assets.FirstOrDefault(asset => asset.Name == AssetName)?.BrowserDownloadUrl)
+            ? new ReleaseInfo(
+                version, release.TagName, release.Name, release.Body,
+                release.Assets.FirstOrDefault(asset => asset.Name == AssetName)?.BrowserDownloadUrl,
+                release.Assets.FirstOrDefault(asset => asset.Name == ChecksumAssetName)?.BrowserDownloadUrl)
             : null;
     }
 
@@ -47,6 +52,30 @@ public sealed class UpdateService
         await using (var output = File.Create(packagePath))
         {
             await input.CopyToAsync(output, cancellationToken);
+        }
+
+        // Non essendo ancora firmato digitalmente (vedi RIEPILOGO-SVILUPPO.md), l'unica difesa contro un
+        // download corrotto o un asset alterato è verificarne il checksum SHA-256 pubblicato dalla
+        // pipeline di release accanto allo zip, prima di scompattarlo sopra l'installazione esistente.
+        if (string.IsNullOrWhiteSpace(release.ChecksumUrl))
+        {
+            File.Delete(packagePath);
+            throw new InvalidOperationException(
+                $"La release {release.TagName} non pubblica il checksum {ChecksumAssetName}: impossibile verificarne l'integrità, aggiornamento annullato.");
+        }
+
+        var expectedHash = (await _httpClient.GetStringAsync(release.ChecksumUrl, cancellationToken)).Trim();
+        string actualHash;
+        await using (var packageStream = File.OpenRead(packagePath))
+        {
+            actualHash = Convert.ToHexString(await SHA256.HashDataAsync(packageStream, cancellationToken));
+        }
+
+        if (!string.Equals(expectedHash, actualHash, StringComparison.OrdinalIgnoreCase))
+        {
+            File.Delete(packagePath);
+            throw new InvalidOperationException(
+                $"Il pacchetto scaricato per {release.TagName} non corrisponde al checksum pubblicato: potrebbe essere corrotto o alterato. Aggiornamento annullato.");
         }
 
         var applicationPath = AppContext.BaseDirectory.TrimEnd(Path.DirectorySeparatorChar);
@@ -87,4 +116,4 @@ public sealed class UpdateService
     }
 }
 
-public sealed record ReleaseInfo(Version Version, string TagName, string Name, string Notes, string? DownloadUrl);
+public sealed record ReleaseInfo(Version Version, string TagName, string Name, string Notes, string? DownloadUrl, string? ChecksumUrl);

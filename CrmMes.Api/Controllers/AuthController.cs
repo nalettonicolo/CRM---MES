@@ -45,20 +45,26 @@ public class AuthController : ControllerBase
             return BadRequest(new { message = "Nome, email e password di almeno 8 caratteri sono obbligatori." });
         }
 
+        // Bootstrap-only: questo endpoint resta anonimo esclusivamente per creare il primo
+        // Admin di un ambiente nuovo senza richiedere accesso diretto al database. Una volta che
+        // esiste almeno un utente, l'auto-registrazione pubblica è chiusa: solo un Admin autenticato
+        // può crearne altri, da POST /api/users (vedi UsersController.CreateUser, AdminOnly).
+        if (await _dbContext.Users.AnyAsync(cancellationToken))
+        {
+            return StatusCode(StatusCodes.Status403Forbidden,
+                new { message = "La registrazione pubblica è disabilitata: chiedi a un Admin di crearti un account." });
+        }
+
         if (await _dbContext.Users.AnyAsync(user => user.Email == email, cancellationToken))
         {
             return Conflict(new { message = "Email già registrata." });
         }
 
-        // Bootstrap: il primo utente mai registrato diventa Admin, così un ambiente nuovo
-        // non richiede accesso diretto al database per creare il primo amministratore.
-        var isFirstUser = !await _dbContext.Users.AnyAsync(cancellationToken);
-
         var user = new User
         {
             Name = name,
             Email = email,
-            Role = isFirstUser ? "Admin" : "Operator"
+            Role = "Admin"
         };
         user.PasswordHash = _passwordHasher.HashPassword(user, request.Password);
         _dbContext.Users.Add(user);

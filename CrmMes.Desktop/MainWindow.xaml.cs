@@ -92,11 +92,17 @@ public partial class MainWindow : Window
         [13] = "Spedizioni in ingresso (es. da un fornitore) e in uscita (es. verso un cliente), collegabili opzionalmente a un ordine fornitore o a una commessa. Ciclo: In preparazione -> Spedita -> Consegnata, oppure Annullata.",
     };
 
-    // TEMPORANEO: login disabilitato su richiesta per velocizzare i test.
-    // Per riattivare il login manuale: impostare SkipLoginForTesting a false.
+#if DEBUG
+    // TEMPORANEO: login disabilitato su richiesta per velocizzare i test in build di sviluppo.
+    // Racchiuso in #if DEBUG (non un semplice flag a runtime) perché il compilatore esclude
+    // interamente questo blocco — condizione, credenziali comprese — dalle build Release, inclusa
+    // quella pubblicata dalla pipeline di release su GitHub: non può quindi mai raggiungere un
+    // eseguibile distribuito, nemmeno per una dimenticanza. Per riattivare il login manuale anche
+    // in Debug: impostare SkipLoginForTesting a false.
     private const bool SkipLoginForTesting = true;
     private const string TestEmail = "nicolo.test@gestionale.local";
     private const string TestPassword = "Gestionale2026!";
+#endif
 
     public MainWindow()
     {
@@ -219,6 +225,7 @@ public partial class MainWindow : Window
             ConnectionStatus.Text = healthy ? "API e Neon online" : "API non disponibile";
             LoginButton.IsEnabled = healthy;
 
+#if DEBUG
             if (healthy && SkipLoginForTesting)
             {
                 try
@@ -231,6 +238,7 @@ public partial class MainWindow : Window
                     LoginError.Text = $"Auto-login disattivato: {exception.Message}";
                 }
             }
+#endif
         }
         catch
         {

@@ -4,14 +4,16 @@ using CrmMes.Api.Controllers;
 
 namespace CrmMes.Api.Tests;
 
-public class AuthRefreshTests : IClassFixture<ApiTestFixture>
+public class AuthRefreshTests : IClassFixture<AdminSeededApiTestFixture>
 {
-    private readonly ApiTestFixture _fixture;
+    private readonly AdminSeededApiTestFixture _fixture;
 
-    public AuthRefreshTests(ApiTestFixture fixture) => _fixture = fixture;
+    public AuthRefreshTests(AdminSeededApiTestFixture fixture) => _fixture = fixture;
 
+    // La registrazione pubblica è bootstrap-only (vedi AuthBootstrapTests), quindi ogni utente oltre il
+    // primo va creato tramite un Admin autenticato, non con TestAuth.RegisterAsync.
     private Task<AuthResponse> RegisterUniqueUserAsync(string prefix) =>
-        TestAuth.RegisterAsync(_fixture.Client, "Refresh Tester", $"{prefix}-{Guid.NewGuid():N}@test.local", "Password123!");
+        TestAuth.CreateUserWithRoleAsync(_fixture.Factory, _fixture.Admin.Token, "Operator", prefix);
 
     [Fact]
     public async Task Login_ReturnsUsableRefreshTokenAndExpiry()

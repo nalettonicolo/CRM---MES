@@ -4,40 +4,29 @@ using CrmMes.Api.Controllers;
 
 namespace CrmMes.Api.Tests;
 
-public class AuthTests : IClassFixture<ApiTestFixture>
+public class AuthTests : IClassFixture<AdminSeededApiTestFixture>
 {
-    private readonly ApiTestFixture _fixture;
+    private readonly AdminSeededApiTestFixture _fixture;
 
-    public AuthTests(ApiTestFixture fixture) => _fixture = fixture;
+    public AuthTests(AdminSeededApiTestFixture fixture) => _fixture = fixture;
 
     [Fact]
-    public async Task Register_DuplicateEmail_ReturnsConflict()
+    public async Task Register_AfterBootstrapUserExists_ReturnsForbidden()
     {
-        await TestAuth.RegisterAsync(_fixture.Client, "Uno", "duplicato@test.local", "Password123!");
-
+        // La registrazione pubblica è bootstrap-only (vedi AuthBootstrapTests): il fixture ha già
+        // registrato l'Admin di bootstrap in InitializeAsync, quindi qualunque ulteriore tentativo di
+        // auto-registrazione va rifiutato — solo un Admin può creare altri utenti, da POST /api/users.
         var response = await _fixture.Client.PostAsJsonAsync(
             "/api/auth/register",
             new RegisterRequest("Due", "duplicato@test.local", "Password123!"));
 
-        Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
-    }
-
-    [Fact]
-    public async Task Register_ShortPassword_ReturnsBadRequest()
-    {
-        var response = await _fixture.Client.PostAsJsonAsync(
-            "/api/auth/register",
-            new RegisterRequest("Corto", "corto@test.local", "1234"));
-
-        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
     }
 
     [Fact]
     public async Task Login_ValidCredentials_ReturnsToken()
     {
-        await TestAuth.RegisterAsync(_fixture.Client, "Login Ok", "login-ok@test.local", "Password123!");
-
-        var auth = await TestAuth.LoginAsync(_fixture.Client, "login-ok@test.local", "Password123!");
+        var auth = await TestAuth.CreateUserWithRoleAsync(_fixture.Factory, _fixture.Admin.Token, "Operator", "login-ok");
 
         Assert.False(string.IsNullOrWhiteSpace(auth.Token));
     }
@@ -45,9 +34,7 @@ public class AuthTests : IClassFixture<ApiTestFixture>
     [Fact]
     public async Task Login_WrongPassword_ReturnsUnauthorized()
     {
-        await TestAuth.RegisterAsync(_fixture.Client, "Login Bad", "login-bad@test.local", "Password123!");
-
-        var response = await TestAuth.LoginRawAsync(_fixture.Client, "login-bad@test.local", "WrongPassword!");
+        var response = await TestAuth.LoginRawAsync(_fixture.Client, AdminSeededApiTestFixture.AdminEmail, "WrongPassword!");
 
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
     }
