@@ -162,6 +162,12 @@ public partial class WorkOrderDetailWindow : Window
         }
     }
 
+    private void Label_Click(object sender, RoutedEventArgs e)
+    {
+        var window = new WorkOrderLabelWindow(CodeText.Text, ProductText.Text, LotNumberText.Text.Replace("Lotto ", string.Empty)) { Owner = this };
+        window.ShowDialog();
+    }
+
     private async void Traceability_Click(object sender, RoutedEventArgs e)
     {
         try

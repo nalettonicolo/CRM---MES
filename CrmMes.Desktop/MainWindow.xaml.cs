@@ -195,6 +195,12 @@ public partial class MainWindow : Window
         }
     }
 
+    private void ShopFloorTerminalButton_Click(object sender, RoutedEventArgs e)
+    {
+        var window = new ShopFloorTerminalWindow(_apiClient) { Owner = this };
+        window.ShowDialog();
+    }
+
     private async Task ConnectAsync()
     {
         try

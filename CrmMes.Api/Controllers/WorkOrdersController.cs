@@ -68,6 +68,20 @@ public class WorkOrdersController : ControllerBase
         return order is null ? NotFound() : Ok(ToResponse(order));
     }
 
+    /// <summary>Looks a work order up by its human-readable code instead of its id — what a shop-floor
+    /// terminal needs after reading a barcode/QR label printed on the job traveler, since the operator
+    /// scans a printed code, not a GUID.</summary>
+    [HttpGet("by-code/{code}")]
+    public async Task<ActionResult<WorkOrderResponse>> GetWorkOrderByCode(string code, CancellationToken cancellationToken = default)
+    {
+        var order = await _dbContext.WorkOrders
+            .AsNoTracking()
+            .Include(o => o.Operations)
+            .SingleOrDefaultAsync(o => o.Code == code, cancellationToken);
+
+        return order is null ? NotFound() : Ok(ToResponse(order));
+    }
+
     [Authorize(Policy = "Warehouse")]
     [HttpPost]
     public async Task<ActionResult<WorkOrderResponse>> CreateWorkOrder(

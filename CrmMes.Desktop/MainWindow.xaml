@@ -159,6 +159,12 @@
                                             <TextBlock Text="Cruscotto" Margin="6,0,0,0" />
                                         </StackPanel>
                                     </RadioButton>
+                                    <Button x:Name="ShopFloorTerminalButton" Style="{StaticResource SidebarLinkButton}" HorizontalAlignment="Stretch" HorizontalContentAlignment="Left" Margin="0,6,0,0" Click="ShopFloorTerminalButton_Click">
+                                        <StackPanel Orientation="Horizontal">
+                                            <TextBlock Text="&#xE8FD;" FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets" FontSize="16" Width="24" />
+                                            <TextBlock Text="Terminale di reparto" Margin="6,0,0,0" />
+                                        </StackPanel>
+                                    </Button>
                                 </StackPanel>
                             </Expander>
 

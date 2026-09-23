@@ -105,6 +105,27 @@ public static class ListExporter
         }).GeneratePdf(filePath);
     }
 
+    /// <summary>A small printable label (QR + code/product/lot) for a work order traveler — attach it to
+    /// the physical batch so <see cref="ShopFloorTerminalWindow"/> can scan it back at the machine.</summary>
+    public static void ExportWorkOrderLabel(string code, string productName, string lotNumber, byte[] qrPngBytes, string filePath)
+    {
+        Document.Create(container =>
+        {
+            container.Page(page =>
+            {
+                page.Size(340, 420);
+                page.Margin(20);
+                page.Content().Column(column =>
+                {
+                    column.Item().AlignCenter().Height(220).Image(qrPngBytes);
+                    column.Item().PaddingTop(14).AlignCenter().Text(code).FontSize(16).Bold();
+                    column.Item().PaddingTop(4).AlignCenter().Text(productName).FontSize(12);
+                    column.Item().AlignCenter().Text($"Lotto {lotNumber}").FontSize(10).FontColor(Colors.Grey.Darken1);
+                });
+            });
+        }).GeneratePdf(filePath);
+    }
+
     private static string Sanitize(string sheetName)
     {
         var invalid = new[] { '\\', '/', '?', '*', '[', ']', ':' };

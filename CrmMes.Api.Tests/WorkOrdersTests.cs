@@ -770,4 +770,27 @@ public class WorkOrdersTests : IClassFixture<AdminSeededApiTestFixture>
         Assert.NotNull(dashboard.OeeRatio);
         Assert.InRange(dashboard.OeeRatio!.Value, 0m, 1m);
     }
+
+    [Fact]
+    public async Task GetWorkOrderByCode_ReturnsMatchingOrder()
+    {
+        var (product, _) = await CreateProductWithRoutingAndBomAsync(materialStock: 100);
+        var createResponse = await _adminClient.PostAsJsonAsync(
+            "/api/work-orders", new CreateWorkOrderRequest(product.Id, 1, null, null, null, null, null));
+        var order = (await createResponse.Content.ReadFromJsonAsync<WorkOrderResponse>())!;
+
+        var response = await _adminClient.GetAsync($"/api/work-orders/by-code/{order.Code}");
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var found = await response.Content.ReadFromJsonAsync<WorkOrderResponse>();
+        Assert.Equal(order.Id, found!.Id);
+    }
+
+    [Fact]
+    public async Task GetWorkOrderByCode_UnknownCode_ReturnsNotFound()
+    {
+        var response = await _adminClient.GetAsync("/api/work-orders/by-code/CODICE-INESISTENTE");
+
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+    }
 }

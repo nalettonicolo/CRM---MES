@@ -496,6 +496,21 @@ public sealed class ApiClient
             ?? throw new InvalidOperationException("Risposta commessa non valida.");
     }
 
+    /// <summary>Looks a work order up by its printed code — what the shop-floor terminal calls after
+    /// reading a barcode/QR label, since the operator scans a printed code, not a GUID.</summary>
+    public async Task<WorkOrderDetailDto> GetWorkOrderByCodeAsync(string code, CancellationToken cancellationToken = default)
+    {
+        using var response = await _httpClient.GetAsync($"api/work-orders/by-code/{Uri.EscapeDataString(code)}", cancellationToken);
+        if (response.StatusCode == HttpStatusCode.NotFound)
+        {
+            throw new InvalidOperationException($"Nessuna commessa trovata con il codice \"{code}\".");
+        }
+
+        await EnsureSuccessAsync(response, cancellationToken);
+        return await response.Content.ReadFromJsonAsync<WorkOrderDetailDto>(cancellationToken: cancellationToken)
+            ?? throw new InvalidOperationException("Risposta commessa non valida.");
+    }
+
     public async Task CreateWorkOrderAsync(
         Guid productId, decimal quantity, Guid? areaId, string? customerReference, DateTime? dueDate, string? notes,
         string? productLotNumber = null, CancellationToken cancellationToken = default)
