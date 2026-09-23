@@ -98,6 +98,18 @@ public partial class WorkOrderDetailWindow : Window
         await ReloadAsync();
     }
 
+    private async void NonConformities_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is not FrameworkElement { Tag: WorkOrderOperationDto operation })
+        {
+            return;
+        }
+
+        var window = new NonConformitiesWindow(_apiClient, _workOrderId, operation.Id, operation.Name) { Owner = this };
+        window.ShowDialog();
+        await ReloadAsync();
+    }
+
     private async void Release_Click(object sender, RoutedEventArgs e)
     {
         ErrorText.Text = string.Empty;

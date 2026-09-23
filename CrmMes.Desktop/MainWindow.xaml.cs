@@ -1129,6 +1129,15 @@ public partial class MainWindow : Window
         OnTimeRateText.Text = dashboard.OnTimeCompletionRate.HasValue
             ? dashboard.OnTimeCompletionRate.Value.ToString("P0")
             : "-";
+        AvailabilityText.Text = dashboard.AvailabilityRatio.HasValue
+            ? dashboard.AvailabilityRatio.Value.ToString("P0")
+            : "-";
+        QualityText.Text = dashboard.QualityRatio.HasValue
+            ? dashboard.QualityRatio.Value.ToString("P0")
+            : "-";
+        OeeText.Text = dashboard.OeeRatio.HasValue
+            ? dashboard.OeeRatio.Value.ToString("P0")
+            : "-";
     });
 
     private Task LoadWorkCentersAsync() => RunBusyAsync(string.Empty, async () =>

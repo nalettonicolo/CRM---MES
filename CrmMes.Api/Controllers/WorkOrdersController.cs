@@ -510,6 +510,71 @@ public class WorkOrdersController : ControllerBase
         downtime.EndedAt,
         downtime.EndedAt.HasValue ? (decimal)(downtime.EndedAt.Value - downtime.StartedAt).TotalMinutes : null);
 
+    /// <summary>Logs a quality defect found during or after an operation — the Quality component of
+    /// OEE. Unlike a downtime this isn't a start/end interval, just a point-in-time record of what was
+    /// found and how many units it affected, so it can be registered on an operation that has already
+    /// finished (a defect discovered at final inspection), not only while it's running.</summary>
+    [Authorize]
+    [HttpPost("{id:guid}/operations/{operationId:guid}/non-conformities")]
+    public async Task<ActionResult<NonConformityResponse>> RegisterNonConformity(
+        Guid id, Guid operationId, RegisterNonConformityRequest request, CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(request.Description))
+        {
+            return BadRequest(new { message = "Indica la descrizione della non conformità." });
+        }
+
+        if (request.ScrapQuantity <= 0)
+        {
+            return BadRequest(new { message = "La quantità scartata deve essere maggiore di zero." });
+        }
+
+        var operation = await _dbContext.WorkOrderOperations
+            .SingleOrDefaultAsync(op => op.Id == operationId && op.WorkOrderId == id, cancellationToken);
+        if (operation is null)
+        {
+            return NotFound();
+        }
+
+        if (operation.Status == "Pending")
+        {
+            return Conflict(new { message = "Si può registrare una non conformità solo su una fase avviata o completata." });
+        }
+
+        var nonConformity = new NonConformity
+        {
+            WorkOrderOperationId = operationId,
+            Description = request.Description.Trim(),
+            ScrapQuantity = request.ScrapQuantity,
+            Notes = string.IsNullOrWhiteSpace(request.Notes) ? null : request.Notes.Trim()
+        };
+
+        _dbContext.NonConformities.Add(nonConformity);
+        await _dbContext.SaveChangesAsync(cancellationToken);
+
+        return Ok(ToNonConformityResponse(nonConformity));
+    }
+
+    [HttpGet("{id:guid}/operations/{operationId:guid}/non-conformities")]
+    public async Task<ActionResult<IEnumerable<NonConformityResponse>>> GetNonConformities(
+        Guid id, Guid operationId, CancellationToken cancellationToken = default)
+    {
+        var nonConformities = await _dbContext.NonConformities
+            .AsNoTracking()
+            .Where(n => n.WorkOrderOperationId == operationId)
+            .OrderByDescending(n => n.DetectedAt)
+            .ToListAsync(cancellationToken);
+
+        return Ok(nonConformities.Select(ToNonConformityResponse));
+    }
+
+    private static NonConformityResponse ToNonConformityResponse(NonConformity nonConformity) => new(
+        nonConformity.Id,
+        nonConformity.Description,
+        nonConformity.ScrapQuantity,
+        nonConformity.Notes,
+        nonConformity.DetectedAt);
+
     /// <summary>Day-granularity finite-capacity forward scheduler: assigns each still-open operation
     /// (skips ones already Done) to the earliest calendar day(s) where its work center — matched by name
     /// against the registered <see cref="WorkCenter"/> catalog — has spare daily capacity, accounting for
@@ -794,10 +859,8 @@ public class WorkOrdersController : ControllerBase
         return actual is > 0 ? operation.EstimatedMinutes / actual.Value : null;
     }
 
-    /// <summary>Aggregate KPIs across recent work orders: a first step toward real-time production
-    /// visibility. Deliberately not full OEE (Availability × Performance × Quality) — that needs
-    /// downtime-reason and scrap/quality capture this project doesn't have yet; this covers the
-    /// Performance component plus simple throughput/on-time counts.</summary>
+    /// <summary>Aggregate KPIs across recent work orders, including full OEE (Availability × Performance
+    /// × Quality) now that all three components are tracked, plus simple throughput/on-time counts.</summary>
     [HttpGet("dashboard")]
     public async Task<ActionResult<WorkOrderDashboardResponse>> GetDashboard(
         [FromQuery] int days = 7, CancellationToken cancellationToken = default)
@@ -829,8 +892,7 @@ public class WorkOrdersController : ControllerBase
         var onTimeCount = ordersWithDueDate.Count(order => order.CompletedAt <= order.DueDate);
 
         // Availability (OEE): gross running time of recently completed phases minus the machine stops
-        // logged against those same phases. Together with Performance (above), this covers two of OEE's
-        // three components — Quality/scrap still isn't tracked, so this is not yet full OEE.
+        // logged against those same phases.
         var recentOperationIds = recentlyCompletedOperations.Select(op => op.Id).ToHashSet();
         var closedDowntimes = await _dbContext.OperationDowntimes
             .AsNoTracking()
@@ -842,15 +904,43 @@ public class WorkOrdersController : ControllerBase
             ? Math.Max(0, (totalGrossMinutes - totalDowntimeMinutes) / totalGrossMinutes)
             : (decimal?)null;
 
+        // Quality (OEE): scrap logged against the operations of orders completed in the period, weighed
+        // against those orders' planned quantity. An approximation — scrap is logged per operation, not
+        // per finished order, but the order's planned quantity is the only "units produced" figure this
+        // schema has, the same simplification the rest of the project makes (e.g. one material lot per
+        // whole work order instead of per serial unit).
+        var completedOrderIds = completedOrders.Select(order => order.Id).ToHashSet();
+        var scrapForCompletedOrders = await _dbContext.NonConformities
+            .AsNoTracking()
+            .Include(nonConformity => nonConformity.Operation)
+            .Where(nonConformity => completedOrderIds.Contains(nonConformity.Operation.WorkOrderId))
+            .ToListAsync(cancellationToken);
+        var totalScrapQuantity = scrapForCompletedOrders.Sum(nonConformity => nonConformity.ScrapQuantity);
+        var totalProducedQuantity = completedOrders.Sum(order => order.Quantity);
+        var qualityRatio = totalProducedQuantity > 0
+            ? Math.Max(0, (totalProducedQuantity - totalScrapQuantity) / totalProducedQuantity)
+            : (decimal?)null;
+
+        // Full OEE: Performance is capped at 1 for this composite (finishing faster than estimated
+        // shouldn't inflate OEE past 100%, even though the standalone AveragePerformanceRatio above can
+        // exceed 1 to show "ahead of schedule").
+        var averagePerformanceRatio = performanceRatios.Count > 0 ? performanceRatios.Average() : (decimal?)null;
+        var oeeRatio = availabilityRatio.HasValue && averagePerformanceRatio.HasValue && qualityRatio.HasValue
+            ? availabilityRatio.Value * Math.Min(1, averagePerformanceRatio.Value) * qualityRatio.Value
+            : (decimal?)null;
+
         return Ok(new WorkOrderDashboardResponse(
             days,
             statusCounts.ToDictionary(entry => entry.Status, entry => entry.Count),
             recentlyCompletedOperations.Count,
-            performanceRatios.Count > 0 ? performanceRatios.Average() : null,
+            averagePerformanceRatio,
             completedOrders.Count,
             ordersWithDueDate.Count > 0 ? (decimal)onTimeCount / ordersWithDueDate.Count : null,
             totalDowntimeMinutes,
-            availabilityRatio));
+            availabilityRatio,
+            totalScrapQuantity,
+            qualityRatio,
+            oeeRatio));
     }
 }
 
@@ -926,7 +1016,10 @@ public sealed record WorkOrderDashboardResponse(
     int WorkOrdersCompletedInPeriod,
     decimal? OnTimeCompletionRate,
     decimal TotalDowntimeMinutes,
-    decimal? AvailabilityRatio);
+    decimal? AvailabilityRatio,
+    decimal TotalScrapQuantity,
+    decimal? QualityRatio,
+    decimal? OeeRatio);
 
 public sealed record MaterialAvailabilityLineResponse(string MaterialCode, decimal Required, decimal Available, decimal Shortfall);
 
@@ -949,3 +1042,12 @@ public sealed record OperationDowntimeResponse(
     DateTime StartedAt,
     DateTime? EndedAt,
     decimal? DurationMinutes);
+
+public sealed record RegisterNonConformityRequest(string Description, decimal ScrapQuantity, string? Notes);
+
+public sealed record NonConformityResponse(
+    Guid Id,
+    string Description,
+    decimal ScrapQuantity,
+    string? Notes,
+    DateTime DetectedAt);

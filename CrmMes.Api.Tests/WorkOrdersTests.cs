@@ -669,4 +669,105 @@ public class WorkOrdersTests : IClassFixture<AdminSeededApiTestFixture>
         Assert.NotNull(dashboard.AvailabilityRatio);
         Assert.InRange(dashboard.AvailabilityRatio!.Value, 0m, 1m);
     }
+
+    [Fact]
+    public async Task RegisterNonConformity_OnInProgressOperation_Succeeds()
+    {
+        var (workOrderId, operationId) = await CreateAndStartFirstOperationAsync();
+
+        var response = await _adminClient.PostAsJsonAsync(
+            $"/api/work-orders/{workOrderId}/operations/{operationId}/non-conformities",
+            new RegisterNonConformityRequest("Fuori tolleranza", 2, "Verificare calibro"));
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var nonConformity = await response.Content.ReadFromJsonAsync<NonConformityResponse>();
+        Assert.Equal("Fuori tolleranza", nonConformity!.Description);
+        Assert.Equal(2, nonConformity.ScrapQuantity);
+    }
+
+    [Fact]
+    public async Task RegisterNonConformity_OnPendingOperation_ReturnsConflict()
+    {
+        var (product, _) = await CreateProductWithRoutingAndBomAsync(materialStock: 100);
+        var createResponse = await _adminClient.PostAsJsonAsync(
+            "/api/work-orders", new CreateWorkOrderRequest(product.Id, 1, null, null, null, null, null));
+        var order = (await createResponse.Content.ReadFromJsonAsync<WorkOrderResponse>())!;
+        var operationId = order.Operations.OrderBy(op => op.SequenceNumber).First().Id;
+
+        var response = await _adminClient.PostAsJsonAsync(
+            $"/api/work-orders/{order.Id}/operations/{operationId}/non-conformities",
+            new RegisterNonConformityRequest("Difetto", 1, null));
+
+        Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task RegisterNonConformity_WithZeroQuantity_ReturnsBadRequest()
+    {
+        var (workOrderId, operationId) = await CreateAndStartFirstOperationAsync();
+
+        var response = await _adminClient.PostAsJsonAsync(
+            $"/api/work-orders/{workOrderId}/operations/{operationId}/non-conformities",
+            new RegisterNonConformityRequest("Difetto", 0, null));
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task RegisterNonConformity_OnCompletedOperation_Succeeds()
+    {
+        var (workOrderId, operationId) = await CreateAndStartFirstOperationAsync();
+        await _adminClient.PostAsync($"/api/work-orders/{workOrderId}/operations/{operationId}/complete", null);
+
+        var response = await _adminClient.PostAsJsonAsync(
+            $"/api/work-orders/{workOrderId}/operations/{operationId}/non-conformities",
+            new RegisterNonConformityRequest("Difetto trovato al collaudo finale", 1, null));
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task GetNonConformities_ListsRecordedDefects()
+    {
+        var (workOrderId, operationId) = await CreateAndStartFirstOperationAsync();
+        await _adminClient.PostAsJsonAsync(
+            $"/api/work-orders/{workOrderId}/operations/{operationId}/non-conformities",
+            new RegisterNonConformityRequest("Difetto estetico", 3, "Rigatura superficiale"));
+
+        var nonConformities = await _adminClient.GetFromJsonAsync<List<NonConformityResponse>>(
+            $"/api/work-orders/{workOrderId}/operations/{operationId}/non-conformities");
+
+        Assert.Single(nonConformities!);
+        Assert.Equal("Difetto estetico", nonConformities![0].Description);
+        Assert.Equal(3, nonConformities[0].ScrapQuantity);
+    }
+
+    [Fact]
+    public async Task Dashboard_ReflectsScrapAndQualityRatioAndFullOee()
+    {
+        var (product, _) = await CreateProductWithRoutingAndBomAsync(materialStock: 100);
+        var createResponse = await _adminClient.PostAsJsonAsync(
+            "/api/work-orders", new CreateWorkOrderRequest(product.Id, 10, null, null, null, null, null));
+        var order = (await createResponse.Content.ReadFromJsonAsync<WorkOrderResponse>())!;
+        await _adminClient.PostAsync($"/api/work-orders/{order.Id}/release", null);
+
+        foreach (var op in order.Operations.OrderBy(op => op.SequenceNumber))
+        {
+            await _adminClient.PostAsync($"/api/work-orders/{order.Id}/operations/{op.Id}/start", null);
+            await _adminClient.PostAsJsonAsync(
+                $"/api/work-orders/{order.Id}/operations/{op.Id}/non-conformities",
+                new RegisterNonConformityRequest("Scarto", 1, null));
+            await _adminClient.PostAsync($"/api/work-orders/{order.Id}/operations/{op.Id}/complete", null);
+        }
+        await _adminClient.PostAsync($"/api/work-orders/{order.Id}/complete", null);
+
+        var dashboard = await _adminClient.GetFromJsonAsync<WorkOrderDashboardResponse>("/api/work-orders/dashboard?days=1");
+
+        Assert.NotNull(dashboard);
+        Assert.True(dashboard!.TotalScrapQuantity >= 2);
+        Assert.NotNull(dashboard.QualityRatio);
+        Assert.InRange(dashboard.QualityRatio!.Value, 0m, 1m);
+        Assert.NotNull(dashboard.OeeRatio);
+        Assert.InRange(dashboard.OeeRatio!.Value, 0m, 1m);
+    }
 }

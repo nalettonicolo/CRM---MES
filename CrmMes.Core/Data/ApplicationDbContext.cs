@@ -27,6 +27,7 @@ public class ApplicationDbContext : DbContext
     public DbSet<WorkOrder> WorkOrders => Set<WorkOrder>();
     public DbSet<WorkOrderOperation> WorkOrderOperations => Set<WorkOrderOperation>();
     public DbSet<OperationDowntime> OperationDowntimes => Set<OperationDowntime>();
+    public DbSet<NonConformity> NonConformities => Set<NonConformity>();
     public DbSet<MaterialLot> MaterialLots => Set<MaterialLot>();
     public DbSet<MaterialLotConsumption> MaterialLotConsumptions => Set<MaterialLotConsumption>();
     public DbSet<WorkCenter> WorkCenters => Set<WorkCenter>();
@@ -200,6 +201,16 @@ public class ApplicationDbContext : DbContext
             entity.HasOne(d => d.Operation)
                 .WithMany()
                 .HasForeignKey(d => d.WorkOrderOperationId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<NonConformity>(entity =>
+        {
+            entity.Property(n => n.Description).HasMaxLength(200);
+            entity.Property(n => n.Notes).HasMaxLength(1000);
+            entity.HasOne(n => n.Operation)
+                .WithMany()
+                .HasForeignKey(n => n.WorkOrderOperationId)
                 .OnDelete(DeleteBehavior.Cascade);
         });
 

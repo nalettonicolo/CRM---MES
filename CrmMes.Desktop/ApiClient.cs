@@ -650,6 +650,18 @@ public sealed class ApiClient
         await EnsureSuccessAsync(response, cancellationToken);
     }
 
+    public Task<IReadOnlyList<NonConformityDto>> GetNonConformitiesAsync(Guid workOrderId, Guid operationId, CancellationToken cancellationToken = default)
+        => GetAsync<NonConformityDto>($"api/work-orders/{workOrderId}/operations/{operationId}/non-conformities", cancellationToken);
+
+    public async Task<NonConformityDto> RegisterNonConformityAsync(Guid workOrderId, Guid operationId, string description, decimal scrapQuantity, string? notes, CancellationToken cancellationToken = default)
+    {
+        using var response = await _httpClient.PostAsJsonAsync(
+            $"api/work-orders/{workOrderId}/operations/{operationId}/non-conformities", new { description, scrapQuantity, notes }, cancellationToken);
+        await EnsureSuccessAsync(response, cancellationToken);
+        return await response.Content.ReadFromJsonAsync<NonConformityDto>(cancellationToken: cancellationToken)
+            ?? throw new InvalidOperationException("Risposta non conformità non valida.");
+    }
+
     public async Task<WorkOrderWithdrawalSlipDto> GenerateWithdrawalSlipAsync(Guid workOrderId, CancellationToken cancellationToken = default)
     {
         using var response = await _httpClient.PostAsync($"api/work-orders/{workOrderId}/generate-withdrawal-slip", null, cancellationToken);
@@ -881,6 +893,8 @@ public sealed record WorkOrderWithdrawalSlipDto(Guid WithdrawalSlipId, string Wi
 
 public sealed record OperationDowntimeDto(Guid Id, string Reason, string? Notes, DateTime StartedAt, DateTime? EndedAt, decimal? DurationMinutes);
 
+public sealed record NonConformityDto(Guid Id, string Description, decimal ScrapQuantity, string? Notes, DateTime DetectedAt);
+
 public sealed record MaterialAvailabilityLineDto(string MaterialCode, decimal Required, decimal Available, decimal Shortfall);
 
 public sealed record MaterialAvailabilityDto(bool IsAvailable, List<MaterialAvailabilityLineDto> Lines);
@@ -905,7 +919,12 @@ public sealed record WorkOrderDashboardDto(
     int OperationsCompletedInPeriod,
     decimal? AveragePerformanceRatio,
     int WorkOrdersCompletedInPeriod,
-    decimal? OnTimeCompletionRate);
+    decimal? OnTimeCompletionRate,
+    decimal TotalDowntimeMinutes,
+    decimal? AvailabilityRatio,
+    decimal TotalScrapQuantity,
+    decimal? QualityRatio,
+    decimal? OeeRatio);
 
 public sealed record MaterialLotSummaryDto(
     Guid Id,
