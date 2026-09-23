@@ -4,8 +4,43 @@ using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.IdentityModel.Tokens;
 using System.Text;
+using Serilog;
+using Serilog.Sinks.Grafana.Loki;
 
 var builder = WebApplication.CreateBuilder(args);
+
+// Structured JSON to console always (readable in Render's log viewer); also ships to Grafana Cloud
+// Loki when LOKI_URL is configured (via appsettings, user-secrets locally, or Render env vars) — the
+// API runs fine without it, this is purely additive for log retention/search beyond Render's own window.
+builder.Host.UseSerilog((context, services, loggerConfiguration) =>
+{
+    loggerConfiguration
+        .ReadFrom.Configuration(context.Configuration)
+        // ReadFrom.Configuration only picks up a "Serilog" config section, which this project doesn't
+        // have (it uses the built-in ASP.NET Core "Logging:LogLevel" schema instead) — without this,
+        // ASP.NET Core's own per-request diagnostics (start/end, endpoint matching, status code) log at
+        // Information and double up with the single-line request summary below.
+        .MinimumLevel.Override("Microsoft.AspNetCore", Serilog.Events.LogEventLevel.Warning)
+        .Enrich.FromLogContext()
+        .Enrich.WithProperty("Application", "CrmMes.Api")
+        .Enrich.WithProperty("Environment", context.HostingEnvironment.EnvironmentName)
+        .WriteTo.Console(new Serilog.Formatting.Json.JsonFormatter());
+
+    var lokiUrl = context.Configuration["Loki:Url"] ?? Environment.GetEnvironmentVariable("LOKI_URL");
+    if (!string.IsNullOrWhiteSpace(lokiUrl))
+    {
+        var lokiUser = context.Configuration["Loki:User"] ?? Environment.GetEnvironmentVariable("LOKI_USER");
+        var lokiPassword = context.Configuration["Loki:Password"] ?? Environment.GetEnvironmentVariable("LOKI_PASSWORD");
+        var credentials = !string.IsNullOrWhiteSpace(lokiUser) && !string.IsNullOrWhiteSpace(lokiPassword)
+            ? new LokiCredentials { Login = lokiUser, Password = lokiPassword }
+            : null;
+
+        loggerConfiguration.WriteTo.GrafanaLoki(
+            lokiUrl,
+            credentials: credentials,
+            labels: [new LokiLabel { Key = "app", Value = "crmmes-api" }]);
+    }
+});
 
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
@@ -24,14 +59,6 @@ builder.Services.AddProblemDetails(options =>
         }
     };
 });
-builder.Services.AddHttpLogging(options =>
-{
-    options.LoggingFields = Microsoft.AspNetCore.HttpLogging.HttpLoggingFields.RequestMethod
-        | Microsoft.AspNetCore.HttpLogging.HttpLoggingFields.RequestPath
-        | Microsoft.AspNetCore.HttpLogging.HttpLoggingFields.ResponseStatusCode
-        | Microsoft.AspNetCore.HttpLogging.HttpLoggingFields.Duration;
-});
-
 var jwtKey = builder.Configuration["Jwt:Key"]
     ?? Environment.GetEnvironmentVariable("CRM_MES_JWT_KEY")
     ?? (builder.Environment.IsDevelopment() ? "development-only-key-change-before-deploy-32chars" : null);
@@ -94,7 +121,7 @@ else
     app.UseHsts();
 }
 
-app.UseHttpLogging();
+app.UseSerilogRequestLogging();
 app.UseResponseCompression();
 app.UseHttpsRedirection();
 app.UseAuthentication();

@@ -37,6 +37,7 @@ Sintesi ad alto livello di cosa è stato costruito finora e cosa manca ancora. P
 - API in produzione su Render.com (piano Free), deploy automatico a ogni push su `main`, database Neon Postgres.
 - Workflow di keep-alive (ping ogni 10 minuti) per ridurre il cold-start del piano gratuito.
 - Auto-update del client Windows da release GitHub.
+- **Logging strutturato** (appena aggiunto): l'API usa Serilog, log in formato JSON su console (una riga per richiesta HTTP con metodo/percorso/stato/durata, non più righe sparse dei diagnostici interni di ASP.NET Core) invece del testo semplice precedente. Spedizione opzionale a **Grafana Cloud** (Loki) per conservazione e ricerca oltre la finestra limitata dei log di Render: attiva da sola se sono impostate le variabili d'ambiente `LOKI_URL` (+ `LOKI_USER`/`LOKI_PASSWORD` se il datasource lo richiede) su Render; senza, l'app funziona comunque, solo senza conservazione a lungo termine.
 
 ### Client Windows (WPF)
 - Sidebar raggruppata per macro-aree (Magazzino, Acquisti, Produzione, Amministrazione), espandibile.
@@ -56,8 +57,8 @@ Sintesi ad alto livello di cosa è stato costruito finora e cosa manca ancora. P
 - **Qualità approssimata, non per pezzo**: lo scarto è registrato per fase e confrontato con la quantità pianificata dell'intera commessa (stesso tipo di semplificazione della tracciabilità lotti), non con un conteggio reale di pezzi buoni/scartati per singola unità prodotta.
 - **Tracciabilità solo a livello di commessa**: un lotto per l'intera commessa, non per singola matricola/unità prodotta.
 - **Import PDF cataloghi non validato nel mondo reale**: euristica generica (raggruppamento parole per riga/colonna), testata solo su PDF generati sinteticamente in fase di test — va riverificata al primo catalogo fornitore reale disponibile.
-- **Distribuzione**: nessun installer Windows firmato digitalmente; solo auto-update da release GitHub.
-- **Logging di produzione**: le richieste HTTP sono loggate ma manca un sink esterno (es. servizio di log centralizzato) oltre ai log locali di Render.
+- **Distribuzione**: nessun installer Windows firmato digitalmente — serve un certificato di firma del codice (a pagamento, da acquistare); senza, resta solo l'auto-update da release GitHub.
+- **Grafana Cloud non ancora collegato**: il logging centralizzato è pronto lato codice, ma serve creare l'account gratuito e impostare `LOKI_URL`/`LOKI_USER`/`LOKI_PASSWORD` su Render per attivarlo davvero.
 - **Nessuna modalità offline**: il client resta online-only, senza coda di sincronizzazione in caso di API irraggiungibile.
 
 ## Riferimento rapido gap di mercato
