@@ -25,7 +25,9 @@ public sealed class StatusToBrushConverter : IValueConverter
         ["Closed"] = "#3D7A4C",
         ["Completed"] = "#3D7A4C",
         ["Done"] = "#3D7A4C",
+        ["Good"] = "#3D7A4C",
         ["Cancelled"] = "#C0392B",
+        ["Scrapped"] = "#C0392B",
     };
 
     public object Convert(object? value, Type targetType, object? parameter, CultureInfo culture)
@@ -66,6 +68,8 @@ public sealed class StatusToItalianTextConverter : IValueConverter
         ["Completed"] = "Completata",
         ["Pending"] = "In attesa",
         ["Done"] = "Completata",
+        ["Good"] = "Buona",
+        ["Scrapped"] = "Scartata",
     };
 
     public static string Translate(string? status) =>

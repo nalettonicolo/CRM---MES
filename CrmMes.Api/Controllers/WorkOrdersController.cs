@@ -142,6 +142,23 @@ public class WorkOrdersController : ControllerBase
             });
         }
 
+        // Per-serial tracking only makes sense for a whole number of discrete units — a continuous or
+        // bulk quantity (e.g. 2.5 kg) has nothing to number, so no units are generated for it and it
+        // keeps using the batch-level lot number and quality approximation instead.
+        if (order.Quantity == Math.Floor(order.Quantity) && order.Quantity > 0)
+        {
+            for (var sequence = 1; sequence <= (int)order.Quantity; sequence++)
+            {
+                order.Units.Add(new WorkOrderUnit
+                {
+                    WorkOrderId = order.Id,
+                    SequenceNumber = sequence,
+                    SerialNumber = $"{order.Code}-{sequence:000}",
+                    Status = "Pending"
+                });
+            }
+        }
+
         _dbContext.WorkOrders.Add(order);
         _dbContext.AuditLogs.Add(new AuditLog
         {
@@ -323,6 +340,7 @@ public class WorkOrdersController : ControllerBase
     {
         var order = await _dbContext.WorkOrders
             .Include(o => o.Operations)
+            .Include(o => o.Units)
             .SingleOrDefaultAsync(o => o.Id == id, cancellationToken);
 
         if (order is null)
@@ -340,8 +358,16 @@ public class WorkOrdersController : ControllerBase
             return Conflict(new { message = "Tutte le fasi devono essere completate prima di chiudere la commessa." });
         }
 
+        // Any unit nothing scrapped along the way ships as-is: it was never flagged, so it's good.
+        var completedAt = DateTime.UtcNow;
+        foreach (var unit in order.Units.Where(u => u.Status == "Pending"))
+        {
+            unit.Status = "Good";
+            unit.ResolvedAt = completedAt;
+        }
+
         order.Status = "Completed";
-        order.CompletedAt = DateTime.UtcNow;
+        order.CompletedAt = completedAt;
         _dbContext.AuditLogs.Add(new AuditLog
         {
             Action = "WorkOrderCompleted",
@@ -561,19 +587,58 @@ public class WorkOrdersController : ControllerBase
             return Conflict(new { message = "Si può registrare una non conformità solo su una fase avviata o completata." });
         }
 
+        WorkOrderUnit? unit = null;
+        if (request.WorkOrderUnitId.HasValue)
+        {
+            unit = await _dbContext.WorkOrderUnits
+                .SingleOrDefaultAsync(u => u.Id == request.WorkOrderUnitId.Value && u.WorkOrderId == id, cancellationToken);
+            if (unit is null)
+            {
+                return BadRequest(new { message = "Unità non trovata per questa commessa." });
+            }
+
+            if (unit.Status != "Pending")
+            {
+                return Conflict(new { message = $"L'unità {unit.SerialNumber} è già stata risolta ({unit.Status})." });
+            }
+        }
+
         var nonConformity = new NonConformity
         {
             WorkOrderOperationId = operationId,
             Description = request.Description.Trim(),
             ScrapQuantity = request.ScrapQuantity,
             Notes = string.IsNullOrWhiteSpace(request.Notes) ? null : request.Notes.Trim(),
-            ReportedBy = string.IsNullOrWhiteSpace(operatorName) ? null : operatorName.Trim()
+            ReportedBy = string.IsNullOrWhiteSpace(operatorName) ? null : operatorName.Trim(),
+            WorkOrderUnitId = unit?.Id
         };
+
+        // Registering a non-conformity against a specific unit is what scraps it — no separate step.
+        if (unit is not null)
+        {
+            unit.Status = "Scrapped";
+            unit.ResolvedAt = nonConformity.DetectedAt;
+        }
 
         _dbContext.NonConformities.Add(nonConformity);
         await _dbContext.SaveChangesAsync(cancellationToken);
 
-        return Ok(ToNonConformityResponse(nonConformity));
+        return Ok(ToNonConformityResponse(nonConformity, unit));
+    }
+
+    /// <summary>Per-serial traceability: which units this work order produced and what happened to each
+    /// — nothing when the quantity wasn't a whole number at creation time (see <see cref="WorkOrderUnit"/>
+    /// for why).</summary>
+    [HttpGet("{id:guid}/units")]
+    public async Task<ActionResult<IEnumerable<WorkOrderUnitResponse>>> GetUnits(Guid id, CancellationToken cancellationToken = default)
+    {
+        var units = await _dbContext.WorkOrderUnits
+            .AsNoTracking()
+            .Where(u => u.WorkOrderId == id)
+            .OrderBy(u => u.SequenceNumber)
+            .ToListAsync(cancellationToken);
+
+        return Ok(units.Select(u => new WorkOrderUnitResponse(u.Id, u.SequenceNumber, u.SerialNumber, u.Status)));
     }
 
     [HttpGet("{id:guid}/operations/{operationId:guid}/non-conformities")]
@@ -582,20 +647,23 @@ public class WorkOrdersController : ControllerBase
     {
         var nonConformities = await _dbContext.NonConformities
             .AsNoTracking()
+            .Include(n => n.Unit)
             .Where(n => n.WorkOrderOperationId == operationId)
             .OrderByDescending(n => n.DetectedAt)
             .ToListAsync(cancellationToken);
 
-        return Ok(nonConformities.Select(ToNonConformityResponse));
+        return Ok(nonConformities.Select(n => ToNonConformityResponse(n, n.Unit)));
     }
 
-    private static NonConformityResponse ToNonConformityResponse(NonConformity nonConformity) => new(
+    private static NonConformityResponse ToNonConformityResponse(NonConformity nonConformity, WorkOrderUnit? unit) => new(
         nonConformity.Id,
         nonConformity.Description,
         nonConformity.ScrapQuantity,
         nonConformity.Notes,
         nonConformity.DetectedAt,
-        nonConformity.ReportedBy);
+        nonConformity.ReportedBy,
+        nonConformity.WorkOrderUnitId,
+        unit?.SerialNumber);
 
     /// <summary>Day-granularity finite-capacity forward scheduler: assigns each still-open operation
     /// (skips ones already Done) to the earliest calendar day(s) where its work center — matched by name
@@ -873,9 +941,8 @@ public class WorkOrdersController : ControllerBase
             : null;
 
     /// <summary>EstimatedMinutes / ActualMinutes for a finished operation: above 1 means faster than
-    /// planned, below 1 means slower. This is the "Performance" component of OEE in isolation — full
-    /// OEE also needs downtime (Availability) and scrap (Quality) tracking, which this project doesn't
-    /// capture yet.</summary>
+    /// planned, below 1 means slower. This is the "Performance" component of OEE in isolation — see
+    /// GetDashboard for how it combines with Availability (downtime) and Quality (scrap) into full OEE.</summary>
     private static decimal? PerformanceRatio(WorkOrderOperation operation)
     {
         var actual = ActualMinutes(operation);
@@ -927,21 +994,38 @@ public class WorkOrdersController : ControllerBase
             ? Math.Max(0, (totalGrossMinutes - totalDowntimeMinutes) / totalGrossMinutes)
             : (decimal?)null;
 
-        // Quality (OEE): scrap logged against the operations of orders completed in the period, weighed
-        // against those orders' planned quantity. An approximation — scrap is logged per operation, not
-        // per finished order, but the order's planned quantity is the only "units produced" figure this
-        // schema has, the same simplification the rest of the project makes (e.g. one material lot per
-        // whole work order instead of per serial unit).
+        // Quality (OEE): for a completed order with per-unit tracking (see WorkOrderUnit — generated
+        // only when the ordered quantity was a whole number), this is now an exact good-vs-scrapped unit
+        // count, not an approximation. An order without units (its quantity wasn't whole, e.g. 2.5 kg of
+        // a bulk product) falls back to comparing logged scrap against its planned quantity — the same
+        // approximation this dashboard used before per-unit tracking existed. The two are blended into
+        // one ratio, weighted so a handful of untracked bulk orders can't swing the number as much as
+        // hundreds of precisely-tracked units.
         var completedOrderIds = completedOrders.Select(order => order.Id).ToHashSet();
-        var scrapForCompletedOrders = await _dbContext.NonConformities
+        var unitsForCompletedOrders = await _dbContext.WorkOrderUnits
             .AsNoTracking()
-            .Include(nonConformity => nonConformity.Operation)
-            .Where(nonConformity => completedOrderIds.Contains(nonConformity.Operation.WorkOrderId))
+            .Where(unit => completedOrderIds.Contains(unit.WorkOrderId))
             .ToListAsync(cancellationToken);
-        var totalScrapQuantity = scrapForCompletedOrders.Sum(nonConformity => nonConformity.ScrapQuantity);
-        var totalProducedQuantity = completedOrders.Sum(order => order.Quantity);
-        var qualityRatio = totalProducedQuantity > 0
-            ? Math.Max(0, (totalProducedQuantity - totalScrapQuantity) / totalProducedQuantity)
+        var ordersWithUnits = unitsForCompletedOrders.Select(unit => unit.WorkOrderId).ToHashSet();
+        var totalUnitsTracked = unitsForCompletedOrders.Count;
+        var goodUnitsTracked = unitsForCompletedOrders.Count(unit => unit.Status == "Good");
+
+        var ordersWithoutUnits = completedOrders.Where(order => !ordersWithUnits.Contains(order.Id)).ToList();
+        var untrackedOrderIds = ordersWithoutUnits.Select(order => order.Id).ToHashSet();
+        var scrapForOrdersWithoutUnits = untrackedOrderIds.Count > 0
+            ? await _dbContext.NonConformities
+                .AsNoTracking()
+                .Include(nonConformity => nonConformity.Operation)
+                .Where(nonConformity => untrackedOrderIds.Contains(nonConformity.Operation.WorkOrderId))
+                .ToListAsync(cancellationToken)
+            : [];
+        var totalScrapQuantity = scrapForOrdersWithoutUnits.Sum(nonConformity => nonConformity.ScrapQuantity);
+        var totalProducedQuantity = ordersWithoutUnits.Sum(order => order.Quantity);
+
+        var totalWeight = totalUnitsTracked + totalProducedQuantity;
+        var goodWeight = goodUnitsTracked + Math.Max(0, totalProducedQuantity - totalScrapQuantity);
+        var qualityRatio = totalWeight > 0
+            ? Math.Max(0, goodWeight / totalWeight)
             : (decimal?)null;
 
         // Full OEE: Performance is capped at 1 for this composite (finishing faster than estimated
@@ -1070,7 +1154,7 @@ public sealed record OperationDowntimeResponse(
     string? ReportedBy,
     string? ClosedBy);
 
-public sealed record RegisterNonConformityRequest(string Description, decimal ScrapQuantity, string? Notes);
+public sealed record RegisterNonConformityRequest(string Description, decimal ScrapQuantity, string? Notes, Guid? WorkOrderUnitId = null);
 
 public sealed record NonConformityResponse(
     Guid Id,
@@ -1078,4 +1162,8 @@ public sealed record NonConformityResponse(
     decimal ScrapQuantity,
     string? Notes,
     DateTime DetectedAt,
-    string? ReportedBy);
+    string? ReportedBy,
+    Guid? WorkOrderUnitId,
+    string? UnitSerialNumber);
+
+public sealed record WorkOrderUnitResponse(Guid Id, int SequenceNumber, string SerialNumber, string Status);

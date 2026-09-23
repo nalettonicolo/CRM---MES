@@ -28,11 +28,31 @@ public partial class NonConformitiesWindow : Window
         try
         {
             NonConformitiesList.ItemsSource = await _apiClient.GetNonConformitiesAsync(_workOrderId, _operationId);
+            await ReloadUnitsAsync();
         }
         catch (Exception exception)
         {
             ErrorText.Text = exception.Message;
         }
+    }
+
+    /// <summary>Only shows the unit picker when the work order actually has per-serial units (its
+    /// quantity was a whole number at creation — see WorkOrderUnit) and at least one is still Pending;
+    /// otherwise there's nothing meaningful to scrap by unit and the picker would just be empty.</summary>
+    private async Task ReloadUnitsAsync()
+    {
+        var units = await _apiClient.GetWorkOrderUnitsAsync(_workOrderId);
+        var pendingUnits = units.Where(u => u.Status == "Pending").ToList();
+
+        if (pendingUnits.Count == 0)
+        {
+            UnitPickerPanel.Visibility = Visibility.Collapsed;
+            UnitCombo.ItemsSource = null;
+            return;
+        }
+
+        UnitPickerPanel.Visibility = Visibility.Visible;
+        UnitCombo.ItemsSource = pendingUnits;
     }
 
     private async void RegisterNonConformity_Click(object sender, RoutedEventArgs e)
@@ -50,10 +70,12 @@ public partial class NonConformitiesWindow : Window
             return;
         }
 
+        var selectedUnitId = (UnitCombo.SelectedItem as WorkOrderUnitDto)?.Id;
+
         try
         {
             await _apiClient.RegisterNonConformityAsync(_workOrderId, _operationId, description, scrapQuantity,
-                string.IsNullOrWhiteSpace(NotesBox.Text) ? null : NotesBox.Text.Trim(), _operatorName);
+                string.IsNullOrWhiteSpace(NotesBox.Text) ? null : NotesBox.Text.Trim(), _operatorName, selectedUnitId);
             DescriptionBox.Text = string.Empty;
             NotesBox.Text = string.Empty;
             ScrapQuantityBox.Text = "1";

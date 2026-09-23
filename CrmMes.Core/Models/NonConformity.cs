@@ -20,4 +20,10 @@ public class NonConformity
     /// terminal — free text, not a user FK, same rationale as WorkOrderOperation's StartedBy/CompletedBy.
     /// Null when the action came from the office client.</summary>
     public string? ReportedBy { get; set; }
+
+    /// <summary>The specific serial unit this defect scrapped, when the work order has per-unit tracking
+    /// (see <see cref="WorkOrderUnit"/>) and the reporter picked one. Null for a work order whose quantity
+    /// isn't a whole number (nothing to pick), or when the reporter didn't attribute it to one unit.</summary>
+    public Guid? WorkOrderUnitId { get; set; }
+    public WorkOrderUnit? Unit { get; set; }
 }

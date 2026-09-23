@@ -31,6 +31,7 @@ public class ApplicationDbContext : DbContext
     public DbSet<MaterialLot> MaterialLots => Set<MaterialLot>();
     public DbSet<MaterialLotConsumption> MaterialLotConsumptions => Set<MaterialLotConsumption>();
     public DbSet<WorkCenter> WorkCenters => Set<WorkCenter>();
+    public DbSet<WorkOrderUnit> WorkOrderUnits => Set<WorkOrderUnit>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -217,6 +218,21 @@ public class ApplicationDbContext : DbContext
             entity.HasOne(n => n.Operation)
                 .WithMany()
                 .HasForeignKey(n => n.WorkOrderOperationId)
+                .OnDelete(DeleteBehavior.Cascade);
+            entity.HasOne(n => n.Unit)
+                .WithMany()
+                .HasForeignKey(n => n.WorkOrderUnitId)
+                .OnDelete(DeleteBehavior.SetNull);
+        });
+
+        modelBuilder.Entity<WorkOrderUnit>(entity =>
+        {
+            entity.Property(u => u.SerialNumber).HasMaxLength(120);
+            entity.Property(u => u.Status).HasMaxLength(50);
+            entity.HasIndex(u => u.SerialNumber).IsUnique();
+            entity.HasOne(u => u.WorkOrder)
+                .WithMany(w => w.Units)
+                .HasForeignKey(u => u.WorkOrderId)
                 .OnDelete(DeleteBehavior.Cascade);
         });
 

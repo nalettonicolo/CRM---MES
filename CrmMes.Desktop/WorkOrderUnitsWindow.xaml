@@ -1,0 +1,42 @@
+<Window x:Class="CrmMes.Desktop.WorkOrderUnitsWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:local="clr-namespace:CrmMes.Desktop"
+        Title="Unità prodotte" Icon="Assets/logo.ico" Height="520" Width="560"
+        WindowStartupLocation="CenterOwner" ResizeMode="CanResize" MinHeight="400" MinWidth="480"
+        Background="{StaticResource BackgroundBrush}">
+    <Grid Margin="24">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+
+        <StackPanel Grid.Row="0">
+            <TextBlock Text="U N I T À   P R O D O T T E" Style="{StaticResource MicroLabel}" Foreground="{StaticResource PrimaryBrush}" />
+            <TextBlock x:Name="OrderCodeText" Style="{StaticResource EditorialTitle}" FontSize="26" Margin="0,0,0,4" />
+        </StackPanel>
+
+        <TextBlock Grid.Row="1" x:Name="InfoText" Foreground="{StaticResource TextSecondaryBrush}" FontSize="12.5" TextWrapping="Wrap" Margin="0,4,0,16" />
+
+        <Border Grid.Row="2" Style="{StaticResource CardBorder}" Padding="4">
+            <ListView x:Name="UnitsList">
+                <ListView.View>
+                    <GridView>
+                        <GridViewColumn Header="#" DisplayMemberBinding="{Binding SequenceNumber}" Width="40" />
+                        <GridViewColumn Header="Matricola" DisplayMemberBinding="{Binding SerialNumber}" Width="280" />
+                        <GridViewColumn Header="Esito" Width="120">
+                            <GridViewColumn.CellTemplate>
+                                <DataTemplate>
+                                    <Border Style="{StaticResource Pill}" Background="{Binding Status, Converter={StaticResource StatusToBrush}}">
+                                        <TextBlock Style="{StaticResource PillText}" Text="{Binding Status, Converter={StaticResource StatusToItalianText}}" Foreground="{Binding Status, Converter={StaticResource StatusToBrush}, ConverterParameter=Foreground}" />
+                                    </Border>
+                                </DataTemplate>
+                            </GridViewColumn.CellTemplate>
+                        </GridViewColumn>
+                    </GridView>
+                </ListView.View>
+            </ListView>
+        </Border>
+    </Grid>
+</Window>

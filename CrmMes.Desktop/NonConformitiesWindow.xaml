@@ -36,6 +36,10 @@
                     <TextBox x:Name="ScrapQuantityBox" Text="1" />
                 </StackPanel>
             </Grid>
+            <StackPanel x:Name="UnitPickerPanel" Margin="0,0,0,8" Visibility="Collapsed">
+                <TextBlock Text="Unità interessata (opzionale — scarta quella unità specifica)" Foreground="{StaticResource TextSecondaryBrush}" FontSize="11" Margin="0,0,0,4" />
+                <ComboBox x:Name="UnitCombo" DisplayMemberPath="SerialNumber" />
+            </StackPanel>
             <Button Content="Segnala non conformità" Width="180" Height="34" HorizontalAlignment="Right" Click="RegisterNonConformity_Click" />
             <TextBlock x:Name="ErrorText" Foreground="{StaticResource DangerBrush}" TextWrapping="Wrap" Margin="0,8,0,0" />
         </StackPanel>
@@ -51,6 +55,7 @@
                         <GridViewColumn Header="Quantità" DisplayMemberBinding="{Binding ScrapQuantity}" Width="80" />
                         <GridViewColumn Header="Rilevata" DisplayMemberBinding="{Binding DetectedAt, StringFormat={}{0:g}}" Width="130" />
                         <GridViewColumn Header="Segnalata da" DisplayMemberBinding="{Binding ReportedBy}" Width="110" />
+                        <GridViewColumn Header="Unità" DisplayMemberBinding="{Binding UnitSerialNumber}" Width="130" />
                     </GridView>
                 </ListView.View>
             </ListView>

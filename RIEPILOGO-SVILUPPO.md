@@ -22,13 +22,14 @@ Sintesi ad alto livello di cosa è stato costruito finora e cosa manca ancora. P
 - Prodotti con distinta base e ciclo di lavoro propri.
 - Commesse (`Draft`→`Released`→`InProgress`→`Completed`/`Cancelled`) con fasi fotografate dal ciclo di lavoro al momento della creazione.
 - Generazione automatica della distinta di prelievo da commessa.
-- Tracciabilità lotti materiali con consumo FIFO e genealogia bidirezionale (lotto materiale ↔ commessa); il lotto è per l'intera commessa, non per singola matricola.
+- Tracciabilità lotti materiali con consumo FIFO e genealogia bidirezionale (lotto materiale ↔ commessa); il lotto resta per l'intera commessa (vedi sotto per la tracciabilità per singola unità).
+- **Tracciabilità e qualità per singola unità prodotta** (appena aggiunto): quando la quantità di una commessa è un numero intero di pezzi, alla creazione vengono generate le singole unità (es. "WO-...-001", "-002", "-003"), ciascuna con il proprio esito — "In attesa" finché la commessa è in corso, "Scartata" se le si registra contro una non conformità specifica, "Buona" automaticamente al completamento della commessa se non è mai stata scartata. Una commessa con quantità non intera (es. 2,5 kg di un prodotto sfuso) non genera unità e continua a usare l'approssimazione precedente — non c'è nulla di discreto da numerare. Nuova finestra "Unità prodotte" nel dettaglio commessa per consultare l'esito di ciascuna; la finestra "Segnala non conformità" propone ora un selettore per scegliere quale unità specifica scartare. Il cruscotto calcola la Qualità con il conteggio reale buone/scartate per le commesse con unità tracciate, mescolato (pesato) con l'approssimazione precedente per quelle senza.
 - Verifica disponibilità materiali prima del rilascio (bloccante di default, forzabile con conferma esplicita).
 - Performance per fase (minuti stimati vs effettivi).
 - Centri di lavoro con capacità e calcolo del carico/arretrato.
 - Pianificazione a calendario delle fasi in base alla capacità del centro di lavoro.
 - **Fermi macchina con causale**: un solo fermo aperto per fase, blocca il completamento della fase finché non viene chiuso; il cruscotto calcola la Disponibilità (componente OEE).
-- **Non conformità/scarti**: registrazione di difetti con descrizione libera, quantità scartata e note, collegata alla singola fase; registrabile sia a fase in corso sia dopo il completamento (un difetto può emergere al collaudo finale). Il cruscotto calcola la Qualità (scarti sulla quantità pianificata delle commesse completate nel periodo) e l'**OEE completo** (Disponibilità × Performance × Qualità).
+- **Non conformità/scarti**: registrazione di difetti con descrizione libera, quantità scartata e note, collegata alla singola fase (e opzionalmente alla singola unità, vedi sotto); registrabile sia a fase in corso sia dopo il completamento (un difetto può emergere al collaudo finale). Il cruscotto calcola la Qualità e l'**OEE completo** (Disponibilità × Performance × Qualità).
 - **Barcode/QR e terminale di reparto**: ogni commessa ha un'etichetta QR stampabile (codice commessa codificato in un QR, esportabile in PDF dalla scheda commessa) da allegare al lotto fisico. Il "Terminale di reparto" è una finestra semplificata e a caratteri grandi pensata per l'operatore in linea: si scansiona (o digita) il codice — un lettore barcode/QR USB funziona già come tastiera, non serve integrazione hardware dedicata — e si vede subito la fase attiva della commessa, con un unico grande pulsante per avviarla/completarla e accesso rapido a "Segnala fermo"/"Segnala non conformità", senza dover navigare il client completo.
 - **Identificazione operatore via PIN** (appena aggiunto): un Admin assegna a ogni utente un PIN numerico (4-8 cifre, hash separato dalla password di login) dalla scheda Utenti. Il Terminale di reparto richiede questo PIN prima di mostrare qualunque commessa — "chi ha fatto cosa" è ora tracciato: avvio/completamento fase, apertura/chiusura fermo e segnalazione non conformità registrano il nome dell'operatore identificato, visibile nello storico fermi/NC e nell'elenco fasi. Le azioni dal client d'ufficio restano senza operatore associato (nessun PIN richiesto lì).
 - Cruscotto KPI: commesse per stato, fasi completate, performance media, puntualità, disponibilità, qualità, OEE.
@@ -56,8 +57,7 @@ Sintesi ad alto livello di cosa è stato costruito finora e cosa manca ancora. P
 ## Cosa manca
 
 - **Login reale disattivato**: `SkipLoginForTesting = true` in `MainWindow.xaml.cs` bypassa l'autenticazione per velocizzare lo sviluppo — **da rimettere a `false` prima di un uso reale o condiviso** (previsto prima della pubblicazione).
-- **Qualità approssimata, non per pezzo**: lo scarto è registrato per fase e confrontato con la quantità pianificata dell'intera commessa (stesso tipo di semplificazione della tracciabilità lotti), non con un conteggio reale di pezzi buoni/scartati per singola unità prodotta.
-- **Tracciabilità solo a livello di commessa**: un lotto per l'intera commessa, non per singola matricola/unità prodotta.
+- **Tracciabilità per unità ancora parziale**: la singola unità ha un esito (buona/scartata) ma non un proprio percorso attraverso le fasi (le fasi restano a livello di commessa/batch, non per singola unità) né un proprio lotto materiali (il consumo materiali resta aggregato per l'intera commessa) — sapere "quale lotto materiale è finito in quale unità specifica" richiederebbe un intervento separato, non incluso in questo giro.
 - **Import PDF cataloghi non validato nel mondo reale**: euristica generica (raggruppamento parole per riga/colonna), testata solo su PDF generati sinteticamente in fase di test — va riverificata al primo catalogo fornitore reale disponibile.
 - **Firma digitale non ancora attiva**: la pipeline di release è pronta a firmare (vedi sopra), ma senza un certificato di firma del codice — a pagamento, da acquistare presso un'autorità come DigiCert o Sectigo (circa 70-400€/anno) — le release restano non firmate.
 - **Grafana Cloud non ancora collegato**: il logging centralizzato è pronto lato codice, ma serve creare l'account gratuito e impostare `LOKI_URL`/`LOKI_USER`/`LOKI_PASSWORD` su Render per attivarlo davvero.
@@ -71,7 +71,7 @@ Dei quattro gap segnalati come "ancora aperti" rispetto ai MES di mercato (Katan
 |---|---|
 | Pianificazione a calendario | ✅ Chiuso |
 | Fermi macchina con causale | ✅ Chiuso |
-| Qualità / non conformità (NCM) | ✅ Chiuso (approssimazione: scarto per fase su quantità pianificata, non per singolo pezzo) |
+| Qualità / non conformità (NCM) | ✅ Chiuso, con conteggio reale buone/scartate per singola unità quando la quantità è un numero intero |
 | Barcode/QR e terminale shop floor | ✅ Chiuso (con identificazione operatore via PIN) |
 
 Con la chiusura di Disponibilità e Qualità, il cruscotto ora calcola anche l'**OEE completo** (Disponibilità × Performance × Qualità), non solo la sua componente Performance.

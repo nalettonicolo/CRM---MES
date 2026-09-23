@@ -746,8 +746,10 @@ public class WorkOrdersTests : IClassFixture<AdminSeededApiTestFixture>
     public async Task Dashboard_ReflectsScrapAndQualityRatioAndFullOee()
     {
         var (product, _) = await CreateProductWithRoutingAndBomAsync(materialStock: 100);
+        // A non-integer quantity deliberately skips per-unit tracking (see WorkOrderUnit), keeping this
+        // test on the older scrap-vs-planned-quantity approximation path it was written to exercise.
         var createResponse = await _adminClient.PostAsJsonAsync(
-            "/api/work-orders", new CreateWorkOrderRequest(product.Id, 10, null, null, null, null, null));
+            "/api/work-orders", new CreateWorkOrderRequest(product.Id, 10.5m, null, null, null, null, null));
         var order = (await createResponse.Content.ReadFromJsonAsync<WorkOrderResponse>())!;
         await _adminClient.PostAsync($"/api/work-orders/{order.Id}/release", null);
 
@@ -846,5 +848,152 @@ public class WorkOrdersTests : IClassFixture<AdminSeededApiTestFixture>
         var response = await _adminClient.GetAsync("/api/work-orders/by-code/CODICE-INESISTENTE");
 
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task CreateWorkOrder_WithIntegerQuantity_GeneratesOneUnitPerPiece()
+    {
+        var (product, _) = await CreateProductWithRoutingAndBomAsync(materialStock: 100);
+        var createResponse = await _adminClient.PostAsJsonAsync(
+            "/api/work-orders", new CreateWorkOrderRequest(product.Id, 3, null, null, null, null, null));
+        var order = (await createResponse.Content.ReadFromJsonAsync<WorkOrderResponse>())!;
+
+        var units = await _adminClient.GetFromJsonAsync<List<WorkOrderUnitResponse>>($"/api/work-orders/{order.Id}/units");
+
+        Assert.Equal(3, units!.Count);
+        Assert.Equal([1, 2, 3], units.Select(u => u.SequenceNumber));
+        Assert.All(units, u => Assert.Equal("Pending", u.Status));
+        Assert.All(units, u => Assert.StartsWith(order.Code, u.SerialNumber));
+    }
+
+    [Fact]
+    public async Task CreateWorkOrder_WithNonIntegerQuantity_GeneratesNoUnits()
+    {
+        var (product, _) = await CreateProductWithRoutingAndBomAsync(materialStock: 100);
+        var createResponse = await _adminClient.PostAsJsonAsync(
+            "/api/work-orders", new CreateWorkOrderRequest(product.Id, 2.5m, null, null, null, null, null));
+        var order = (await createResponse.Content.ReadFromJsonAsync<WorkOrderResponse>())!;
+
+        var units = await _adminClient.GetFromJsonAsync<List<WorkOrderUnitResponse>>($"/api/work-orders/{order.Id}/units");
+
+        Assert.Empty(units!);
+    }
+
+    [Fact]
+    public async Task RegisterNonConformity_WithUnit_ScrapsThatUnitOnly()
+    {
+        var (workOrderId, operationId) = await CreateAndStartFirstOperationAsync();
+        var units = await _adminClient.GetFromJsonAsync<List<WorkOrderUnitResponse>>($"/api/work-orders/{workOrderId}/units");
+        var unit = units!.Single();
+
+        var response = await _adminClient.PostAsJsonAsync(
+            $"/api/work-orders/{workOrderId}/operations/{operationId}/non-conformities",
+            new RegisterNonConformityRequest("Fuori tolleranza", 1, null, unit.Id));
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var nonConformity = await response.Content.ReadFromJsonAsync<NonConformityResponse>();
+        Assert.Equal(unit.Id, nonConformity!.WorkOrderUnitId);
+        Assert.Equal(unit.SerialNumber, nonConformity.UnitSerialNumber);
+
+        var updatedUnits = await _adminClient.GetFromJsonAsync<List<WorkOrderUnitResponse>>($"/api/work-orders/{workOrderId}/units");
+        Assert.Equal("Scrapped", updatedUnits!.Single(u => u.Id == unit.Id).Status);
+    }
+
+    [Fact]
+    public async Task RegisterNonConformity_WithAlreadyResolvedUnit_ReturnsConflict()
+    {
+        var (workOrderId, operationId) = await CreateAndStartFirstOperationAsync();
+        var units = await _adminClient.GetFromJsonAsync<List<WorkOrderUnitResponse>>($"/api/work-orders/{workOrderId}/units");
+        var unit = units!.Single();
+        await _adminClient.PostAsJsonAsync(
+            $"/api/work-orders/{workOrderId}/operations/{operationId}/non-conformities",
+            new RegisterNonConformityRequest("Fuori tolleranza", 1, null, unit.Id));
+
+        var response = await _adminClient.PostAsJsonAsync(
+            $"/api/work-orders/{workOrderId}/operations/{operationId}/non-conformities",
+            new RegisterNonConformityRequest("Altro difetto", 1, null, unit.Id));
+
+        Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task RegisterNonConformity_WithUnitFromAnotherWorkOrder_ReturnsBadRequest()
+    {
+        var (workOrderId, operationId) = await CreateAndStartFirstOperationAsync();
+        var (otherWorkOrderId, _) = await CreateAndStartFirstOperationAsync();
+        var otherUnits = await _adminClient.GetFromJsonAsync<List<WorkOrderUnitResponse>>($"/api/work-orders/{otherWorkOrderId}/units");
+
+        var response = await _adminClient.PostAsJsonAsync(
+            $"/api/work-orders/{workOrderId}/operations/{operationId}/non-conformities",
+            new RegisterNonConformityRequest("Fuori tolleranza", 1, null, otherUnits!.Single().Id));
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task CompleteWorkOrder_FlipsRemainingPendingUnitsToGood()
+    {
+        var (product, _) = await CreateProductWithRoutingAndBomAsync(materialStock: 100);
+        var createResponse = await _adminClient.PostAsJsonAsync(
+            "/api/work-orders", new CreateWorkOrderRequest(product.Id, 2, null, null, null, null, null));
+        var order = (await createResponse.Content.ReadFromJsonAsync<WorkOrderResponse>())!;
+        await _adminClient.PostAsync($"/api/work-orders/{order.Id}/release", null);
+
+        var units = await _adminClient.GetFromJsonAsync<List<WorkOrderUnitResponse>>($"/api/work-orders/{order.Id}/units");
+        var scrappedUnit = units!.First();
+
+        foreach (var op in order.Operations.OrderBy(op => op.SequenceNumber))
+        {
+            await _adminClient.PostAsync($"/api/work-orders/{order.Id}/operations/{op.Id}/start", null);
+            if (op.SequenceNumber == order.Operations.Min(o => o.SequenceNumber))
+            {
+                await _adminClient.PostAsJsonAsync(
+                    $"/api/work-orders/{order.Id}/operations/{op.Id}/non-conformities",
+                    new RegisterNonConformityRequest("Scarto", 1, null, scrappedUnit.Id));
+            }
+
+            await _adminClient.PostAsync($"/api/work-orders/{order.Id}/operations/{op.Id}/complete", null);
+        }
+
+        await _adminClient.PostAsync($"/api/work-orders/{order.Id}/complete", null);
+
+        var finalUnits = (await _adminClient.GetFromJsonAsync<List<WorkOrderUnitResponse>>($"/api/work-orders/{order.Id}/units"))!;
+        Assert.Equal("Scrapped", finalUnits.Single(u => u.Id == scrappedUnit.Id).Status);
+        Assert.All(finalUnits.Where(u => u.Id != scrappedUnit.Id), u => Assert.Equal("Good", u.Status));
+    }
+
+    [Fact]
+    public async Task Dashboard_UsesExactUnitCountsForOrdersWithUnits()
+    {
+        var (product, _) = await CreateProductWithRoutingAndBomAsync(materialStock: 100);
+        var createResponse = await _adminClient.PostAsJsonAsync(
+            "/api/work-orders", new CreateWorkOrderRequest(product.Id, 4, null, null, null, null, null));
+        var order = (await createResponse.Content.ReadFromJsonAsync<WorkOrderResponse>())!;
+        await _adminClient.PostAsync($"/api/work-orders/{order.Id}/release", null);
+
+        var units = await _adminClient.GetFromJsonAsync<List<WorkOrderUnitResponse>>($"/api/work-orders/{order.Id}/units");
+        var scrappedUnit = units!.First();
+        var firstOperationId = order.Operations.OrderBy(op => op.SequenceNumber).First().Id;
+
+        foreach (var op in order.Operations.OrderBy(op => op.SequenceNumber))
+        {
+            await _adminClient.PostAsync($"/api/work-orders/{order.Id}/operations/{op.Id}/start", null);
+            if (op.Id == firstOperationId)
+            {
+                await _adminClient.PostAsJsonAsync(
+                    $"/api/work-orders/{order.Id}/operations/{op.Id}/non-conformities",
+                    new RegisterNonConformityRequest("Scarto", 1, null, scrappedUnit.Id));
+            }
+
+            await _adminClient.PostAsync($"/api/work-orders/{order.Id}/operations/{op.Id}/complete", null);
+        }
+
+        await _adminClient.PostAsync($"/api/work-orders/{order.Id}/complete", null);
+
+        var dashboard = await _adminClient.GetFromJsonAsync<WorkOrderDashboardResponse>("/api/work-orders/dashboard?days=1");
+
+        Assert.NotNull(dashboard);
+        Assert.NotNull(dashboard!.QualityRatio);
+        Assert.InRange(dashboard.QualityRatio!.Value, 0m, 1m);
     }
 }

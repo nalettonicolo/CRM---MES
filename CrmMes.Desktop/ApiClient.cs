@@ -676,14 +676,20 @@ public sealed class ApiClient
     public Task<IReadOnlyList<NonConformityDto>> GetNonConformitiesAsync(Guid workOrderId, Guid operationId, CancellationToken cancellationToken = default)
         => GetAsync<NonConformityDto>($"api/work-orders/{workOrderId}/operations/{operationId}/non-conformities", cancellationToken);
 
-    public async Task<NonConformityDto> RegisterNonConformityAsync(Guid workOrderId, Guid operationId, string description, decimal scrapQuantity, string? notes, string? operatorName = null, CancellationToken cancellationToken = default)
+    public async Task<NonConformityDto> RegisterNonConformityAsync(Guid workOrderId, Guid operationId, string description, decimal scrapQuantity, string? notes, string? operatorName = null, Guid? workOrderUnitId = null, CancellationToken cancellationToken = default)
     {
         using var response = await _httpClient.PostAsJsonAsync(
-            $"api/work-orders/{workOrderId}/operations/{operationId}/non-conformities{OperatorQuery(operatorName)}", new { description, scrapQuantity, notes }, cancellationToken);
+            $"api/work-orders/{workOrderId}/operations/{operationId}/non-conformities{OperatorQuery(operatorName)}",
+            new { description, scrapQuantity, notes, workOrderUnitId }, cancellationToken);
         await EnsureSuccessAsync(response, cancellationToken);
         return await response.Content.ReadFromJsonAsync<NonConformityDto>(cancellationToken: cancellationToken)
             ?? throw new InvalidOperationException("Risposta non conformità non valida.");
     }
+
+    /// <summary>Per-serial traceability: which units a work order produced and what happened to each.
+    /// Empty when the work order's quantity wasn't a whole number at creation (see WorkOrderUnit).</summary>
+    public Task<IReadOnlyList<WorkOrderUnitDto>> GetWorkOrderUnitsAsync(Guid workOrderId, CancellationToken cancellationToken = default)
+        => GetAsync<WorkOrderUnitDto>($"api/work-orders/{workOrderId}/units", cancellationToken);
 
     public async Task<IdentifyOperatorDto> IdentifyOperatorByPinAsync(string pin, CancellationToken cancellationToken = default)
     {
@@ -937,7 +943,9 @@ public sealed record WorkOrderWithdrawalSlipDto(Guid WithdrawalSlipId, string Wi
 
 public sealed record OperationDowntimeDto(Guid Id, string Reason, string? Notes, DateTime StartedAt, DateTime? EndedAt, decimal? DurationMinutes, string? ReportedBy, string? ClosedBy);
 
-public sealed record NonConformityDto(Guid Id, string Description, decimal ScrapQuantity, string? Notes, DateTime DetectedAt, string? ReportedBy);
+public sealed record NonConformityDto(Guid Id, string Description, decimal ScrapQuantity, string? Notes, DateTime DetectedAt, string? ReportedBy, Guid? WorkOrderUnitId, string? UnitSerialNumber);
+
+public sealed record WorkOrderUnitDto(Guid Id, int SequenceNumber, string SerialNumber, string Status);
 
 public sealed record IdentifyOperatorDto(Guid Id, string Name);
 

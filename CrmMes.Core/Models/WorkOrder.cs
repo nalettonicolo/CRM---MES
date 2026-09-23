@@ -9,7 +9,7 @@ public class WorkOrder
 
     /// <summary>Batch/lot identifier for the finished goods this work order produces — the traceability
     /// anchor a customer complaint or a recall would search by. All units from one work order share this
-    /// one lot number; per-unit serials are a separate, not-yet-built feature for products that need it.</summary>
+    /// one lot number; <see cref="Units"/> is the finer per-serial layer on top of it.</summary>
     public string ProductLotNumber { get; set; } = string.Empty;
 
     public Guid ProductId { get; set; }
@@ -25,4 +25,5 @@ public class WorkOrder
     public DateTime? ReleasedAt { get; set; }
     public DateTime? CompletedAt { get; set; }
     public ICollection<WorkOrderOperation> Operations { get; set; } = new List<WorkOrderOperation>();
+    public ICollection<WorkOrderUnit> Units { get; set; } = new List<WorkOrderUnit>();
 }

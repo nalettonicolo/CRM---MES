@@ -115,6 +115,7 @@
 
         <StackPanel Grid.Row="5" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,16,0,0">
             <Button x:Name="LabelButton" Style="{StaticResource SecondaryButton}" Content="Etichetta QR" Width="120" Height="36" Margin="0,0,10,0" Click="Label_Click" />
+            <Button x:Name="UnitsButton" Style="{StaticResource SecondaryButton}" Content="Unità prodotte" Width="130" Height="36" Margin="0,0,10,0" Click="Units_Click" />
             <Button x:Name="TraceabilityButton" Style="{StaticResource SecondaryButton}" Content="Tracciabilità materiali" Width="160" Height="36" Margin="0,0,10,0" Click="Traceability_Click" />
             <Button x:Name="ScheduleButton" Style="{StaticResource SecondaryButton}" Content="Pianifica" Width="110" Height="36" Margin="0,0,10,0" Click="Schedule_Click" />
             <Button x:Name="ReleaseButton" Content="Rilascia" Width="110" Height="36" Margin="0,0,10,0" Click="Release_Click" />

@@ -168,6 +168,12 @@ public partial class WorkOrderDetailWindow : Window
         window.ShowDialog();
     }
 
+    private void Units_Click(object sender, RoutedEventArgs e)
+    {
+        var window = new WorkOrderUnitsWindow(_apiClient, _workOrderId, CodeText.Text) { Owner = this };
+        window.ShowDialog();
+    }
+
     private async void Traceability_Click(object sender, RoutedEventArgs e)
     {
         try
