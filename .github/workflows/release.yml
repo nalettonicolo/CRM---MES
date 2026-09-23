@@ -1,0 +1,92 @@
+name: Release desktop client
+
+# Triggered by pushing a version tag (e.g. `git tag v1.2.0 && git push origin v1.2.0`). Publishes
+# CrmMes.Desktop as a GitHub Release with the exact asset name UpdateService.cs expects
+# (CrmMes.Desktop-win-x64.zip), so existing installs pick it up automatically via their update check.
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "8.0.x"
+
+      - name: Derive version from tag
+        id: version
+        shell: pwsh
+        run: |
+          $version = "${{ github.ref_name }}".TrimStart('v', 'V')
+          "version=$version" >> $env:GITHUB_OUTPUT
+
+      - name: Restore
+        run: dotnet restore CrmMes.sln
+
+      - name: Test API
+        run: dotnet test CrmMes.Api.Tests/CrmMes.Api.Tests.csproj --configuration Release
+
+      - name: Test Desktop client
+        run: dotnet test CrmMes.Desktop.Tests/CrmMes.Desktop.Tests.csproj --configuration Release
+
+      - name: Publish CrmMes.Desktop
+        run: >
+          dotnet publish CrmMes.Desktop/CrmMes.Desktop.csproj
+          -c Release -r win-x64 --self-contained false
+          -p:Version=${{ steps.version.outputs.version }}
+          -o publish
+
+      - name: Check for a code-signing certificate
+        id: cert_check
+        shell: pwsh
+        run: |
+          $hasCert = -not [string]::IsNullOrEmpty('${{ secrets.WINDOWS_CERTIFICATE_BASE64 }}')
+          "has_cert=$hasCert" >> $env:GITHUB_OUTPUT
+
+      # Inactive until WINDOWS_CERTIFICATE_BASE64 (the .pfx, base64-encoded) and
+      # WINDOWS_CERTIFICATE_PASSWORD are added as repository secrets (Settings > Secrets and variables >
+      # Actions). Until then this step is skipped and the release ships unsigned, exactly as it does
+      # today — adding the two secrets is the only change needed to start signing releases.
+      - name: Sign executables
+        if: steps.cert_check.outputs.has_cert == 'true'
+        shell: pwsh
+        env:
+          CERT_BASE64: ${{ secrets.WINDOWS_CERTIFICATE_BASE64 }}
+          CERT_PASSWORD: ${{ secrets.WINDOWS_CERTIFICATE_PASSWORD }}
+        run: |
+          $certPath = Join-Path $env:RUNNER_TEMP "signing-cert.pfx"
+          [IO.File]::WriteAllBytes($certPath, [Convert]::FromBase64String($env:CERT_BASE64))
+
+          $signtool = Get-ChildItem "C:\Program Files (x86)\Windows Kits\10\bin" -Recurse -Filter signtool.exe -ErrorAction SilentlyContinue |
+            Where-Object { $_.FullName -like "*x64*" } | Select-Object -First 1 -ExpandProperty FullName
+          if (-not $signtool) {
+            throw "signtool.exe non trovato sul runner: verificare che il Windows SDK sia installato."
+          }
+
+          Get-ChildItem -Path publish -Include *.exe,*.dll -Recurse | ForEach-Object {
+            & $signtool sign /f $certPath /p $env:CERT_PASSWORD /fd SHA256 /tr http://timestamp.digicert.com /td SHA256 $_.FullName
+            if ($LASTEXITCODE -ne 0) {
+              throw "Firma fallita per $($_.FullName)"
+            }
+          }
+
+          Remove-Item $certPath -Force
+
+      - name: Create release archive
+        shell: pwsh
+        run: Compress-Archive -Path publish\* -DestinationPath CrmMes.Desktop-win-x64.zip
+
+      - name: Publish GitHub release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: CrmMes.Desktop-win-x64.zip
+          generate_release_notes: true
