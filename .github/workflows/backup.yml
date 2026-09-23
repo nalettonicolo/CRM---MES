@@ -1,0 +1,42 @@
+name: Backup database
+
+# Il piano Neon Free ha solo 6 ore di point-in-time recovery e non supporta gli snapshot
+# programmati (verificato via API: "backup schedule creation is not enabled for this project").
+# Questo workflow è quindi l'unico backup reale oltre quella finestra di 6 ore: un dump logico
+# completo del database di produzione, ogni giorno, conservato come artifact per 90 giorni.
+# Vedi DISASTER-RECOVERY.md per la procedura di ripristino, testata.
+on:
+  schedule:
+    - cron: "0 3 * * *" # ogni giorno alle 03:00 UTC
+  workflow_dispatch: {}
+
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Install PostgreSQL 18 client
+        run: |
+          sudo sh -c 'echo "deb https://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" > /etc/apt/sources.list.d/pgdg.list'
+          curl -fsSL https://www.postgresql.org/media/keys/ACCC4CF8.asc | sudo gpg --dearmor -o /etc/apt/trusted.gpg.d/pgdg.gpg
+          sudo apt-get update
+          sudo apt-get install -y postgresql-client-18
+
+      - name: Dump database
+        env:
+          DATABASE_URL: ${{ secrets.NEON_DATABASE_URL }}
+        run: |
+          if [ -z "$DATABASE_URL" ]; then
+            echo "Il secret NEON_DATABASE_URL non è impostato (Settings > Secrets and variables > Actions)." >&2
+            echo "Usa la connection string Neon della stessa istanza usata da Render/dallo sviluppo locale." >&2
+            exit 1
+          fi
+          FILENAME="crmmes-backup-$(date -u +%Y%m%d-%H%M%S).dump"
+          /usr/lib/postgresql/18/bin/pg_dump "$DATABASE_URL" --format=custom --no-owner --no-privileges -f "$FILENAME"
+          echo "FILENAME=$FILENAME" >> "$GITHUB_ENV"
+
+      - name: Upload backup artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ env.FILENAME }}
+          path: ${{ env.FILENAME }}
+          retention-days: 90
