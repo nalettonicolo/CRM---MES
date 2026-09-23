@@ -30,6 +30,8 @@
         <!-- Persistent operator bar: shown once identified, replaces the gate. -->
         <DockPanel Grid.Row="2" x:Name="OperatorBar" Visibility="Collapsed" Margin="0,4,0,0">
             <Button DockPanel.Dock="Right" Style="{StaticResource SecondaryButton}" Content="Cambia operatore" Width="150" Height="32" Click="ChangeOperator_Click" />
+            <Button DockPanel.Dock="Right" x:Name="SyncNowButton" Style="{StaticResource SecondaryButton}" Content="Sincronizza ora" Width="130" Height="32" Margin="0,0,10,0" Click="SyncNow_Click" Visibility="Collapsed" />
+            <TextBlock x:Name="OfflineStatusText" DockPanel.Dock="Right" VerticalAlignment="Center" Margin="0,0,16,0" FontWeight="SemiBold" />
             <TextBlock Foreground="{StaticResource TextSecondaryBrush}" VerticalAlignment="Center">
                 <Run Text="Operatore:" />
                 <Run x:Name="OperatorNameText" FontWeight="SemiBold" Foreground="{StaticResource TextPrimaryBrush}" />

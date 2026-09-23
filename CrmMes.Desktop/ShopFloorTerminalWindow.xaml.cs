@@ -1,5 +1,8 @@
+using System.Net.Http;
+using System.Text.Json;
 using System.Windows;
 using System.Windows.Input;
+using System.Windows.Threading;
 
 namespace CrmMes.Desktop;
 
@@ -8,20 +11,91 @@ namespace CrmMes.Desktop;
 /// then scans (or types) the work order code printed on the job's <see cref="WorkOrderLabelWindow"/>
 /// label, and starts/completes the next open phase or logs a downtime/non-conformity against it —
 /// without navigating the full office client. A barcode/QR scanner reads as a keyboard (types the
-/// code, then Enter), so this needs no special hardware integration, just a focused text box.</summary>
+/// code, then Enter), so this needs no special hardware integration, just a focused text box.
+///
+/// Starting/completing a phase also works with no connectivity: if the API can't be reached, the
+/// action is queued locally (<see cref="OfflineActionQueue"/>) instead of failing, and replayed
+/// automatically once the connection comes back — the piece of the terminal most likely to run on a
+/// shop-floor PC with a flaky network. Fermi macchina and non conformità (opened from here via their
+/// own windows) aren't wired into the queue yet, only the two direct actions on this screen.</summary>
 public partial class ShopFloorTerminalWindow : Window
 {
     private readonly ApiClient _apiClient;
+    private readonly OfflineActionQueue _offlineQueue;
+    private readonly DispatcherTimer _syncTimer;
     private static readonly StatusToBrushConverter StatusBrush = new();
     private string? _operatorName;
     private WorkOrderDetailDto? _order;
     private WorkOrderOperationDto? _activeOperation;
 
+    private sealed record OperationActionPayload(Guid WorkOrderId, Guid OperationId, string? OperatorName);
+
     public ShopFloorTerminalWindow(ApiClient apiClient)
     {
         InitializeComponent();
         _apiClient = apiClient;
-        Loaded += (_, _) => PinBox.Focus();
+        _offlineQueue = new OfflineActionQueue();
+        _offlineQueue.RegisterHandler("StartOperation", async (json, ct) =>
+        {
+            var payload = JsonSerializer.Deserialize<OperationActionPayload>(json)!;
+            await _apiClient.StartOperationAsync(payload.WorkOrderId, payload.OperationId, payload.OperatorName, ct);
+        });
+        _offlineQueue.RegisterHandler("CompleteOperation", async (json, ct) =>
+        {
+            var payload = JsonSerializer.Deserialize<OperationActionPayload>(json)!;
+            await _apiClient.CompleteOperationAsync(payload.WorkOrderId, payload.OperationId, payload.OperatorName, ct);
+        });
+
+        _syncTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(30) };
+        _syncTimer.Tick += async (_, _) => await TrySyncAsync();
+
+        Loaded += (_, _) =>
+        {
+            PinBox.Focus();
+            UpdateOfflineStatusUi();
+            _syncTimer.Start();
+            _ = TrySyncAsync();
+        };
+        Closed += (_, _) => _syncTimer.Stop();
+    }
+
+    private void UpdateOfflineStatusUi()
+    {
+        if (_offlineQueue.Count == 0)
+        {
+            OfflineStatusText.Text = string.Empty;
+            SyncNowButton.Visibility = Visibility.Collapsed;
+            return;
+        }
+
+        OfflineStatusText.Text = $"⚠ {_offlineQueue.Count} azion{(_offlineQueue.Count == 1 ? "e" : "i")} in coda (offline)";
+        OfflineStatusText.Foreground = (System.Windows.Media.Brush)FindResource("DangerBrush");
+        SyncNowButton.Visibility = Visibility.Visible;
+    }
+
+    private async void SyncNow_Click(object sender, RoutedEventArgs e) => await TrySyncAsync();
+
+    private async Task TrySyncAsync()
+    {
+        if (_offlineQueue.Count == 0)
+        {
+            return;
+        }
+
+        var result = await _offlineQueue.SyncAsync();
+        UpdateOfflineStatusUi();
+
+        if (result.Synced > 0 && _order is not null)
+        {
+            // A queued action for the order currently on screen may have just landed — pull the real
+            // state instead of guessing, same as the immediate (online) path already does.
+            await RefreshAsync();
+        }
+
+        if (result.Rejected.Count > 0)
+        {
+            ErrorText.Text = string.Join(" ", result.Rejected.Select(r => $"{r.Action.Description}: {r.Error}"));
+        }
     }
 
     private async void PinBox_KeyDown(object sender, KeyEventArgs e)
@@ -178,9 +252,10 @@ public partial class ShopFloorTerminalWindow : Window
         }
 
         ErrorText.Text = string.Empty;
+        var isStart = _activeOperation.Status == "Pending";
         try
         {
-            if (_activeOperation.Status == "Pending")
+            if (isStart)
             {
                 await _apiClient.StartOperationAsync(_order.Id, _activeOperation.Id, _operatorName);
             }
@@ -190,6 +265,19 @@ public partial class ShopFloorTerminalWindow : Window
             }
 
             await RefreshAsync();
+        }
+        catch (HttpRequestException)
+        {
+            var kind = isStart ? "StartOperation" : "CompleteOperation";
+            var payload = new OperationActionPayload(_order.Id, _activeOperation.Id, _operatorName);
+            var description = $"{(isStart ? "Avvio" : "Completamento")} fase \"{_activeOperation.Name}\" — {_order.Code}";
+            _offlineQueue.Enqueue(kind, payload, description);
+            UpdateOfflineStatusUi();
+
+            ActiveOperationText.Text = $"Nessuna connessione: azione messa in coda ({description}), verrà sincronizzata automaticamente.";
+            ActionButton.IsEnabled = false;
+            DowntimeButton.IsEnabled = false;
+            NonConformityButton.IsEnabled = false;
         }
         catch (Exception exception)
         {
