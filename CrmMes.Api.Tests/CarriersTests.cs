@@ -58,6 +58,23 @@ public class CarriersTests : IClassFixture<AdminSeededApiTestFixture>
     }
 
     [Fact]
+    public async Task GetCarrierDetail_IncludesItsShipments()
+    {
+        var carrier = await CreateCarrierAsync();
+        var createShipment = await _adminClient.PostAsJsonAsync(
+            "/api/shipments", new { direction = "Outbound", carrierId = carrier.Id, counterpartReference = "Cliente Detail Test" });
+        createShipment.EnsureSuccessStatusCode();
+
+        var response = await _adminClient.GetAsync($"/api/carriers/{carrier.Id}/detail");
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var detail = await response.Content.ReadFromJsonAsync<CarrierDetailResponse>();
+        Assert.Equal(carrier.Name, detail!.Name);
+        Assert.Single(detail.Shipments);
+        Assert.Equal("Cliente Detail Test", detail.Shipments[0].CounterpartReference);
+    }
+
+    [Fact]
     public async Task DeactivateCarrier_RemovesItFromActiveList()
     {
         var carrier = await CreateCarrierAsync();

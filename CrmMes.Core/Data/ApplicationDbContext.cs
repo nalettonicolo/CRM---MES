@@ -67,6 +67,7 @@ public class ApplicationDbContext : DbContext
         {
             entity.Property(s => s.Name).HasMaxLength(200);
             entity.Property(s => s.Code).HasMaxLength(80);
+            entity.Property(s => s.Website).HasMaxLength(500);
             entity.HasIndex(s => s.Code).IsUnique();
         });
 

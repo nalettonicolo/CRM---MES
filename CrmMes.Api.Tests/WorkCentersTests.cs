@@ -127,5 +127,12 @@ public class WorkCentersTests : IClassFixture<AdminSeededApiTestFixture>
         Assert.Equal(150, line.PendingMinutes);
         Assert.Equal(1, line.OpenOperations);
         Assert.Equal(1.5m, line.BacklogDays);
+
+        var detailResponse = await _adminClient.GetAsync($"/api/work-centers/{workCenter.Id}/detail");
+        Assert.Equal(HttpStatusCode.OK, detailResponse.StatusCode);
+        var detail = await detailResponse.Content.ReadFromJsonAsync<WorkCenterDetailResponse>();
+        var pendingOperation = Assert.Single(detail!.PendingOperations);
+        Assert.Equal("Fase 1", pendingOperation.OperationName);
+        Assert.Equal(150, pendingOperation.EstimatedMinutes);
     }
 }

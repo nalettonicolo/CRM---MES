@@ -127,6 +127,33 @@ public class WorkCentersController : ControllerBase
         return NoContent();
     }
 
+    /// <summary>Dettaglio di un centro di lavoro: anagrafica + le fasi aperte (Pending/InProgress su
+    /// commesse Released/InProgress) accodate su di esso, individuate per nome come nel calcolo del
+    /// carico sopra — così si vede esattamente quali commesse stanno aspettando, non solo il totale.</summary>
+    [HttpGet("{id:guid}/detail")]
+    public async Task<ActionResult<WorkCenterDetailResponse>> GetWorkCenterDetail(Guid id, CancellationToken cancellationToken = default)
+    {
+        var workCenter = await _dbContext.WorkCenters.AsNoTracking().SingleOrDefaultAsync(w => w.Id == id, cancellationToken);
+        if (workCenter is null)
+        {
+            return NotFound();
+        }
+
+        var pendingOperations = await _dbContext.WorkOrderOperations.AsNoTracking()
+            .Include(op => op.WorkOrder)
+            .Where(op => OpenOperationStatuses.Contains(op.Status) &&
+                         OpenWorkOrderStatuses.Contains(op.WorkOrder.Status) &&
+                         op.WorkCenter != null && op.WorkCenter.ToLower() == workCenter.Name.ToLower())
+            .OrderBy(op => op.WorkOrder.DueDate)
+            .Select(op => new WorkCenterPendingOperationResponse(
+                op.Id, op.WorkOrder.Code, op.Name, op.SequenceNumber, op.Status, op.EstimatedMinutes, op.WorkOrder.DueDate))
+            .ToListAsync(cancellationToken);
+
+        return Ok(new WorkCenterDetailResponse(
+            workCenter.Id, workCenter.Code, workCenter.Name, workCenter.Description,
+            workCenter.DailyCapacityMinutes, workCenter.IsActive, pendingOperations));
+    }
+
     /// <summary>For each registered work center, the pending minutes from operations still open
     /// (Pending/InProgress) on work orders that are Released or InProgress, matched by name against the
     /// free-text WorkCenter field on the operation. Also lists free-text work centers used on the floor
@@ -194,3 +221,10 @@ public sealed record WorkCenterLoadResponse(
     decimal PendingMinutes,
     int OpenOperations,
     decimal? BacklogDays);
+
+public sealed record WorkCenterPendingOperationResponse(
+    Guid OperationId, string WorkOrderCode, string OperationName, int SequenceNumber, string Status, decimal EstimatedMinutes, DateTime? WorkOrderDueDate);
+
+public sealed record WorkCenterDetailResponse(
+    Guid Id, string Code, string Name, string? Description, decimal DailyCapacityMinutes, bool IsActive,
+    List<WorkCenterPendingOperationResponse> PendingOperations);

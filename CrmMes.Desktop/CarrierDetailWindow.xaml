@@ -1,0 +1,50 @@
+<Window x:Class="CrmMes.Desktop.CarrierDetailWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Dettaglio corriere" Icon="Assets/logo.ico" Height="520" Width="620"
+        WindowStartupLocation="CenterOwner" ResizeMode="CanResize" MinHeight="400" MinWidth="520"
+        Background="{StaticResource BackgroundBrush}">
+    <Grid Margin="24">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+
+        <StackPanel Grid.Row="0">
+            <TextBlock Text="C O R R I E R E" Style="{StaticResource MicroLabel}" Foreground="{StaticResource PrimaryBrush}" />
+            <TextBlock x:Name="CarrierTitleText" Style="{StaticResource EditorialTitle}" FontSize="26" Margin="0,0,0,4" />
+        </StackPanel>
+        <TextBlock Grid.Row="1" x:Name="CarrierInfoText" Foreground="{StaticResource TextSecondaryBrush}" FontSize="12.5" TextWrapping="Wrap" Margin="0,4,0,16" />
+
+        <TextBlock Grid.Row="2" Text="Spedizioni gestite" FontWeight="SemiBold" Foreground="{StaticResource TextPrimaryBrush}" Margin="0,0,0,6" />
+        <Border Grid.Row="3" Style="{StaticResource CardBorder}" Padding="4">
+            <ListView x:Name="ShipmentsList">
+                <ListView.View>
+                    <GridView>
+                        <GridViewColumn Header="Codice" DisplayMemberBinding="{Binding Code}" Width="150" />
+                        <GridViewColumn Header="Direzione" Width="100">
+                            <GridViewColumn.CellTemplate>
+                                <DataTemplate>
+                                    <TextBlock Text="{Binding Direction, Converter={StaticResource StatusToItalianText}}" Foreground="{StaticResource TextSecondaryBrush}" />
+                                </DataTemplate>
+                            </GridViewColumn.CellTemplate>
+                        </GridViewColumn>
+                        <GridViewColumn Header="Stato" Width="130">
+                            <GridViewColumn.CellTemplate>
+                                <DataTemplate>
+                                    <Border Style="{StaticResource Pill}" Background="{Binding Status, Converter={StaticResource StatusToBrush}}">
+                                        <TextBlock Style="{StaticResource PillText}" Text="{Binding Status, Converter={StaticResource StatusToItalianText}}" Foreground="{Binding Status, Converter={StaticResource StatusToBrush}, ConverterParameter=Foreground}" />
+                                    </Border>
+                                </DataTemplate>
+                            </GridViewColumn.CellTemplate>
+                        </GridViewColumn>
+                        <GridViewColumn Header="Tracking" DisplayMemberBinding="{Binding TrackingNumber}" Width="120" />
+                        <GridViewColumn Header="Controparte" DisplayMemberBinding="{Binding CounterpartReference}" Width="160" />
+                    </GridView>
+                </ListView.View>
+            </ListView>
+        </Border>
+    </Grid>
+</Window>

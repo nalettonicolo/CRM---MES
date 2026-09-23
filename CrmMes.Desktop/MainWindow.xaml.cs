@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
@@ -37,6 +38,7 @@ public partial class MainWindow : Window
     private bool _workCentersLoaded;
     private bool _carriersLoaded;
     private bool _shipmentsLoaded;
+    private bool _suppliersLoaded;
 
     private static readonly Dictionary<int, string> PageTitles = new()
     {
@@ -54,6 +56,8 @@ public partial class MainWindow : Window
         [11] = "Centri di lavoro",
         [12] = "Corrieri",
         [13] = "Spedizioni",
+        [14] = "Fornitori",
+        [15] = "Ricerca catalogo",
     };
 
     private static readonly Dictionary<int, string> PageEyebrows = new()
@@ -64,6 +68,8 @@ public partial class MainWindow : Window
         [3] = "M A G A Z Z I N O",
         [9] = "M A G A Z Z I N O",
         [4] = "A C Q U I S T I",
+        [14] = "A C Q U I S T I",
+        [15] = "A C Q U I S T I",
         [7] = "P R O D U Z I O N E",
         [8] = "P R O D U Z I O N E",
         [10] = "P R O D U Z I O N E",
@@ -90,6 +96,8 @@ public partial class MainWindow : Window
         [11] = "Anagrafica dei centri di lavoro (reparti/linee) con la loro capacità produttiva giornaliera in minuti, e il confronto con il carico di lavoro attualmente in attesa su ciascuno. È una stima di arretrato, non una pianificazione a calendario con date precise.",
         [12] = "Anagrafica dei corrieri usati per le spedizioni in ingresso e in uscita.",
         [13] = "Spedizioni in ingresso (es. da un fornitore) e in uscita (es. verso un cliente), collegabili opzionalmente a un ordine fornitore o a una commessa. Ciclo: In preparazione -> Spedita -> Consegnata, oppure Annullata.",
+        [14] = "Anagrafica fornitori. Doppio click su una riga per il dettaglio: ordini d'acquisto e voci di catalogo collegate.",
+        [15] = "Ricerca rapida nel catalogo (materiali collegati a un fornitore con part number/prezzo/lead time), senza dover importare un PDF: utile quando il catalogo del fornitore è il suo sito web.",
     };
 
 #if DEBUG
@@ -340,6 +348,9 @@ public partial class MainWindow : Window
             case "Spedizioni" when !_shipmentsLoaded:
                 await LoadShipmentsAsync();
                 break;
+            case "Fornitori" when !_suppliersLoaded:
+                await LoadSuppliersAsync();
+                break;
         }
     }
 
@@ -513,10 +524,103 @@ public partial class MainWindow : Window
         }
     }
 
-    private void NewSupplierButton_Click(object sender, RoutedEventArgs e)
+    private async void NewSupplierButton_Click(object sender, RoutedEventArgs e)
     {
         var dialog = new CreateSupplierWindow(_apiClient) { Owner = this };
-        dialog.ShowDialog();
+        if (dialog.ShowDialog() == true && dialog.Created && _suppliersLoaded)
+        {
+            await LoadSuppliersAsync();
+        }
+    }
+
+    private async void NewSupplierTabButton_Click(object sender, RoutedEventArgs e)
+    {
+        var dialog = new CreateSupplierWindow(_apiClient) { Owner = this };
+        if (dialog.ShowDialog() == true && dialog.Created)
+        {
+            await LoadSuppliersAsync();
+        }
+    }
+
+    private async void RefreshSuppliersButton_Click(object sender, RoutedEventArgs e) => await LoadSuppliersAsync();
+
+    private void SuppliersList_MouseDoubleClick(object sender, MouseButtonEventArgs e)
+    {
+        if (SuppliersList.SelectedItem is SupplierDto supplier)
+        {
+            var dialog = new SupplierDetailWindow(_apiClient, supplier.Id) { Owner = this };
+            dialog.ShowDialog();
+        }
+    }
+
+    private void AreasList_MouseDoubleClick(object sender, MouseButtonEventArgs e)
+    {
+        if (AreasList.SelectedItem is AreaDto area)
+        {
+            var dialog = new AreaDetailWindow(_apiClient, area.Id) { Owner = this };
+            dialog.ShowDialog();
+        }
+    }
+
+    private void CarriersList_MouseDoubleClick(object sender, MouseButtonEventArgs e)
+    {
+        if (CarriersList.SelectedItem is CarrierDto carrier)
+        {
+            var dialog = new CarrierDetailWindow(_apiClient, carrier.Id) { Owner = this };
+            dialog.ShowDialog();
+        }
+    }
+
+    private void WorkCentersList_MouseDoubleClick(object sender, MouseButtonEventArgs e)
+    {
+        if (WorkCentersList.SelectedItem is WorkCenterDto workCenter)
+        {
+            var dialog = new WorkCenterDetailWindow(_apiClient, workCenter.Id) { Owner = this };
+            dialog.ShowDialog();
+        }
+    }
+
+    private async void SearchCatalog_Click(object sender, RoutedEventArgs e) => await RunCatalogSearchAsync();
+
+    private async void CatalogSearchBox_KeyDown(object sender, KeyEventArgs e)
+    {
+        if (e.Key == Key.Enter)
+        {
+            await RunCatalogSearchAsync();
+        }
+    }
+
+    private async Task RunCatalogSearchAsync()
+    {
+        var query = CatalogSearchBox.Text.Trim();
+        if (string.IsNullOrWhiteSpace(query))
+        {
+            return;
+        }
+
+        await RunBusyAsync("Ricerca in corso...", async () =>
+        {
+            CatalogSearchResultsList.ItemsSource = await _apiClient.SearchCatalogAsync(query);
+        });
+    }
+
+    private void OpenCatalogResultWebsite_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is not Button { Tag: CatalogSearchResultDto result } || string.IsNullOrWhiteSpace(result.SupplierWebsite))
+        {
+            MessageBox.Show("Questo fornitore non ha un sito web registrato. Puoi aggiungerlo dalla scheda Fornitori.", "Nessun sito", MessageBoxButton.OK, MessageBoxImage.Information);
+            return;
+        }
+
+        try
+        {
+            var url = result.SupplierWebsite.Contains("://") ? result.SupplierWebsite : $"https://{result.SupplierWebsite}";
+            Process.Start(new ProcessStartInfo(url) { UseShellExecute = true });
+        }
+        catch (Exception exception)
+        {
+            MessageBox.Show($"Impossibile aprire il link: {exception.Message}", "Errore", MessageBoxButton.OK, MessageBoxImage.Warning);
+        }
     }
 
     private async void NewAreaButton_Click(object sender, RoutedEventArgs e)
@@ -1259,6 +1363,12 @@ public partial class MainWindow : Window
     {
         CarriersList.ItemsSource = await _apiClient.GetCarriersAsync(activeOnly: false);
         _carriersLoaded = true;
+    });
+
+    private Task LoadSuppliersAsync() => RunBusyAsync(string.Empty, async () =>
+    {
+        SuppliersList.ItemsSource = await _apiClient.GetSuppliersAsync();
+        _suppliersLoaded = true;
     });
 
     private Task LoadShipmentsAsync() => RunBusyAsync(string.Empty, async () =>

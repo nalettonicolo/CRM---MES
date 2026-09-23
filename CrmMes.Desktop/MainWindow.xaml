@@ -130,6 +130,18 @@
                                             <TextBlock Text="Ordini fornitore" Margin="6,0,0,0" />
                                         </StackPanel>
                                     </RadioButton>
+                                    <RadioButton x:Name="NavSuppliers" Style="{StaticResource NavItem}" GroupName="Nav" Tag="14" Checked="NavItem_Checked">
+                                        <StackPanel Orientation="Horizontal">
+                                            <TextBlock Text="&#xE719;" FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets" FontSize="16" Width="24" />
+                                            <TextBlock Text="Fornitori" Margin="6,0,0,0" />
+                                        </StackPanel>
+                                    </RadioButton>
+                                    <RadioButton x:Name="NavCatalogSearch" Style="{StaticResource NavItem}" GroupName="Nav" Tag="15" Checked="NavItem_Checked">
+                                        <StackPanel Orientation="Horizontal">
+                                            <TextBlock Text="&#xE721;" FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets" FontSize="16" Width="24" />
+                                            <TextBlock Text="Ricerca catalogo" Margin="6,0,0,0" />
+                                        </StackPanel>
+                                    </RadioButton>
                                 </StackPanel>
                             </Expander>
 
@@ -448,7 +460,7 @@
                                     <TextBlock Text="Aree aziendali" VerticalAlignment="Center" Foreground="{StaticResource TextSecondaryBrush}" />
                                 </DockPanel>
                                 <Border Grid.Row="1" Style="{StaticResource CardBorder}" Padding="4">
-                                    <ListView x:Name="AreasList">
+                                    <ListView x:Name="AreasList" MouseDoubleClick="AreasList_MouseDoubleClick">
                                         <ListView.View>
                                             <GridView>
                                                 <GridViewColumn Header="Codice" DisplayMemberBinding="{Binding Code}" Width="140" />
@@ -701,7 +713,7 @@
                                 <TextBlock Grid.Row="1" x:Name="WorkCenterErrorText" Foreground="{StaticResource DangerBrush}" TextWrapping="Wrap" Margin="0,0,0,8" />
 
                                 <Border Grid.Row="2" Style="{StaticResource CardBorder}" Padding="4" MinHeight="110">
-                                    <ListView x:Name="WorkCentersList">
+                                    <ListView x:Name="WorkCentersList" MouseDoubleClick="WorkCentersList_MouseDoubleClick">
                                         <ListView.View>
                                             <GridView>
                                                 <GridViewColumn Header="Codice" DisplayMemberBinding="{Binding Code}" Width="120" />
@@ -753,7 +765,7 @@
                                     <TextBlock Text="Corrieri per le spedizioni in ingresso e in uscita" VerticalAlignment="Center" Foreground="{StaticResource TextSecondaryBrush}" />
                                 </DockPanel>
                                 <Border Grid.Row="1" Style="{StaticResource CardBorder}" Padding="4">
-                                    <ListView x:Name="CarriersList">
+                                    <ListView x:Name="CarriersList" MouseDoubleClick="CarriersList_MouseDoubleClick">
                                         <ListView.View>
                                             <GridView>
                                                 <GridViewColumn Header="Codice" DisplayMemberBinding="{Binding Code}" Width="140" />
@@ -836,6 +848,76 @@
                                     <Button x:Name="DeliverShipmentButton" Content="Segna come consegnata" Width="170" Height="36" Margin="0,0,10,0" Click="DeliverShipmentButton_Click" IsEnabled="False" />
                                     <Button x:Name="CancelShipmentButton" Style="{StaticResource DangerButton}" Content="Annulla selezionata" Width="160" Height="36" Click="CancelShipmentButton_Click" IsEnabled="False" />
                                 </StackPanel>
+                            </Grid>
+                        </TabItem>
+
+                        <TabItem Header="Fornitori">
+                            <Grid>
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto" />
+                                    <RowDefinition Height="*" />
+                                </Grid.RowDefinitions>
+                                <DockPanel Grid.Row="0" Margin="0,0,0,14">
+                                    <Button DockPanel.Dock="Right" Content="Nuovo fornitore" Width="140" Height="36" Click="NewSupplierTabButton_Click" />
+                                    <Button DockPanel.Dock="Right" Style="{StaticResource SecondaryButton}" Content="Aggiorna" Width="100" Height="36" Margin="0,0,10,0" Click="RefreshSuppliersButton_Click" />
+                                    <TextBlock Text="Anagrafica fornitori — doppio click per il dettaglio (ordini e catalogo)" VerticalAlignment="Center" Foreground="{StaticResource TextSecondaryBrush}" />
+                                </DockPanel>
+                                <Border Grid.Row="1" Style="{StaticResource CardBorder}" Padding="4">
+                                    <ListView x:Name="SuppliersList" MouseDoubleClick="SuppliersList_MouseDoubleClick">
+                                        <ListView.View>
+                                            <GridView>
+                                                <GridViewColumn Header="Codice" DisplayMemberBinding="{Binding Code}" Width="120" />
+                                                <GridViewColumn Header="Nome" DisplayMemberBinding="{Binding Name}" Width="220" />
+                                                <GridViewColumn Header="Email" DisplayMemberBinding="{Binding Email}" Width="180" />
+                                                <GridViewColumn Header="Sito web" DisplayMemberBinding="{Binding Website}" Width="200" />
+                                                <GridViewColumn Header="Attivo" Width="90">
+                                                    <GridViewColumn.CellTemplate>
+                                                        <DataTemplate>
+                                                            <Border Style="{StaticResource Pill}" Background="{Binding IsActive, Converter={StaticResource BoolToBrush}}">
+                                                                <TextBlock Style="{StaticResource PillText}" Text="{Binding IsActive, Converter={StaticResource BoolToText}, ConverterParameter=Attivo|Inattivo}" Foreground="{Binding IsActive, Converter={StaticResource BoolToBrush}, ConverterParameter=Foreground}" />
+                                                            </Border>
+                                                        </DataTemplate>
+                                                    </GridViewColumn.CellTemplate>
+                                                </GridViewColumn>
+                                            </GridView>
+                                        </ListView.View>
+                                    </ListView>
+                                </Border>
+                            </Grid>
+                        </TabItem>
+
+                        <TabItem Header="Ricerca catalogo">
+                            <Grid>
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto" />
+                                    <RowDefinition Height="*" />
+                                </Grid.RowDefinitions>
+                                <DockPanel Grid.Row="0" Margin="0,0,0,14">
+                                    <Button DockPanel.Dock="Right" Content="Cerca" Width="100" Height="36" Click="SearchCatalog_Click" />
+                                    <TextBox x:Name="CatalogSearchBox" DockPanel.Dock="Right" Width="280" Margin="0,0,10,0" Tag="Codice, descrizione o part number" KeyDown="CatalogSearchBox_KeyDown" />
+                                    <TextBlock Text="Ricerca rapida nel catalogo importato, senza bisogno di un PDF — se un fornitore non ha voci qui, apri il suo sito dalla scheda Fornitori" VerticalAlignment="Center" Foreground="{StaticResource TextSecondaryBrush}" TextWrapping="Wrap" />
+                                </DockPanel>
+                                <Border Grid.Row="1" Style="{StaticResource CardBorder}" Padding="4">
+                                    <ListView x:Name="CatalogSearchResultsList">
+                                        <ListView.View>
+                                            <GridView>
+                                                <GridViewColumn Header="Materiale" DisplayMemberBinding="{Binding MaterialCode}" Width="100" />
+                                                <GridViewColumn Header="Descrizione" DisplayMemberBinding="{Binding MaterialName}" Width="180" />
+                                                <GridViewColumn Header="Fornitore" DisplayMemberBinding="{Binding SupplierName}" Width="150" />
+                                                <GridViewColumn Header="Part number" DisplayMemberBinding="{Binding PartNumber}" Width="120" />
+                                                <GridViewColumn Header="Prezzo" DisplayMemberBinding="{Binding UnitPrice}" Width="80" />
+                                                <GridViewColumn Header="Lead time (gg)" DisplayMemberBinding="{Binding LeadTimeDays}" Width="100" />
+                                                <GridViewColumn Header="" Width="110">
+                                                    <GridViewColumn.CellTemplate>
+                                                        <DataTemplate>
+                                                            <Button Content="Apri sito ↗" Style="{StaticResource SecondaryButton}" Height="26" Click="OpenCatalogResultWebsite_Click" Tag="{Binding}" />
+                                                        </DataTemplate>
+                                                    </GridViewColumn.CellTemplate>
+                                                </GridViewColumn>
+                                            </GridView>
+                                        </ListView.View>
+                                    </ListView>
+                                </Border>
                             </Grid>
                         </TabItem>
 

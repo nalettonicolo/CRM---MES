@@ -71,6 +71,28 @@ public class CarriersController : ControllerBase
         return Created($"api/carriers/{carrier.Id}", response);
     }
 
+    /// <summary>Dettaglio corriere in una sola chiamata: anagrafica + tutte le spedizioni gestite,
+    /// invece di caricare l'intera lista spedizioni e filtrarla lato client.</summary>
+    [HttpGet("{id:guid}/detail")]
+    public async Task<ActionResult<CarrierDetailResponse>> GetCarrierDetail(Guid id, CancellationToken cancellationToken = default)
+    {
+        var carrier = await _dbContext.Carriers.AsNoTracking().SingleOrDefaultAsync(c => c.Id == id, cancellationToken);
+        if (carrier is null)
+        {
+            return NotFound();
+        }
+
+        var shipments = await _dbContext.Shipments.AsNoTracking()
+            .Where(shipment => shipment.CarrierId == id)
+            .OrderByDescending(shipment => shipment.CreatedAt)
+            .Select(shipment => new CarrierShipmentResponse(
+                shipment.Id, shipment.Code, shipment.Direction, shipment.Status,
+                shipment.TrackingNumber, shipment.CounterpartReference, shipment.CreatedAt))
+            .ToListAsync(cancellationToken);
+
+        return Ok(new CarrierDetailResponse(carrier.Id, carrier.Name, carrier.Code, carrier.Email, carrier.Phone, carrier.IsActive, shipments));
+    }
+
     [Authorize(Policy = "Warehouse")]
     [HttpDelete("{id:guid}")]
     public async Task<IActionResult> DeactivateCarrier(Guid id, CancellationToken cancellationToken = default)
@@ -90,3 +112,9 @@ public class CarriersController : ControllerBase
 public sealed record CarrierResponse(Guid Id, string Name, string Code, string? Email, string? Phone, bool IsActive);
 
 public sealed record CreateCarrierRequest(string? Name, string? Code, string? Email, string? Phone);
+
+public sealed record CarrierShipmentResponse(
+    Guid Id, string Code, string Direction, string Status, string? TrackingNumber, string? CounterpartReference, DateTime CreatedAt);
+
+public sealed record CarrierDetailResponse(
+    Guid Id, string Name, string Code, string? Email, string? Phone, bool IsActive, List<CarrierShipmentResponse> Shipments);

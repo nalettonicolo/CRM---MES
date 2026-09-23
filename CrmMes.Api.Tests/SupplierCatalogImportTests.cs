@@ -46,6 +46,10 @@ public class SupplierCatalogImportTests : IClassFixture<AdminSeededApiTestFixtur
 
         var searchResponse = await _adminClient.GetFromJsonAsync<List<object>>($"/api/supplier-catalog/search?q=PN-{suffix}");
         Assert.Single(searchResponse!);
+
+        var upperCaseSearchResponse = await _adminClient.GetFromJsonAsync<List<CatalogSearchResultResponse>>(
+            $"/api/supplier-catalog/search?q={Uri.EscapeDataString($"MATERIALE CSV")}");
+        Assert.Contains(upperCaseSearchResponse!, result => result.PartNumber == $"PN-{suffix}");
     }
 
     [Fact]

@@ -5,7 +5,7 @@
         WindowStartupLocation="CenterOwner" ResizeMode="NoResize"
         Background="{StaticResource BackgroundBrush}">
     <StackPanel Margin="24">
-        <TextBlock Text="Nuovo fornitore" FontSize="18" FontWeight="SemiBold" Foreground="{StaticResource TextPrimaryBrush}" Margin="0,0,0,18" />
+        <TextBlock x:Name="TitleText" Text="Nuovo fornitore" FontSize="18" FontWeight="SemiBold" Foreground="{StaticResource TextPrimaryBrush}" Margin="0,0,0,18" />
 
         <TextBlock Text="Nome" Foreground="{StaticResource TextSecondaryBrush}" FontSize="12.5" Margin="0,0,0,5" />
         <TextBox x:Name="NameBox" Margin="0,0,0,14" />
@@ -18,6 +18,9 @@
 
         <TextBlock Text="Telefono (opzionale)" Foreground="{StaticResource TextSecondaryBrush}" FontSize="12.5" Margin="0,0,0,5" />
         <TextBox x:Name="PhoneBox" Margin="0,0,0,14" />
+
+        <TextBlock Text="Sito web / catalogo online (opzionale, utile quando non c'è un PDF da importare)" Foreground="{StaticResource TextSecondaryBrush}" FontSize="12.5" Margin="0,0,0,5" />
+        <TextBox x:Name="WebsiteBox" Margin="0,0,0,14" />
 
         <TextBlock x:Name="ErrorText" Foreground="{StaticResource DangerBrush}" TextWrapping="Wrap" Margin="0,0,0,10" />
 

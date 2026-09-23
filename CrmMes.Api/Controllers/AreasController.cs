@@ -24,6 +24,56 @@ public class AreasController : ControllerBase
         return Ok(await _dbContext.Areas.AsNoTracking().OrderBy(area => area.Name).ToListAsync(cancellationToken));
     }
 
+    /// <summary>Tutto ciò che serve per la schermata di dettaglio di un'area in una sola chiamata
+    /// (utenti assegnati, commesse destinate qui, distinte di prelievo verso quest'area) invece di tre
+    /// andata/ritorno separate.</summary>
+    [HttpGet("{id:guid}/detail")]
+    public async Task<ActionResult<AreaDetailResponse>> GetAreaDetail(Guid id, CancellationToken cancellationToken = default)
+    {
+        var area = await _dbContext.Areas.AsNoTracking()
+            .Include(a => a.Users)
+            .SingleOrDefaultAsync(a => a.Id == id, cancellationToken);
+        if (area is null)
+        {
+            return NotFound();
+        }
+
+        var workOrders = await _dbContext.WorkOrders.AsNoTracking()
+            .Where(order => order.AreaId == id)
+            .OrderByDescending(order => order.CreatedAt)
+            .Select(order => new AreaWorkOrderResponse(order.Id, order.Code, order.Status, order.DueDate))
+            .ToListAsync(cancellationToken);
+
+        var withdrawalSlips = await _dbContext.WithdrawalSlips.AsNoTracking()
+            .Where(slip => slip.AreaId == id)
+            .OrderByDescending(slip => slip.CreatedAt)
+            .Select(slip => new AreaWithdrawalSlipResponse(slip.Id, slip.Code, slip.Status, slip.CreatedAt))
+            .ToListAsync(cancellationToken);
+
+        var users = area.Users
+            .OrderBy(user => user.Name)
+            .Select(user => new AreaUserResponse(user.Id, user.Name, user.Email, user.Role))
+            .ToList();
+
+        return Ok(new AreaDetailResponse(area.Id, area.Name, area.Code, area.IsActive, users, workOrders, withdrawalSlips));
+    }
+
+    [Authorize(Policy = "AdminOnly")]
+    [HttpDelete("{areaId:guid}/users/{userId:guid}")]
+    public async Task<IActionResult> UnassignUser(Guid areaId, Guid userId, CancellationToken cancellationToken = default)
+    {
+        var area = await _dbContext.Areas.Include(a => a.Users).SingleOrDefaultAsync(item => item.Id == areaId, cancellationToken);
+        var user = area?.Users.SingleOrDefault(candidate => candidate.Id == userId);
+        if (area is null || user is null)
+        {
+            return NotFound();
+        }
+
+        area.Users.Remove(user);
+        await _dbContext.SaveChangesAsync(cancellationToken);
+        return NoContent();
+    }
+
     [Authorize(Policy = "AdminOnly")]
     [HttpPost]
     public async Task<ActionResult<Area>> CreateArea(
@@ -74,3 +124,18 @@ public class AreasController : ControllerBase
 }
 
 public sealed record CreateAreaRequest(string? Name, string? Code);
+
+public sealed record AreaUserResponse(Guid Id, string Name, string Email, string Role);
+
+public sealed record AreaWorkOrderResponse(Guid Id, string Code, string Status, DateTime? DueDate);
+
+public sealed record AreaWithdrawalSlipResponse(Guid Id, string Code, string Status, DateTime CreatedAt);
+
+public sealed record AreaDetailResponse(
+    Guid Id,
+    string Name,
+    string Code,
+    bool IsActive,
+    List<AreaUserResponse> Users,
+    List<AreaWorkOrderResponse> WorkOrders,
+    List<AreaWithdrawalSlipResponse> WithdrawalSlips);

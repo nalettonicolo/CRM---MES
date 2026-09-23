@@ -1,0 +1,43 @@
+<Window x:Class="CrmMes.Desktop.WorkCenterDetailWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Dettaglio centro di lavoro" Icon="Assets/logo.ico" Height="560" Width="680"
+        WindowStartupLocation="CenterOwner" ResizeMode="CanResize" MinHeight="420" MinWidth="560"
+        Background="{StaticResource BackgroundBrush}">
+    <Grid Margin="24">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+
+        <StackPanel Grid.Row="0">
+            <TextBlock Text="C E N T R O   D I   L A V O R O" Style="{StaticResource MicroLabel}" Foreground="{StaticResource PrimaryBrush}" />
+            <TextBlock x:Name="CenterTitleText" Style="{StaticResource EditorialTitle}" FontSize="26" Margin="0,0,0,4" />
+        </StackPanel>
+        <TextBlock Grid.Row="1" x:Name="CenterInfoText" Foreground="{StaticResource TextSecondaryBrush}" FontSize="12.5" TextWrapping="Wrap" Margin="0,4,0,16" />
+
+        <TextBlock Grid.Row="2" Text="Fasi in coda (Pending/In corso, su commesse rilasciate)" FontWeight="SemiBold" Foreground="{StaticResource TextPrimaryBrush}" Margin="0,0,0,6" />
+        <Border Grid.Row="3" Style="{StaticResource CardBorder}" Padding="4">
+            <ListView x:Name="OperationsList">
+                <ListView.View>
+                    <GridView>
+                        <GridViewColumn Header="Commessa" DisplayMemberBinding="{Binding WorkOrderCode}" Width="140" />
+                        <GridViewColumn Header="#" DisplayMemberBinding="{Binding SequenceNumber}" Width="35" />
+                        <GridViewColumn Header="Fase" DisplayMemberBinding="{Binding OperationName}" Width="180" />
+                        <GridViewColumn Header="Stato" Width="110">
+                            <GridViewColumn.CellTemplate>
+                                <DataTemplate>
+                                    <TextBlock Text="{Binding Status, Converter={StaticResource StatusToItalianText}}" Foreground="{Binding Status, Converter={StaticResource StatusToBrush}, ConverterParameter=Foreground}" />
+                                </DataTemplate>
+                            </GridViewColumn.CellTemplate>
+                        </GridViewColumn>
+                        <GridViewColumn Header="Minuti stimati" DisplayMemberBinding="{Binding EstimatedMinutes}" Width="100" />
+                        <GridViewColumn Header="Scadenza" DisplayMemberBinding="{Binding WorkOrderDueDate}" Width="110" />
+                    </GridView>
+                </ListView.View>
+            </ListView>
+        </Border>
+    </Grid>
+</Window>

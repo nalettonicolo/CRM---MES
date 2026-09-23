@@ -5,13 +5,35 @@ namespace CrmMes.Desktop;
 public partial class CreateSupplierWindow : Window
 {
     private readonly ApiClient _apiClient;
+    private readonly Guid? _editingSupplierId;
 
     public bool Created { get; private set; }
 
-    public CreateSupplierWindow(ApiClient apiClient)
+    /// <summary>Creation mode.</summary>
+    public CreateSupplierWindow(ApiClient apiClient) : this(apiClient, existing: null)
+    {
+    }
+
+    /// <summary>Edit mode: pre-fills i campi modificabili; il codice non è modificabile dopo la
+    /// creazione (identifica il fornitore in cataloghi/ordini già registrati).</summary>
+    public CreateSupplierWindow(ApiClient apiClient, SupplierDetailDto? existing)
     {
         InitializeComponent();
         _apiClient = apiClient;
+
+        if (existing is not null)
+        {
+            _editingSupplierId = existing.Id;
+            Title = $"Modifica fornitore {existing.Code}";
+            TitleText.Text = $"Modifica fornitore {existing.Code}";
+            CreateButton.Content = "Salva modifiche";
+            NameBox.Text = existing.Name;
+            CodeBox.Text = existing.Code;
+            CodeBox.IsEnabled = false;
+            EmailBox.Text = existing.Email;
+            PhoneBox.Text = existing.Phone;
+            WebsiteBox.Text = existing.Website;
+        }
     }
 
     private async void Create_Click(object sender, RoutedEventArgs e)
@@ -28,7 +50,15 @@ public partial class CreateSupplierWindow : Window
         CreateButton.IsEnabled = false;
         try
         {
-            await _apiClient.CreateSupplierAsync(name, code, EmailBox.Text, PhoneBox.Text);
+            if (_editingSupplierId is Guid supplierId)
+            {
+                await _apiClient.EditSupplierAsync(supplierId, name, EmailBox.Text, PhoneBox.Text, WebsiteBox.Text);
+            }
+            else
+            {
+                await _apiClient.CreateSupplierAsync(name, code, EmailBox.Text, PhoneBox.Text, WebsiteBox.Text);
+            }
+
             Created = true;
             Close();
         }

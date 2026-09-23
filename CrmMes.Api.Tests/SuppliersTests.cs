@@ -42,6 +42,26 @@ public class SuppliersTests : IClassFixture<AdminSeededApiTestFixture>
     }
 
     [Fact]
+    public async Task EditSupplier_UpdatesWebsite_ThenDetailReflectsIt()
+    {
+        var code = $"WEB-{Guid.NewGuid():N}";
+        var createResponse = await _adminClient.PostAsJsonAsync(
+            "/api/suppliers", new CreateSupplierRequest("Fornitore Web", code, null, null));
+        var created = (await createResponse.Content.ReadFromJsonAsync<SupplierResponse>())!;
+
+        var editResponse = await _adminClient.PutAsJsonAsync(
+            $"/api/suppliers/{created.Id}", new EditSupplierRequest("Fornitore Web", null, null, "https://esempio-fornitore.test"));
+        Assert.Equal(HttpStatusCode.OK, editResponse.StatusCode);
+
+        var detailResponse = await _adminClient.GetAsync($"/api/suppliers/{created.Id}/detail");
+        var detail = await detailResponse.Content.ReadFromJsonAsync<SupplierDetailResponse>();
+
+        Assert.Equal("https://esempio-fornitore.test", detail!.Website);
+        Assert.Empty(detail.PurchaseOrders);
+        Assert.Empty(detail.CatalogEntries);
+    }
+
+    [Fact]
     public async Task CreateSupplier_AsOperator_ReturnsForbidden()
     {
         var operatorAuth = await TestAuth.CreateUserWithRoleAsync(_fixture.Factory, _fixture.Admin.Token, "Operator", "sup-op");

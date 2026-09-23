@@ -35,28 +35,28 @@ public class SupplierCatalogController : ControllerBase
             return BadRequest(new { message = "Il parametro q è obbligatorio." });
         }
 
-        var search = q.Trim();
+        var search = q.Trim().ToLower();
         var results = await _dbContext.MaterialSuppliers
             .AsNoTracking()
             .Include(item => item.Material)
             .Include(item => item.Supplier)
-            .Where(item => item.PartNumber.Contains(search) ||
-                          item.Description != null && item.Description.Contains(search) ||
-                          item.Material.Code.Contains(search) ||
-                          item.Material.Name.Contains(search))
+            .Where(item => item.PartNumber.ToLower().Contains(search) ||
+                          item.Description != null && item.Description.ToLower().Contains(search) ||
+                          item.Material.Code.ToLower().Contains(search) ||
+                          item.Material.Name.ToLower().Contains(search))
             .OrderBy(item => item.Material.Code)
             .Take(100)
-            .Select(item => new
-            {
+            .Select(item => new CatalogSearchResultResponse(
                 item.Material.Code,
-                MaterialName = item.Material.Name,
-                Supplier = item.Supplier.Name,
-                SupplierCode = item.Supplier.Code,
+                item.Material.Name,
+                item.Supplier.Id,
+                item.Supplier.Name,
+                item.Supplier.Code,
+                item.Supplier.Website,
                 item.PartNumber,
                 item.Description,
                 item.UnitPrice,
-                item.LeadTimeDays
-            })
+                item.LeadTimeDays))
             .ToListAsync(cancellationToken);
 
         return Ok(results);
@@ -417,3 +417,15 @@ public class SupplierCatalogController : ControllerBase
 }
 
 public sealed record ImportSummary(int Imported, int CreatedMaterials, int CreatedLinks);
+
+public sealed record CatalogSearchResultResponse(
+    string MaterialCode,
+    string MaterialName,
+    Guid SupplierId,
+    string SupplierName,
+    string SupplierCode,
+    string? SupplierWebsite,
+    string PartNumber,
+    string? Description,
+    decimal UnitPrice,
+    decimal LeadTimeDays);

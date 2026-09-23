@@ -244,14 +244,67 @@ public sealed class ApiClient
     public Task<IReadOnlyList<AreaDto>> GetAreasAsync(CancellationToken cancellationToken = default)
         => GetAsync<AreaDto>("api/areas", cancellationToken);
 
+    public async Task<AreaDetailDto> GetAreaDetailAsync(Guid id, CancellationToken cancellationToken = default)
+    {
+        using var response = await _httpClient.GetAsync($"api/areas/{id}/detail", cancellationToken);
+        await EnsureSuccessAsync(response, cancellationToken);
+        return await response.Content.ReadFromJsonAsync<AreaDetailDto>(cancellationToken: cancellationToken)
+            ?? throw new InvalidOperationException("Risposta dettaglio area non valida.");
+    }
+
+    public async Task AssignUserToAreaAsync(Guid areaId, Guid userId, CancellationToken cancellationToken = default)
+    {
+        using var response = await _httpClient.PostAsync($"api/areas/{areaId}/users/{userId}", null, cancellationToken);
+        await EnsureSuccessAsync(response, cancellationToken);
+    }
+
+    public async Task UnassignUserFromAreaAsync(Guid areaId, Guid userId, CancellationToken cancellationToken = default)
+    {
+        using var response = await _httpClient.DeleteAsync($"api/areas/{areaId}/users/{userId}", cancellationToken);
+        await EnsureSuccessAsync(response, cancellationToken);
+    }
+
     public Task<IReadOnlyList<UserRowDto>> GetUsersAsync(CancellationToken cancellationToken = default)
         => GetAsync<UserRowDto>("api/users", cancellationToken);
 
     public Task<IReadOnlyList<SupplierDto>> GetSuppliersAsync(CancellationToken cancellationToken = default)
         => GetAsync<SupplierDto>("api/suppliers", cancellationToken);
 
+    public async Task<SupplierDetailDto> GetSupplierDetailAsync(Guid id, CancellationToken cancellationToken = default)
+    {
+        using var response = await _httpClient.GetAsync($"api/suppliers/{id}/detail", cancellationToken);
+        await EnsureSuccessAsync(response, cancellationToken);
+        return await response.Content.ReadFromJsonAsync<SupplierDetailDto>(cancellationToken: cancellationToken)
+            ?? throw new InvalidOperationException("Risposta dettaglio fornitore non valida.");
+    }
+
+    public async Task EditSupplierAsync(Guid id, string name, string? email, string? phone, string? website, CancellationToken cancellationToken = default)
+    {
+        using var response = await _httpClient.PutAsJsonAsync($"api/suppliers/{id}", new { name, email, phone, website }, cancellationToken);
+        await EnsureSuccessAsync(response, cancellationToken);
+    }
+
+    public Task<IReadOnlyList<CatalogSearchResultDto>> SearchCatalogAsync(string query, CancellationToken cancellationToken = default)
+        => GetAsync<CatalogSearchResultDto>($"api/supplier-catalog/search?q={Uri.EscapeDataString(query)}", cancellationToken);
+
     public Task<IReadOnlyList<CarrierDto>> GetCarriersAsync(bool activeOnly = true, CancellationToken cancellationToken = default)
         => GetAsync<CarrierDto>($"api/carriers?activeOnly={activeOnly}", cancellationToken);
+
+    public async Task<CarrierDetailDto> GetCarrierDetailAsync(Guid id, CancellationToken cancellationToken = default)
+    {
+        using var response = await _httpClient.GetAsync($"api/carriers/{id}/detail", cancellationToken);
+        await EnsureSuccessAsync(response, cancellationToken);
+        return await response.Content.ReadFromJsonAsync<CarrierDetailDto>(cancellationToken: cancellationToken)
+            ?? throw new InvalidOperationException("Risposta dettaglio corriere non valida.");
+    }
+
+    public async Task<WorkCenterDetailDto> GetWorkCenterDetailAsync(Guid id, CancellationToken cancellationToken = default)
+    {
+        using var response = await _httpClient.GetAsync($"api/work-centers/{id}/detail", cancellationToken);
+        await EnsureSuccessAsync(response, cancellationToken);
+        return await response.Content.ReadFromJsonAsync<WorkCenterDetailDto>(cancellationToken: cancellationToken)
+            ?? throw new InvalidOperationException("Risposta dettaglio centro di lavoro non valida.");
+    }
 
     public async Task CreateCarrierAsync(string name, string code, string? email, string? phone, CancellationToken cancellationToken = default)
     {
@@ -445,11 +498,11 @@ public sealed class ApiClient
         await EnsureSuccessAsync(response, cancellationToken);
     }
 
-    public async Task CreateSupplierAsync(string name, string code, string? email, string? phone, CancellationToken cancellationToken = default)
+    public async Task CreateSupplierAsync(string name, string code, string? email, string? phone, string? website = null, CancellationToken cancellationToken = default)
     {
         using var response = await _httpClient.PostAsJsonAsync(
             "api/suppliers",
-            new { name, code, email, phone },
+            new { name, code, email, phone, website },
             cancellationToken);
         await EnsureSuccessAsync(response, cancellationToken);
     }
@@ -960,9 +1013,42 @@ public sealed record WorkCenterLoadDto(
 
 public sealed record UserRowDto(Guid Id, string Name, string Email, string Role, bool IsActive, DateTime CreatedAt);
 
-public sealed record SupplierDto(Guid Id, string Name, string Code, string? Email, string? Phone, bool IsActive);
+public sealed record SupplierDto(Guid Id, string Name, string Code, string? Email, string? Phone, string? Website, bool IsActive);
+
+public sealed record SupplierPurchaseOrderDto(Guid Id, string Code, string Status, DateTime CreatedAt);
+
+public sealed record SupplierCatalogEntryDto(string MaterialCode, string MaterialName, string PartNumber, string? Description, decimal UnitPrice, decimal LeadTimeDays);
+
+public sealed record SupplierDetailDto(
+    Guid Id, string Name, string Code, string? Email, string? Phone, string? Website, bool IsActive,
+    List<SupplierPurchaseOrderDto> PurchaseOrders, List<SupplierCatalogEntryDto> CatalogEntries);
+
+public sealed record CatalogSearchResultDto(
+    string MaterialCode, string MaterialName, Guid SupplierId, string SupplierName, string SupplierCode,
+    string? SupplierWebsite, string PartNumber, string? Description, decimal UnitPrice, decimal LeadTimeDays);
 
 public sealed record CarrierDto(Guid Id, string Name, string Code, string? Email, string? Phone, bool IsActive);
+
+public sealed record CarrierShipmentDto(Guid Id, string Code, string Direction, string Status, string? TrackingNumber, string? CounterpartReference, DateTime CreatedAt);
+
+public sealed record CarrierDetailDto(Guid Id, string Name, string Code, string? Email, string? Phone, bool IsActive, List<CarrierShipmentDto> Shipments);
+
+public sealed record AreaUserDto(Guid Id, string Name, string Email, string Role);
+
+public sealed record AreaWorkOrderDto(Guid Id, string Code, string Status, DateTime? DueDate);
+
+public sealed record AreaWithdrawalSlipDto(Guid Id, string Code, string Status, DateTime CreatedAt);
+
+public sealed record AreaDetailDto(
+    Guid Id, string Name, string Code, bool IsActive,
+    List<AreaUserDto> Users, List<AreaWorkOrderDto> WorkOrders, List<AreaWithdrawalSlipDto> WithdrawalSlips);
+
+public sealed record WorkCenterPendingOperationDto(
+    Guid OperationId, string WorkOrderCode, string OperationName, int SequenceNumber, string Status, decimal EstimatedMinutes, DateTime? WorkOrderDueDate);
+
+public sealed record WorkCenterDetailDto(
+    Guid Id, string Code, string Name, string? Description, decimal DailyCapacityMinutes, bool IsActive,
+    List<WorkCenterPendingOperationDto> PendingOperations);
 
 public sealed record ShipmentSummaryDto(
     Guid Id,
