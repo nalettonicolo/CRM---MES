@@ -9,7 +9,7 @@ namespace CrmMes.Desktop;
 
 public sealed class ApiClient
 {
-    private readonly HttpClient _httpClient = new();
+    private HttpClient _httpClient = new();
 
     public Uri BaseAddress => _httpClient.BaseAddress!;
 
@@ -18,10 +18,23 @@ public sealed class ApiClient
         SetBaseUrl(ClientSettings.DefaultApiBaseUrl);
     }
 
-    /// <summary>Ripunta il client a un nuovo indirizzo API (es. dopo un cambio nelle impostazioni).</summary>
+    /// <summary>Ripunta il client a un nuovo indirizzo API (es. dopo un cambio nelle impostazioni).
+    /// HttpClient vieta di modificare BaseAddress dopo la prima richiesta inviata, quindi non lo
+    /// riusiamo: ne creiamo uno nuovo, portando avanti l'eventuale token di autenticazione già impostato.</summary>
     public void SetBaseUrl(string baseUrl)
     {
-        _httpClient.BaseAddress = new Uri(baseUrl.EndsWith('/') ? baseUrl : baseUrl + "/");
+        var newClient = new HttpClient
+        {
+            BaseAddress = new Uri(baseUrl.EndsWith('/') ? baseUrl : baseUrl + "/")
+        };
+        if (_httpClient.DefaultRequestHeaders.Authorization is { } authorization)
+        {
+            newClient.DefaultRequestHeaders.Authorization = authorization;
+        }
+
+        var previousClient = _httpClient;
+        _httpClient = newClient;
+        previousClient.Dispose();
     }
 
     public async Task<bool> EnsureLocalApiAsync(CancellationToken cancellationToken = default)
@@ -236,6 +249,80 @@ public sealed class ApiClient
 
     public Task<IReadOnlyList<SupplierDto>> GetSuppliersAsync(CancellationToken cancellationToken = default)
         => GetAsync<SupplierDto>("api/suppliers", cancellationToken);
+
+    public Task<IReadOnlyList<CarrierDto>> GetCarriersAsync(bool activeOnly = true, CancellationToken cancellationToken = default)
+        => GetAsync<CarrierDto>($"api/carriers?activeOnly={activeOnly}", cancellationToken);
+
+    public async Task CreateCarrierAsync(string name, string code, string? email, string? phone, CancellationToken cancellationToken = default)
+    {
+        using var response = await _httpClient.PostAsJsonAsync(
+            "api/carriers", new { name, code, email, phone }, cancellationToken);
+        await EnsureSuccessAsync(response, cancellationToken);
+    }
+
+    public async Task DeactivateCarrierAsync(Guid id, CancellationToken cancellationToken = default)
+    {
+        using var response = await _httpClient.DeleteAsync($"api/carriers/{id}", cancellationToken);
+        await EnsureSuccessAsync(response, cancellationToken);
+    }
+
+    public Task<IReadOnlyList<ShipmentSummaryDto>> GetShipmentsAsync(string? direction = null, string? status = null, CancellationToken cancellationToken = default)
+    {
+        var query = new List<string>();
+        if (!string.IsNullOrWhiteSpace(direction))
+        {
+            query.Add($"direction={Uri.EscapeDataString(direction)}");
+        }
+
+        if (!string.IsNullOrWhiteSpace(status))
+        {
+            query.Add($"status={Uri.EscapeDataString(status)}");
+        }
+
+        var queryString = query.Count > 0 ? $"?{string.Join('&', query)}" : string.Empty;
+        return GetAsync<ShipmentSummaryDto>($"api/shipments{queryString}", cancellationToken);
+    }
+
+    public async Task<ShipmentDetailDto> CreateShipmentAsync(
+        string direction,
+        Guid carrierId,
+        string? trackingNumber,
+        Guid? purchaseOrderId,
+        Guid? workOrderId,
+        string? counterpartReference,
+        string? address,
+        string? notes,
+        DateTime? expectedAt,
+        CancellationToken cancellationToken = default)
+    {
+        using var response = await _httpClient.PostAsJsonAsync(
+            "api/shipments",
+            new { direction, carrierId, trackingNumber, purchaseOrderId, workOrderId, counterpartReference, address, notes, expectedAt },
+            cancellationToken);
+        await EnsureSuccessAsync(response, cancellationToken);
+        return await response.Content.ReadFromJsonAsync<ShipmentDetailDto>(cancellationToken: cancellationToken)
+            ?? throw new InvalidOperationException("Risposta spedizione non valida.");
+    }
+
+    public async Task<ShipmentDetailDto> ShipShipmentAsync(Guid id, string? trackingNumber, CancellationToken cancellationToken = default)
+    {
+        using var response = await _httpClient.PostAsJsonAsync($"api/shipments/{id}/ship", new { trackingNumber }, cancellationToken);
+        await EnsureSuccessAsync(response, cancellationToken);
+        return await response.Content.ReadFromJsonAsync<ShipmentDetailDto>(cancellationToken: cancellationToken)
+            ?? throw new InvalidOperationException("Risposta spedizione non valida.");
+    }
+
+    public async Task DeliverShipmentAsync(Guid id, CancellationToken cancellationToken = default)
+    {
+        using var response = await _httpClient.PostAsync($"api/shipments/{id}/deliver", null, cancellationToken);
+        await EnsureSuccessAsync(response, cancellationToken);
+    }
+
+    public async Task CancelShipmentAsync(Guid id, CancellationToken cancellationToken = default)
+    {
+        using var response = await _httpClient.PostAsync($"api/shipments/{id}/cancel", null, cancellationToken);
+        await EnsureSuccessAsync(response, cancellationToken);
+    }
 
     public async Task<ImportSummaryDto> ImportCatalogExcelAsync(string filePath, CancellationToken cancellationToken = default)
     {
@@ -874,6 +961,41 @@ public sealed record WorkCenterLoadDto(
 public sealed record UserRowDto(Guid Id, string Name, string Email, string Role, bool IsActive, DateTime CreatedAt);
 
 public sealed record SupplierDto(Guid Id, string Name, string Code, string? Email, string? Phone, bool IsActive);
+
+public sealed record CarrierDto(Guid Id, string Name, string Code, string? Email, string? Phone, bool IsActive);
+
+public sealed record ShipmentSummaryDto(
+    Guid Id,
+    string Code,
+    string Direction,
+    string Status,
+    string CarrierName,
+    string? TrackingNumber,
+    string? CounterpartReference,
+    DateTime? ExpectedAt,
+    DateTime? ShippedAt,
+    DateTime? DeliveredAt,
+    DateTime CreatedAt);
+
+public sealed record ShipmentDetailDto(
+    Guid Id,
+    string Code,
+    string Direction,
+    string Status,
+    Guid CarrierId,
+    string CarrierName,
+    string? TrackingNumber,
+    Guid? PurchaseOrderId,
+    string? PurchaseOrderCode,
+    Guid? WorkOrderId,
+    string? WorkOrderCode,
+    string? CounterpartReference,
+    string? Address,
+    string? Notes,
+    DateTime? ExpectedAt,
+    DateTime? ShippedAt,
+    DateTime? DeliveredAt,
+    DateTime CreatedAt);
 
 public sealed record ImportSummaryDto(int Imported, int CreatedMaterials, int CreatedLinks);
 

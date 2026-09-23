@@ -22,6 +22,7 @@ public partial class MainWindow : Window
     private ProductSummaryDto? _selectedProduct;
     private WorkOrderSummaryDto? _selectedWorkOrder;
     private MaterialLotSummaryDto? _selectedMaterialLot;
+    private ShipmentSummaryDto? _selectedShipment;
 
     private bool _lowStockLoaded;
     private bool _missingLoaded;
@@ -34,6 +35,8 @@ public partial class MainWindow : Window
     private bool _materialLotsLoaded;
     private bool _dashboardLoaded;
     private bool _workCentersLoaded;
+    private bool _carriersLoaded;
+    private bool _shipmentsLoaded;
 
     private static readonly Dictionary<int, string> PageTitles = new()
     {
@@ -49,6 +52,8 @@ public partial class MainWindow : Window
         [9] = "Lotti materiali",
         [10] = "Cruscotto",
         [11] = "Centri di lavoro",
+        [12] = "Corrieri",
+        [13] = "Spedizioni",
     };
 
     private static readonly Dictionary<int, string> PageEyebrows = new()
@@ -65,6 +70,8 @@ public partial class MainWindow : Window
         [11] = "P R O D U Z I O N E",
         [5] = "A M M I N I S T R A Z I O N E",
         [6] = "A M M I N I S T R A Z I O N E",
+        [12] = "S P E D I Z I O N I",
+        [13] = "S P E D I Z I O N I",
     };
 
     private static readonly Dictionary<int, string> PageHelpTexts = new()
@@ -81,6 +88,8 @@ public partial class MainWindow : Window
         [9] = "Tracciabilità dei lotti materiale: ogni ingresso di giacenza (ricezione ordine, carico manuale) genera un lotto. Il consumo nelle distinte di prelievo avviene FIFO dal lotto più vecchio; aprendo un lotto si vede dove è stato usato.",
         [10] = "Indicatori aggregati sulle commesse degli ultimi giorni: quante per stato, fasi completate, performance media (minuti stimati/effettivi), percentuale di consegne puntuali. Copre solo la componente \"Performance\", non un OEE completo.",
         [11] = "Anagrafica dei centri di lavoro (reparti/linee) con la loro capacità produttiva giornaliera in minuti, e il confronto con il carico di lavoro attualmente in attesa su ciascuno. È una stima di arretrato, non una pianificazione a calendario con date precise.",
+        [12] = "Anagrafica dei corrieri usati per le spedizioni in ingresso e in uscita.",
+        [13] = "Spedizioni in ingresso (es. da un fornitore) e in uscita (es. verso un cliente), collegabili opzionalmente a un ordine fornitore o a una commessa. Ciclo: In preparazione -> Spedita -> Consegnata, oppure Annullata.",
     };
 
     // TEMPORANEO: login disabilitato su richiesta per velocizzare i test.
@@ -317,6 +326,12 @@ public partial class MainWindow : Window
             case "Centri di lavoro" when !_workCentersLoaded:
                 await LoadWorkCentersAsync();
                 break;
+            case "Corrieri" when !_carriersLoaded:
+                await LoadCarriersAsync();
+                break;
+            case "Spedizioni" when !_shipmentsLoaded:
+                await LoadShipmentsAsync();
+                break;
         }
     }
 
@@ -503,6 +518,131 @@ public partial class MainWindow : Window
         {
             await LoadAreasAsync();
         }
+    }
+
+    private async void NewCarrierButton_Click(object sender, RoutedEventArgs e)
+    {
+        var dialog = new CreateCarrierWindow(_apiClient) { Owner = this };
+        if (dialog.ShowDialog() == true && dialog.Created)
+        {
+            await LoadCarriersAsync();
+        }
+    }
+
+    private async void DeactivateCarrier_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is not Button { Tag: CarrierDto carrier })
+        {
+            return;
+        }
+
+        if (MessageBox.Show($"Disattivare il corriere {carrier.Name}?", "Conferma", MessageBoxButton.YesNo, MessageBoxImage.Question) != MessageBoxResult.Yes)
+        {
+            return;
+        }
+
+        await RunBusyAsync("Disattivazione in corso...", async () =>
+        {
+            await _apiClient.DeactivateCarrierAsync(carrier.Id);
+            await LoadCarriersAsync();
+        });
+    }
+
+    private async void NewShipmentButton_Click(object sender, RoutedEventArgs e)
+    {
+        IReadOnlyList<CarrierDto> carriers;
+        IReadOnlyList<PurchaseOrderSummaryDto> purchaseOrders;
+        IReadOnlyList<WorkOrderSummaryDto> workOrders;
+        try
+        {
+            carriers = await _apiClient.GetCarriersAsync();
+            purchaseOrders = await _apiClient.GetPurchaseOrdersAsync();
+            workOrders = await _apiClient.GetWorkOrdersAsync();
+        }
+        catch (Exception exception)
+        {
+            MessageBox.Show(exception.Message, "Errore", MessageBoxButton.OK, MessageBoxImage.Warning);
+            return;
+        }
+
+        if (carriers.Count == 0)
+        {
+            MessageBox.Show("Crea prima almeno un corriere attivo.", "Nuova spedizione", MessageBoxButton.OK, MessageBoxImage.Information);
+            return;
+        }
+
+        var dialog = new CreateShipmentWindow(_apiClient, carriers, purchaseOrders, workOrders) { Owner = this };
+        if (dialog.ShowDialog() == true && dialog.Created)
+        {
+            await LoadShipmentsAsync();
+        }
+    }
+
+    private async void ShipmentDirectionFilter_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (_shipmentsLoaded)
+        {
+            await LoadShipmentsAsync();
+        }
+    }
+
+    private void ShipmentsList_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        _selectedShipment = ShipmentsList.SelectedItem as ShipmentSummaryDto;
+        var hasSelection = _selectedShipment is not null;
+        ShipShipmentButton.IsEnabled = hasSelection && _selectedShipment!.Status == "Preparing";
+        DeliverShipmentButton.IsEnabled = hasSelection && _selectedShipment!.Status == "Shipped";
+        CancelShipmentButton.IsEnabled = hasSelection && (_selectedShipment!.Status is "Preparing" or "Shipped");
+    }
+
+    private async void ShipShipmentButton_Click(object sender, RoutedEventArgs e)
+    {
+        if (_selectedShipment is null)
+        {
+            return;
+        }
+
+        var shipmentId = _selectedShipment.Id;
+        await RunBusyAsync("Spedizione in corso...", async () =>
+        {
+            await _apiClient.ShipShipmentAsync(shipmentId, null);
+            await LoadShipmentsAsync();
+        });
+    }
+
+    private async void DeliverShipmentButton_Click(object sender, RoutedEventArgs e)
+    {
+        if (_selectedShipment is null)
+        {
+            return;
+        }
+
+        var shipmentId = _selectedShipment.Id;
+        await RunBusyAsync("Registrazione consegna in corso...", async () =>
+        {
+            await _apiClient.DeliverShipmentAsync(shipmentId);
+            await LoadShipmentsAsync();
+        });
+    }
+
+    private async void CancelShipmentButton_Click(object sender, RoutedEventArgs e)
+    {
+        if (_selectedShipment is null)
+        {
+            return;
+        }
+
+        if (MessageBox.Show($"Annullare la spedizione {_selectedShipment.Code}?", "Conferma", MessageBoxButton.YesNo, MessageBoxImage.Question) != MessageBoxResult.Yes)
+        {
+            return;
+        }
+
+        var shipmentId = _selectedShipment.Id;
+        await RunBusyAsync("Annullamento in corso...", async () =>
+        {
+            await _apiClient.CancelShipmentAsync(shipmentId);
+            await LoadShipmentsAsync();
+        });
     }
 
     private async void NewUserButton_Click(object sender, RoutedEventArgs e)
@@ -906,6 +1046,10 @@ public partial class MainWindow : Window
 
     private async void RefreshWorkOrdersButton_Click(object sender, RoutedEventArgs e) => await LoadWorkOrdersAsync();
 
+    private async void RefreshCarriersButton_Click(object sender, RoutedEventArgs e) => await LoadCarriersAsync();
+
+    private async void RefreshShipmentsButton_Click(object sender, RoutedEventArgs e) => await LoadShipmentsAsync();
+
     private void PurchaseOrdersList_SelectionChanged(object sender, SelectionChangedEventArgs e)
     {
         _selectedOrder = PurchaseOrdersList.SelectedItem as PurchaseOrderSummaryDto;
@@ -1101,6 +1245,23 @@ public partial class MainWindow : Window
     {
         AreasList.ItemsSource = await _apiClient.GetAreasAsync();
         _areasLoaded = true;
+    });
+
+    private Task LoadCarriersAsync() => RunBusyAsync(string.Empty, async () =>
+    {
+        CarriersList.ItemsSource = await _apiClient.GetCarriersAsync(activeOnly: false);
+        _carriersLoaded = true;
+    });
+
+    private Task LoadShipmentsAsync() => RunBusyAsync(string.Empty, async () =>
+    {
+        var direction = (ShipmentDirectionFilter.SelectedItem as ComboBoxItem)?.Tag as string;
+        ShipmentsList.ItemsSource = await _apiClient.GetShipmentsAsync(string.IsNullOrEmpty(direction) ? null : direction);
+        _shipmentsLoaded = true;
+        _selectedShipment = null;
+        ShipShipmentButton.IsEnabled = false;
+        DeliverShipmentButton.IsEnabled = false;
+        CancelShipmentButton.IsEnabled = false;
     });
 
     private Task LoadUsersAsync() => RunBusyAsync(string.Empty, async () =>

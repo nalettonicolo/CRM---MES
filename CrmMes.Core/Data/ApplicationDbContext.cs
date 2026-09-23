@@ -32,6 +32,8 @@ public class ApplicationDbContext : DbContext
     public DbSet<MaterialLotConsumption> MaterialLotConsumptions => Set<MaterialLotConsumption>();
     public DbSet<WorkCenter> WorkCenters => Set<WorkCenter>();
     public DbSet<WorkOrderUnit> WorkOrderUnits => Set<WorkOrderUnit>();
+    public DbSet<Carrier> Carriers => Set<Carrier>();
+    public DbSet<Shipment> Shipments => Set<Shipment>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -117,6 +119,39 @@ public class ApplicationDbContext : DbContext
             entity.HasOne(poi => poi.MissingMaterial)
                 .WithMany()
                 .HasForeignKey(poi => poi.MissingMaterialId)
+                .OnDelete(DeleteBehavior.SetNull);
+        });
+
+        modelBuilder.Entity<Carrier>(entity =>
+        {
+            entity.Property(c => c.Name).HasMaxLength(200);
+            entity.Property(c => c.Code).HasMaxLength(80);
+            entity.Property(c => c.Email).HasMaxLength(200);
+            entity.Property(c => c.Phone).HasMaxLength(50);
+            entity.HasIndex(c => c.Code).IsUnique();
+        });
+
+        modelBuilder.Entity<Shipment>(entity =>
+        {
+            entity.Property(s => s.Code).HasMaxLength(80);
+            entity.Property(s => s.Direction).HasMaxLength(20);
+            entity.Property(s => s.Status).HasMaxLength(50);
+            entity.Property(s => s.TrackingNumber).HasMaxLength(120);
+            entity.Property(s => s.CounterpartReference).HasMaxLength(250);
+            entity.Property(s => s.Address).HasMaxLength(500);
+            entity.Property(s => s.Notes).HasMaxLength(1000);
+            entity.HasIndex(s => s.Code).IsUnique();
+            entity.HasOne(s => s.Carrier)
+                .WithMany()
+                .HasForeignKey(s => s.CarrierId)
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne(s => s.PurchaseOrder)
+                .WithMany()
+                .HasForeignKey(s => s.PurchaseOrderId)
+                .OnDelete(DeleteBehavior.SetNull);
+            entity.HasOne(s => s.WorkOrder)
+                .WithMany()
+                .HasForeignKey(s => s.WorkOrderId)
                 .OnDelete(DeleteBehavior.SetNull);
         });
 
