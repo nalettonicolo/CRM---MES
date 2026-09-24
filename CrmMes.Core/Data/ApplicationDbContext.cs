@@ -34,6 +34,7 @@ public class ApplicationDbContext : DbContext
     public DbSet<WorkOrderUnit> WorkOrderUnits => Set<WorkOrderUnit>();
     public DbSet<Carrier> Carriers => Set<Carrier>();
     public DbSet<Shipment> Shipments => Set<Shipment>();
+    public DbSet<Site> Sites => Set<Site>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -53,6 +54,18 @@ public class ApplicationDbContext : DbContext
         {
             entity.Property(a => a.Name).HasMaxLength(200);
             entity.Property(a => a.Code).HasMaxLength(50);
+            entity.HasOne(a => a.Site)
+                .WithMany()
+                .HasForeignKey(a => a.SiteId)
+                .OnDelete(DeleteBehavior.SetNull);
+        });
+
+        modelBuilder.Entity<Site>(entity =>
+        {
+            entity.Property(s => s.Name).HasMaxLength(200);
+            entity.Property(s => s.Code).HasMaxLength(50);
+            entity.Property(s => s.Address).HasMaxLength(500);
+            entity.HasIndex(s => s.Code).IsUnique();
         });
 
         modelBuilder.Entity<Material>(entity =>
@@ -326,6 +339,10 @@ public class ApplicationDbContext : DbContext
             entity.Property(w => w.Name).HasMaxLength(200);
             entity.Property(w => w.Description).HasMaxLength(500);
             entity.HasIndex(w => w.Code).IsUnique();
+            entity.HasOne(w => w.Site)
+                .WithMany()
+                .HasForeignKey(w => w.SiteId)
+                .OnDelete(DeleteBehavior.SetNull);
         });
 
         // Sqlite has no native decimal type and can't ORDER BY / compare the TEXT it stores decimals as.

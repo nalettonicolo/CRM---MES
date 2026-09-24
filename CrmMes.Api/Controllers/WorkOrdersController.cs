@@ -28,12 +28,18 @@ public class WorkOrdersController : ControllerBase
     [HttpGet]
     public async Task<ActionResult<IEnumerable<WorkOrderSummaryResponse>>> GetWorkOrders(
         [FromQuery] string? status = null,
+        [FromQuery] Guid? siteId = null,
         CancellationToken cancellationToken = default)
     {
         var query = _dbContext.WorkOrders.AsNoTracking();
         if (!string.IsNullOrWhiteSpace(status))
         {
             query = query.Where(order => order.Status == status.Trim());
+        }
+
+        if (siteId.HasValue)
+        {
+            query = query.Where(order => order.Area != null && order.Area.SiteId == siteId);
         }
 
         var orders = await query

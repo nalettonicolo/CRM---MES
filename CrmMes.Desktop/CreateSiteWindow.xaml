@@ -1,11 +1,11 @@
-<Window x:Class="CrmMes.Desktop.CreateAreaWindow"
+<Window x:Class="CrmMes.Desktop.CreateSiteWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="Nuova area" Icon="Assets/logo.ico" Width="400" SizeToContent="Height"
+        Title="Nuova sede" Icon="Assets/logo.ico" Width="420" SizeToContent="Height"
         WindowStartupLocation="CenterOwner" ResizeMode="NoResize"
         Background="{StaticResource BackgroundBrush}">
     <StackPanel Margin="24">
-        <TextBlock Text="Nuova area" FontSize="18" FontWeight="SemiBold" Foreground="{StaticResource TextPrimaryBrush}" Margin="0,0,0,18" />
+        <TextBlock Text="Nuova sede" FontSize="18" FontWeight="SemiBold" Foreground="{StaticResource TextPrimaryBrush}" Margin="0,0,0,18" />
 
         <TextBlock Text="Nome" Foreground="{StaticResource TextSecondaryBrush}" FontSize="12.5" Margin="0,0,0,5" />
         <TextBox x:Name="NameBox" Margin="0,0,0,14" />
@@ -13,14 +13,14 @@
         <TextBlock Text="Codice" Foreground="{StaticResource TextSecondaryBrush}" FontSize="12.5" Margin="0,0,0,5" />
         <TextBox x:Name="CodeBox" Margin="0,0,0,14" />
 
-        <TextBlock Text="Sede (opzionale)" Foreground="{StaticResource TextSecondaryBrush}" FontSize="12.5" Margin="0,0,0,5" />
-        <ComboBox x:Name="SiteCombo" DisplayMemberPath="Name" Height="34" Margin="0,0,0,14" />
+        <TextBlock Text="Indirizzo (opzionale)" Foreground="{StaticResource TextSecondaryBrush}" FontSize="12.5" Margin="0,0,0,5" />
+        <TextBox x:Name="AddressBox" Margin="0,0,0,14" />
 
         <TextBlock x:Name="ErrorText" Foreground="{StaticResource DangerBrush}" TextWrapping="Wrap" Margin="0,0,0,10" />
 
         <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,6,0,0">
             <Button Style="{StaticResource SecondaryButton}" Content="Annulla" Width="100" Height="36" Margin="0,0,10,0" Click="Cancel_Click" />
-            <Button x:Name="CreateButton" Content="Crea area" Width="140" Height="36" Click="Create_Click" />
+            <Button x:Name="CreateButton" Content="Crea sede" Width="130" Height="36" Click="Create_Click" />
         </StackPanel>
     </StackPanel>
 </Window>

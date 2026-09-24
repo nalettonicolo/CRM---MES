@@ -19,9 +19,15 @@ public class AreasController : ControllerBase
     }
 
     [HttpGet]
-    public async Task<ActionResult<IEnumerable<Area>>> GetAreas(CancellationToken cancellationToken = default)
+    public async Task<ActionResult<IEnumerable<Area>>> GetAreas([FromQuery] Guid? siteId = null, CancellationToken cancellationToken = default)
     {
-        return Ok(await _dbContext.Areas.AsNoTracking().OrderBy(area => area.Name).ToListAsync(cancellationToken));
+        var query = _dbContext.Areas.AsNoTracking();
+        if (siteId.HasValue)
+        {
+            query = query.Where(area => area.SiteId == siteId);
+        }
+
+        return Ok(await query.OrderBy(area => area.Name).ToListAsync(cancellationToken));
     }
 
     /// <summary>Tutto ciò che serve per la schermata di dettaglio di un'area in una sola chiamata
@@ -93,10 +99,41 @@ public class AreasController : ControllerBase
             return Conflict(new { message = "Esiste già un'area con questo codice." });
         }
 
-        var area = new Area { Name = name, Code = code };
+        Site? site = null;
+        if (request.SiteId.HasValue)
+        {
+            site = await _dbContext.Sites.SingleOrDefaultAsync(s => s.Id == request.SiteId && s.IsActive, cancellationToken);
+            if (site is null)
+            {
+                return BadRequest(new { message = "Sede non trovata o non attiva." });
+            }
+        }
+
+        var area = new Area { Name = name, Code = code, SiteId = site?.Id };
         _dbContext.Areas.Add(area);
         await _dbContext.SaveChangesAsync(cancellationToken);
         return Created($"api/areas/{area.Id}", area);
+    }
+
+    [Authorize(Policy = "AdminOnly")]
+    [HttpPut("{id:guid}/site")]
+    public async Task<IActionResult> SetAreaSite(Guid id, SetSiteRequest request, CancellationToken cancellationToken = default)
+    {
+        var area = await _dbContext.Areas.SingleOrDefaultAsync(a => a.Id == id, cancellationToken);
+        if (area is null)
+        {
+            return NotFound();
+        }
+
+        if (request.SiteId.HasValue &&
+            !await _dbContext.Sites.AnyAsync(s => s.Id == request.SiteId && s.IsActive, cancellationToken))
+        {
+            return BadRequest(new { message = "Sede non trovata o non attiva." });
+        }
+
+        area.SiteId = request.SiteId;
+        await _dbContext.SaveChangesAsync(cancellationToken);
+        return NoContent();
     }
 
     [Authorize(Policy = "AdminOnly")]
@@ -123,7 +160,9 @@ public class AreasController : ControllerBase
     }
 }
 
-public sealed record CreateAreaRequest(string? Name, string? Code);
+public sealed record CreateAreaRequest(string? Name, string? Code, Guid? SiteId = null);
+
+public sealed record SetSiteRequest(Guid? SiteId);
 
 public sealed record AreaUserResponse(Guid Id, string Name, string Email, string Role);
 

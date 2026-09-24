@@ -29,6 +29,7 @@ public class WorkCentersController : ControllerBase
     [HttpGet]
     public async Task<ActionResult<IEnumerable<WorkCenterResponse>>> GetWorkCenters(
         [FromQuery] bool activeOnly = true,
+        [FromQuery] Guid? siteId = null,
         CancellationToken cancellationToken = default)
     {
         var query = _dbContext.WorkCenters.AsNoTracking();
@@ -37,9 +38,14 @@ public class WorkCentersController : ControllerBase
             query = query.Where(w => w.IsActive);
         }
 
+        if (siteId.HasValue)
+        {
+            query = query.Where(w => w.SiteId == siteId);
+        }
+
         var workCenters = await query
             .OrderBy(w => w.Name)
-            .Select(w => new WorkCenterResponse(w.Id, w.Code, w.Name, w.Description, w.DailyCapacityMinutes, w.IsActive))
+            .Select(w => new WorkCenterResponse(w.Id, w.Code, w.Name, w.Description, w.DailyCapacityMinutes, w.IsActive, w.SiteId))
             .ToListAsync(cancellationToken);
 
         return Ok(workCenters);
@@ -67,18 +73,25 @@ public class WorkCentersController : ControllerBase
             return Conflict(new { message = "Esiste già un centro di lavoro con questo codice." });
         }
 
+        if (request.SiteId.HasValue &&
+            !await _dbContext.Sites.AnyAsync(s => s.Id == request.SiteId && s.IsActive, cancellationToken))
+        {
+            return BadRequest(new { message = "Sede non trovata o non attiva." });
+        }
+
         var workCenter = new WorkCenter
         {
             Code = code,
             Name = request.Name.Trim(),
             Description = string.IsNullOrWhiteSpace(request.Description) ? null : request.Description.Trim(),
-            DailyCapacityMinutes = request.DailyCapacityMinutes
+            DailyCapacityMinutes = request.DailyCapacityMinutes,
+            SiteId = request.SiteId
         };
 
         _dbContext.WorkCenters.Add(workCenter);
         await _dbContext.SaveChangesAsync(cancellationToken);
 
-        return Ok(new WorkCenterResponse(workCenter.Id, workCenter.Code, workCenter.Name, workCenter.Description, workCenter.DailyCapacityMinutes, workCenter.IsActive));
+        return Ok(new WorkCenterResponse(workCenter.Id, workCenter.Code, workCenter.Name, workCenter.Description, workCenter.DailyCapacityMinutes, workCenter.IsActive, workCenter.SiteId));
     }
 
     [Authorize(Policy = "Warehouse")]
@@ -104,12 +117,19 @@ public class WorkCentersController : ControllerBase
             return NotFound();
         }
 
+        if (request.SiteId.HasValue &&
+            !await _dbContext.Sites.AnyAsync(s => s.Id == request.SiteId && s.IsActive, cancellationToken))
+        {
+            return BadRequest(new { message = "Sede non trovata o non attiva." });
+        }
+
         workCenter.Name = request.Name.Trim();
         workCenter.Description = string.IsNullOrWhiteSpace(request.Description) ? null : request.Description.Trim();
         workCenter.DailyCapacityMinutes = request.DailyCapacityMinutes;
+        workCenter.SiteId = request.SiteId;
 
         await _dbContext.SaveChangesAsync(cancellationToken);
-        return Ok(new WorkCenterResponse(workCenter.Id, workCenter.Code, workCenter.Name, workCenter.Description, workCenter.DailyCapacityMinutes, workCenter.IsActive));
+        return Ok(new WorkCenterResponse(workCenter.Id, workCenter.Code, workCenter.Name, workCenter.Description, workCenter.DailyCapacityMinutes, workCenter.IsActive, workCenter.SiteId));
     }
 
     [Authorize(Policy = "Warehouse")]
@@ -207,9 +227,9 @@ public class WorkCentersController : ControllerBase
     }
 }
 
-public sealed record CreateWorkCenterRequest(string Code, string Name, string? Description, decimal DailyCapacityMinutes);
-public sealed record EditWorkCenterRequest(string Name, string? Description, decimal DailyCapacityMinutes);
-public sealed record WorkCenterResponse(Guid Id, string Code, string Name, string? Description, decimal DailyCapacityMinutes, bool IsActive);
+public sealed record CreateWorkCenterRequest(string Code, string Name, string? Description, decimal DailyCapacityMinutes, Guid? SiteId = null);
+public sealed record EditWorkCenterRequest(string Name, string? Description, decimal DailyCapacityMinutes, Guid? SiteId = null);
+public sealed record WorkCenterResponse(Guid Id, string Code, string Name, string? Description, decimal DailyCapacityMinutes, bool IsActive, Guid? SiteId = null);
 
 /// <summary>Id/Code are null for a work center used on the floor (free text on a routing step / operation)
 /// that has no matching registered WorkCenter record — its capacity and backlog-in-days are unknown.</summary>

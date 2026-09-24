@@ -39,6 +39,7 @@ public partial class MainWindow : Window
     private bool _carriersLoaded;
     private bool _shipmentsLoaded;
     private bool _suppliersLoaded;
+    private bool _sitesLoaded;
 
     private static readonly Dictionary<int, string> PageTitles = new()
     {
@@ -58,6 +59,7 @@ public partial class MainWindow : Window
         [13] = "Spedizioni",
         [14] = "Fornitori",
         [15] = "Ricerca catalogo",
+        [16] = "Sedi",
     };
 
     private static readonly Dictionary<int, string> PageEyebrows = new()
@@ -76,6 +78,7 @@ public partial class MainWindow : Window
         [11] = "P R O D U Z I O N E",
         [5] = "A M M I N I S T R A Z I O N E",
         [6] = "A M M I N I S T R A Z I O N E",
+        [16] = "A M M I N I S T R A Z I O N E",
         [12] = "S P E D I Z I O N I",
         [13] = "S P E D I Z I O N I",
     };
@@ -98,6 +101,7 @@ public partial class MainWindow : Window
         [13] = "Spedizioni in ingresso (es. da un fornitore) e in uscita (es. verso un cliente), collegabili opzionalmente a un ordine fornitore o a una commessa. Ciclo: In preparazione -> Spedita -> Consegnata, oppure Annullata.",
         [14] = "Anagrafica fornitori. Doppio click su una riga per il dettaglio: ordini d'acquisto e voci di catalogo collegate.",
         [15] = "Ricerca rapida nel catalogo (materiali collegati a un fornitore con part number/prezzo/lead time), senza dover importare un PDF: utile quando il catalogo del fornitore è il suo sito web.",
+        [16] = "Sedi fisiche della stessa azienda (es. un secondo stabilimento). Non sono aziende separate: utenti, materiali, fornitori e prodotti restano condivisi — la sede è solo una dimensione per filtrare/riportare aree e centri di lavoro. Doppio click su una sede per vedere quali aree e centri di lavoro le appartengono.",
     };
 
 #if DEBUG
@@ -351,6 +355,9 @@ public partial class MainWindow : Window
             case "Fornitori" when !_suppliersLoaded:
                 await LoadSuppliersAsync();
                 break;
+            case "Sedi" when !_sitesLoaded:
+                await LoadSitesAsync();
+                break;
         }
     }
 
@@ -543,6 +550,45 @@ public partial class MainWindow : Window
     }
 
     private async void RefreshSuppliersButton_Click(object sender, RoutedEventArgs e) => await LoadSuppliersAsync();
+
+    private async void RefreshSitesButton_Click(object sender, RoutedEventArgs e) => await LoadSitesAsync();
+
+    private async void NewSiteButton_Click(object sender, RoutedEventArgs e)
+    {
+        var dialog = new CreateSiteWindow(_apiClient) { Owner = this };
+        if (dialog.ShowDialog() == true && dialog.Created)
+        {
+            await LoadSitesAsync();
+        }
+    }
+
+    private void SitesList_MouseDoubleClick(object sender, MouseButtonEventArgs e)
+    {
+        if (SitesList.SelectedItem is SiteDto site)
+        {
+            var dialog = new SiteDetailWindow(_apiClient, site.Id) { Owner = this };
+            dialog.ShowDialog();
+        }
+    }
+
+    private async void DeactivateSite_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is not Button { Tag: SiteDto site })
+        {
+            return;
+        }
+
+        if (MessageBox.Show($"Disattivare la sede {site.Name}?", "Conferma", MessageBoxButton.YesNo, MessageBoxImage.Question) != MessageBoxResult.Yes)
+        {
+            return;
+        }
+
+        await RunBusyAsync("Disattivazione in corso...", async () =>
+        {
+            await _apiClient.DeactivateSiteAsync(site.Id);
+            await LoadSitesAsync();
+        });
+    }
 
     private void SuppliersList_MouseDoubleClick(object sender, MouseButtonEventArgs e)
     {
@@ -1378,6 +1424,12 @@ public partial class MainWindow : Window
     {
         SuppliersList.ItemsSource = await _apiClient.GetSuppliersAsync();
         _suppliersLoaded = true;
+    });
+
+    private Task LoadSitesAsync() => RunBusyAsync(string.Empty, async () =>
+    {
+        SitesList.ItemsSource = await _apiClient.GetSitesAsync(activeOnly: false);
+        _sitesLoaded = true;
     });
 
     private Task LoadShipmentsAsync() => RunBusyAsync(string.Empty, async () =>

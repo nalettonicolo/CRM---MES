@@ -2,27 +2,16 @@ using System.Windows;
 
 namespace CrmMes.Desktop;
 
-public partial class CreateAreaWindow : Window
+public partial class CreateSiteWindow : Window
 {
     private readonly ApiClient _apiClient;
 
     public bool Created { get; private set; }
 
-    public CreateAreaWindow(ApiClient apiClient)
+    public CreateSiteWindow(ApiClient apiClient)
     {
         InitializeComponent();
         _apiClient = apiClient;
-        Loaded += async (_, _) =>
-        {
-            try
-            {
-                SiteCombo.ItemsSource = await _apiClient.GetSitesAsync();
-            }
-            catch (Exception exception)
-            {
-                ErrorText.Text = exception.Message;
-            }
-        };
     }
 
     private async void Create_Click(object sender, RoutedEventArgs e)
@@ -39,8 +28,7 @@ public partial class CreateAreaWindow : Window
         CreateButton.IsEnabled = false;
         try
         {
-            var siteId = (SiteCombo.SelectedItem as SiteDto)?.Id;
-            await _apiClient.CreateAreaAsync(name, code, siteId);
+            await _apiClient.CreateSiteAsync(name, code, AddressBox.Text);
             Created = true;
             Close();
         }

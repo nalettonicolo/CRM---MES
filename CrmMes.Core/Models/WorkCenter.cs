@@ -17,4 +17,8 @@ public class WorkCenter
 
     public bool IsActive { get; set; } = true;
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+
+    /// <summary>Which physical site (seconda sede) this work center is at. Null = not yet assigned.</summary>
+    public Guid? SiteId { get; set; }
+    public Site? Site { get; set; }
 }

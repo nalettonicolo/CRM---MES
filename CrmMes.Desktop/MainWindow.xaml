@@ -211,6 +211,12 @@
                                             <TextBlock Text="Utenti" Margin="6,0,0,0" />
                                         </StackPanel>
                                     </RadioButton>
+                                    <RadioButton x:Name="NavSites" Style="{StaticResource NavItem}" GroupName="Nav" Tag="16" Checked="NavItem_Checked">
+                                        <StackPanel Orientation="Horizontal">
+                                            <TextBlock Text="&#xE81D;" FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets" FontSize="16" Width="24" />
+                                            <TextBlock Text="Sedi" Margin="6,0,0,0" />
+                                        </StackPanel>
+                                    </RadioButton>
                                 </StackPanel>
                             </Expander>
                         </StackPanel>
@@ -911,6 +917,47 @@
                                                     <GridViewColumn.CellTemplate>
                                                         <DataTemplate>
                                                             <Button Content="Apri sito ↗" Style="{StaticResource SecondaryButton}" Height="26" Click="OpenCatalogResultWebsite_Click" Tag="{Binding}" />
+                                                        </DataTemplate>
+                                                    </GridViewColumn.CellTemplate>
+                                                </GridViewColumn>
+                                            </GridView>
+                                        </ListView.View>
+                                    </ListView>
+                                </Border>
+                            </Grid>
+                        </TabItem>
+
+                        <TabItem Header="Sedi">
+                            <Grid>
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto" />
+                                    <RowDefinition Height="*" />
+                                </Grid.RowDefinitions>
+                                <DockPanel Grid.Row="0" Margin="0,0,0,14">
+                                    <Button DockPanel.Dock="Right" Content="Nuova sede" Width="120" Height="36" Click="NewSiteButton_Click" />
+                                    <Button DockPanel.Dock="Right" Style="{StaticResource SecondaryButton}" Content="Aggiorna" Width="100" Height="36" Margin="0,0,10,0" Click="RefreshSitesButton_Click" />
+                                    <TextBlock Text="Sedi fisiche dell'azienda — doppio click per il dettaglio (aree e centri di lavoro)" VerticalAlignment="Center" Foreground="{StaticResource TextSecondaryBrush}" />
+                                </DockPanel>
+                                <Border Grid.Row="1" Style="{StaticResource CardBorder}" Padding="4">
+                                    <ListView x:Name="SitesList" MouseDoubleClick="SitesList_MouseDoubleClick">
+                                        <ListView.View>
+                                            <GridView>
+                                                <GridViewColumn Header="Codice" DisplayMemberBinding="{Binding Code}" Width="140" />
+                                                <GridViewColumn Header="Nome" DisplayMemberBinding="{Binding Name}" Width="220" />
+                                                <GridViewColumn Header="Indirizzo" DisplayMemberBinding="{Binding Address}" Width="240" />
+                                                <GridViewColumn Header="Attiva" Width="100">
+                                                    <GridViewColumn.CellTemplate>
+                                                        <DataTemplate>
+                                                            <Border Style="{StaticResource Pill}" Background="{Binding IsActive, Converter={StaticResource BoolToBrush}}">
+                                                                <TextBlock Style="{StaticResource PillText}" Text="{Binding IsActive, Converter={StaticResource BoolToText}, ConverterParameter=Attiva|Inattiva}" Foreground="{Binding IsActive, Converter={StaticResource BoolToBrush}, ConverterParameter=Foreground}" />
+                                                            </Border>
+                                                        </DataTemplate>
+                                                    </GridViewColumn.CellTemplate>
+                                                </GridViewColumn>
+                                                <GridViewColumn Header="" Width="100">
+                                                    <GridViewColumn.CellTemplate>
+                                                        <DataTemplate>
+                                                            <Button Content="Disattiva" Style="{StaticResource SecondaryButton}" Height="28" Click="DeactivateSite_Click" Tag="{Binding}" />
                                                         </DataTemplate>
                                                     </GridViewColumn.CellTemplate>
                                                 </GridViewColumn>

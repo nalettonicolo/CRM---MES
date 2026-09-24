@@ -244,6 +244,29 @@ public sealed class ApiClient
     public Task<IReadOnlyList<AreaDto>> GetAreasAsync(CancellationToken cancellationToken = default)
         => GetAsync<AreaDto>("api/areas", cancellationToken);
 
+    public Task<IReadOnlyList<SiteDto>> GetSitesAsync(bool activeOnly = true, CancellationToken cancellationToken = default)
+        => GetAsync<SiteDto>($"api/sites?activeOnly={activeOnly}", cancellationToken);
+
+    public async Task<SiteDetailDto> GetSiteDetailAsync(Guid id, CancellationToken cancellationToken = default)
+    {
+        using var response = await _httpClient.GetAsync($"api/sites/{id}/detail", cancellationToken);
+        await EnsureSuccessAsync(response, cancellationToken);
+        return await response.Content.ReadFromJsonAsync<SiteDetailDto>(cancellationToken: cancellationToken)
+            ?? throw new InvalidOperationException("Risposta dettaglio sede non valida.");
+    }
+
+    public async Task CreateSiteAsync(string name, string code, string? address, CancellationToken cancellationToken = default)
+    {
+        using var response = await _httpClient.PostAsJsonAsync("api/sites", new { name, code, address }, cancellationToken);
+        await EnsureSuccessAsync(response, cancellationToken);
+    }
+
+    public async Task DeactivateSiteAsync(Guid id, CancellationToken cancellationToken = default)
+    {
+        using var response = await _httpClient.DeleteAsync($"api/sites/{id}", cancellationToken);
+        await EnsureSuccessAsync(response, cancellationToken);
+    }
+
     public async Task<AreaDetailDto> GetAreaDetailAsync(Guid id, CancellationToken cancellationToken = default)
     {
         using var response = await _httpClient.GetAsync($"api/areas/{id}/detail", cancellationToken);
@@ -536,9 +559,9 @@ public sealed class ApiClient
         await EnsureSuccessAsync(response, cancellationToken);
     }
 
-    public async Task CreateAreaAsync(string name, string code, CancellationToken cancellationToken = default)
+    public async Task CreateAreaAsync(string name, string code, Guid? siteId = null, CancellationToken cancellationToken = default)
     {
-        using var response = await _httpClient.PostAsJsonAsync("api/areas", new { name, code }, cancellationToken);
+        using var response = await _httpClient.PostAsJsonAsync("api/areas", new { name, code, siteId }, cancellationToken);
         await EnsureSuccessAsync(response, cancellationToken);
     }
 
@@ -1020,7 +1043,17 @@ public sealed record PurchaseOrderItemDto(
     decimal ReceivedQuantity,
     Guid? MissingMaterialId);
 
-public sealed record AreaDto(Guid Id, string Name, string Code, bool IsActive, DateTime CreatedAt);
+public sealed record AreaDto(Guid Id, string Name, string Code, bool IsActive, DateTime CreatedAt, Guid? SiteId = null);
+
+public sealed record SiteDto(Guid Id, string Name, string Code, string? Address, bool IsActive);
+
+public sealed record SiteAreaDto(Guid Id, string Name, string Code, bool IsActive);
+
+public sealed record SiteWorkCenterDto(Guid Id, string Name, string Code, bool IsActive);
+
+public sealed record SiteDetailDto(
+    Guid Id, string Name, string Code, string? Address, bool IsActive,
+    List<SiteAreaDto> Areas, List<SiteWorkCenterDto> WorkCenters);
 
 public sealed record WorkCenterDto(Guid Id, string Code, string Name, string? Description, decimal DailyCapacityMinutes, bool IsActive);
 
