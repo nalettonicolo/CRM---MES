@@ -85,6 +85,65 @@ public class UsersController : ControllerBase
         return Created($"api/users/{user.Id}", new UserResponse(user.Id, user.Name, user.Email, user.Role, user.IsActive, user.CreatedAt));
     }
 
+    /// <summary>Dettaglio utente in una sola chiamata: anagrafica + aree assegnate + attività recente
+    /// (fasi avviate/completate, fermi segnalati/chiusi, non conformità segnalate) tracciata tramite
+    /// StartedByUserId/CompletedByUserId/ReportedByUserId/ClosedByUserId — collegata per id, non più solo
+    /// per nome libero. Ogni lista limitata alle 50 voci più recenti.</summary>
+    [HttpGet("{id:guid}/detail")]
+    public async Task<ActionResult<UserDetailResponse>> GetUserDetail(Guid id, CancellationToken cancellationToken = default)
+    {
+        var user = await _dbContext.Users.AsNoTracking()
+            .Include(u => u.Areas)
+            .SingleOrDefaultAsync(u => u.Id == id, cancellationToken);
+        if (user is null)
+        {
+            return NotFound();
+        }
+
+        var startedOperations = await _dbContext.WorkOrderOperations.AsNoTracking()
+            .Include(op => op.WorkOrder)
+            .Where(op => op.StartedByUserId == id)
+            .OrderByDescending(op => op.StartedAt)
+            .Take(50)
+            .Select(op => new UserActivityResponse(op.WorkOrder.Code, op.Name, "Fase avviata", op.StartedAt!.Value))
+            .ToListAsync(cancellationToken);
+
+        var completedOperations = await _dbContext.WorkOrderOperations.AsNoTracking()
+            .Include(op => op.WorkOrder)
+            .Where(op => op.CompletedByUserId == id)
+            .OrderByDescending(op => op.CompletedAt)
+            .Take(50)
+            .Select(op => new UserActivityResponse(op.WorkOrder.Code, op.Name, "Fase completata", op.CompletedAt!.Value))
+            .ToListAsync(cancellationToken);
+
+        var downtimes = await _dbContext.OperationDowntimes.AsNoTracking()
+            .Include(d => d.Operation).ThenInclude(op => op.WorkOrder)
+            .Where(d => d.ReportedByUserId == id || d.ClosedByUserId == id)
+            .OrderByDescending(d => d.StartedAt)
+            .Take(50)
+            .Select(d => new UserActivityResponse(
+                d.Operation.WorkOrder.Code, d.Operation.Name,
+                d.ReportedByUserId == id ? "Fermo segnalato" : "Fermo chiuso", d.StartedAt))
+            .ToListAsync(cancellationToken);
+
+        var nonConformities = await _dbContext.NonConformities.AsNoTracking()
+            .Include(n => n.Operation).ThenInclude(op => op.WorkOrder)
+            .Where(n => n.ReportedByUserId == id)
+            .OrderByDescending(n => n.DetectedAt)
+            .Take(50)
+            .Select(n => new UserActivityResponse(n.Operation.WorkOrder.Code, n.Operation.Name, "Non conformità segnalata", n.DetectedAt))
+            .ToListAsync(cancellationToken);
+
+        var activity = startedOperations.Concat(completedOperations).Concat(downtimes).Concat(nonConformities)
+            .OrderByDescending(a => a.At)
+            .Take(50)
+            .ToList();
+
+        var areas = user.Areas.OrderBy(a => a.Name).Select(a => new UserAreaResponse(a.Id, a.Name, a.Code)).ToList();
+
+        return Ok(new UserDetailResponse(user.Id, user.Name, user.Email, user.Role, user.IsActive, user.CreatedAt, areas, activity));
+    }
+
     /// <summary>Sets or replaces the short PIN a user types at the shop-floor terminal to identify
     /// themselves — a separate, much shorter secret than their login password, meant for a kiosk, not for
     /// signing in. Admin-only, same as creating a user.</summary>
@@ -148,3 +207,11 @@ public sealed record UserResponse(Guid Id, string Name, string Email, string Rol
 public sealed record SetUserPinRequest(string? Pin);
 public sealed record IdentifyByPinRequest(string? Pin);
 public sealed record IdentifyByPinResponse(Guid Id, string Name);
+
+public sealed record UserAreaResponse(Guid Id, string Name, string Code);
+
+public sealed record UserActivityResponse(string WorkOrderCode, string OperationName, string Kind, DateTime At);
+
+public sealed record UserDetailResponse(
+    Guid Id, string Name, string Email, string Role, bool IsActive, DateTime CreatedAt,
+    List<UserAreaResponse> Areas, List<UserActivityResponse> RecentActivity);

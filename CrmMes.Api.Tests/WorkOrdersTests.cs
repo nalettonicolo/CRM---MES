@@ -828,6 +828,24 @@ public class WorkOrdersTests : IClassFixture<AdminSeededApiTestFixture>
     }
 
     [Fact]
+    public async Task OperatorActions_WithOperatorId_AppearInUserDetailActivity()
+    {
+        var operatorAuth = await TestAuth.CreateUserWithRoleAsync(_fixture.Factory, _fixture.Admin.Token, "Operator", "activity-user");
+        var (workOrderId, operationId) = await CreateAndStartFirstOperationAsync();
+
+        var startResponse = await _adminClient.PostAsJsonAsync(
+            $"/api/work-orders/{workOrderId}/operations/{operationId}/downtime/start?operatorId={operatorAuth.UserId}",
+            new StartDowntimeRequest("Guasto", null));
+        startResponse.EnsureSuccessStatusCode();
+
+        var detailResponse = await _adminClient.GetAsync($"/api/users/{operatorAuth.UserId}/detail");
+        Assert.Equal(HttpStatusCode.OK, detailResponse.StatusCode);
+        var detail = await detailResponse.Content.ReadFromJsonAsync<UserDetailResponse>();
+
+        Assert.Contains(detail!.RecentActivity, a => a.Kind == "Fermo segnalato");
+    }
+
+    [Fact]
     public async Task GetWorkOrderByCode_ReturnsMatchingOrder()
     {
         var (product, _) = await CreateProductWithRoutingAndBomAsync(materialStock: 100);

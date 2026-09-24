@@ -88,7 +88,7 @@ public partial class MainWindow : Window
         [3] = "Documenti di prelievo materiale da magazzino verso un'area (es. reparto produzione). Bozza -> Pronta -> Chiusa (scarica davvero la giacenza) oppure Annullata. Solo le distinte in bozza si possono modificare.",
         [4] = "Ordini di acquisto verso i fornitori. Bozza -> Confermato -> ricevuto (anche parzialmente). Ricevere un ordine carica la giacenza e crea un lotto materiale tracciabile per ogni riga.",
         [5] = "Aree/reparti dell'azienda a cui è possibile destinare una distinta di prelievo o assegnare una commessa.",
-        [6] = "Utenti abilitati ad accedere al gestionale, con il rispettivo ruolo (Admin, Warehouse, Purchasing, Operator). Solo un Admin può crearne di nuovi.",
+        [6] = "Utenti abilitati ad accedere al gestionale, con il rispettivo ruolo (Admin, Warehouse, Purchasing, Operator). Solo un Admin può crearne di nuovi. Doppio click su una riga per il dettaglio: aree assegnate e attività recente (fasi, fermi, non conformità, collegate per identità PIN, non più solo per nome libero).",
         [7] = "Anagrafica dei prodotti che si costruiscono: distinta base (materiali necessari) e ciclo di lavoro (fasi di produzione). Da qui si genera automaticamente la struttura di ogni nuova commessa.",
         [8] = "Commesse di produzione: quantità da costruire di un prodotto, con le fasi del ciclo di lavoro tracciate una per una (avvio/completamento, minuti effettivi, performance). Rilasciare una commessa verifica la disponibilità dei materiali.",
         [9] = "Tracciabilità dei lotti materiale: ogni ingresso di giacenza (ricezione ordine, carico manuale) genera un lotto. Il consumo nelle distinte di prelievo avviene FIFO dal lotto più vecchio; aprendo un lotto si vede dove è stato usato.",
@@ -549,6 +549,15 @@ public partial class MainWindow : Window
         if (SuppliersList.SelectedItem is SupplierDto supplier)
         {
             var dialog = new SupplierDetailWindow(_apiClient, supplier.Id) { Owner = this };
+            dialog.ShowDialog();
+        }
+    }
+
+    private void UsersList_MouseDoubleClick(object sender, MouseButtonEventArgs e)
+    {
+        if (UsersList.SelectedItem is UserRowDto user)
+        {
+            var dialog = new UserDetailWindow(_apiClient, user.Id) { Owner = this };
             dialog.ShowDialog();
         }
     }

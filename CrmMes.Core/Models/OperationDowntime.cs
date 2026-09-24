@@ -18,8 +18,12 @@ public class OperationDowntime
     public DateTime? EndedAt { get; set; }
 
     /// <summary>Name of the operator who reported/closed this stop, as identified by PIN at the
-    /// shop-floor terminal — free text, not a user FK, same rationale as WorkOrderOperation's
-    /// StartedBy/CompletedBy. Null when the action came from the office client.</summary>
+    /// shop-floor terminal — a display snapshot, same rationale as WorkOrderOperation's
+    /// StartedBy/CompletedBy. ReportedByUserId/ClosedByUserId are the authoritative link.</summary>
     public string? ReportedBy { get; set; }
     public string? ClosedBy { get; set; }
+    public Guid? ReportedByUserId { get; set; }
+    public User? ReportedByUser { get; set; }
+    public Guid? ClosedByUserId { get; set; }
+    public User? ClosedByUser { get; set; }
 }

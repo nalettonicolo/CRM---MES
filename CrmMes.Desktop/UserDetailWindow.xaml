@@ -1,0 +1,53 @@
+<Window x:Class="CrmMes.Desktop.UserDetailWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Dettaglio utente" Icon="Assets/logo.ico" Height="600" Width="640"
+        WindowStartupLocation="CenterOwner" ResizeMode="CanResize" MinHeight="440" MinWidth="540"
+        Background="{StaticResource BackgroundBrush}">
+    <Grid Margin="24">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+
+        <StackPanel Grid.Row="0">
+            <TextBlock Text="U T E N T E" Style="{StaticResource MicroLabel}" Foreground="{StaticResource PrimaryBrush}" />
+            <TextBlock x:Name="UserTitleText" Style="{StaticResource EditorialTitle}" FontSize="26" Margin="0,0,0,4" />
+        </StackPanel>
+        <TextBlock Grid.Row="1" x:Name="UserInfoText" Foreground="{StaticResource TextSecondaryBrush}" FontSize="12.5" TextWrapping="Wrap" Margin="0,4,0,10" />
+
+        <TextBlock Grid.Row="2" Text="Aree assegnate" FontWeight="SemiBold" Foreground="{StaticResource TextPrimaryBrush}" Margin="0,6,0,6" />
+        <ItemsControl Grid.Row="3" x:Name="AreasPanel" Margin="0,0,0,16">
+            <ItemsControl.ItemsPanel>
+                <ItemsPanelTemplate>
+                    <WrapPanel Orientation="Horizontal" />
+                </ItemsPanelTemplate>
+            </ItemsControl.ItemsPanel>
+            <ItemsControl.ItemTemplate>
+                <DataTemplate>
+                    <Border Style="{StaticResource Pill}" Background="{StaticResource SurfaceRaisedBrush}" Margin="0,0,8,8">
+                        <TextBlock Style="{StaticResource PillText}" Text="{Binding Name}" Foreground="{StaticResource TextPrimaryBrush}" />
+                    </Border>
+                </DataTemplate>
+            </ItemsControl.ItemTemplate>
+        </ItemsControl>
+
+        <TextBlock Grid.Row="4" Text="Attività recente (fasi, fermi, non conformità)" FontWeight="SemiBold" Foreground="{StaticResource TextPrimaryBrush}" Margin="0,0,0,6" />
+        <Border Grid.Row="5" Style="{StaticResource CardBorder}" Padding="4">
+            <ListView x:Name="ActivityList">
+                <ListView.View>
+                    <GridView>
+                        <GridViewColumn Header="Quando" DisplayMemberBinding="{Binding At}" Width="140" />
+                        <GridViewColumn Header="Tipo" DisplayMemberBinding="{Binding Kind}" Width="160" />
+                        <GridViewColumn Header="Commessa" DisplayMemberBinding="{Binding WorkOrderCode}" Width="140" />
+                        <GridViewColumn Header="Fase" DisplayMemberBinding="{Binding OperationName}" Width="160" />
+                    </GridView>
+                </ListView.View>
+            </ListView>
+        </Border>
+    </Grid>
+</Window>

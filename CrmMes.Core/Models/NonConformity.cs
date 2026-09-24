@@ -17,9 +17,11 @@ public class NonConformity
     public DateTime DetectedAt { get; set; } = DateTime.UtcNow;
 
     /// <summary>Name of the operator who reported this defect, as identified by PIN at the shop-floor
-    /// terminal — free text, not a user FK, same rationale as WorkOrderOperation's StartedBy/CompletedBy.
-    /// Null when the action came from the office client.</summary>
+    /// terminal — a display snapshot, same rationale as WorkOrderOperation's StartedBy/CompletedBy.
+    /// ReportedByUserId is the authoritative link.</summary>
     public string? ReportedBy { get; set; }
+    public Guid? ReportedByUserId { get; set; }
+    public User? ReportedByUser { get; set; }
 
     /// <summary>The specific serial unit this defect scrapped, when the work order has per-unit tracking
     /// (see <see cref="WorkOrderUnit"/>) and the reporter picked one. Null for a work order whose quantity

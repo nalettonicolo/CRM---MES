@@ -9,14 +9,16 @@ public partial class NonConformitiesWindow : Window
     private readonly Guid _workOrderId;
     private readonly Guid _operationId;
     private readonly string? _operatorName;
+    private readonly Guid? _operatorId;
 
-    public NonConformitiesWindow(ApiClient apiClient, Guid workOrderId, Guid operationId, string operationName, string? operatorName = null)
+    public NonConformitiesWindow(ApiClient apiClient, Guid workOrderId, Guid operationId, string operationName, string? operatorName = null, Guid? operatorId = null)
     {
         InitializeComponent();
         _apiClient = apiClient;
         _workOrderId = workOrderId;
         _operationId = operationId;
         _operatorName = operatorName;
+        _operatorId = operatorId;
         OperationNameText.Text = operationName;
         Loaded += NonConformitiesWindow_Loaded;
     }
@@ -75,7 +77,7 @@ public partial class NonConformitiesWindow : Window
         try
         {
             await _apiClient.RegisterNonConformityAsync(_workOrderId, _operationId, description, scrapQuantity,
-                string.IsNullOrWhiteSpace(NotesBox.Text) ? null : NotesBox.Text.Trim(), _operatorName, selectedUnitId);
+                string.IsNullOrWhiteSpace(NotesBox.Text) ? null : NotesBox.Text.Trim(), _operatorName, selectedUnitId, _operatorId);
             DescriptionBox.Text = string.Empty;
             NotesBox.Text = string.Empty;
             ScrapQuantityBox.Text = "1";

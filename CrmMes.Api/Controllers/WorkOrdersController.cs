@@ -384,7 +384,7 @@ public class WorkOrdersController : ControllerBase
     [Authorize]
     [HttpPost("{id:guid}/operations/{operationId:guid}/start")]
     public async Task<ActionResult<WorkOrderResponse>> StartOperation(
-        Guid id, Guid operationId, [FromQuery] string? operatorName = null, CancellationToken cancellationToken = default)
+        Guid id, Guid operationId, [FromQuery] string? operatorName = null, [FromQuery] Guid? operatorId = null, CancellationToken cancellationToken = default)
     {
         var order = await _dbContext.WorkOrders
             .Include(o => o.Operations)
@@ -414,6 +414,7 @@ public class WorkOrdersController : ControllerBase
         operation.Status = "InProgress";
         operation.StartedAt = DateTime.UtcNow;
         operation.StartedBy = string.IsNullOrWhiteSpace(operatorName) ? null : operatorName.Trim();
+        operation.StartedByUserId = operatorId;
         if (order.Status == "Released")
         {
             order.Status = "InProgress";
@@ -426,7 +427,7 @@ public class WorkOrdersController : ControllerBase
     [Authorize]
     [HttpPost("{id:guid}/operations/{operationId:guid}/complete")]
     public async Task<ActionResult<WorkOrderResponse>> CompleteOperation(
-        Guid id, Guid operationId, [FromQuery] string? operatorName = null, CancellationToken cancellationToken = default)
+        Guid id, Guid operationId, [FromQuery] string? operatorName = null, [FromQuery] Guid? operatorId = null, CancellationToken cancellationToken = default)
     {
         var order = await _dbContext.WorkOrders
             .Include(o => o.Operations)
@@ -458,6 +459,7 @@ public class WorkOrdersController : ControllerBase
         operation.Status = "Done";
         operation.CompletedAt = DateTime.UtcNow;
         operation.CompletedBy = string.IsNullOrWhiteSpace(operatorName) ? null : operatorName.Trim();
+        operation.CompletedByUserId = operatorId;
 
         await _dbContext.SaveChangesAsync(cancellationToken);
         return Ok(ToResponse(order));
@@ -469,7 +471,7 @@ public class WorkOrdersController : ControllerBase
     [Authorize]
     [HttpPost("{id:guid}/operations/{operationId:guid}/downtime/start")]
     public async Task<ActionResult<OperationDowntimeResponse>> StartDowntime(
-        Guid id, Guid operationId, StartDowntimeRequest request, [FromQuery] string? operatorName = null, CancellationToken cancellationToken = default)
+        Guid id, Guid operationId, StartDowntimeRequest request, [FromQuery] string? operatorName = null, [FromQuery] Guid? operatorId = null, CancellationToken cancellationToken = default)
     {
         if (string.IsNullOrWhiteSpace(request.Reason))
         {
@@ -500,7 +502,8 @@ public class WorkOrdersController : ControllerBase
             WorkOrderOperationId = operationId,
             Reason = request.Reason.Trim(),
             Notes = string.IsNullOrWhiteSpace(request.Notes) ? null : request.Notes.Trim(),
-            ReportedBy = string.IsNullOrWhiteSpace(operatorName) ? null : operatorName.Trim()
+            ReportedBy = string.IsNullOrWhiteSpace(operatorName) ? null : operatorName.Trim(),
+            ReportedByUserId = operatorId
         };
 
         _dbContext.OperationDowntimes.Add(downtime);
@@ -512,7 +515,7 @@ public class WorkOrdersController : ControllerBase
     [Authorize]
     [HttpPost("{id:guid}/operations/{operationId:guid}/downtime/{downtimeId:guid}/end")]
     public async Task<ActionResult<OperationDowntimeResponse>> EndDowntime(
-        Guid id, Guid operationId, Guid downtimeId, [FromQuery] string? operatorName = null, CancellationToken cancellationToken = default)
+        Guid id, Guid operationId, Guid downtimeId, [FromQuery] string? operatorName = null, [FromQuery] Guid? operatorId = null, CancellationToken cancellationToken = default)
     {
         var downtime = await _dbContext.OperationDowntimes
             .SingleOrDefaultAsync(d => d.Id == downtimeId && d.WorkOrderOperationId == operationId, cancellationToken);
@@ -528,6 +531,7 @@ public class WorkOrdersController : ControllerBase
 
         downtime.EndedAt = DateTime.UtcNow;
         downtime.ClosedBy = string.IsNullOrWhiteSpace(operatorName) ? null : operatorName.Trim();
+        downtime.ClosedByUserId = operatorId;
         await _dbContext.SaveChangesAsync(cancellationToken);
 
         return Ok(ToDowntimeResponse(downtime));
@@ -563,7 +567,7 @@ public class WorkOrdersController : ControllerBase
     [Authorize]
     [HttpPost("{id:guid}/operations/{operationId:guid}/non-conformities")]
     public async Task<ActionResult<NonConformityResponse>> RegisterNonConformity(
-        Guid id, Guid operationId, RegisterNonConformityRequest request, [FromQuery] string? operatorName = null, CancellationToken cancellationToken = default)
+        Guid id, Guid operationId, RegisterNonConformityRequest request, [FromQuery] string? operatorName = null, [FromQuery] Guid? operatorId = null, CancellationToken cancellationToken = default)
     {
         if (string.IsNullOrWhiteSpace(request.Description))
         {
@@ -610,6 +614,7 @@ public class WorkOrdersController : ControllerBase
             ScrapQuantity = request.ScrapQuantity,
             Notes = string.IsNullOrWhiteSpace(request.Notes) ? null : request.Notes.Trim(),
             ReportedBy = string.IsNullOrWhiteSpace(operatorName) ? null : operatorName.Trim(),
+            ReportedByUserId = operatorId,
             WorkOrderUnitId = unit?.Id
         };
 

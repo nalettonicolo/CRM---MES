@@ -267,6 +267,14 @@ public sealed class ApiClient
     public Task<IReadOnlyList<UserRowDto>> GetUsersAsync(CancellationToken cancellationToken = default)
         => GetAsync<UserRowDto>("api/users", cancellationToken);
 
+    public async Task<UserDetailDto> GetUserDetailAsync(Guid id, CancellationToken cancellationToken = default)
+    {
+        using var response = await _httpClient.GetAsync($"api/users/{id}/detail", cancellationToken);
+        await EnsureSuccessAsync(response, cancellationToken);
+        return await response.Content.ReadFromJsonAsync<UserDetailDto>(cancellationToken: cancellationToken)
+            ?? throw new InvalidOperationException("Risposta dettaglio utente non valida.");
+    }
+
     public Task<IReadOnlyList<SupplierDto>> GetSuppliersAsync(CancellationToken cancellationToken = default)
         => GetAsync<SupplierDto>("api/suppliers", cancellationToken);
 
@@ -774,52 +782,66 @@ public sealed class ApiClient
         await EnsureSuccessAsync(response, cancellationToken);
     }
 
-    public async Task StartOperationAsync(Guid workOrderId, Guid operationId, string? operatorName = null, CancellationToken cancellationToken = default)
+    public async Task StartOperationAsync(Guid workOrderId, Guid operationId, string? operatorName = null, Guid? operatorId = null, CancellationToken cancellationToken = default)
     {
         using var response = await _httpClient.PostAsync(
-            $"api/work-orders/{workOrderId}/operations/{operationId}/start{OperatorQuery(operatorName)}", null, cancellationToken);
+            $"api/work-orders/{workOrderId}/operations/{operationId}/start{OperatorQuery(operatorName, operatorId)}", null, cancellationToken);
         await EnsureSuccessAsync(response, cancellationToken);
     }
 
-    public async Task CompleteOperationAsync(Guid workOrderId, Guid operationId, string? operatorName = null, CancellationToken cancellationToken = default)
+    public async Task CompleteOperationAsync(Guid workOrderId, Guid operationId, string? operatorName = null, Guid? operatorId = null, CancellationToken cancellationToken = default)
     {
         using var response = await _httpClient.PostAsync(
-            $"api/work-orders/{workOrderId}/operations/{operationId}/complete{OperatorQuery(operatorName)}", null, cancellationToken);
+            $"api/work-orders/{workOrderId}/operations/{operationId}/complete{OperatorQuery(operatorName, operatorId)}", null, cancellationToken);
         await EnsureSuccessAsync(response, cancellationToken);
     }
 
     public Task<IReadOnlyList<OperationDowntimeDto>> GetOperationDowntimesAsync(Guid workOrderId, Guid operationId, CancellationToken cancellationToken = default)
         => GetAsync<OperationDowntimeDto>($"api/work-orders/{workOrderId}/operations/{operationId}/downtimes", cancellationToken);
 
-    public async Task<OperationDowntimeDto> StartDowntimeAsync(Guid workOrderId, Guid operationId, string reason, string? notes, string? operatorName = null, CancellationToken cancellationToken = default)
+    public async Task<OperationDowntimeDto> StartDowntimeAsync(Guid workOrderId, Guid operationId, string reason, string? notes, string? operatorName = null, Guid? operatorId = null, CancellationToken cancellationToken = default)
     {
         using var response = await _httpClient.PostAsJsonAsync(
-            $"api/work-orders/{workOrderId}/operations/{operationId}/downtime/start{OperatorQuery(operatorName)}", new { reason, notes }, cancellationToken);
+            $"api/work-orders/{workOrderId}/operations/{operationId}/downtime/start{OperatorQuery(operatorName, operatorId)}", new { reason, notes }, cancellationToken);
         await EnsureSuccessAsync(response, cancellationToken);
         return await response.Content.ReadFromJsonAsync<OperationDowntimeDto>(cancellationToken: cancellationToken)
             ?? throw new InvalidOperationException("Risposta fermo non valida.");
     }
 
-    /// <summary>Query string for the optional operator-attribution parameter every terminal-triggered
+    /// <summary>Query string for the optional operator-attribution parameters every terminal-triggered
     /// action forwards to the API, so it can log who (as identified by PIN) did what — empty when no
-    /// operator is known, e.g. an action from the office client.</summary>
-    private static string OperatorQuery(string? operatorName) =>
-        string.IsNullOrWhiteSpace(operatorName) ? string.Empty : $"?operatorName={Uri.EscapeDataString(operatorName)}";
+    /// operator is known, e.g. an action from the office client. operatorId is the authoritative link
+    /// (User.Id); operatorName is kept as a display snapshot alongside it.</summary>
+    private static string OperatorQuery(string? operatorName, Guid? operatorId = null)
+    {
+        var parts = new List<string>();
+        if (!string.IsNullOrWhiteSpace(operatorName))
+        {
+            parts.Add($"operatorName={Uri.EscapeDataString(operatorName)}");
+        }
 
-    public async Task EndDowntimeAsync(Guid workOrderId, Guid operationId, Guid downtimeId, string? operatorName = null, CancellationToken cancellationToken = default)
+        if (operatorId is Guid id)
+        {
+            parts.Add($"operatorId={id}");
+        }
+
+        return parts.Count == 0 ? string.Empty : $"?{string.Join('&', parts)}";
+    }
+
+    public async Task EndDowntimeAsync(Guid workOrderId, Guid operationId, Guid downtimeId, string? operatorName = null, Guid? operatorId = null, CancellationToken cancellationToken = default)
     {
         using var response = await _httpClient.PostAsync(
-            $"api/work-orders/{workOrderId}/operations/{operationId}/downtime/{downtimeId}/end{OperatorQuery(operatorName)}", null, cancellationToken);
+            $"api/work-orders/{workOrderId}/operations/{operationId}/downtime/{downtimeId}/end{OperatorQuery(operatorName, operatorId)}", null, cancellationToken);
         await EnsureSuccessAsync(response, cancellationToken);
     }
 
     public Task<IReadOnlyList<NonConformityDto>> GetNonConformitiesAsync(Guid workOrderId, Guid operationId, CancellationToken cancellationToken = default)
         => GetAsync<NonConformityDto>($"api/work-orders/{workOrderId}/operations/{operationId}/non-conformities", cancellationToken);
 
-    public async Task<NonConformityDto> RegisterNonConformityAsync(Guid workOrderId, Guid operationId, string description, decimal scrapQuantity, string? notes, string? operatorName = null, Guid? workOrderUnitId = null, CancellationToken cancellationToken = default)
+    public async Task<NonConformityDto> RegisterNonConformityAsync(Guid workOrderId, Guid operationId, string description, decimal scrapQuantity, string? notes, string? operatorName = null, Guid? workOrderUnitId = null, Guid? operatorId = null, CancellationToken cancellationToken = default)
     {
         using var response = await _httpClient.PostAsJsonAsync(
-            $"api/work-orders/{workOrderId}/operations/{operationId}/non-conformities{OperatorQuery(operatorName)}",
+            $"api/work-orders/{workOrderId}/operations/{operationId}/non-conformities{OperatorQuery(operatorName, operatorId)}",
             new { description, scrapQuantity, notes, workOrderUnitId }, cancellationToken);
         await EnsureSuccessAsync(response, cancellationToken);
         return await response.Content.ReadFromJsonAsync<NonConformityDto>(cancellationToken: cancellationToken)
@@ -1012,6 +1034,14 @@ public sealed record WorkCenterLoadDto(
     decimal? BacklogDays);
 
 public sealed record UserRowDto(Guid Id, string Name, string Email, string Role, bool IsActive, DateTime CreatedAt);
+
+public sealed record UserAreaDto(Guid Id, string Name, string Code);
+
+public sealed record UserActivityDto(string WorkOrderCode, string OperationName, string Kind, DateTime At);
+
+public sealed record UserDetailDto(
+    Guid Id, string Name, string Email, string Role, bool IsActive, DateTime CreatedAt,
+    List<UserAreaDto> Areas, List<UserActivityDto> RecentActivity);
 
 public sealed record SupplierDto(Guid Id, string Name, string Code, string? Email, string? Phone, string? Website, bool IsActive);
 

@@ -494,7 +494,7 @@
                                     <TextBlock Text="Utenti registrati" VerticalAlignment="Center" Foreground="{StaticResource TextSecondaryBrush}" />
                                 </DockPanel>
                                 <Border Grid.Row="1" Style="{StaticResource CardBorder}" Padding="4">
-                                    <ListView x:Name="UsersList" SelectionChanged="UsersList_SelectionChanged">
+                                    <ListView x:Name="UsersList" SelectionChanged="UsersList_SelectionChanged" MouseDoubleClick="UsersList_MouseDoubleClick">
                                         <ListView.View>
                                             <GridView>
                                                 <GridViewColumn Header="Nome" DisplayMemberBinding="{Binding Name}" Width="200" />

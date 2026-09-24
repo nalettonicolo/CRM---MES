@@ -18,10 +18,16 @@ public class WorkOrderOperation
     public DateTime? CompletedAt { get; set; }
 
     /// <summary>Name of the operator who started/completed this phase, as identified by PIN at the
-    /// shop-floor terminal — free text, not a user FK, since the office client doesn't require operator
-    /// identification. Null when the action came from the office client instead of the terminal.</summary>
+    /// shop-floor terminal — a display snapshot, not authoritative: kept even if the user is later
+    /// renamed/deactivated, and still set from the office client (which has no PIN identification) via
+    /// free text. StartedByUserId/CompletedByUserId are the authoritative link when the action did come
+    /// from a PIN-identified operator; both are null when it came from the office client.</summary>
     public string? StartedBy { get; set; }
     public string? CompletedBy { get; set; }
+    public Guid? StartedByUserId { get; set; }
+    public User? StartedByUser { get; set; }
+    public Guid? CompletedByUserId { get; set; }
+    public User? CompletedByUser { get; set; }
 
     /// <summary>Day-level finite-capacity plan produced by <c>POST /api/work-orders/{id}/schedule</c> —
     /// which calendar day(s) this operation is expected to run on, given its work center's registered

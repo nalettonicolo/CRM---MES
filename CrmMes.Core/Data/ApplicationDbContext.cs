@@ -232,6 +232,14 @@ public class ApplicationDbContext : DbContext
                 .WithMany(w => w.Operations)
                 .HasForeignKey(o => o.WorkOrderId)
                 .OnDelete(DeleteBehavior.Cascade);
+            entity.HasOne(o => o.StartedByUser)
+                .WithMany()
+                .HasForeignKey(o => o.StartedByUserId)
+                .OnDelete(DeleteBehavior.SetNull);
+            entity.HasOne(o => o.CompletedByUser)
+                .WithMany()
+                .HasForeignKey(o => o.CompletedByUserId)
+                .OnDelete(DeleteBehavior.SetNull);
         });
 
         modelBuilder.Entity<OperationDowntime>(entity =>
@@ -244,6 +252,14 @@ public class ApplicationDbContext : DbContext
                 .WithMany()
                 .HasForeignKey(d => d.WorkOrderOperationId)
                 .OnDelete(DeleteBehavior.Cascade);
+            entity.HasOne(d => d.ReportedByUser)
+                .WithMany()
+                .HasForeignKey(d => d.ReportedByUserId)
+                .OnDelete(DeleteBehavior.SetNull);
+            entity.HasOne(d => d.ClosedByUser)
+                .WithMany()
+                .HasForeignKey(d => d.ClosedByUserId)
+                .OnDelete(DeleteBehavior.SetNull);
         });
 
         modelBuilder.Entity<NonConformity>(entity =>
@@ -258,6 +274,10 @@ public class ApplicationDbContext : DbContext
             entity.HasOne(n => n.Unit)
                 .WithMany()
                 .HasForeignKey(n => n.WorkOrderUnitId)
+                .OnDelete(DeleteBehavior.SetNull);
+            entity.HasOne(n => n.ReportedByUser)
+                .WithMany()
+                .HasForeignKey(n => n.ReportedByUserId)
                 .OnDelete(DeleteBehavior.SetNull);
         });
 

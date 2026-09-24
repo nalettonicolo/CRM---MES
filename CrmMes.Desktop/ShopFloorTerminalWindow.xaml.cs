@@ -25,10 +25,11 @@ public partial class ShopFloorTerminalWindow : Window
     private readonly DispatcherTimer _syncTimer;
     private static readonly StatusToBrushConverter StatusBrush = new();
     private string? _operatorName;
+    private Guid? _operatorId;
     private WorkOrderDetailDto? _order;
     private WorkOrderOperationDto? _activeOperation;
 
-    private sealed record OperationActionPayload(Guid WorkOrderId, Guid OperationId, string? OperatorName);
+    private sealed record OperationActionPayload(Guid WorkOrderId, Guid OperationId, string? OperatorName, Guid? OperatorId);
 
     public ShopFloorTerminalWindow(ApiClient apiClient)
     {
@@ -38,12 +39,12 @@ public partial class ShopFloorTerminalWindow : Window
         _offlineQueue.RegisterHandler("StartOperation", async (json, ct) =>
         {
             var payload = JsonSerializer.Deserialize<OperationActionPayload>(json)!;
-            await _apiClient.StartOperationAsync(payload.WorkOrderId, payload.OperationId, payload.OperatorName, ct);
+            await _apiClient.StartOperationAsync(payload.WorkOrderId, payload.OperationId, payload.OperatorName, payload.OperatorId, ct);
         });
         _offlineQueue.RegisterHandler("CompleteOperation", async (json, ct) =>
         {
             var payload = JsonSerializer.Deserialize<OperationActionPayload>(json)!;
-            await _apiClient.CompleteOperationAsync(payload.WorkOrderId, payload.OperationId, payload.OperatorName, ct);
+            await _apiClient.CompleteOperationAsync(payload.WorkOrderId, payload.OperationId, payload.OperatorName, payload.OperatorId, ct);
         });
 
         _syncTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(30) };
@@ -121,6 +122,7 @@ public partial class ShopFloorTerminalWindow : Window
         {
             var operatorDto = await _apiClient.IdentifyOperatorByPinAsync(pin);
             _operatorName = operatorDto.Name;
+            _operatorId = operatorDto.Id;
             OperatorNameText.Text = operatorDto.Name;
             PinBox.Password = string.Empty;
 
@@ -143,6 +145,7 @@ public partial class ShopFloorTerminalWindow : Window
     private void ChangeOperator_Click(object sender, RoutedEventArgs e)
     {
         _operatorName = null;
+        _operatorId = null;
         _order = null;
         _activeOperation = null;
 
@@ -257,11 +260,11 @@ public partial class ShopFloorTerminalWindow : Window
         {
             if (isStart)
             {
-                await _apiClient.StartOperationAsync(_order.Id, _activeOperation.Id, _operatorName);
+                await _apiClient.StartOperationAsync(_order.Id, _activeOperation.Id, _operatorName, _operatorId);
             }
             else
             {
-                await _apiClient.CompleteOperationAsync(_order.Id, _activeOperation.Id, _operatorName);
+                await _apiClient.CompleteOperationAsync(_order.Id, _activeOperation.Id, _operatorName, _operatorId);
             }
 
             await RefreshAsync();
@@ -269,7 +272,7 @@ public partial class ShopFloorTerminalWindow : Window
         catch (HttpRequestException)
         {
             var kind = isStart ? "StartOperation" : "CompleteOperation";
-            var payload = new OperationActionPayload(_order.Id, _activeOperation.Id, _operatorName);
+            var payload = new OperationActionPayload(_order.Id, _activeOperation.Id, _operatorName, _operatorId);
             var description = $"{(isStart ? "Avvio" : "Completamento")} fase \"{_activeOperation.Name}\" — {_order.Code}";
             _offlineQueue.Enqueue(kind, payload, description);
             UpdateOfflineStatusUi();
@@ -303,7 +306,7 @@ public partial class ShopFloorTerminalWindow : Window
             return;
         }
 
-        var window = new OperationDowntimesWindow(_apiClient, _order.Id, _activeOperation.Id, _activeOperation.Name, _operatorName) { Owner = this };
+        var window = new OperationDowntimesWindow(_apiClient, _order.Id, _activeOperation.Id, _activeOperation.Name, _operatorName, _operatorId) { Owner = this };
         window.ShowDialog();
         await RefreshAsync();
     }
@@ -315,7 +318,7 @@ public partial class ShopFloorTerminalWindow : Window
             return;
         }
 
-        var window = new NonConformitiesWindow(_apiClient, _order.Id, _activeOperation.Id, _activeOperation.Name, _operatorName) { Owner = this };
+        var window = new NonConformitiesWindow(_apiClient, _order.Id, _activeOperation.Id, _activeOperation.Name, _operatorName, _operatorId) { Owner = this };
         window.ShowDialog();
         await RefreshAsync();
     }
