@@ -49,6 +49,31 @@ public sealed class StatusToBrushConverter : IValueConverter
         => throw new NotSupportedException();
 }
 
+/// <summary>Maps a planning entry's Type ("WorkOrder", "PurchaseOrder", "Shipment", "MaintenanceTask")
+/// to a distinct color, so the planning board's entries read as "which kind of commitment" at a glance
+/// without reading the row — same colored-text pattern as StatusToBrushConverter, one hue per type
+/// instead of per status.</summary>
+public sealed class PlanningTypeToBrushConverter : IValueConverter
+{
+    private static readonly Dictionary<string, string> Palette = new(StringComparer.OrdinalIgnoreCase)
+    {
+        ["WorkOrder"] = "#2E6F9E",
+        ["PurchaseOrder"] = "#B36F1B",
+        ["Shipment"] = "#3D7A4C",
+        ["MaintenanceTask"] = "#7B4FA3",
+    };
+
+    public object Convert(object? value, Type targetType, object? parameter, CultureInfo culture)
+    {
+        var key = value as string ?? string.Empty;
+        var hex = Palette.TryGetValue(key, out var color) ? color : "#8C7F6A";
+        return new SolidColorBrush((Color)ColorConverter.ConvertFromString(hex));
+    }
+
+    public object ConvertBack(object value, Type targetType, object? parameter, CultureInfo culture)
+        => throw new NotSupportedException();
+}
+
 /// <summary>Translates a workflow status string (as stored/returned by the API, always in English:
 /// Draft, Released, Done, ...) to the Italian label shown in the UI. Centralized here so every pill,
 /// column and detail header stays consistent instead of each screen inventing its own text.</summary>

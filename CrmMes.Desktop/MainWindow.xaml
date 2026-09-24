@@ -171,6 +171,12 @@
                                             <TextBlock Text="Cruscotto" Margin="6,0,0,0" />
                                         </StackPanel>
                                     </RadioButton>
+                                    <RadioButton x:Name="NavPlanning" Style="{StaticResource NavItem}" GroupName="Nav" Tag="19" Checked="NavItem_Checked">
+                                        <StackPanel Orientation="Horizontal">
+                                            <TextBlock Text="&#xE787;" FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets" FontSize="16" Width="24" />
+                                            <TextBlock Text="Pianificazione" Margin="6,0,0,0" />
+                                        </StackPanel>
+                                    </RadioButton>
                                     <Button x:Name="ShopFloorTerminalButton" Style="{StaticResource SidebarLinkButton}" HorizontalAlignment="Stretch" HorizontalContentAlignment="Left" Margin="0,6,0,0" Click="ShopFloorTerminalButton_Click">
                                         <StackPanel Orientation="Horizontal">
                                             <TextBlock Text="&#xE8FD;" FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets" FontSize="16" Width="24" />
@@ -462,12 +468,14 @@
                                         </ListView.View>
                                     </ListView>
                                 </Border>
-                                <StackPanel Grid.Row="2" Orientation="Horizontal" Margin="0,14,0,0">
-                                    <Button x:Name="EditOrderButton" Style="{StaticResource SecondaryButton}" Content="Modifica" Width="110" Height="36" Margin="0,0,10,0" Click="EditOrderButton_Click" IsEnabled="False" />
-                                    <Button x:Name="ConfirmOrderButton" Content="Conferma selezionato" Width="160" Height="36" Margin="0,0,10,0" Click="ConfirmOrderButton_Click" IsEnabled="False" />
-                                    <Button x:Name="ReceiveOrderButton" Content="Ricevi residuo" Width="140" Height="36" Margin="0,0,10,0" Click="ReceiveOrderButton_Click" IsEnabled="False" />
-                                    <Button x:Name="CancelOrderButton" Style="{StaticResource DangerButton}" Content="Annulla selezionato" Width="160" Height="36" Click="CancelOrderButton_Click" IsEnabled="False" />
-                                </StackPanel>
+                                <WrapPanel Grid.Row="2" Margin="0,14,0,0">
+                                    <Button x:Name="EditOrderButton" Style="{StaticResource SecondaryButton}" Content="Modifica" Width="110" Height="36" Margin="0,10,10,0" Click="EditOrderButton_Click" IsEnabled="False" />
+                                    <Button x:Name="ConfirmOrderButton" Content="Conferma selezionato" Width="160" Height="36" Margin="0,10,10,0" Click="ConfirmOrderButton_Click" IsEnabled="False" />
+                                    <Button x:Name="ReceiveOrderButton" Content="Ricevi residuo" Width="140" Height="36" Margin="0,10,10,0" Click="ReceiveOrderButton_Click" IsEnabled="False" />
+                                    <Button x:Name="CancelOrderButton" Style="{StaticResource DangerButton}" Content="Annulla selezionato" Width="160" Height="36" Margin="0,10,10,0" Click="CancelOrderButton_Click" IsEnabled="False" />
+                                    <DatePicker x:Name="ExpectedDeliveryPicker" Width="150" Height="36" Margin="0,10,10,0" IsEnabled="False" />
+                                    <Button x:Name="SetExpectedDeliveryButton" Style="{StaticResource SecondaryButton}" Content="Imposta consegna prevista" Width="200" Height="36" Margin="0,10,0,0" Click="SetExpectedDeliveryButton_Click" IsEnabled="False" />
+                                </WrapPanel>
                             </Grid>
                         </TabItem>
 
@@ -589,6 +597,7 @@
                                 <DockPanel Grid.Row="0" Margin="0,0,0,14">
                                     <Button DockPanel.Dock="Right" Content="Nuova commessa" Width="150" Height="36" Click="NewWorkOrderButton_Click" />
                                     <Button DockPanel.Dock="Right" Style="{StaticResource SecondaryButton}" Content="Aggiorna" Width="100" Height="36" Margin="0,0,10,0" Click="RefreshWorkOrdersButton_Click" />
+                                    <ComboBox x:Name="WorkOrdersSiteFilterCombo" DockPanel.Dock="Right" Width="170" Height="36" Margin="0,0,10,0" DisplayMemberPath="Name" SelectionChanged="SiteFilter_SelectionChanged" />
                                     <TextBlock Text="Commesse di produzione" VerticalAlignment="Center" Foreground="{StaticResource TextSecondaryBrush}" />
                                 </DockPanel>
                                 <Border Grid.Row="1" Style="{StaticResource CardBorder}" Padding="4">
@@ -675,6 +684,7 @@
                                 </Grid.RowDefinitions>
                                 <DockPanel Grid.Row="0" Margin="0,0,0,14">
                                     <Button DockPanel.Dock="Right" Style="{StaticResource SecondaryButton}" Content="Aggiorna" Width="100" Height="36" Click="RefreshDashboardButton_Click" />
+                                    <ComboBox x:Name="DashboardSiteFilterCombo" DockPanel.Dock="Right" Width="170" Height="36" Margin="0,0,10,0" DisplayMemberPath="Name" SelectionChanged="SiteFilter_SelectionChanged" />
                                     <TextBlock Text="Avanzamento produzione negli ultimi 7 giorni" VerticalAlignment="Center" Foreground="{StaticResource TextSecondaryBrush}" />
                                 </DockPanel>
                                 <Border Grid.Row="1" Style="{StaticResource CardBorder}" Padding="20">
@@ -733,7 +743,10 @@
                                     <TextBox x:Name="WorkCenterNameBox" DockPanel.Dock="Right" Width="180" Margin="0,0,10,0" Tag="Nome centro" />
                                     <TextBox x:Name="WorkCenterCodeBox" Margin="0,0,10,0" Tag="Codice" />
                                 </DockPanel>
-                                <TextBlock Grid.Row="1" x:Name="WorkCenterErrorText" Foreground="{StaticResource DangerBrush}" TextWrapping="Wrap" Margin="0,0,0,8" />
+                                <DockPanel Grid.Row="1" Margin="0,0,0,8">
+                                    <ComboBox x:Name="WorkCentersSiteFilterCombo" DockPanel.Dock="Right" Width="170" Height="30" DisplayMemberPath="Name" SelectionChanged="SiteFilter_SelectionChanged" />
+                                    <TextBlock x:Name="WorkCenterErrorText" Foreground="{StaticResource DangerBrush}" TextWrapping="Wrap" VerticalAlignment="Center" />
+                                </DockPanel>
 
                                 <Border Grid.Row="2" Style="{StaticResource CardBorder}" Padding="4" MinHeight="110">
                                     <ListView x:Name="WorkCentersList" MouseDoubleClick="WorkCentersList_MouseDoubleClick">
@@ -1069,6 +1082,108 @@
                                 <StackPanel Grid.Row="2" Orientation="Horizontal" Margin="0,14,0,0">
                                     <Button x:Name="CompleteMaintenanceTaskButton" Content="Segna come completato" Width="180" Height="36" Click="CompleteMaintenanceTask_Click" IsEnabled="False" />
                                 </StackPanel>
+                            </Grid>
+                        </TabItem>
+
+                        <TabItem Header="Pianificazione">
+                            <Grid>
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto" />
+                                    <RowDefinition Height="Auto" />
+                                    <RowDefinition Height="Auto" />
+                                    <RowDefinition Height="*" />
+                                </Grid.RowDefinitions>
+
+                                <DockPanel Grid.Row="0" Margin="0,0,0,10">
+                                    <Button DockPanel.Dock="Right" Style="{StaticResource SecondaryButton}" Content="Aggiorna" Width="100" Height="36" Click="RefreshPlanningButton_Click" />
+                                    <ComboBox x:Name="PlanningWeeksCombo" DockPanel.Dock="Right" Width="140" Height="36" Margin="0,0,10,0" SelectionChanged="PlanningWeeksCombo_SelectionChanged">
+                                        <ComboBoxItem Content="4 settimane" Tag="4" IsSelected="True" />
+                                        <ComboBoxItem Content="8 settimane" Tag="8" />
+                                        <ComboBoxItem Content="12 settimane" Tag="12" />
+                                        <ComboBoxItem Content="26 settimane" Tag="26" />
+                                    </ComboBox>
+                                    <ComboBox x:Name="PlanningSiteFilterCombo" DockPanel.Dock="Right" Width="170" Height="36" Margin="0,0,10,0" DisplayMemberPath="Name" SelectionChanged="SiteFilter_SelectionChanged" />
+                                    <TextBlock Text="Scadenze aggregate: commesse, ordini fornitore, spedizioni, manutenzioni" VerticalAlignment="Center" Foreground="{StaticResource TextSecondaryBrush}" />
+                                </DockPanel>
+
+                                <WrapPanel Grid.Row="1" Margin="0,0,0,10">
+                                    <CheckBox x:Name="PlanningFilterWorkOrder" Content="Commesse" IsChecked="True" Margin="0,0,18,0" VerticalAlignment="Center" Checked="PlanningTypeFilter_Changed" Unchecked="PlanningTypeFilter_Changed">
+                                        <CheckBox.Foreground>
+                                            <SolidColorBrush Color="#2E6F9E" />
+                                        </CheckBox.Foreground>
+                                    </CheckBox>
+                                    <CheckBox x:Name="PlanningFilterPurchaseOrder" Content="Ordini fornitore" IsChecked="True" Margin="0,0,18,0" VerticalAlignment="Center" Checked="PlanningTypeFilter_Changed" Unchecked="PlanningTypeFilter_Changed">
+                                        <CheckBox.Foreground>
+                                            <SolidColorBrush Color="#B36F1B" />
+                                        </CheckBox.Foreground>
+                                    </CheckBox>
+                                    <CheckBox x:Name="PlanningFilterShipment" Content="Spedizioni" IsChecked="True" Margin="0,0,18,0" VerticalAlignment="Center" Checked="PlanningTypeFilter_Changed" Unchecked="PlanningTypeFilter_Changed">
+                                        <CheckBox.Foreground>
+                                            <SolidColorBrush Color="#3D7A4C" />
+                                        </CheckBox.Foreground>
+                                    </CheckBox>
+                                    <CheckBox x:Name="PlanningFilterMaintenanceTask" Content="Manutenzioni" IsChecked="True" VerticalAlignment="Center" Checked="PlanningTypeFilter_Changed" Unchecked="PlanningTypeFilter_Changed">
+                                        <CheckBox.Foreground>
+                                            <SolidColorBrush Color="#7B4FA3" />
+                                        </CheckBox.Foreground>
+                                    </CheckBox>
+                                </WrapPanel>
+
+                                <UniformGrid Grid.Row="2" Columns="4" Margin="0,0,0,16">
+                                    <Border Style="{StaticResource CardBorder}" Padding="16" Margin="0,0,10,0">
+                                        <StackPanel>
+                                            <TextBlock Text="In ritardo" Foreground="{StaticResource TextSecondaryBrush}" FontSize="12" />
+                                            <TextBlock x:Name="PlanningOverdueText" Text="0" FontSize="26" FontWeight="SemiBold" Foreground="{StaticResource DangerBrush}" />
+                                        </StackPanel>
+                                    </Border>
+                                    <Border Style="{StaticResource CardBorder}" Padding="16" Margin="0,0,10,0">
+                                        <StackPanel>
+                                            <TextBlock Text="Questa settimana" Foreground="{StaticResource TextSecondaryBrush}" FontSize="12" />
+                                            <TextBlock x:Name="PlanningThisWeekText" Text="0" FontSize="26" FontWeight="SemiBold" Foreground="{StaticResource TextPrimaryBrush}" />
+                                        </StackPanel>
+                                    </Border>
+                                    <Border Style="{StaticResource CardBorder}" Padding="16" Margin="0,0,10,0">
+                                        <StackPanel>
+                                            <TextBlock Text="Prossima settimana" Foreground="{StaticResource TextSecondaryBrush}" FontSize="12" />
+                                            <TextBlock x:Name="PlanningNextWeekText" Text="0" FontSize="26" FontWeight="SemiBold" Foreground="{StaticResource TextPrimaryBrush}" />
+                                        </StackPanel>
+                                    </Border>
+                                    <Border Style="{StaticResource CardBorder}" Padding="16">
+                                        <StackPanel>
+                                            <TextBlock Text="Totale nel periodo" Foreground="{StaticResource TextSecondaryBrush}" FontSize="12" />
+                                            <TextBlock x:Name="PlanningTotalText" Text="0" FontSize="26" FontWeight="SemiBold" Foreground="{StaticResource PrimaryBrush}" />
+                                        </StackPanel>
+                                    </Border>
+                                </UniformGrid>
+
+                                <Border Grid.Row="3" Style="{StaticResource CardBorder}" Padding="4">
+                                    <ListView x:Name="PlanningList">
+                                        <ListView.GroupStyle>
+                                            <GroupStyle>
+                                                <GroupStyle.HeaderTemplate>
+                                                    <DataTemplate>
+                                                        <TextBlock Text="{Binding Name}" FontWeight="SemiBold" FontSize="14" Foreground="{StaticResource TextPrimaryBrush}" Margin="4,10,0,4" />
+                                                    </DataTemplate>
+                                                </GroupStyle.HeaderTemplate>
+                                            </GroupStyle>
+                                        </ListView.GroupStyle>
+                                        <ListView.View>
+                                            <GridView>
+                                                <GridViewColumn Header="Tipo" Width="130">
+                                                    <GridViewColumn.CellTemplate>
+                                                        <DataTemplate>
+                                                            <TextBlock Text="{Binding Kind}" Foreground="{Binding Type, Converter={StaticResource PlanningTypeToBrush}}" FontWeight="SemiBold" />
+                                                        </DataTemplate>
+                                                    </GridViewColumn.CellTemplate>
+                                                </GridViewColumn>
+                                                <GridViewColumn Header="Codice" DisplayMemberBinding="{Binding Code}" Width="180" />
+                                                <GridViewColumn Header="Dettaglio" DisplayMemberBinding="{Binding Detail}" Width="220" />
+                                                <GridViewColumn Header="Stato" DisplayMemberBinding="{Binding Status}" Width="110" />
+                                                <GridViewColumn Header="Data" DisplayMemberBinding="{Binding DateLabel}" Width="110" />
+                                            </GridView>
+                                        </ListView.View>
+                                    </ListView>
+                                </Border>
                             </Grid>
                         </TabItem>
 

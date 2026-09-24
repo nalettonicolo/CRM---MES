@@ -209,4 +209,118 @@ public class WithdrawalSlipsTests : IClassFixture<AdminSeededApiTestFixture>
 
         Assert.Equal(HttpStatusCode.Conflict, editResponse.StatusCode);
     }
+
+    /// <summary>Product with a one-line BOM (2 units of the given material per product unit) and a
+    /// single-step routing, ready to drive a work order with tracked units end to end.</summary>
+    private async Task<ProductResponse> CreateProductWithBomAsync(string materialCode)
+    {
+        var productResponse = await _adminClient.PostAsJsonAsync(
+            "/api/products", new CreateProductRequest($"PROD-{Guid.NewGuid():N}"[..12], "Prodotto di test", null));
+        var product = (await productResponse.Content.ReadFromJsonAsync<ProductResponse>())!;
+
+        await _adminClient.PutAsJsonAsync(
+            $"/api/products/{product.Id}/bom",
+            new ReplaceBillOfMaterialRequest([new BillOfMaterialItemRequest(materialCode, 2, null)]));
+        await _adminClient.PutAsJsonAsync(
+            $"/api/products/{product.Id}/routing",
+            new ReplaceRoutingRequest([new RoutingStepRequest("Assemblaggio", null, "Linea 1", 30)]));
+
+        return product;
+    }
+
+    [Fact]
+    public async Task CloseWithdrawalSlip_ForWorkOrderWithUnits_AttributesOneLotAcrossAllUnits()
+    {
+        var suffix = Guid.NewGuid().ToString("N")[..8];
+        var materialResponse = await _adminClient.PostAsJsonAsync(
+            "/api/materials", new CreateMaterialRequest($"MAT-{suffix}", $"Materiale {suffix}", "pz", 0, 0));
+        var material = (await materialResponse.Content.ReadFromJsonAsync<MaterialResponse>())!;
+
+        var lotResponse = await _adminClient.PostAsJsonAsync(
+            "/api/material-lots", new CreateMaterialLotRequest(material.Code, $"LOT-{suffix}", 10, null));
+        lotResponse.EnsureSuccessStatusCode();
+        var lot = (await lotResponse.Content.ReadFromJsonAsync<MaterialLotSummaryResponse>())!;
+
+        var product = await CreateProductWithBomAsync(material.Code);
+        var areaResponse = await _adminClient.PostAsJsonAsync("/api/areas", new CreateAreaRequest($"Area {suffix}", $"AREA-{suffix}"));
+        var area = (await areaResponse.Content.ReadFromJsonAsync<Area>())!;
+
+        // 3 units, BOM needs 2 each -> 6 total, comfortably inside the single 10-unit lot.
+        var orderResponse = await _adminClient.PostAsJsonAsync(
+            "/api/work-orders", new CreateWorkOrderRequest(product.Id, 3, null, area.Id, null, null, null));
+        var order = (await orderResponse.Content.ReadFromJsonAsync<WorkOrderResponse>())!;
+
+        var generateResponse = await _adminClient.PostAsync($"/api/work-orders/{order.Id}/generate-withdrawal-slip", null);
+        var generated = (await generateResponse.Content.ReadFromJsonAsync<WorkOrderWithdrawalSlipResponse>())!;
+        await _adminClient.PostAsync($"/api/withdrawal-slips/{generated.WithdrawalSlipId}/ready", null);
+        var closeResponse = await _adminClient.PostAsync($"/api/withdrawal-slips/{generated.WithdrawalSlipId}/close", null);
+        Assert.Equal(HttpStatusCode.OK, closeResponse.StatusCode);
+
+        var units = await _adminClient.GetFromJsonAsync<List<WorkOrderUnitResponse>>($"/api/work-orders/{order.Id}/units");
+        Assert.Equal(3, units!.Count);
+
+        using var scope = _fixture.Factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+        foreach (var unit in units)
+        {
+            var attributed = await db.WorkOrderUnitMaterialLots
+                .Where(l => l.WorkOrderUnitId == unit.Id)
+                .ToListAsync();
+            Assert.Single(attributed);
+            Assert.Equal(lot.Id, attributed[0].MaterialLotId);
+            Assert.Equal(2, attributed[0].Quantity);
+        }
+    }
+
+    [Fact]
+    public async Task CloseWithdrawalSlip_ForWorkOrderWithUnits_SplitsAUnitAcrossTwoLotsWhenTheBoundaryFallsMidUnit()
+    {
+        var suffix = Guid.NewGuid().ToString("N")[..8];
+        var materialResponse = await _adminClient.PostAsJsonAsync(
+            "/api/materials", new CreateMaterialRequest($"MAT-{suffix}", $"Materiale {suffix}", "pz", 0, 0));
+        var material = (await materialResponse.Content.ReadFromJsonAsync<MaterialResponse>())!;
+
+        // Two lots of 3 each, received in sequence (FIFO order = lot1 then lot2). BOM needs 2 per unit
+        // over 3 units (6 total): unit1 takes 2 from lot1 (1 left), unit2 takes the last 1 from lot1 +
+        // 1 from lot2 (a genuine split), unit3 takes the remaining 2 from lot2.
+        var lot1Response = await _adminClient.PostAsJsonAsync(
+            "/api/material-lots", new CreateMaterialLotRequest(material.Code, $"LOT-{suffix}-A", 3, null));
+        var lot1 = (await lot1Response.Content.ReadFromJsonAsync<MaterialLotSummaryResponse>())!;
+        var lot2Response = await _adminClient.PostAsJsonAsync(
+            "/api/material-lots", new CreateMaterialLotRequest(material.Code, $"LOT-{suffix}-B", 3, null));
+        var lot2 = (await lot2Response.Content.ReadFromJsonAsync<MaterialLotSummaryResponse>())!;
+
+        var product = await CreateProductWithBomAsync(material.Code);
+        var areaResponse = await _adminClient.PostAsJsonAsync("/api/areas", new CreateAreaRequest($"Area {suffix}", $"AREA-{suffix}"));
+        var area = (await areaResponse.Content.ReadFromJsonAsync<Area>())!;
+
+        var orderResponse = await _adminClient.PostAsJsonAsync(
+            "/api/work-orders", new CreateWorkOrderRequest(product.Id, 3, null, area.Id, null, null, null));
+        var order = (await orderResponse.Content.ReadFromJsonAsync<WorkOrderResponse>())!;
+
+        var generateResponse = await _adminClient.PostAsync($"/api/work-orders/{order.Id}/generate-withdrawal-slip", null);
+        var generated = (await generateResponse.Content.ReadFromJsonAsync<WorkOrderWithdrawalSlipResponse>())!;
+        await _adminClient.PostAsync($"/api/withdrawal-slips/{generated.WithdrawalSlipId}/ready", null);
+        await _adminClient.PostAsync($"/api/withdrawal-slips/{generated.WithdrawalSlipId}/close", null);
+
+        var units = (await _adminClient.GetFromJsonAsync<List<WorkOrderUnitResponse>>($"/api/work-orders/{order.Id}/units"))!
+            .OrderBy(u => u.SequenceNumber).ToList();
+
+        using var scope = _fixture.Factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+
+        var unit2Lots = await db.WorkOrderUnitMaterialLots.Where(l => l.WorkOrderUnitId == units[1].Id).ToListAsync();
+        Assert.Equal(2, unit2Lots.Count);
+        Assert.Equal(2, unit2Lots.Sum(l => l.Quantity));
+        Assert.Contains(unit2Lots, l => l.MaterialLotId == lot1.Id);
+        Assert.Contains(unit2Lots, l => l.MaterialLotId == lot2.Id);
+
+        var unit1Lots = await db.WorkOrderUnitMaterialLots.Where(l => l.WorkOrderUnitId == units[0].Id).ToListAsync();
+        Assert.Single(unit1Lots);
+        Assert.Equal(lot1.Id, unit1Lots[0].MaterialLotId);
+
+        var unit3Lots = await db.WorkOrderUnitMaterialLots.Where(l => l.WorkOrderUnitId == units[2].Id).ToListAsync();
+        Assert.Single(unit3Lots);
+        Assert.Equal(lot2.Id, unit3Lots[0].MaterialLotId);
+    }
 }

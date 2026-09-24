@@ -1,6 +1,8 @@
+using System.ComponentModel;
 using System.Diagnostics;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Data;
 using System.Windows.Input;
 using System.Windows.Threading;
 
@@ -43,6 +45,11 @@ public partial class MainWindow : Window
     private bool _equipmentLoaded;
     private bool _maintenanceLoaded;
     private MaintenanceTaskDto? _selectedMaintenanceTask;
+    private bool _siteFilterOptionsLoaded;
+    private bool _syncingSiteFilters;
+    private Guid? _siteFilterId;
+    private bool _planningLoaded;
+    private int _planningWeeks = 4;
 
     private static readonly Dictionary<int, string> PageTitles = new()
     {
@@ -65,6 +72,7 @@ public partial class MainWindow : Window
         [16] = "Sedi",
         [17] = "Macchine",
         [18] = "Manutenzione",
+        [19] = "Pianificazione",
     };
 
     private static readonly Dictionary<int, string> PageEyebrows = new()
@@ -88,6 +96,7 @@ public partial class MainWindow : Window
         [18] = "M A N U T E N Z I O N E",
         [12] = "S P E D I Z I O N I",
         [13] = "S P E D I Z I O N I",
+        [19] = "P R O D U Z I O N E",
     };
 
     private static readonly Dictionary<int, string> PageHelpTexts = new()
@@ -111,6 +120,7 @@ public partial class MainWindow : Window
         [16] = "Sedi fisiche della stessa azienda (es. un secondo stabilimento). Non sono aziende separate: utenti, materiali, fornitori e prodotti restano condivisi — la sede è solo una dimensione per filtrare/riportare aree e centri di lavoro. Doppio click su una sede per vedere quali aree e centri di lavoro le appartengono.",
         [17] = "Anagrafica macchine/asset per la manutenzione — il controparte di Centri di lavoro, che resta l'unità di capacità. Doppio click su una macchina per lo storico degli interventi di manutenzione registrati su di essa.",
         [18] = "Interventi di manutenzione preventiva (pianificata, con scadenza ed eventuale ricorrenza — completandolo genera subito la prossima occorrenza) o correttiva (a fronte di un guasto). È il pezzo che permette di intervenire sul fattore Disponibilità dell'OEE, non solo misurarlo.",
+        [19] = "Board settimanale che aggrega tutte le scadenze già tracciate altrove — consegne commesse, consegne previste ordini fornitore, spedizioni, interventi di manutenzione — colorate per tipo, filtrabili per tipo/stato/sede, con un cruscotto di riepilogo (in ritardo/questa settimana/prossima settimana/totale). Non introduce nuovi dati: aggrega e colora quello che esiste già nelle rispettive sezioni.",
     };
 
 #if DEBUG
@@ -344,15 +354,18 @@ public partial class MainWindow : Window
                 await LoadProductsAsync();
                 break;
             case "Commesse" when !_workOrdersLoaded:
+                await EnsureSiteFilterOptionsAsync();
                 await LoadWorkOrdersAsync();
                 break;
             case "Lotti materiali" when !_materialLotsLoaded:
                 await LoadMaterialLotsAsync();
                 break;
             case "Cruscotto" when !_dashboardLoaded:
+                await EnsureSiteFilterOptionsAsync();
                 await LoadDashboardAsync();
                 break;
             case "Centri di lavoro" when !_workCentersLoaded:
+                await EnsureSiteFilterOptionsAsync();
                 await LoadWorkCentersAsync();
                 break;
             case "Corrieri" when !_carriersLoaded:
@@ -372,6 +385,10 @@ public partial class MainWindow : Window
                 break;
             case "Manutenzione" when !_maintenanceLoaded:
                 await LoadMaintenanceTasksAsync();
+                break;
+            case "Pianificazione" when !_planningLoaded:
+                await EnsureSiteFilterOptionsAsync();
+                await LoadPlanningAsync();
                 break;
         }
     }
@@ -1333,6 +1350,22 @@ public partial class MainWindow : Window
         ConfirmOrderButton.IsEnabled = hasSelection && _selectedOrder!.Status == "Draft";
         ReceiveOrderButton.IsEnabled = hasSelection && (_selectedOrder!.Status is "Confirmed" or "PartiallyReceived");
         CancelOrderButton.IsEnabled = hasSelection && (_selectedOrder!.Status is not ("Received" or "Cancelled"));
+        ExpectedDeliveryPicker.IsEnabled = hasSelection;
+        SetExpectedDeliveryButton.IsEnabled = hasSelection;
+    }
+
+    private async void SetExpectedDeliveryButton_Click(object sender, RoutedEventArgs e)
+    {
+        if (_selectedOrder is null || ExpectedDeliveryPicker.SelectedDate is not DateTime date)
+        {
+            return;
+        }
+
+        var orderId = _selectedOrder.Id;
+        await RunBusyAsync("Aggiornamento consegna prevista...", async () =>
+        {
+            await _apiClient.SetPurchaseOrderExpectedDeliveryAsync(orderId, date);
+        });
     }
 
     private async void EditOrderButton_Click(object sender, RoutedEventArgs e)
@@ -1555,6 +1588,83 @@ public partial class MainWindow : Window
         CompleteMaintenanceTaskButton.IsEnabled = false;
     });
 
+    /// <summary>One row on the planning board, already shaped for display — week label used for the
+    /// ListView's group headers, date pre-formatted, everything else copied straight from the API.</summary>
+    public sealed record PlanningEntryRow(string Type, string Code, string Detail, string Kind, string Status, DateTime Date, string DateLabel, string WeekLabel);
+
+    private static readonly HashSet<string> PlanningAllTypes = ["WorkOrder", "PurchaseOrder", "Shipment", "MaintenanceTask"];
+
+    private Task LoadPlanningAsync() => RunBusyAsync(string.Empty, async () =>
+    {
+        var selectedTypes = new List<string>();
+        if (PlanningFilterWorkOrder.IsChecked == true) selectedTypes.Add("WorkOrder");
+        if (PlanningFilterPurchaseOrder.IsChecked == true) selectedTypes.Add("PurchaseOrder");
+        if (PlanningFilterShipment.IsChecked == true) selectedTypes.Add("Shipment");
+        if (PlanningFilterMaintenanceTask.IsChecked == true) selectedTypes.Add("MaintenanceTask");
+
+        // All four checked (the common case) means "no filter" server-side, same as none checked would
+        // be meaningless to ask for — but an empty selection should show nothing, not everything, so it's
+        // special-cased separately below instead of being sent as "no filter".
+        var planning = selectedTypes.Count == 0
+            ? new PlanningDto(DateTime.UtcNow, _planningWeeks, [], new PlanningDashboardDto(0, 0, 0, 0))
+            : await _apiClient.GetPlanningAsync(
+                weeks: _planningWeeks, siteId: _siteFilterId,
+                types: selectedTypes.Count == PlanningAllTypes.Count ? null : selectedTypes);
+
+        var culture = System.Globalization.CultureInfo.CurrentCulture;
+        var rows = planning.Entries.Select(entry =>
+        {
+            var weekStart = StartOfWeek(entry.Date);
+            var weekEnd = weekStart.AddDays(6);
+            return new PlanningEntryRow(
+                entry.Type, entry.Code, entry.Detail, entry.Kind,
+                StatusToItalianTextConverter.Translate(entry.Status), entry.Date,
+                entry.Date.ToString("d", culture),
+                $"Settimana del {weekStart:dd/MM} - {weekEnd:dd/MM}");
+        }).ToList();
+
+        var view = new ListCollectionView(rows);
+        view.GroupDescriptions.Add(new PropertyGroupDescription(nameof(PlanningEntryRow.WeekLabel)));
+        PlanningList.ItemsSource = view;
+
+        PlanningOverdueText.Text = planning.Dashboard.Overdue.ToString();
+        PlanningThisWeekText.Text = planning.Dashboard.ThisWeek.ToString();
+        PlanningNextWeekText.Text = planning.Dashboard.NextWeek.ToString();
+        PlanningTotalText.Text = planning.Dashboard.Total.ToString();
+
+        _planningLoaded = true;
+    });
+
+    private static DateTime StartOfWeek(DateTime date)
+    {
+        var diff = (7 + (date.DayOfWeek - DayOfWeek.Monday)) % 7;
+        return date.Date.AddDays(-diff);
+    }
+
+    private async void RefreshPlanningButton_Click(object sender, RoutedEventArgs e) => await LoadPlanningAsync();
+
+    private async void PlanningTypeFilter_Changed(object sender, RoutedEventArgs e)
+    {
+        if (_planningLoaded)
+        {
+            await LoadPlanningAsync();
+        }
+    }
+
+    private async void PlanningWeeksCombo_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (PlanningWeeksCombo.SelectedItem is not ComboBoxItem item || item.Tag is not string tag || !int.TryParse(tag, out var weeks))
+        {
+            return;
+        }
+
+        _planningWeeks = weeks;
+        if (_planningLoaded)
+        {
+            await LoadPlanningAsync();
+        }
+    }
+
     private Task LoadShipmentsAsync() => RunBusyAsync(string.Empty, async () =>
     {
         var direction = (ShipmentDirectionFilter.SelectedItem as ComboBoxItem)?.Tag as string;
@@ -1581,9 +1691,77 @@ public partial class MainWindow : Window
         EditProductButton.IsEnabled = false;
     });
 
+    /// <summary>Populates the "Sede" filter combos shared by Commesse/Cruscotto/Centri di lavoro, once —
+    /// a synthetic "Tutte le sedi" entry (Id = Guid.Empty) sits first so "no filter" is a selectable
+    /// option, not just an absence.</summary>
+    private async Task EnsureSiteFilterOptionsAsync()
+    {
+        if (_siteFilterOptionsLoaded)
+        {
+            return;
+        }
+
+        var sites = await _apiClient.GetSitesAsync();
+        var options = new List<SiteDto> { new(Guid.Empty, "Tutte le sedi", "", null, true) };
+        options.AddRange(sites);
+
+        _syncingSiteFilters = true;
+        WorkOrdersSiteFilterCombo.ItemsSource = options;
+        WorkOrdersSiteFilterCombo.SelectedIndex = 0;
+        DashboardSiteFilterCombo.ItemsSource = options.ToList();
+        DashboardSiteFilterCombo.SelectedIndex = 0;
+        WorkCentersSiteFilterCombo.ItemsSource = options.ToList();
+        WorkCentersSiteFilterCombo.SelectedIndex = 0;
+        PlanningSiteFilterCombo.ItemsSource = options.ToList();
+        PlanningSiteFilterCombo.SelectedIndex = 0;
+        _syncingSiteFilters = false;
+
+        _siteFilterOptionsLoaded = true;
+    }
+
+    /// <summary>Any of the three "Sede" combos changing updates the one shared filter and keeps the other
+    /// two in sync, then reloads whichever tab is currently showing — so the filter behaves as one scope
+    /// followed across Commesse/Cruscotto/Centri di lavoro, not three independent ones.</summary>
+    private async void SiteFilter_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (_syncingSiteFilters || sender is not ComboBox combo)
+        {
+            return;
+        }
+
+        var selected = combo.SelectedItem as SiteDto;
+        _siteFilterId = selected is null || selected.Id == Guid.Empty ? null : selected.Id;
+
+        _syncingSiteFilters = true;
+        foreach (var otherCombo in new[] { WorkOrdersSiteFilterCombo, DashboardSiteFilterCombo, WorkCentersSiteFilterCombo, PlanningSiteFilterCombo })
+        {
+            if (!ReferenceEquals(otherCombo, combo) && otherCombo.ItemsSource is IEnumerable<SiteDto> items)
+            {
+                otherCombo.SelectedItem = items.FirstOrDefault(s => s.Id == (selected?.Id ?? Guid.Empty));
+            }
+        }
+        _syncingSiteFilters = false;
+
+        switch ((MainTabs.SelectedItem as TabItem)?.Header as string)
+        {
+            case "Commesse":
+                await LoadWorkOrdersAsync();
+                break;
+            case "Cruscotto":
+                await LoadDashboardAsync();
+                break;
+            case "Centri di lavoro":
+                await LoadWorkCentersAsync();
+                break;
+            case "Pianificazione":
+                await LoadPlanningAsync();
+                break;
+        }
+    }
+
     private Task LoadWorkOrdersAsync() => RunBusyAsync(string.Empty, async () =>
     {
-        WorkOrdersList.ItemsSource = await _apiClient.GetWorkOrdersAsync();
+        WorkOrdersList.ItemsSource = await _apiClient.GetWorkOrdersAsync(siteId: _siteFilterId);
         _workOrdersLoaded = true;
         _selectedWorkOrder = null;
         OpenWorkOrderButton.IsEnabled = false;
@@ -1602,7 +1780,7 @@ public partial class MainWindow : Window
 
     private Task LoadDashboardAsync() => RunBusyAsync(string.Empty, async () =>
     {
-        var dashboard = await _apiClient.GetWorkOrderDashboardAsync();
+        var dashboard = await _apiClient.GetWorkOrderDashboardAsync(siteId: _siteFilterId);
         _dashboardLoaded = true;
 
         DashboardStatusList.ItemsSource = dashboard.WorkOrdersByStatus;
@@ -1627,8 +1805,8 @@ public partial class MainWindow : Window
 
     private Task LoadWorkCentersAsync() => RunBusyAsync(string.Empty, async () =>
     {
-        WorkCentersList.ItemsSource = await _apiClient.GetWorkCentersAsync();
-        WorkCenterLoadList.ItemsSource = await _apiClient.GetWorkCenterLoadAsync();
+        WorkCentersList.ItemsSource = await _apiClient.GetWorkCentersAsync(_siteFilterId);
+        WorkCenterLoadList.ItemsSource = await _apiClient.GetWorkCenterLoadAsync(_siteFilterId);
         _workCentersLoaded = true;
     });
 

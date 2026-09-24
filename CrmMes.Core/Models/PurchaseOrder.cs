@@ -10,5 +10,10 @@ public class PurchaseOrder
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     public DateTime? ConfirmedAt { get; set; }
     public DateTime? ReceivedAt { get; set; }
+
+    /// <summary>Expected delivery date as agreed with the supplier — set by purchasing when confirming
+    /// the order, independent of any shipment (a shipment may not exist yet). Feeds the planning
+    /// calendar; purely informational, never enforced.</summary>
+    public DateTime? ExpectedDeliveryDate { get; set; }
     public ICollection<PurchaseOrderItem> Items { get; set; } = new List<PurchaseOrderItem>();
 }

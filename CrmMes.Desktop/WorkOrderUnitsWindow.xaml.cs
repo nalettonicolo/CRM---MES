@@ -30,12 +30,22 @@ public partial class WorkOrderUnitsWindow : Window
                 return;
             }
 
-            InfoText.Text = $"{units.Count} unità pianificate. Ogni unità nasce \"In attesa\": diventa \"Scartata\" se le si registra contro una non conformità, oppure \"Buona\" automaticamente al completamento della commessa se non è mai stata scartata.";
+            InfoText.Text = $"{units.Count} unità pianificate. Ogni unità nasce \"In attesa\": diventa \"Scartata\" se le si registra contro una non conformità, oppure \"Buona\" automaticamente al completamento della commessa se non è mai stata scartata. Doppio click su una riga per il dettaglio (fasi attraversate e lotti materiali attribuiti).";
             UnitsList.ItemsSource = units;
         }
         catch (Exception exception)
         {
             InfoText.Text = exception.Message;
         }
+    }
+
+    private void UnitsList_MouseDoubleClick(object sender, System.Windows.Input.MouseButtonEventArgs e)
+    {
+        if (UnitsList.SelectedItem is not WorkOrderUnitDto unit)
+        {
+            return;
+        }
+
+        new WorkOrderUnitDetailWindow(_apiClient, _workOrderId, unit.Id) { Owner = this }.ShowDialog();
     }
 }

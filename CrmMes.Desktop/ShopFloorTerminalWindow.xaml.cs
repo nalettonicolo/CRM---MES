@@ -13,11 +13,12 @@ namespace CrmMes.Desktop;
 /// without navigating the full office client. A barcode/QR scanner reads as a keyboard (types the
 /// code, then Enter), so this needs no special hardware integration, just a focused text box.
 ///
-/// Starting/completing a phase also works with no connectivity: if the API can't be reached, the
-/// action is queued locally (<see cref="OfflineActionQueue"/>) instead of failing, and replayed
-/// automatically once the connection comes back — the piece of the terminal most likely to run on a
-/// shop-floor PC with a flaky network. Fermi macchina and non conformità (opened from here via their
-/// own windows) aren't wired into the queue yet, only the two direct actions on this screen.</summary>
+/// Starting/completing a phase, opening/closing a downtime, and registering a non-conformity all work
+/// with no connectivity: if the API can't be reached, the action is queued locally
+/// (<see cref="OfflineActionQueue"/>) instead of failing, and replayed automatically once the connection
+/// comes back — this terminal is the piece of the app most likely to run on a shop-floor PC with a flaky
+/// network. The downtime/non-conformity windows opened from here share this same queue (passed in), so
+/// they queue too; opened from the office client instead (no queue passed), they stay online-only.</summary>
 public partial class ShopFloorTerminalWindow : Window
 {
     private readonly ApiClient _apiClient;
@@ -46,6 +47,8 @@ public partial class ShopFloorTerminalWindow : Window
             var payload = JsonSerializer.Deserialize<OperationActionPayload>(json)!;
             await _apiClient.CompleteOperationAsync(payload.WorkOrderId, payload.OperationId, payload.OperatorName, payload.OperatorId, ct);
         });
+        OperationDowntimesWindow.RegisterOfflineHandlers(_offlineQueue, _apiClient);
+        NonConformitiesWindow.RegisterOfflineHandlers(_offlineQueue, _apiClient);
 
         _syncTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(30) };
         _syncTimer.Tick += async (_, _) => await TrySyncAsync();
@@ -306,7 +309,7 @@ public partial class ShopFloorTerminalWindow : Window
             return;
         }
 
-        var window = new OperationDowntimesWindow(_apiClient, _order.Id, _activeOperation.Id, _activeOperation.Name, _operatorName, _operatorId) { Owner = this };
+        var window = new OperationDowntimesWindow(_apiClient, _order.Id, _activeOperation.Id, _activeOperation.Name, _operatorName, _operatorId, _offlineQueue) { Owner = this };
         window.ShowDialog();
         await RefreshAsync();
     }
@@ -318,7 +321,7 @@ public partial class ShopFloorTerminalWindow : Window
             return;
         }
 
-        var window = new NonConformitiesWindow(_apiClient, _order.Id, _activeOperation.Id, _activeOperation.Name, _operatorName, _operatorId) { Owner = this };
+        var window = new NonConformitiesWindow(_apiClient, _order.Id, _activeOperation.Id, _activeOperation.Name, _operatorName, _operatorId, _offlineQueue) { Owner = this };
         window.ShowDialog();
         await RefreshAsync();
     }

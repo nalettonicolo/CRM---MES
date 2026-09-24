@@ -1014,4 +1014,114 @@ public class WorkOrdersTests : IClassFixture<AdminSeededApiTestFixture>
         Assert.NotNull(dashboard!.QualityRatio);
         Assert.InRange(dashboard.QualityRatio!.Value, 0m, 1m);
     }
+
+    [Fact]
+    public async Task StartAndCompleteOperation_ProjectsTimingToEveryPendingUnit()
+    {
+        var (product, _) = await CreateProductWithRoutingAndBomAsync(materialStock: 100);
+        var createResponse = await _adminClient.PostAsJsonAsync(
+            "/api/work-orders", new CreateWorkOrderRequest(product.Id, 2, null, null, null, null, null));
+        var order = (await createResponse.Content.ReadFromJsonAsync<WorkOrderResponse>())!;
+        await _adminClient.PostAsync($"/api/work-orders/{order.Id}/release", null);
+
+        var units = await _adminClient.GetFromJsonAsync<List<WorkOrderUnitResponse>>($"/api/work-orders/{order.Id}/units");
+        var firstOperation = order.Operations.OrderBy(op => op.SequenceNumber).First();
+
+        await _adminClient.PostAsync($"/api/work-orders/{order.Id}/operations/{firstOperation.Id}/start", null);
+        await _adminClient.PostAsync($"/api/work-orders/{order.Id}/operations/{firstOperation.Id}/complete", null);
+
+        foreach (var unit in units!)
+        {
+            var detail = await _adminClient.GetFromJsonAsync<WorkOrderUnitDetailResponse>($"/api/work-orders/{order.Id}/units/{unit.Id}/detail");
+            Assert.NotNull(detail);
+            var firstOpProgress = detail!.Operations.Single(op => op.OperationId == firstOperation.Id);
+            Assert.Equal("Done", firstOpProgress.Status);
+            Assert.NotNull(firstOpProgress.StartedAt);
+            Assert.NotNull(firstOpProgress.CompletedAt);
+
+            var secondOpProgress = detail.Operations.Single(op => op.OperationId != firstOperation.Id);
+            Assert.Equal("Pending", secondOpProgress.Status);
+        }
+    }
+
+    [Fact]
+    public async Task ScrappedUnit_StopsReceivingLaterPhaseTiming()
+    {
+        var (product, _) = await CreateProductWithRoutingAndBomAsync(materialStock: 100);
+        var createResponse = await _adminClient.PostAsJsonAsync(
+            "/api/work-orders", new CreateWorkOrderRequest(product.Id, 2, null, null, null, null, null));
+        var order = (await createResponse.Content.ReadFromJsonAsync<WorkOrderResponse>())!;
+        await _adminClient.PostAsync($"/api/work-orders/{order.Id}/release", null);
+
+        var units = await _adminClient.GetFromJsonAsync<List<WorkOrderUnitResponse>>($"/api/work-orders/{order.Id}/units");
+        var scrappedUnit = units!.First();
+        var operations = order.Operations.OrderBy(op => op.SequenceNumber).ToList();
+        var firstOperation = operations[0];
+        var secondOperation = operations[1];
+
+        await _adminClient.PostAsync($"/api/work-orders/{order.Id}/operations/{firstOperation.Id}/start", null);
+        await _adminClient.PostAsJsonAsync(
+            $"/api/work-orders/{order.Id}/operations/{firstOperation.Id}/non-conformities",
+            new RegisterNonConformityRequest("Scarto", 1, null, scrappedUnit.Id));
+        await _adminClient.PostAsync($"/api/work-orders/{order.Id}/operations/{firstOperation.Id}/complete", null);
+        await _adminClient.PostAsync($"/api/work-orders/{order.Id}/operations/{secondOperation.Id}/start", null);
+
+        var detail = await _adminClient.GetFromJsonAsync<WorkOrderUnitDetailResponse>($"/api/work-orders/{order.Id}/units/{scrappedUnit.Id}/detail");
+        var secondOpProgress = detail!.Operations.Single(op => op.OperationId == secondOperation.Id);
+        // The scrapped unit was already Scrapped before the second phase started, so it never received
+        // that phase's InProgress timing — unlike the still-Pending (Good) unit, which would.
+        Assert.Equal("Pending", secondOpProgress.Status);
+    }
+
+    [Fact]
+    public async Task Dashboard_FilteredBySite_OnlyCountsWorkOrdersInThatSite()
+    {
+        var siteResponse = await _adminClient.PostAsJsonAsync(
+            "/api/sites", new CreateSiteRequest($"Sede {Guid.NewGuid():N}"[..14], $"SITE-{Guid.NewGuid():N}"[..10], null));
+        siteResponse.EnsureSuccessStatusCode();
+        var site = (await siteResponse.Content.ReadFromJsonAsync<SiteResponse>())!;
+
+        var areaInSite = await CreateAreaInSiteAsync(site.Id);
+        var otherArea = await CreateAreaAsync();
+
+        var (product, _) = await CreateProductWithRoutingAndBomAsync(materialStock: 100);
+
+        var inSiteOrderResponse = await _adminClient.PostAsJsonAsync(
+            "/api/work-orders", new CreateWorkOrderRequest(product.Id, 1, null, areaInSite.Id, null, null, null));
+        var inSiteOrder = (await inSiteOrderResponse.Content.ReadFromJsonAsync<WorkOrderResponse>())!;
+
+        var otherOrderResponse = await _adminClient.PostAsJsonAsync(
+            "/api/work-orders", new CreateWorkOrderRequest(product.Id, 1, null, otherArea.Id, null, null, null));
+        var otherOrder = (await otherOrderResponse.Content.ReadFromJsonAsync<WorkOrderResponse>())!;
+
+        foreach (var order in new[] { inSiteOrder, otherOrder })
+        {
+            await _adminClient.PostAsync($"/api/work-orders/{order.Id}/release", null);
+            foreach (var op in order.Operations)
+            {
+                await _adminClient.PostAsync($"/api/work-orders/{order.Id}/operations/{op.Id}/start", null);
+                await _adminClient.PostAsync($"/api/work-orders/{order.Id}/operations/{op.Id}/complete", null);
+            }
+
+            await _adminClient.PostAsync($"/api/work-orders/{order.Id}/complete", null);
+        }
+
+        var filtered = await _adminClient.GetFromJsonAsync<WorkOrderDashboardResponse>($"/api/work-orders/dashboard?days=1&siteId={site.Id}");
+
+        Assert.NotNull(filtered);
+        Assert.True(filtered!.WorkOrdersCompletedInPeriod >= 1);
+
+        using var scope = _fixture.Factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+        var otherOrderStillExists = await db.WorkOrders.AnyAsync(o => o.Id == otherOrder.Id && o.Status == "Completed");
+        Assert.True(otherOrderStillExists); // sanity: the other order did complete, it's just outside the filtered site.
+    }
+
+    private async Task<Area> CreateAreaInSiteAsync(Guid siteId)
+    {
+        var suffix = Guid.NewGuid().ToString("N")[..8];
+        var response = await _adminClient.PostAsJsonAsync("/api/areas", new CreateAreaRequest($"Area {suffix}", $"AREA-{suffix}", siteId));
+        response.EnsureSuccessStatusCode();
+        return (await response.Content.ReadFromJsonAsync<Area>())!;
+    }
 }

@@ -185,6 +185,29 @@ public class ProcurementController : ControllerBase
         return Ok(ToResponse(order));
     }
 
+    /// <summary>Sets (or clears) the expected delivery date agreed with the supplier — independent of
+    /// the order's line items, so purchasing can record/update it without going through the full edit
+    /// flow. Feeds the planning board; purely informational, never enforced against ReceivedAt.</summary>
+    [Authorize(Policy = "Purchasing")]
+    [HttpPut("purchase-orders/{id:guid}/expected-delivery")]
+    public async Task<ActionResult<PurchaseOrderResponse>> SetExpectedDelivery(
+        Guid id, SetExpectedDeliveryRequest request, CancellationToken cancellationToken = default)
+    {
+        var order = await _dbContext.PurchaseOrders
+            .Include(item => item.Items)
+            .SingleOrDefaultAsync(item => item.Id == id, cancellationToken);
+
+        if (order is null)
+        {
+            return NotFound();
+        }
+
+        order.ExpectedDeliveryDate = request.ExpectedDeliveryDate;
+        await _dbContext.SaveChangesAsync(cancellationToken);
+
+        return Ok(ToResponse(order));
+    }
+
     [Authorize(Policy = "Purchasing")]
     [HttpPost("purchase-orders")]
     public async Task<ActionResult<PurchaseOrderResponse>> CreatePurchaseOrder(
@@ -624,6 +647,7 @@ public class ProcurementController : ControllerBase
             order.CreatedAt,
             order.ConfirmedAt,
             order.ReceivedAt,
+            order.ExpectedDeliveryDate,
             order.Items.Select(item => new PurchaseOrderItemResponse(
                 item.Id,
                 item.MaterialCode,
@@ -675,6 +699,8 @@ public sealed record EditPurchaseOrderRequest(
     Guid SupplierId,
     List<CreatePurchaseOrderItemRequest> Items);
 
+public sealed record SetExpectedDeliveryRequest(DateTime? ExpectedDeliveryDate);
+
 public sealed record ReceivePurchaseOrderRequest(
     List<ReceivePurchaseOrderItemRequest> Items);
 
@@ -691,6 +717,7 @@ public sealed record PurchaseOrderResponse(
     DateTime CreatedAt,
     DateTime? ConfirmedAt,
     DateTime? ReceivedAt,
+    DateTime? ExpectedDeliveryDate,
     IReadOnlyList<PurchaseOrderItemResponse> Items);
 
 public sealed record PurchaseOrderSummaryResponse(

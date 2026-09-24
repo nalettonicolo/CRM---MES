@@ -18,4 +18,6 @@ public class WorkOrderUnit
     public string Status { get; set; } = "Pending";
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     public DateTime? ResolvedAt { get; set; }
+    public ICollection<WorkOrderUnitOperation> Operations { get; set; } = new List<WorkOrderUnitOperation>();
+    public ICollection<WorkOrderUnitMaterialLot> MaterialLots { get; set; } = new List<WorkOrderUnitMaterialLot>();
 }

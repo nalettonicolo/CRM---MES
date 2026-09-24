@@ -9,6 +9,7 @@
     <local:BoolToBrushConverter x:Key="BoolToBrush" />
     <local:OperationStatusToActionTextConverter x:Key="OperationStatusToActionText" />
     <local:StatusNotEqualToVisibilityConverter x:Key="StatusNotEqualToVisibility" />
+    <local:PlanningTypeToBrushConverter x:Key="PlanningTypeToBrush" />
 
     <!-- ===================================================================
          DESIGN SYSTEM — "Fusione": sintesi delle tre direzioni provate.

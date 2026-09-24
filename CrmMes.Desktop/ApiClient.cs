@@ -221,6 +221,40 @@ public sealed class ApiClient
         await EnsureSuccessAsync(response, cancellationToken);
     }
 
+    public async Task SetPurchaseOrderExpectedDeliveryAsync(Guid id, DateTime? expectedDeliveryDate, CancellationToken cancellationToken = default)
+    {
+        using var response = await _httpClient.PutAsJsonAsync(
+            $"api/procurement/purchase-orders/{id}/expected-delivery", new { expectedDeliveryDate }, cancellationToken);
+        await EnsureSuccessAsync(response, cancellationToken);
+    }
+
+    /// <summary>The planning board: every dated commitment (commesse, ordini fornitore, spedizioni,
+    /// manutenzioni) in one aggregated, filterable list plus a summary dashboard. See PlanningController.</summary>
+    public async Task<PlanningDto> GetPlanningAsync(
+        DateTime? from = null, int weeks = 4, Guid? siteId = null, IReadOnlyList<string>? types = null, CancellationToken cancellationToken = default)
+    {
+        var parameters = new List<string> { $"weeks={weeks}" };
+        if (from.HasValue)
+        {
+            parameters.Add($"from={from.Value:yyyy-MM-dd}");
+        }
+
+        if (siteId.HasValue)
+        {
+            parameters.Add($"siteId={siteId}");
+        }
+
+        if (types is { Count: > 0 })
+        {
+            parameters.Add($"types={Uri.EscapeDataString(string.Join(",", types))}");
+        }
+
+        using var response = await _httpClient.GetAsync($"api/planning?{string.Join("&", parameters)}", cancellationToken);
+        await EnsureSuccessAsync(response, cancellationToken);
+        return await response.Content.ReadFromJsonAsync<PlanningDto>(cancellationToken: cancellationToken)
+            ?? throw new InvalidOperationException("Risposta planning non valida.");
+    }
+
     public async Task ReceiveRemainingQuantityAsync(Guid id, CancellationToken cancellationToken = default)
     {
         var order = await GetPurchaseOrderAsync(id, cancellationToken);
@@ -619,11 +653,11 @@ public sealed class ApiClient
         await EnsureSuccessAsync(response, cancellationToken);
     }
 
-    public Task<IReadOnlyList<WorkCenterDto>> GetWorkCentersAsync(CancellationToken cancellationToken = default)
-        => GetAsync<WorkCenterDto>("api/work-centers", cancellationToken);
+    public Task<IReadOnlyList<WorkCenterDto>> GetWorkCentersAsync(Guid? siteId = null, CancellationToken cancellationToken = default)
+        => GetAsync<WorkCenterDto>(siteId.HasValue ? $"api/work-centers?siteId={siteId}" : "api/work-centers", cancellationToken);
 
-    public Task<IReadOnlyList<WorkCenterLoadDto>> GetWorkCenterLoadAsync(CancellationToken cancellationToken = default)
-        => GetAsync<WorkCenterLoadDto>("api/work-centers/load", cancellationToken);
+    public Task<IReadOnlyList<WorkCenterLoadDto>> GetWorkCenterLoadAsync(Guid? siteId = null, CancellationToken cancellationToken = default)
+        => GetAsync<WorkCenterLoadDto>(siteId.HasValue ? $"api/work-centers/load?siteId={siteId}" : "api/work-centers/load", cancellationToken);
 
     public async Task CreateWorkCenterAsync(string code, string name, decimal dailyCapacityMinutes, CancellationToken cancellationToken = default)
     {
@@ -729,14 +763,20 @@ public sealed class ApiClient
         await EnsureSuccessAsync(response, cancellationToken);
     }
 
-    public Task<IReadOnlyList<WorkOrderSummaryDto>> GetWorkOrdersAsync(string? status = null, CancellationToken cancellationToken = default)
+    public Task<IReadOnlyList<WorkOrderSummaryDto>> GetWorkOrdersAsync(string? status = null, Guid? siteId = null, CancellationToken cancellationToken = default)
     {
-        var query = "api/work-orders";
+        var parameters = new List<string>();
         if (!string.IsNullOrWhiteSpace(status))
         {
-            query += $"?status={Uri.EscapeDataString(status)}";
+            parameters.Add($"status={Uri.EscapeDataString(status)}");
         }
 
+        if (siteId.HasValue)
+        {
+            parameters.Add($"siteId={siteId}");
+        }
+
+        var query = "api/work-orders" + (parameters.Count > 0 ? "?" + string.Join("&", parameters) : "");
         return GetAsync<WorkOrderSummaryDto>(query, cancellationToken);
     }
 
@@ -821,9 +861,15 @@ public sealed class ApiClient
     public Task<IReadOnlyList<WorkOrderMaterialLotDto>> GetWorkOrderMaterialLotsAsync(Guid workOrderId, CancellationToken cancellationToken = default)
         => GetAsync<WorkOrderMaterialLotDto>($"api/work-orders/{workOrderId}/material-lots", cancellationToken);
 
-    public async Task<WorkOrderDashboardDto> GetWorkOrderDashboardAsync(int days = 7, CancellationToken cancellationToken = default)
+    public async Task<WorkOrderDashboardDto> GetWorkOrderDashboardAsync(int days = 7, Guid? siteId = null, CancellationToken cancellationToken = default)
     {
-        using var response = await _httpClient.GetAsync($"api/work-orders/dashboard?days={days}", cancellationToken);
+        var query = $"api/work-orders/dashboard?days={days}";
+        if (siteId.HasValue)
+        {
+            query += $"&siteId={siteId}";
+        }
+
+        using var response = await _httpClient.GetAsync(query, cancellationToken);
         await EnsureSuccessAsync(response, cancellationToken);
         return await response.Content.ReadFromJsonAsync<WorkOrderDashboardDto>(cancellationToken: cancellationToken)
             ?? throw new InvalidOperationException("Risposta cruscotto non valida.");
@@ -956,6 +1002,16 @@ public sealed class ApiClient
     /// Empty when the work order's quantity wasn't a whole number at creation (see WorkOrderUnit).</summary>
     public Task<IReadOnlyList<WorkOrderUnitDto>> GetWorkOrderUnitsAsync(Guid workOrderId, CancellationToken cancellationToken = default)
         => GetAsync<WorkOrderUnitDto>($"api/work-orders/{workOrderId}/units", cancellationToken);
+
+    /// <summary>Full per-serial traceability for one unit: which phases it went through and when, and
+    /// which material lots fed it. See WorkOrderUnitDetailResponse on the API side.</summary>
+    public async Task<WorkOrderUnitDetailDto> GetWorkOrderUnitDetailAsync(Guid workOrderId, Guid unitId, CancellationToken cancellationToken = default)
+    {
+        using var response = await _httpClient.GetAsync($"api/work-orders/{workOrderId}/units/{unitId}/detail", cancellationToken);
+        await EnsureSuccessAsync(response, cancellationToken);
+        return await response.Content.ReadFromJsonAsync<WorkOrderUnitDetailDto>(cancellationToken: cancellationToken)
+            ?? throw new InvalidOperationException("Risposta dettaglio unità non valida.");
+    }
 
     public async Task<IdentifyOperatorDto> IdentifyOperatorByPinAsync(string pin, CancellationToken cancellationToken = default)
     {
@@ -1323,6 +1379,26 @@ public sealed record OperationDowntimeDto(Guid Id, string Reason, string? Notes,
 public sealed record NonConformityDto(Guid Id, string Description, decimal ScrapQuantity, string? Notes, DateTime DetectedAt, string? ReportedBy, Guid? WorkOrderUnitId, string? UnitSerialNumber);
 
 public sealed record WorkOrderUnitDto(Guid Id, int SequenceNumber, string SerialNumber, string Status);
+
+public sealed record WorkOrderUnitOperationDto(Guid OperationId, int SequenceNumber, string Name, string Status, DateTime? StartedAt, DateTime? CompletedAt);
+
+public sealed record WorkOrderUnitMaterialLotDto(Guid MaterialLotId, string MaterialCode, string LotNumber, decimal Quantity);
+
+public sealed record PlanningEntryDto(string Type, Guid Id, string Code, string Status, DateTime Date, string Detail, string Kind);
+
+public sealed record PlanningDashboardDto(int Overdue, int ThisWeek, int NextWeek, int Total);
+
+public sealed record PlanningDto(DateTime RangeStart, int Weeks, IReadOnlyList<PlanningEntryDto> Entries, PlanningDashboardDto Dashboard);
+
+public sealed record WorkOrderUnitDetailDto(
+    Guid Id,
+    int SequenceNumber,
+    string SerialNumber,
+    string Status,
+    DateTime CreatedAt,
+    DateTime? ResolvedAt,
+    IReadOnlyList<WorkOrderUnitOperationDto> Operations,
+    IReadOnlyList<WorkOrderUnitMaterialLotDto> MaterialLots);
 
 public sealed record IdentifyOperatorDto(Guid Id, string Name);
 

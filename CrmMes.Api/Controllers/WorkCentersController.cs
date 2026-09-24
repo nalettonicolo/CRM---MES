@@ -179,7 +179,8 @@ public class WorkCentersController : ControllerBase
     /// free-text WorkCenter field on the operation. Also lists free-text work centers used on the floor
     /// that have no matching registered capacity, so they surface as "non censito" instead of disappearing.</summary>
     [HttpGet("load")]
-    public async Task<ActionResult<IEnumerable<WorkCenterLoadResponse>>> GetLoadOverview(CancellationToken cancellationToken = default)
+    public async Task<ActionResult<IEnumerable<WorkCenterLoadResponse>>> GetLoadOverview(
+        [FromQuery] Guid? siteId = null, CancellationToken cancellationToken = default)
     {
         var pendingByName = await _dbContext.WorkOrderOperations
             .Where(op => OpenOperationStatuses.Contains(op.Status) &&
@@ -196,7 +197,7 @@ public class WorkCentersController : ControllerBase
 
         var workCenters = await _dbContext.WorkCenters
             .AsNoTracking()
-            .Where(w => w.IsActive)
+            .Where(w => w.IsActive && (siteId == null || w.SiteId == siteId))
             .ToListAsync(cancellationToken);
 
         var results = new List<WorkCenterLoadResponse>();
@@ -217,10 +218,15 @@ public class WorkCentersController : ControllerBase
                 backlogDays));
         }
 
-        var registeredNames = workCenters.Select(w => w.Name).ToHashSet(StringComparer.OrdinalIgnoreCase);
-        foreach (var unmatched in pendingByName.Where(p => !registeredNames.Contains(p.Name)))
+        // Unregistered work centers have no site to filter by, so they only show up in the unfiltered
+        // ("Tutte le sedi") view — otherwise they'd always appear regardless of the selected site.
+        if (siteId is null)
         {
-            results.Add(new WorkCenterLoadResponse(null, null, unmatched.Name, null, unmatched.PendingMinutes, unmatched.OpenOperations, null));
+            var registeredNames = workCenters.Select(w => w.Name).ToHashSet(StringComparer.OrdinalIgnoreCase);
+            foreach (var unmatched in pendingByName.Where(p => !registeredNames.Contains(p.Name)))
+            {
+                results.Add(new WorkCenterLoadResponse(null, null, unmatched.Name, null, unmatched.PendingMinutes, unmatched.OpenOperations, null));
+            }
         }
 
         return Ok(results.OrderByDescending(r => r.PendingMinutes));

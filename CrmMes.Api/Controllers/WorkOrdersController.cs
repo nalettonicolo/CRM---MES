@@ -155,13 +155,29 @@ public class WorkOrdersController : ControllerBase
         {
             for (var sequence = 1; sequence <= (int)order.Quantity; sequence++)
             {
-                order.Units.Add(new WorkOrderUnit
+                var unit = new WorkOrderUnit
                 {
                     WorkOrderId = order.Id,
                     SequenceNumber = sequence,
                     SerialNumber = $"{order.Code}-{sequence:000}",
                     Status = "Pending"
-                });
+                };
+
+                // Per-unit phase history starts as a full Pending grid — one row per operation — so
+                // querying "what has unit N gone through" always has an answer, even before the first
+                // phase starts. StartOperation/CompleteOperation below project the batch-level timing
+                // onto these rows for every unit that's still Pending.
+                foreach (var operation in order.Operations)
+                {
+                    unit.Operations.Add(new WorkOrderUnitOperation
+                    {
+                        WorkOrderUnitId = unit.Id,
+                        WorkOrderOperationId = operation.Id,
+                        Status = "Pending"
+                    });
+                }
+
+                order.Units.Add(unit);
             }
         }
 
@@ -426,8 +442,35 @@ public class WorkOrdersController : ControllerBase
             order.Status = "InProgress";
         }
 
+        await ProjectOperationTimingToUnitsAsync(id, operationId, "InProgress", operation.StartedAt, null, cancellationToken);
+
         await _dbContext.SaveChangesAsync(cancellationToken);
         return Ok(ToResponse(order));
+    }
+
+    /// <summary>Mirrors a batch-level operation's start/complete timing onto every unit that's still
+    /// Pending (not yet scrapped) — see WorkOrderUnitOperation. A no-op when the order has no tracked
+    /// units (non-integer quantity).</summary>
+    private async Task ProjectOperationTimingToUnitsAsync(
+        Guid workOrderId, Guid operationId, string status, DateTime? startedAt, DateTime? completedAt, CancellationToken cancellationToken)
+    {
+        var unitOperations = await _dbContext.WorkOrderUnitOperations
+            .Where(uo => uo.WorkOrderOperationId == operationId && uo.Unit.WorkOrderId == workOrderId && uo.Unit.Status == "Pending")
+            .ToListAsync(cancellationToken);
+
+        foreach (var unitOperation in unitOperations)
+        {
+            unitOperation.Status = status;
+            if (startedAt.HasValue)
+            {
+                unitOperation.StartedAt = startedAt;
+            }
+
+            if (completedAt.HasValue)
+            {
+                unitOperation.CompletedAt = completedAt;
+            }
+        }
     }
 
     [Authorize]
@@ -466,6 +509,8 @@ public class WorkOrdersController : ControllerBase
         operation.CompletedAt = DateTime.UtcNow;
         operation.CompletedBy = string.IsNullOrWhiteSpace(operatorName) ? null : operatorName.Trim();
         operation.CompletedByUserId = operatorId;
+
+        await ProjectOperationTimingToUnitsAsync(id, operationId, "Done", null, operation.CompletedAt, cancellationToken);
 
         await _dbContext.SaveChangesAsync(cancellationToken);
         return Ok(ToResponse(order));
@@ -650,6 +695,43 @@ public class WorkOrdersController : ControllerBase
             .ToListAsync(cancellationToken);
 
         return Ok(units.Select(u => new WorkOrderUnitResponse(u.Id, u.SequenceNumber, u.SerialNumber, u.Status)));
+    }
+
+    /// <summary>Full per-serial traceability for one unit: which phases it went through and when, and
+    /// which material lots fed it — "what happened to this specific piece" in one call. See
+    /// WorkOrderUnitOperation/WorkOrderUnitMaterialLot for how this data is derived.</summary>
+    [HttpGet("{id:guid}/units/{unitId:guid}/detail")]
+    public async Task<ActionResult<WorkOrderUnitDetailResponse>> GetUnitDetail(
+        Guid id, Guid unitId, CancellationToken cancellationToken = default)
+    {
+        var unit = await _dbContext.WorkOrderUnits
+            .AsNoTracking()
+            .SingleOrDefaultAsync(u => u.Id == unitId && u.WorkOrderId == id, cancellationToken);
+
+        if (unit is null)
+        {
+            return NotFound();
+        }
+
+        var operations = await (
+            from unitOperation in _dbContext.WorkOrderUnitOperations.AsNoTracking()
+            join operation in _dbContext.WorkOrderOperations.AsNoTracking() on unitOperation.WorkOrderOperationId equals operation.Id
+            where unitOperation.WorkOrderUnitId == unitId
+            orderby operation.SequenceNumber
+            select new WorkOrderUnitOperationResponse(
+                operation.Id, operation.SequenceNumber, operation.Name, unitOperation.Status, unitOperation.StartedAt, unitOperation.CompletedAt))
+            .ToListAsync(cancellationToken);
+
+        var materialLots = await (
+            from unitLot in _dbContext.WorkOrderUnitMaterialLots.AsNoTracking()
+            join lot in _dbContext.MaterialLots.AsNoTracking() on unitLot.MaterialLotId equals lot.Id
+            where unitLot.WorkOrderUnitId == unitId
+            orderby unitLot.CreatedAt
+            select new WorkOrderUnitMaterialLotResponse(lot.Id, unitLot.MaterialCode, lot.LotNumber, unitLot.Quantity))
+            .ToListAsync(cancellationToken);
+
+        return Ok(new WorkOrderUnitDetailResponse(
+            unit.Id, unit.SequenceNumber, unit.SerialNumber, unit.Status, unit.CreatedAt, unit.ResolvedAt, operations, materialLots));
     }
 
     [HttpGet("{id:guid}/operations/{operationId:guid}/non-conformities")]
@@ -964,19 +1046,21 @@ public class WorkOrdersController : ControllerBase
     /// × Quality) now that all three components are tracked, plus simple throughput/on-time counts.</summary>
     [HttpGet("dashboard")]
     public async Task<ActionResult<WorkOrderDashboardResponse>> GetDashboard(
-        [FromQuery] int days = 7, CancellationToken cancellationToken = default)
+        [FromQuery] int days = 7, [FromQuery] Guid? siteId = null, CancellationToken cancellationToken = default)
     {
         var since = DateTime.UtcNow.AddDays(-Math.Max(1, days));
 
         var statusCounts = await _dbContext.WorkOrders
             .AsNoTracking()
+            .Where(order => siteId == null || (order.Area != null && order.Area.SiteId == siteId))
             .GroupBy(order => order.Status)
             .Select(group => new { Status = group.Key, Count = group.Count() })
             .ToListAsync(cancellationToken);
 
         var recentlyCompletedOperations = await _dbContext.WorkOrderOperations
             .AsNoTracking()
-            .Where(op => op.Status == "Done" && op.CompletedAt >= since && op.StartedAt != null && op.CompletedAt != null)
+            .Where(op => op.Status == "Done" && op.CompletedAt >= since && op.StartedAt != null && op.CompletedAt != null &&
+                (siteId == null || (op.WorkOrder.Area != null && op.WorkOrder.Area.SiteId == siteId)))
             .ToListAsync(cancellationToken);
 
         var performanceRatios = recentlyCompletedOperations
@@ -987,7 +1071,8 @@ public class WorkOrdersController : ControllerBase
 
         var completedOrders = await _dbContext.WorkOrders
             .AsNoTracking()
-            .Where(order => order.Status == "Completed" && order.CompletedAt >= since)
+            .Where(order => order.Status == "Completed" && order.CompletedAt >= since &&
+                (siteId == null || (order.Area != null && order.Area.SiteId == siteId)))
             .ToListAsync(cancellationToken);
         var ordersWithDueDate = completedOrders.Where(order => order.DueDate.HasValue).ToList();
         var onTimeCount = ordersWithDueDate.Count(order => order.CompletedAt <= order.DueDate);
@@ -1178,3 +1263,18 @@ public sealed record NonConformityResponse(
     string? UnitSerialNumber);
 
 public sealed record WorkOrderUnitResponse(Guid Id, int SequenceNumber, string SerialNumber, string Status);
+
+public sealed record WorkOrderUnitOperationResponse(
+    Guid OperationId, int SequenceNumber, string Name, string Status, DateTime? StartedAt, DateTime? CompletedAt);
+
+public sealed record WorkOrderUnitMaterialLotResponse(Guid MaterialLotId, string MaterialCode, string LotNumber, decimal Quantity);
+
+public sealed record WorkOrderUnitDetailResponse(
+    Guid Id,
+    int SequenceNumber,
+    string SerialNumber,
+    string Status,
+    DateTime CreatedAt,
+    DateTime? ResolvedAt,
+    IReadOnlyList<WorkOrderUnitOperationResponse> Operations,
+    IReadOnlyList<WorkOrderUnitMaterialLotResponse> MaterialLots);

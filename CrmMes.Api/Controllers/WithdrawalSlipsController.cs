@@ -331,6 +331,36 @@ public class WithdrawalSlipsController : ControllerBase
             .GroupBy(lot => lot.MaterialCode)
             .ToDictionary(group => group.Key, group => group.OrderBy(lot => lot.ReceivedAt).ToList());
 
+        // Per-unit lot traceability only applies when this slip is tied to a work order with tracked
+        // units (integer quantity) — otherwise there's nothing discrete to attribute lots to.
+        List<WorkOrderUnit>? units = null;
+        Dictionary<string, decimal>? perUnitQuantityByMaterial = null;
+        if (slip.WorkOrderId.HasValue)
+        {
+            var order = await _dbContext.WorkOrders.AsNoTracking()
+                .SingleOrDefaultAsync(o => o.Id == slip.WorkOrderId.Value, cancellationToken);
+            if (order is not null)
+            {
+                var orderUnits = await _dbContext.WorkOrderUnits.AsNoTracking()
+                    .Where(u => u.WorkOrderId == order.Id)
+                    .OrderBy(u => u.SequenceNumber)
+                    .ToListAsync(cancellationToken);
+                if (orderUnits.Count > 0)
+                {
+                    units = orderUnits;
+                    perUnitQuantityByMaterial = await _dbContext.BillOfMaterialItems.AsNoTracking()
+                        .Where(bomItem => bomItem.ProductId == order.ProductId)
+                        .ToDictionaryAsync(bomItem => bomItem.MaterialCode, bomItem => bomItem.Quantity, cancellationToken);
+                }
+            }
+        }
+
+        // Tracks how much of each material has already been attributed to units, across both prior
+        // withdrawal slips for this work order (seeded from the database on first use) and items
+        // processed earlier in this same slip — so a material split across multiple slips still fills
+        // units in order instead of restarting from unit 1 each time.
+        var allocatedSoFarByMaterial = new Dictionary<string, decimal>();
+
         foreach (var item in slip.Items)
         {
             materials[item.MaterialCode].Stock -= item.Quantity;
@@ -341,6 +371,7 @@ public class WithdrawalSlipsController : ControllerBase
             // remainder is simply not attributed to any lot — Material.Stock above is still the
             // authoritative decrement, lots are additive traceability metadata on top of it.
             var remaining = item.Quantity;
+            var consumedLots = new List<(MaterialLot Lot, decimal Quantity)>();
             if (lotsByMaterial.TryGetValue(item.MaterialCode, out var lots))
             {
                 foreach (var lot in lots)
@@ -353,6 +384,7 @@ public class WithdrawalSlipsController : ControllerBase
                     var consumed = Math.Min(remaining, lot.Quantity);
                     lot.Quantity -= consumed;
                     remaining -= consumed;
+                    consumedLots.Add((lot, consumed));
                     _dbContext.MaterialLotConsumptions.Add(new MaterialLotConsumption
                     {
                         MaterialLotId = lot.Id,
@@ -360,6 +392,20 @@ public class WithdrawalSlipsController : ControllerBase
                         Quantity = consumed
                     });
                 }
+            }
+
+            if (units is not null && perUnitQuantityByMaterial is not null &&
+                perUnitQuantityByMaterial.TryGetValue(item.MaterialCode, out var perUnitQuantity) && perUnitQuantity > 0)
+            {
+                if (!allocatedSoFarByMaterial.TryGetValue(item.MaterialCode, out var alreadyAllocated))
+                {
+                    alreadyAllocated = await _dbContext.WorkOrderUnitMaterialLots
+                        .Where(l => l.MaterialCode == item.MaterialCode && units.Select(u => u.Id).Contains(l.WorkOrderUnitId))
+                        .SumAsync(l => l.Quantity, cancellationToken);
+                }
+
+                allocatedSoFarByMaterial[item.MaterialCode] =
+                    alreadyAllocated + AllocateLotsToUnits(item.MaterialCode, consumedLots, units, perUnitQuantity, alreadyAllocated);
             }
         }
 
@@ -377,6 +423,52 @@ public class WithdrawalSlipsController : ControllerBase
         await transaction.CommitAsync(cancellationToken);
 
         return Ok(ToResponse(slip));
+    }
+
+    /// <summary>Pours this item's just-consumed lot quantities into consecutive units' per-unit material
+    /// need, in order — the same "oldest lot first" ledger sliced down to unit granularity. Resumes from
+    /// <paramref name="alreadyAllocated"/> so multiple withdrawal slips for the same work order/material
+    /// keep filling units in sequence instead of restarting from the first unit each time. Returns how
+    /// much was actually attributed (normally the full consumed amount; less only if the units' total
+    /// need is smaller than what was consumed, e.g. rounding at the edges).</summary>
+    private decimal AllocateLotsToUnits(
+        string materialCode, List<(MaterialLot Lot, decimal Quantity)> consumedLots, List<WorkOrderUnit> units,
+        decimal perUnitQuantity, decimal alreadyAllocated)
+    {
+        var unitIndex = (int)(alreadyAllocated / perUnitQuantity);
+        var remainingForCurrentUnit = perUnitQuantity - (alreadyAllocated - unitIndex * perUnitQuantity);
+        if (remainingForCurrentUnit <= 0)
+        {
+            unitIndex++;
+            remainingForCurrentUnit = perUnitQuantity;
+        }
+
+        var totalAttributed = 0m;
+        foreach (var (lot, quantity) in consumedLots)
+        {
+            var lotRemaining = quantity;
+            while (lotRemaining > 0 && unitIndex < units.Count)
+            {
+                var take = Math.Min(lotRemaining, remainingForCurrentUnit);
+                _dbContext.WorkOrderUnitMaterialLots.Add(new WorkOrderUnitMaterialLot
+                {
+                    WorkOrderUnitId = units[unitIndex].Id,
+                    MaterialLotId = lot.Id,
+                    MaterialCode = materialCode,
+                    Quantity = take
+                });
+                totalAttributed += take;
+                lotRemaining -= take;
+                remainingForCurrentUnit -= take;
+                if (remainingForCurrentUnit <= 0)
+                {
+                    unitIndex++;
+                    remainingForCurrentUnit = perUnitQuantity;
+                }
+            }
+        }
+
+        return totalAttributed;
     }
 
     [Authorize(Policy = "Warehouse")]

@@ -39,6 +39,8 @@ public class ApplicationDbContext : DbContext
     public DbSet<MaintenanceTask> MaintenanceTasks => Set<MaintenanceTask>();
     public DbSet<QualityCheckpoint> QualityCheckpoints => Set<QualityCheckpoint>();
     public DbSet<QualityMeasurement> QualityMeasurements => Set<QualityMeasurement>();
+    public DbSet<WorkOrderUnitOperation> WorkOrderUnitOperations => Set<WorkOrderUnitOperation>();
+    public DbSet<WorkOrderUnitMaterialLot> WorkOrderUnitMaterialLots => Set<WorkOrderUnitMaterialLot>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -412,6 +414,33 @@ public class ApplicationDbContext : DbContext
                 .OnDelete(DeleteBehavior.SetNull);
         });
 
+        modelBuilder.Entity<WorkOrderUnitOperation>(entity =>
+        {
+            entity.Property(o => o.Status).HasMaxLength(50);
+            entity.HasIndex(o => new { o.WorkOrderUnitId, o.WorkOrderOperationId }).IsUnique();
+            entity.HasOne(o => o.Unit)
+                .WithMany(u => u.Operations)
+                .HasForeignKey(o => o.WorkOrderUnitId)
+                .OnDelete(DeleteBehavior.Cascade);
+            entity.HasOne(o => o.Operation)
+                .WithMany()
+                .HasForeignKey(o => o.WorkOrderOperationId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<WorkOrderUnitMaterialLot>(entity =>
+        {
+            entity.Property(l => l.MaterialCode).HasMaxLength(120);
+            entity.HasOne(l => l.Unit)
+                .WithMany(u => u.MaterialLots)
+                .HasForeignKey(l => l.WorkOrderUnitId)
+                .OnDelete(DeleteBehavior.Cascade);
+            entity.HasOne(l => l.MaterialLot)
+                .WithMany()
+                .HasForeignKey(l => l.MaterialLotId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
         // Sqlite has no native decimal type and can't ORDER BY / compare the TEXT it stores decimals as.
         // Postgres (production) handles decimal natively, so this only kicks in for the Sqlite test provider.
         if (Database.ProviderName == "Microsoft.EntityFrameworkCore.Sqlite")
@@ -424,6 +453,30 @@ public class ApplicationDbContext : DbContext
                     value => (double)value,
                     value => (decimal)value));
             }
+        }
+
+        // Postgres' timestamptz columns reject any DateTime whose Kind isn't explicitly Utc — but every
+        // DateTime a WPF DatePicker hands the client (a due date, an expected delivery, ...) comes back
+        // as Kind=Unspecified, so saving it straight through throws at SaveChanges time (discovered via a
+        // genuine 500 creating a work order with a due date, not a hypothetical). Rather than remembering
+        // to call DateTime.SpecifyKind at every single assignment site — and every future one — every
+        // DateTime/DateTime? property in the model is normalized to Utc on the way in, once, here.
+        foreach (var property in modelBuilder.Model.GetEntityTypes()
+            .SelectMany(entityType => entityType.GetProperties())
+            .Where(property => property.ClrType == typeof(DateTime)))
+        {
+            property.SetValueConverter(new Microsoft.EntityFrameworkCore.Storage.ValueConversion.ValueConverter<DateTime, DateTime>(
+                value => DateTime.SpecifyKind(value, DateTimeKind.Utc),
+                value => DateTime.SpecifyKind(value, DateTimeKind.Utc)));
+        }
+
+        foreach (var property in modelBuilder.Model.GetEntityTypes()
+            .SelectMany(entityType => entityType.GetProperties())
+            .Where(property => property.ClrType == typeof(DateTime?)))
+        {
+            property.SetValueConverter(new Microsoft.EntityFrameworkCore.Storage.ValueConversion.ValueConverter<DateTime?, DateTime?>(
+                value => value.HasValue ? DateTime.SpecifyKind(value.Value, DateTimeKind.Utc) : value,
+                value => value.HasValue ? DateTime.SpecifyKind(value.Value, DateTimeKind.Utc) : value));
         }
     }
 }

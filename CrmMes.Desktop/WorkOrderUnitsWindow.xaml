@@ -20,7 +20,7 @@
         <TextBlock Grid.Row="1" x:Name="InfoText" Foreground="{StaticResource TextSecondaryBrush}" FontSize="12.5" TextWrapping="Wrap" Margin="0,4,0,16" />
 
         <Border Grid.Row="2" Style="{StaticResource CardBorder}" Padding="4">
-            <ListView x:Name="UnitsList">
+            <ListView x:Name="UnitsList" MouseDoubleClick="UnitsList_MouseDoubleClick">
                 <ListView.View>
                     <GridView>
                         <GridViewColumn Header="#" DisplayMemberBinding="{Binding SequenceNumber}" Width="40" />
