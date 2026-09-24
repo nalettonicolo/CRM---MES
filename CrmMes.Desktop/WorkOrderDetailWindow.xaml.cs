@@ -7,6 +7,7 @@ public partial class WorkOrderDetailWindow : Window
     private readonly ApiClient _apiClient;
     private readonly Guid _workOrderId;
     private readonly IReadOnlyDictionary<Guid, string> _productNames;
+    private Guid _productId;
     private static readonly StatusToBrushConverter StatusBrush = new();
 
     public WorkOrderDetailWindow(ApiClient apiClient, Guid workOrderId, IReadOnlyDictionary<Guid, string> productNames)
@@ -35,6 +36,7 @@ public partial class WorkOrderDetailWindow : Window
             StatusPill.Background = (System.Windows.Media.Brush)StatusBrush.Convert(order.Status, typeof(System.Windows.Media.Brush), null, System.Globalization.CultureInfo.CurrentCulture)!;
             StatusText.Foreground = (System.Windows.Media.Brush)StatusBrush.Convert(order.Status, typeof(System.Windows.Media.Brush), "Foreground", System.Globalization.CultureInfo.CurrentCulture)!;
 
+            _productId = order.ProductId;
             ProductText.Text = _productNames.GetValueOrDefault(order.ProductId, order.ProductId.ToString());
             QuantityText.Text = order.Quantity.ToString();
             DueDateText.Text = order.DueDate?.ToLocalTime().ToString("d") ?? "-";
@@ -171,6 +173,12 @@ public partial class WorkOrderDetailWindow : Window
     private void Units_Click(object sender, RoutedEventArgs e)
     {
         var window = new WorkOrderUnitsWindow(_apiClient, _workOrderId, CodeText.Text) { Owner = this };
+        window.ShowDialog();
+    }
+
+    private void Quality_Click(object sender, RoutedEventArgs e)
+    {
+        var window = new WorkOrderQualityWindow(_apiClient, _workOrderId, _productId, CodeText.Text) { Owner = this };
         window.ShowDialog();
     }
 

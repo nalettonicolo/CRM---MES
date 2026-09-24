@@ -267,6 +267,87 @@ public sealed class ApiClient
         await EnsureSuccessAsync(response, cancellationToken);
     }
 
+    public Task<IReadOnlyList<EquipmentDto>> GetEquipmentAsync(bool activeOnly = true, CancellationToken cancellationToken = default)
+        => GetAsync<EquipmentDto>($"api/equipment?activeOnly={activeOnly}", cancellationToken);
+
+    public async Task<EquipmentDetailDto> GetEquipmentDetailAsync(Guid id, CancellationToken cancellationToken = default)
+    {
+        using var response = await _httpClient.GetAsync($"api/equipment/{id}/detail", cancellationToken);
+        await EnsureSuccessAsync(response, cancellationToken);
+        return await response.Content.ReadFromJsonAsync<EquipmentDetailDto>(cancellationToken: cancellationToken)
+            ?? throw new InvalidOperationException("Risposta dettaglio macchina non valida.");
+    }
+
+    public async Task CreateEquipmentAsync(string name, string code, Guid? workCenterId, CancellationToken cancellationToken = default)
+    {
+        using var response = await _httpClient.PostAsJsonAsync("api/equipment", new { name, code, workCenterId }, cancellationToken);
+        await EnsureSuccessAsync(response, cancellationToken);
+    }
+
+    public async Task DeactivateEquipmentAsync(Guid id, CancellationToken cancellationToken = default)
+    {
+        using var response = await _httpClient.DeleteAsync($"api/equipment/{id}", cancellationToken);
+        await EnsureSuccessAsync(response, cancellationToken);
+    }
+
+    public Task<IReadOnlyList<MaintenanceTaskDto>> GetMaintenanceTasksAsync(string? status = null, string? type = null, Guid? equipmentId = null, CancellationToken cancellationToken = default)
+    {
+        var query = new List<string>();
+        if (!string.IsNullOrWhiteSpace(status)) query.Add($"status={Uri.EscapeDataString(status)}");
+        if (!string.IsNullOrWhiteSpace(type)) query.Add($"type={Uri.EscapeDataString(type)}");
+        if (equipmentId.HasValue) query.Add($"equipmentId={equipmentId}");
+        var queryString = query.Count > 0 ? $"?{string.Join('&', query)}" : string.Empty;
+        return GetAsync<MaintenanceTaskDto>($"api/maintenance-tasks{queryString}", cancellationToken);
+    }
+
+    public async Task CreateMaintenanceTaskAsync(Guid equipmentId, string title, string? description, string type, DateTime? dueDate, int? recurrenceDays, CancellationToken cancellationToken = default)
+    {
+        using var response = await _httpClient.PostAsJsonAsync(
+            "api/maintenance-tasks", new { equipmentId, title, description, type, dueDate, recurrenceDays }, cancellationToken);
+        await EnsureSuccessAsync(response, cancellationToken);
+    }
+
+    public async Task CompleteMaintenanceTaskAsync(Guid id, Guid? completedByUserId, string? notes, CancellationToken cancellationToken = default)
+    {
+        using var response = await _httpClient.PostAsJsonAsync(
+            $"api/maintenance-tasks/{id}/complete", new { completedByUserId, notes }, cancellationToken);
+        await EnsureSuccessAsync(response, cancellationToken);
+    }
+
+    public Task<IReadOnlyList<QualityCheckpointDto>> GetQualityCheckpointsAsync(Guid productId, CancellationToken cancellationToken = default)
+        => GetAsync<QualityCheckpointDto>($"api/quality-checkpoints?productId={productId}", cancellationToken);
+
+    public async Task CreateQualityCheckpointAsync(Guid productId, string name, string? unit, decimal? nominalValue, decimal? lowerLimit, decimal? upperLimit, CancellationToken cancellationToken = default)
+    {
+        using var response = await _httpClient.PostAsJsonAsync(
+            "api/quality-checkpoints", new { productId, name, unit, nominalValue, lowerLimit, upperLimit }, cancellationToken);
+        await EnsureSuccessAsync(response, cancellationToken);
+    }
+
+    public async Task DeactivateQualityCheckpointAsync(Guid id, CancellationToken cancellationToken = default)
+    {
+        using var response = await _httpClient.DeleteAsync($"api/quality-checkpoints/{id}", cancellationToken);
+        await EnsureSuccessAsync(response, cancellationToken);
+    }
+
+    public Task<IReadOnlyList<QualityMeasurementDto>> GetQualityMeasurementsAsync(Guid workOrderId, CancellationToken cancellationToken = default)
+        => GetAsync<QualityMeasurementDto>($"api/quality-measurements?workOrderId={workOrderId}", cancellationToken);
+
+    public async Task RecordQualityMeasurementAsync(Guid checkpointId, Guid workOrderId, Guid? workOrderUnitId, decimal measuredValue, Guid? measuredByUserId, string? notes, CancellationToken cancellationToken = default)
+    {
+        using var response = await _httpClient.PostAsJsonAsync(
+            "api/quality-measurements", new { checkpointId, workOrderId, workOrderUnitId, measuredValue, measuredByUserId, notes }, cancellationToken);
+        await EnsureSuccessAsync(response, cancellationToken);
+    }
+
+    public async Task<QualityCertificateDto> GetQualityCertificateAsync(Guid workOrderId, CancellationToken cancellationToken = default)
+    {
+        using var response = await _httpClient.GetAsync($"api/quality-measurements/certificate/{workOrderId}", cancellationToken);
+        await EnsureSuccessAsync(response, cancellationToken);
+        return await response.Content.ReadFromJsonAsync<QualityCertificateDto>(cancellationToken: cancellationToken)
+            ?? throw new InvalidOperationException("Risposta certificato non valida.");
+    }
+
     public async Task<AreaDetailDto> GetAreaDetailAsync(Guid id, CancellationToken cancellationToken = default)
     {
         using var response = await _httpClient.GetAsync($"api/areas/{id}/detail", cancellationToken);
@@ -1054,6 +1135,31 @@ public sealed record SiteWorkCenterDto(Guid Id, string Name, string Code, bool I
 public sealed record SiteDetailDto(
     Guid Id, string Name, string Code, string? Address, bool IsActive,
     List<SiteAreaDto> Areas, List<SiteWorkCenterDto> WorkCenters);
+
+public sealed record EquipmentDto(Guid Id, string Name, string Code, Guid? WorkCenterId, string? WorkCenterName, bool IsActive);
+
+public sealed record EquipmentMaintenanceTaskDto(Guid Id, string Title, string Type, string Status, DateTime? DueDate, DateTime? CompletedAt);
+
+public sealed record EquipmentDetailDto(
+    Guid Id, string Name, string Code, Guid? WorkCenterId, string? WorkCenterName, bool IsActive,
+    List<EquipmentMaintenanceTaskDto> Tasks);
+
+public sealed record MaintenanceTaskDto(
+    Guid Id, Guid EquipmentId, string EquipmentName, string Title, string? Description, string Type, string Status,
+    DateTime? DueDate, DateTime? CompletedAt, int? RecurrenceDays, string? Notes);
+
+public sealed record QualityCheckpointDto(
+    Guid Id, Guid ProductId, string Name, string? Unit, decimal? NominalValue, decimal? LowerLimit, decimal? UpperLimit, bool IsActive);
+
+public sealed record QualityMeasurementDto(
+    Guid Id, Guid CheckpointId, string CheckpointName, string? Unit,
+    Guid? WorkOrderUnitId, string? UnitSerialNumber,
+    decimal MeasuredValue, decimal? LowerLimit, decimal? UpperLimit, bool? IsWithinTolerance,
+    DateTime MeasuredAt, string? Notes);
+
+public sealed record QualityCertificateDto(
+    Guid WorkOrderId, string WorkOrderCode, string ProductLotNumber, string ProductCode, string ProductName,
+    bool AllPassed, List<QualityMeasurementDto> Measurements);
 
 public sealed record WorkCenterDto(Guid Id, string Code, string Name, string? Description, decimal DailyCapacityMinutes, bool IsActive);
 

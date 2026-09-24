@@ -113,16 +113,17 @@
 
         <TextBlock Grid.Row="4" x:Name="ErrorText" Foreground="{StaticResource DangerBrush}" TextWrapping="Wrap" Margin="0,10,0,0" />
 
-        <StackPanel Grid.Row="5" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,16,0,0">
-            <Button x:Name="LabelButton" Style="{StaticResource SecondaryButton}" Content="Etichetta QR" Width="120" Height="36" Margin="0,0,10,0" Click="Label_Click" />
-            <Button x:Name="UnitsButton" Style="{StaticResource SecondaryButton}" Content="Unità prodotte" Width="130" Height="36" Margin="0,0,10,0" Click="Units_Click" />
-            <Button x:Name="TraceabilityButton" Style="{StaticResource SecondaryButton}" Content="Tracciabilità materiali" Width="160" Height="36" Margin="0,0,10,0" Click="Traceability_Click" />
-            <Button x:Name="ScheduleButton" Style="{StaticResource SecondaryButton}" Content="Pianifica" Width="110" Height="36" Margin="0,0,10,0" Click="Schedule_Click" />
-            <Button x:Name="ReleaseButton" Content="Rilascia" Width="110" Height="36" Margin="0,0,10,0" Click="Release_Click" />
-            <Button x:Name="CompleteButton" Content="Completa" Width="110" Height="36" Margin="0,0,10,0" Click="Complete_Click" />
-            <Button x:Name="GenerateSlipButton" Style="{StaticResource SecondaryButton}" Content="Genera distinta" Width="140" Height="36" Margin="0,0,10,0" Click="GenerateSlip_Click" />
-            <Button x:Name="CancelButton" Style="{StaticResource DangerButton}" Content="Annulla commessa" Width="150" Height="36" Margin="0,0,10,0" Click="Cancel_Click" />
-            <Button Style="{StaticResource SecondaryButton}" Content="Chiudi" Width="100" Height="36" Click="Close_Click" />
-        </StackPanel>
+        <WrapPanel Grid.Row="5" HorizontalAlignment="Right" Margin="0,16,0,0">
+            <Button x:Name="LabelButton" Style="{StaticResource SecondaryButton}" Content="Etichetta QR" Width="120" Height="36" Margin="0,10,10,0" Click="Label_Click" />
+            <Button x:Name="UnitsButton" Style="{StaticResource SecondaryButton}" Content="Unità prodotte" Width="130" Height="36" Margin="0,10,10,0" Click="Units_Click" />
+            <Button x:Name="QualityButton" Style="{StaticResource SecondaryButton}" Content="Controlli qualità" Width="140" Height="36" Margin="0,10,10,0" Click="Quality_Click" />
+            <Button x:Name="TraceabilityButton" Style="{StaticResource SecondaryButton}" Content="Tracciabilità materiali" Width="160" Height="36" Margin="0,10,10,0" Click="Traceability_Click" />
+            <Button x:Name="ScheduleButton" Style="{StaticResource SecondaryButton}" Content="Pianifica" Width="110" Height="36" Margin="0,10,10,0" Click="Schedule_Click" />
+            <Button x:Name="ReleaseButton" Content="Rilascia" Width="110" Height="36" Margin="0,10,10,0" Click="Release_Click" />
+            <Button x:Name="CompleteButton" Content="Completa" Width="110" Height="36" Margin="0,10,10,0" Click="Complete_Click" />
+            <Button x:Name="GenerateSlipButton" Style="{StaticResource SecondaryButton}" Content="Genera distinta" Width="140" Height="36" Margin="0,10,10,0" Click="GenerateSlip_Click" />
+            <Button x:Name="CancelButton" Style="{StaticResource DangerButton}" Content="Annulla commessa" Width="150" Height="36" Margin="0,10,10,0" Click="Cancel_Click" />
+            <Button Style="{StaticResource SecondaryButton}" Content="Chiudi" Width="100" Height="36" Margin="0,10,0,0" Click="Close_Click" />
+        </WrapPanel>
     </Grid>
 </Window>

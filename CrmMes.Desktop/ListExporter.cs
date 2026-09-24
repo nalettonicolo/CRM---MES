@@ -126,6 +126,84 @@ public static class ListExporter
         }).GeneratePdf(filePath);
     }
 
+    /// <summary>Certificato di conformità per una commessa: elenco delle misurazioni registrate contro
+    /// il piano di controllo del prodotto, con esito pass/fail per ciascuna e complessivo.</summary>
+    public static void ExportQualityCertificate(QualityCertificateDto certificate, string filePath)
+    {
+        Document.Create(container =>
+        {
+            container.Page(page =>
+            {
+                page.Size(PageSizes.A4);
+                page.Margin(36);
+                page.DefaultTextStyle(style => style.FontSize(10));
+
+                page.Header().Column(column =>
+                {
+                    column.Item().Text("Certificato di conformità").FontSize(20).Bold();
+                    column.Item().PaddingTop(6).Text($"Commessa {certificate.WorkOrderCode} — Lotto {certificate.ProductLotNumber}").FontSize(12);
+                    column.Item().Text($"{certificate.ProductCode} — {certificate.ProductName}").FontSize(11).FontColor(Colors.Grey.Darken1);
+                    column.Item().PaddingTop(4).Text($"Emesso il {DateTime.Now:dd/MM/yyyy HH:mm}").FontSize(9).FontColor(Colors.Grey.Darken1);
+                    column.Item().PaddingTop(10).Background(certificate.AllPassed ? Colors.Green.Lighten4 : Colors.Red.Lighten4)
+                        .Padding(8).Text(certificate.AllPassed ? "ESITO: CONFORME" : "ESITO: NON CONFORME")
+                        .FontSize(13).Bold().FontColor(certificate.AllPassed ? Colors.Green.Darken2 : Colors.Red.Darken2);
+                    column.Item().PaddingTop(10).LineHorizontal(0.75f).LineColor(Colors.Grey.Lighten1);
+                });
+
+                page.Content().PaddingTop(10).Table(table =>
+                {
+                    table.ColumnsDefinition(columnsDef =>
+                    {
+                        columnsDef.RelativeColumn(2);
+                        columnsDef.RelativeColumn(1.5f);
+                        columnsDef.RelativeColumn(1);
+                        columnsDef.RelativeColumn(1);
+                        columnsDef.RelativeColumn(1);
+                        columnsDef.RelativeColumn(1);
+                    });
+
+                    table.Header(header =>
+                    {
+                        foreach (var text in new[] { "Caratteristica", "Unità", "Min", "Max", "Misurato", "Esito" })
+                        {
+                            header.Cell().BorderBottom(1).BorderColor(Colors.Grey.Darken1).PaddingBottom(4).Text(text).Bold();
+                        }
+                    });
+
+                    foreach (var measurement in certificate.Measurements)
+                    {
+                        var outcome = measurement.IsWithinTolerance switch
+                        {
+                            true => "Conforme",
+                            false => "Non conforme",
+                            null => "—"
+                        };
+                        var color = measurement.IsWithinTolerance switch
+                        {
+                            true => Colors.Green.Darken2,
+                            false => Colors.Red.Darken2,
+                            null => Colors.Grey.Darken1
+                        };
+
+                        table.Cell().BorderBottom(0.5f).BorderColor(Colors.Grey.Lighten2).PaddingVertical(4).Text(measurement.CheckpointName);
+                        table.Cell().BorderBottom(0.5f).BorderColor(Colors.Grey.Lighten2).PaddingVertical(4).Text(measurement.Unit ?? "-");
+                        table.Cell().BorderBottom(0.5f).BorderColor(Colors.Grey.Lighten2).PaddingVertical(4).Text(measurement.LowerLimit?.ToString("0.###") ?? "-");
+                        table.Cell().BorderBottom(0.5f).BorderColor(Colors.Grey.Lighten2).PaddingVertical(4).Text(measurement.UpperLimit?.ToString("0.###") ?? "-");
+                        table.Cell().BorderBottom(0.5f).BorderColor(Colors.Grey.Lighten2).PaddingVertical(4).Text(measurement.MeasuredValue.ToString("0.###"));
+                        table.Cell().BorderBottom(0.5f).BorderColor(Colors.Grey.Lighten2).PaddingVertical(4).Text(outcome).FontColor(color).Bold();
+                    }
+                });
+
+                page.Footer().AlignCenter().Text(text =>
+                {
+                    text.CurrentPageNumber();
+                    text.Span(" / ");
+                    text.TotalPages();
+                });
+            });
+        }).GeneratePdf(filePath);
+    }
+
     private static string Sanitize(string sheetName)
     {
         var invalid = new[] { '\\', '/', '?', '*', '[', ']', ':' };

@@ -35,6 +35,10 @@ public class ApplicationDbContext : DbContext
     public DbSet<Carrier> Carriers => Set<Carrier>();
     public DbSet<Shipment> Shipments => Set<Shipment>();
     public DbSet<Site> Sites => Set<Site>();
+    public DbSet<Equipment> Equipment => Set<Equipment>();
+    public DbSet<MaintenanceTask> MaintenanceTasks => Set<MaintenanceTask>();
+    public DbSet<QualityCheckpoint> QualityCheckpoints => Set<QualityCheckpoint>();
+    public DbSet<QualityMeasurement> QualityMeasurements => Set<QualityMeasurement>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -66,6 +70,38 @@ public class ApplicationDbContext : DbContext
             entity.Property(s => s.Code).HasMaxLength(50);
             entity.Property(s => s.Address).HasMaxLength(500);
             entity.HasIndex(s => s.Code).IsUnique();
+        });
+
+        modelBuilder.Entity<Equipment>(entity =>
+        {
+            entity.Property(e => e.Name).HasMaxLength(200);
+            entity.Property(e => e.Code).HasMaxLength(50);
+            entity.HasIndex(e => e.Code).IsUnique();
+            entity.HasOne(e => e.WorkCenter)
+                .WithMany()
+                .HasForeignKey(e => e.WorkCenterId)
+                .OnDelete(DeleteBehavior.SetNull);
+        });
+
+        modelBuilder.Entity<MaintenanceTask>(entity =>
+        {
+            entity.Property(t => t.Title).HasMaxLength(200);
+            entity.Property(t => t.Description).HasMaxLength(1000);
+            entity.Property(t => t.Type).HasMaxLength(20);
+            entity.Property(t => t.Status).HasMaxLength(20);
+            entity.Property(t => t.Notes).HasMaxLength(1000);
+            entity.HasOne(t => t.Equipment)
+                .WithMany()
+                .HasForeignKey(t => t.EquipmentId)
+                .OnDelete(DeleteBehavior.Cascade);
+            entity.HasOne(t => t.CompletedByUser)
+                .WithMany()
+                .HasForeignKey(t => t.CompletedByUserId)
+                .OnDelete(DeleteBehavior.SetNull);
+            entity.HasOne(t => t.OperationDowntime)
+                .WithMany()
+                .HasForeignKey(t => t.OperationDowntimeId)
+                .OnDelete(DeleteBehavior.SetNull);
         });
 
         modelBuilder.Entity<Material>(entity =>
@@ -342,6 +378,37 @@ public class ApplicationDbContext : DbContext
             entity.HasOne(w => w.Site)
                 .WithMany()
                 .HasForeignKey(w => w.SiteId)
+                .OnDelete(DeleteBehavior.SetNull);
+        });
+
+        modelBuilder.Entity<QualityCheckpoint>(entity =>
+        {
+            entity.Property(c => c.Name).HasMaxLength(200);
+            entity.Property(c => c.Unit).HasMaxLength(50);
+            entity.HasOne(c => c.Product)
+                .WithMany()
+                .HasForeignKey(c => c.ProductId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<QualityMeasurement>(entity =>
+        {
+            entity.Property(m => m.Notes).HasMaxLength(1000);
+            entity.HasOne(m => m.Checkpoint)
+                .WithMany()
+                .HasForeignKey(m => m.CheckpointId)
+                .OnDelete(DeleteBehavior.Cascade);
+            entity.HasOne(m => m.WorkOrder)
+                .WithMany()
+                .HasForeignKey(m => m.WorkOrderId)
+                .OnDelete(DeleteBehavior.Cascade);
+            entity.HasOne(m => m.WorkOrderUnit)
+                .WithMany()
+                .HasForeignKey(m => m.WorkOrderUnitId)
+                .OnDelete(DeleteBehavior.SetNull);
+            entity.HasOne(m => m.MeasuredByUser)
+                .WithMany()
+                .HasForeignKey(m => m.MeasuredByUserId)
                 .OnDelete(DeleteBehavior.SetNull);
         });
 

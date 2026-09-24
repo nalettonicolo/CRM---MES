@@ -40,6 +40,9 @@ public partial class MainWindow : Window
     private bool _shipmentsLoaded;
     private bool _suppliersLoaded;
     private bool _sitesLoaded;
+    private bool _equipmentLoaded;
+    private bool _maintenanceLoaded;
+    private MaintenanceTaskDto? _selectedMaintenanceTask;
 
     private static readonly Dictionary<int, string> PageTitles = new()
     {
@@ -60,6 +63,8 @@ public partial class MainWindow : Window
         [14] = "Fornitori",
         [15] = "Ricerca catalogo",
         [16] = "Sedi",
+        [17] = "Macchine",
+        [18] = "Manutenzione",
     };
 
     private static readonly Dictionary<int, string> PageEyebrows = new()
@@ -79,6 +84,8 @@ public partial class MainWindow : Window
         [5] = "A M M I N I S T R A Z I O N E",
         [6] = "A M M I N I S T R A Z I O N E",
         [16] = "A M M I N I S T R A Z I O N E",
+        [17] = "M A N U T E N Z I O N E",
+        [18] = "M A N U T E N Z I O N E",
         [12] = "S P E D I Z I O N I",
         [13] = "S P E D I Z I O N I",
     };
@@ -102,6 +109,8 @@ public partial class MainWindow : Window
         [14] = "Anagrafica fornitori. Doppio click su una riga per il dettaglio: ordini d'acquisto e voci di catalogo collegate.",
         [15] = "Ricerca rapida nel catalogo (materiali collegati a un fornitore con part number/prezzo/lead time), senza dover importare un PDF: utile quando il catalogo del fornitore è il suo sito web.",
         [16] = "Sedi fisiche della stessa azienda (es. un secondo stabilimento). Non sono aziende separate: utenti, materiali, fornitori e prodotti restano condivisi — la sede è solo una dimensione per filtrare/riportare aree e centri di lavoro. Doppio click su una sede per vedere quali aree e centri di lavoro le appartengono.",
+        [17] = "Anagrafica macchine/asset per la manutenzione — il controparte di Centri di lavoro, che resta l'unità di capacità. Doppio click su una macchina per lo storico degli interventi di manutenzione registrati su di essa.",
+        [18] = "Interventi di manutenzione preventiva (pianificata, con scadenza ed eventuale ricorrenza — completandolo genera subito la prossima occorrenza) o correttiva (a fronte di un guasto). È il pezzo che permette di intervenire sul fattore Disponibilità dell'OEE, non solo misurarlo.",
     };
 
 #if DEBUG
@@ -358,6 +367,12 @@ public partial class MainWindow : Window
             case "Sedi" when !_sitesLoaded:
                 await LoadSitesAsync();
                 break;
+            case "Macchine" when !_equipmentLoaded:
+                await LoadEquipmentAsync();
+                break;
+            case "Manutenzione" when !_maintenanceLoaded:
+                await LoadMaintenanceTasksAsync();
+                break;
         }
     }
 
@@ -552,6 +567,99 @@ public partial class MainWindow : Window
     private async void RefreshSuppliersButton_Click(object sender, RoutedEventArgs e) => await LoadSuppliersAsync();
 
     private async void RefreshSitesButton_Click(object sender, RoutedEventArgs e) => await LoadSitesAsync();
+
+    private async void RefreshEquipmentButton_Click(object sender, RoutedEventArgs e) => await LoadEquipmentAsync();
+
+    private async void NewEquipmentButton_Click(object sender, RoutedEventArgs e)
+    {
+        var dialog = new CreateEquipmentWindow(_apiClient) { Owner = this };
+        if (dialog.ShowDialog() == true && dialog.Created)
+        {
+            await LoadEquipmentAsync();
+        }
+    }
+
+    private void EquipmentList_MouseDoubleClick(object sender, MouseButtonEventArgs e)
+    {
+        if (EquipmentList.SelectedItem is EquipmentDto equipment)
+        {
+            var dialog = new EquipmentDetailWindow(_apiClient, equipment.Id) { Owner = this };
+            dialog.ShowDialog();
+        }
+    }
+
+    private async void DeactivateEquipment_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is not Button { Tag: EquipmentDto equipment })
+        {
+            return;
+        }
+
+        if (MessageBox.Show($"Disattivare la macchina {equipment.Name}?", "Conferma", MessageBoxButton.YesNo, MessageBoxImage.Question) != MessageBoxResult.Yes)
+        {
+            return;
+        }
+
+        await RunBusyAsync("Disattivazione in corso...", async () =>
+        {
+            await _apiClient.DeactivateEquipmentAsync(equipment.Id);
+            await LoadEquipmentAsync();
+        });
+    }
+
+    private async void RefreshMaintenanceButton_Click(object sender, RoutedEventArgs e) => await LoadMaintenanceTasksAsync();
+
+    private async void MaintenanceStatusFilter_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (_maintenanceLoaded)
+        {
+            await LoadMaintenanceTasksAsync();
+        }
+    }
+
+    private void MaintenanceTasksList_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        _selectedMaintenanceTask = MaintenanceTasksList.SelectedItem as MaintenanceTaskDto;
+        CompleteMaintenanceTaskButton.IsEnabled = _selectedMaintenanceTask?.Status == "Pending";
+    }
+
+    private async void NewMaintenanceTaskButton_Click(object sender, RoutedEventArgs e)
+    {
+        try
+        {
+            var equipment = await _apiClient.GetEquipmentAsync();
+            if (equipment.Count == 0)
+            {
+                MessageBox.Show("Crea prima almeno una macchina attiva.", "Nuovo intervento", MessageBoxButton.OK, MessageBoxImage.Information);
+                return;
+            }
+
+            var dialog = new CreateMaintenanceTaskWindow(_apiClient, equipment) { Owner = this };
+            if (dialog.ShowDialog() == true && dialog.Created)
+            {
+                await LoadMaintenanceTasksAsync();
+            }
+        }
+        catch (Exception exception)
+        {
+            MessageBox.Show(exception.Message, "Errore", MessageBoxButton.OK, MessageBoxImage.Warning);
+        }
+    }
+
+    private async void CompleteMaintenanceTask_Click(object sender, RoutedEventArgs e)
+    {
+        if (_selectedMaintenanceTask is null)
+        {
+            return;
+        }
+
+        var taskId = _selectedMaintenanceTask.Id;
+        await RunBusyAsync("Registrazione in corso...", async () =>
+        {
+            await _apiClient.CompleteMaintenanceTaskAsync(taskId, _currentUserId, null);
+            await LoadMaintenanceTasksAsync();
+        });
+    }
 
     private async void NewSiteButton_Click(object sender, RoutedEventArgs e)
     {
@@ -1430,6 +1538,21 @@ public partial class MainWindow : Window
     {
         SitesList.ItemsSource = await _apiClient.GetSitesAsync(activeOnly: false);
         _sitesLoaded = true;
+    });
+
+    private Task LoadEquipmentAsync() => RunBusyAsync(string.Empty, async () =>
+    {
+        EquipmentList.ItemsSource = await _apiClient.GetEquipmentAsync(activeOnly: false);
+        _equipmentLoaded = true;
+    });
+
+    private Task LoadMaintenanceTasksAsync() => RunBusyAsync(string.Empty, async () =>
+    {
+        var status = (MaintenanceStatusFilter.SelectedItem as ComboBoxItem)?.Tag as string;
+        MaintenanceTasksList.ItemsSource = await _apiClient.GetMaintenanceTasksAsync(string.IsNullOrEmpty(status) ? null : status);
+        _maintenanceLoaded = true;
+        _selectedMaintenanceTask = null;
+        CompleteMaintenanceTaskButton.IsEnabled = false;
     });
 
     private Task LoadShipmentsAsync() => RunBusyAsync(string.Empty, async () =>

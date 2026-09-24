@@ -1,0 +1,42 @@
+<Window x:Class="CrmMes.Desktop.EquipmentDetailWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Dettaglio macchina" Icon="Assets/logo.ico" Height="540" Width="640"
+        WindowStartupLocation="CenterOwner" ResizeMode="CanResize" MinHeight="400" MinWidth="540"
+        Background="{StaticResource BackgroundBrush}">
+    <Grid Margin="24">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+
+        <StackPanel Grid.Row="0">
+            <TextBlock Text="M A C C H I N A" Style="{StaticResource MicroLabel}" Foreground="{StaticResource PrimaryBrush}" />
+            <TextBlock x:Name="EquipmentTitleText" Style="{StaticResource EditorialTitle}" FontSize="26" Margin="0,0,0,4" />
+        </StackPanel>
+        <TextBlock Grid.Row="1" x:Name="EquipmentInfoText" Foreground="{StaticResource TextSecondaryBrush}" FontSize="12.5" TextWrapping="Wrap" Margin="0,4,0,16" />
+
+        <TextBlock Grid.Row="2" Text="Storico interventi di manutenzione" FontWeight="SemiBold" Foreground="{StaticResource TextPrimaryBrush}" Margin="0,0,0,6" />
+        <Border Grid.Row="3" Style="{StaticResource CardBorder}" Padding="4">
+            <ListView x:Name="TasksList">
+                <ListView.View>
+                    <GridView>
+                        <GridViewColumn Header="Titolo" DisplayMemberBinding="{Binding Title}" Width="200" />
+                        <GridViewColumn Header="Tipo" DisplayMemberBinding="{Binding Type}" Width="100" />
+                        <GridViewColumn Header="Stato" Width="110">
+                            <GridViewColumn.CellTemplate>
+                                <DataTemplate>
+                                    <TextBlock Text="{Binding Status, Converter={StaticResource StatusToItalianText}}" Foreground="{Binding Status, Converter={StaticResource StatusToBrush}, ConverterParameter=Foreground}" />
+                                </DataTemplate>
+                            </GridViewColumn.CellTemplate>
+                        </GridViewColumn>
+                        <GridViewColumn Header="Scadenza" DisplayMemberBinding="{Binding DueDate}" Width="110" />
+                        <GridViewColumn Header="Completato il" DisplayMemberBinding="{Binding CompletedAt}" Width="130" />
+                    </GridView>
+                </ListView.View>
+            </ListView>
+        </Border>
+    </Grid>
+</Window>

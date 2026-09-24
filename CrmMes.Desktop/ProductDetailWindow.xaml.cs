@@ -230,6 +230,12 @@ public partial class ProductDetailWindow : Window
 
     private void Close_Click(object sender, RoutedEventArgs e) => Close();
 
+    private void QualityPlan_Click(object sender, RoutedEventArgs e)
+    {
+        var dialog = new ProductQualityPlanWindow(_apiClient, _productId, CodeText.Text) { Owner = this };
+        dialog.ShowDialog();
+    }
+
     private sealed record BomRow(string MaterialCode, decimal Quantity, string? Notes);
 
     private sealed record RoutingRow(int Sequence, string Name, string? WorkCenter, decimal EstimatedMinutes);

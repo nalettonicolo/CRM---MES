@@ -97,6 +97,7 @@
         </StackPanel>
 
         <StackPanel Grid.Row="10" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,16,0,0">
+            <Button Style="{StaticResource SecondaryButton}" Content="Piano di controllo qualità" Width="190" Height="36" Margin="0,0,10,0" Click="QualityPlan_Click" />
             <Button x:Name="DeactivateButton" Style="{StaticResource DangerButton}" Content="Disattiva prodotto" Width="150" Height="36" Margin="0,0,10,0" Click="Deactivate_Click" />
             <Button Style="{StaticResource SecondaryButton}" Content="Chiudi" Width="100" Height="36" Click="Close_Click" />
         </StackPanel>
