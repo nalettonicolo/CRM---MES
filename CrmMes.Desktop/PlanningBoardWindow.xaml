@@ -1,0 +1,71 @@
+<Window x:Class="CrmMes.Desktop.PlanningBoardWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Planning produzione" Icon="Assets/logo.ico" Height="800" Width="1400"
+        WindowStartupLocation="CenterOwner" ResizeMode="CanResize" MinHeight="500" MinWidth="900"
+        WindowState="Maximized"
+        Background="{StaticResource BackgroundBrush}">
+    <Grid Margin="20">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+
+        <DockPanel Grid.Row="0" Margin="0,0,0,10">
+            <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
+                <Button x:Name="ManageCategoriesButton" Style="{StaticResource SecondaryButton}" Content="Gestisci categorie" Width="150" Height="34" Margin="0,0,10,0" Click="ManageCategoriesButton_Click" />
+                <Button x:Name="NewProjectButton" Content="+ Nuovo progetto" Width="150" Height="34" Click="NewProjectButton_Click" />
+            </StackPanel>
+            <StackPanel>
+                <TextBlock Text="P L A N N I N G   P R O D U Z I O N E" Style="{StaticResource MicroLabel}" Foreground="{StaticResource PrimaryBrush}" />
+                <TextBlock x:Name="TitleText" Style="{StaticResource EditorialTitle}" FontSize="24" Text="Planning produzione" />
+                <TextBlock x:Name="SubtitleText" Foreground="{StaticResource TextSecondaryBrush}" FontSize="12" Margin="0,2,0,0" />
+            </StackPanel>
+        </DockPanel>
+
+        <WrapPanel x:Name="ToolPanel" Grid.Row="1" Margin="0,0,0,8">
+            <ToggleButton x:Name="FillModeButton" Content="Compila" Width="90" Height="30" Margin="0,4,10,0" IsChecked="True" Click="FillModeButton_Click" />
+            <ToggleButton x:Name="EraseModeButton" Content="Cancella" Width="90" Height="30" Margin="0,4,16,0" Click="EraseModeButton_Click" />
+            <ItemsControl x:Name="CategoryButtonsPanel">
+                <ItemsControl.ItemsPanel>
+                    <ItemsPanelTemplate>
+                        <WrapPanel />
+                    </ItemsPanelTemplate>
+                </ItemsControl.ItemsPanel>
+            </ItemsControl>
+        </WrapPanel>
+
+        <WrapPanel Grid.Row="2" Margin="0,0,0,10">
+            <TextBox x:Name="SearchBox" Width="220" Height="30" Margin="0,0,10,0" Tag="Cerca macchina..." TextChanged="SearchBox_TextChanged" />
+            <ComboBox x:Name="StatusFilterCombo" Width="160" Height="30" Margin="0,0,10,0" SelectionChanged="StatusFilterCombo_SelectionChanged">
+                <ComboBoxItem Content="Tutti gli stati" Tag="" IsSelected="True" />
+                <ComboBoxItem Content="Confermata" Tag="Confermata" />
+                <ComboBoxItem Content="In valutazione" Tag="InValutazione" />
+                <ComboBoxItem Content="In produzione" Tag="InProduzione" />
+                <ComboBoxItem Content="Sospesa" Tag="Sospesa" />
+                <ComboBoxItem Content="Consegnata" Tag="Consegnata" />
+            </ComboBox>
+            <ComboBox x:Name="WeeksRangeCombo" Width="150" Height="30" Margin="0,0,10,0" SelectionChanged="WeeksRangeCombo_SelectionChanged">
+                <ComboBoxItem Content="12 settimane" Tag="12" />
+                <ComboBoxItem Content="26 settimane" Tag="26" IsSelected="True" />
+                <ComboBoxItem Content="52 settimane" Tag="52" />
+                <ComboBoxItem Content="104 settimane" Tag="104" />
+            </ComboBox>
+            <Button x:Name="TodayButton" Style="{StaticResource SecondaryButton}" Content="Oggi" Width="80" Height="30" Margin="0,0,10,0" Click="TodayButton_Click" />
+            <Button x:Name="PrevRangeButton" Style="{StaticResource SecondaryButton}" Content="&lt;" Width="36" Height="30" Margin="0,0,4,0" Click="PrevRangeButton_Click" />
+            <Button x:Name="NextRangeButton" Style="{StaticResource SecondaryButton}" Content="&gt;" Width="36" Height="30" Margin="0,0,10,0" Click="NextRangeButton_Click" />
+            <Button x:Name="RefreshButton" Style="{StaticResource SecondaryButton}" Content="Aggiorna" Width="100" Height="30" Click="RefreshButton_Click" />
+        </WrapPanel>
+
+        <TextBlock Grid.Row="3" x:Name="ErrorText" Foreground="{StaticResource DangerBrush}" TextWrapping="Wrap" Margin="0,0,0,8" />
+
+        <Border Grid.Row="4" Style="{StaticResource CardBorder}" Padding="1">
+            <ScrollViewer x:Name="GridScrollViewer" HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto">
+                <Grid x:Name="BoardGrid" Margin="4" />
+            </ScrollViewer>
+        </Border>
+    </Grid>
+</Window>

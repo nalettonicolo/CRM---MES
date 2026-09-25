@@ -65,7 +65,8 @@ public partial class SupplierDetailWindow : Window
         {
             var detail = await _apiClient.GetSupplierDetailAsync(_supplierId);
             var dialog = new CreateSupplierWindow(_apiClient, detail) { Owner = this };
-            if (dialog.ShowDialog() == true && dialog.Created)
+            dialog.ShowDialog();
+            if (dialog.Created)
             {
                 Changed = true;
                 await ReloadAsync();

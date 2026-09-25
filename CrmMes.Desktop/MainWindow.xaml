@@ -183,6 +183,12 @@
                                             <TextBlock Text="Terminale di reparto" Margin="6,0,0,0" />
                                         </StackPanel>
                                     </Button>
+                                    <Button x:Name="PlanningBoardButton" Style="{StaticResource SidebarLinkButton}" HorizontalAlignment="Stretch" HorizontalContentAlignment="Left" Margin="0,6,0,0" Click="PlanningBoardButton_Click">
+                                        <StackPanel Orientation="Horizontal">
+                                            <TextBlock Text="&#xE787;" FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets" FontSize="16" Width="24" />
+                                            <TextBlock Text="Planning produzione" Margin="6,0,0,0" />
+                                        </StackPanel>
+                                    </Button>
                                 </StackPanel>
                             </Expander>
 

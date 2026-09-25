@@ -1040,6 +1040,91 @@ public sealed class ApiClient
             ?? throw new InvalidOperationException("Risposta di generazione distinta non valida.");
     }
 
+    // ---- Planning produzione (board dipinta a mano) ----
+
+    public Task<IReadOnlyList<PlanningCategoryDto>> GetPlanningCategoriesAsync(bool includeInactive = false, CancellationToken cancellationToken = default)
+        => GetAsync<PlanningCategoryDto>($"api/planning-board/categories?includeInactive={includeInactive}", cancellationToken);
+
+    public async Task<PlanningCategoryDto> CreatePlanningCategoryAsync(string code, string name, string colorHex, CancellationToken cancellationToken = default)
+    {
+        using var response = await _httpClient.PostAsJsonAsync("api/planning-board/categories", new { code, name, colorHex }, cancellationToken);
+        await EnsureSuccessAsync(response, cancellationToken);
+        return await response.Content.ReadFromJsonAsync<PlanningCategoryDto>(cancellationToken: cancellationToken)
+            ?? throw new InvalidOperationException("Risposta categoria non valida.");
+    }
+
+    public async Task EditPlanningCategoryAsync(Guid id, string name, string colorHex, CancellationToken cancellationToken = default)
+    {
+        using var response = await _httpClient.PutAsJsonAsync($"api/planning-board/categories/{id}", new { name, colorHex }, cancellationToken);
+        await EnsureSuccessAsync(response, cancellationToken);
+    }
+
+    public async Task DeactivatePlanningCategoryAsync(Guid id, CancellationToken cancellationToken = default)
+    {
+        using var response = await _httpClient.DeleteAsync($"api/planning-board/categories/{id}", cancellationToken);
+        await EnsureSuccessAsync(response, cancellationToken);
+    }
+
+    public async Task ReorderPlanningCategoriesAsync(IReadOnlyList<Guid> orderedIds, CancellationToken cancellationToken = default)
+    {
+        using var response = await _httpClient.PutAsJsonAsync("api/planning-board/categories/reorder", new { orderedIds }, cancellationToken);
+        await EnsureSuccessAsync(response, cancellationToken);
+    }
+
+    public Task<IReadOnlyList<PlanningProjectDto>> GetPlanningProjectsAsync(bool includeInactive = false, CancellationToken cancellationToken = default)
+        => GetAsync<PlanningProjectDto>($"api/planning-board/projects?includeInactive={includeInactive}", cancellationToken);
+
+    public async Task<PlanningProjectDto> CreatePlanningProjectAsync(string name, string? status, string? notes, Guid? workOrderId, CancellationToken cancellationToken = default)
+    {
+        using var response = await _httpClient.PostAsJsonAsync("api/planning-board/projects", new { name, status, notes, workOrderId }, cancellationToken);
+        await EnsureSuccessAsync(response, cancellationToken);
+        return await response.Content.ReadFromJsonAsync<PlanningProjectDto>(cancellationToken: cancellationToken)
+            ?? throw new InvalidOperationException("Risposta progetto non valida.");
+    }
+
+    public async Task EditPlanningProjectAsync(Guid id, string name, string status, string? notes, Guid? workOrderId, CancellationToken cancellationToken = default)
+    {
+        using var response = await _httpClient.PutAsJsonAsync($"api/planning-board/projects/{id}", new { name, status, notes, workOrderId }, cancellationToken);
+        await EnsureSuccessAsync(response, cancellationToken);
+    }
+
+    public async Task DeactivatePlanningProjectAsync(Guid id, CancellationToken cancellationToken = default)
+    {
+        using var response = await _httpClient.DeleteAsync($"api/planning-board/projects/{id}", cancellationToken);
+        await EnsureSuccessAsync(response, cancellationToken);
+    }
+
+    public async Task ReorderPlanningProjectsAsync(IReadOnlyList<Guid> orderedIds, CancellationToken cancellationToken = default)
+    {
+        using var response = await _httpClient.PutAsJsonAsync("api/planning-board/projects/reorder", new { orderedIds }, cancellationToken);
+        await EnsureSuccessAsync(response, cancellationToken);
+    }
+
+    public async Task<IReadOnlyList<PlanningCellDto>> GetPlanningCellsAsync(DateTime from, int weeks, CancellationToken cancellationToken = default)
+    {
+        using var response = await _httpClient.GetAsync($"api/planning-board/cells?from={from:yyyy-MM-dd}&weeks={weeks}", cancellationToken);
+        await EnsureSuccessAsync(response, cancellationToken);
+        var result = await response.Content.ReadFromJsonAsync<List<PlanningCellDto>>(cancellationToken: cancellationToken);
+        return result ?? [];
+    }
+
+    public async Task PaintPlanningCellsAsync(Guid projectId, Guid categoryId, IReadOnlyList<DateTime> weekStarts, CancellationToken cancellationToken = default)
+    {
+        using var response = await _httpClient.PutAsJsonAsync(
+            "api/planning-board/cells", new { projectId, categoryId, weekStarts }, cancellationToken);
+        await EnsureSuccessAsync(response, cancellationToken);
+    }
+
+    public async Task ClearPlanningCellsAsync(Guid projectId, IReadOnlyList<DateTime> weekStarts, CancellationToken cancellationToken = default)
+    {
+        using var request = new HttpRequestMessage(HttpMethod.Delete, "api/planning-board/cells")
+        {
+            Content = JsonContent.Create(new { projectId, weekStarts })
+        };
+        using var response = await _httpClient.SendAsync(request, cancellationToken);
+        await EnsureSuccessAsync(response, cancellationToken);
+    }
+
     private async Task<IReadOnlyList<T>> GetAsync<T>(string path, CancellationToken cancellationToken)
     {
         using var response = await _httpClient.GetAsync(path, cancellationToken);
@@ -1384,6 +1469,12 @@ public sealed record WorkOrderUnitDto(Guid Id, int SequenceNumber, string Serial
 public sealed record WorkOrderUnitOperationDto(Guid OperationId, int SequenceNumber, string Name, string Status, DateTime? StartedAt, DateTime? CompletedAt);
 
 public sealed record WorkOrderUnitMaterialLotDto(Guid MaterialLotId, string MaterialCode, string LotNumber, decimal Quantity);
+
+public sealed record PlanningCategoryDto(Guid Id, string Code, string Name, string ColorHex, int SequenceNumber, bool IsActive);
+
+public sealed record PlanningProjectDto(Guid Id, string Name, string Status, string? Notes, int SequenceNumber, bool IsActive, Guid? WorkOrderId);
+
+public sealed record PlanningCellDto(Guid ProjectId, Guid CategoryId, DateTime WeekStart);
 
 public sealed record PlanningEntryDto(string Type, Guid Id, string Code, string Status, DateTime Date, string Detail, string Kind);
 

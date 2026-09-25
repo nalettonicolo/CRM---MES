@@ -247,6 +247,12 @@ public partial class MainWindow : Window
         window.ShowDialog();
     }
 
+    private void PlanningBoardButton_Click(object sender, RoutedEventArgs e)
+    {
+        var window = new PlanningBoardWindow(_apiClient, _currentRole == "Admin") { Owner = this };
+        window.ShowDialog();
+    }
+
     private async Task ConnectAsync()
     {
         try
@@ -505,7 +511,8 @@ public partial class MainWindow : Window
     private async void NewMaterialButton_Click(object sender, RoutedEventArgs e)
     {
         var dialog = new CreateMaterialWindow(_apiClient) { Owner = this };
-        if (dialog.ShowDialog() == true && dialog.Created)
+        dialog.ShowDialog();
+        if (dialog.Created)
         {
             await SearchMaterialsAsync();
         }
@@ -531,7 +538,8 @@ public partial class MainWindow : Window
         }
 
         var dialog = new CreateWithdrawalSlipWindow(_apiClient, areas, _currentUserId) { Owner = this };
-        if (dialog.ShowDialog() == true && dialog.Created)
+        dialog.ShowDialog();
+        if (dialog.Created)
         {
             await LoadWithdrawalSlipsAsync();
         }
@@ -557,7 +565,8 @@ public partial class MainWindow : Window
         }
 
         var dialog = new CreatePurchaseOrderWindow(_apiClient, suppliers) { Owner = this };
-        if (dialog.ShowDialog() == true && dialog.Created)
+        dialog.ShowDialog();
+        if (dialog.Created)
         {
             await LoadPurchaseOrdersAsync();
         }
@@ -566,7 +575,8 @@ public partial class MainWindow : Window
     private async void NewSupplierButton_Click(object sender, RoutedEventArgs e)
     {
         var dialog = new CreateSupplierWindow(_apiClient) { Owner = this };
-        if (dialog.ShowDialog() == true && dialog.Created && _suppliersLoaded)
+        dialog.ShowDialog();
+        if (dialog.Created && _suppliersLoaded)
         {
             await LoadSuppliersAsync();
         }
@@ -575,7 +585,8 @@ public partial class MainWindow : Window
     private async void NewSupplierTabButton_Click(object sender, RoutedEventArgs e)
     {
         var dialog = new CreateSupplierWindow(_apiClient) { Owner = this };
-        if (dialog.ShowDialog() == true && dialog.Created)
+        dialog.ShowDialog();
+        if (dialog.Created)
         {
             await LoadSuppliersAsync();
         }
@@ -590,7 +601,8 @@ public partial class MainWindow : Window
     private async void NewEquipmentButton_Click(object sender, RoutedEventArgs e)
     {
         var dialog = new CreateEquipmentWindow(_apiClient) { Owner = this };
-        if (dialog.ShowDialog() == true && dialog.Created)
+        dialog.ShowDialog();
+        if (dialog.Created)
         {
             await LoadEquipmentAsync();
         }
@@ -652,7 +664,8 @@ public partial class MainWindow : Window
             }
 
             var dialog = new CreateMaintenanceTaskWindow(_apiClient, equipment) { Owner = this };
-            if (dialog.ShowDialog() == true && dialog.Created)
+            dialog.ShowDialog();
+            if (dialog.Created)
             {
                 await LoadMaintenanceTasksAsync();
             }
@@ -681,7 +694,8 @@ public partial class MainWindow : Window
     private async void NewSiteButton_Click(object sender, RoutedEventArgs e)
     {
         var dialog = new CreateSiteWindow(_apiClient) { Owner = this };
-        if (dialog.ShowDialog() == true && dialog.Created)
+        dialog.ShowDialog();
+        if (dialog.Created)
         {
             await LoadSitesAsync();
         }
@@ -806,7 +820,8 @@ public partial class MainWindow : Window
     private async void NewAreaButton_Click(object sender, RoutedEventArgs e)
     {
         var dialog = new CreateAreaWindow(_apiClient) { Owner = this };
-        if (dialog.ShowDialog() == true && dialog.Created)
+        dialog.ShowDialog();
+        if (dialog.Created)
         {
             await LoadAreasAsync();
         }
@@ -815,7 +830,8 @@ public partial class MainWindow : Window
     private async void NewCarrierButton_Click(object sender, RoutedEventArgs e)
     {
         var dialog = new CreateCarrierWindow(_apiClient) { Owner = this };
-        if (dialog.ShowDialog() == true && dialog.Created)
+        dialog.ShowDialog();
+        if (dialog.Created)
         {
             await LoadCarriersAsync();
         }
@@ -864,7 +880,8 @@ public partial class MainWindow : Window
         }
 
         var dialog = new CreateShipmentWindow(_apiClient, carriers, purchaseOrders, workOrders) { Owner = this };
-        if (dialog.ShowDialog() == true && dialog.Created)
+        dialog.ShowDialog();
+        if (dialog.Created)
         {
             await LoadShipmentsAsync();
         }
@@ -940,7 +957,8 @@ public partial class MainWindow : Window
     private async void NewUserButton_Click(object sender, RoutedEventArgs e)
     {
         var dialog = new CreateUserWindow(_apiClient) { Owner = this };
-        if (dialog.ShowDialog() == true && dialog.Created)
+        dialog.ShowDialog();
+        if (dialog.Created)
         {
             await LoadUsersAsync();
         }
@@ -965,7 +983,8 @@ public partial class MainWindow : Window
     private async void NewProductButton_Click(object sender, RoutedEventArgs e)
     {
         var dialog = new CreateProductWindow(_apiClient) { Owner = this };
-        if (dialog.ShowDialog() == true && dialog.Created)
+        dialog.ShowDialog();
+        if (dialog.Created)
         {
             await LoadProductsAsync();
         }
@@ -1016,7 +1035,8 @@ public partial class MainWindow : Window
         {
             var existing = await _apiClient.GetProductAsync(_selectedProduct.Id);
             var dialog = new CreateProductWindow(_apiClient, existing) { Owner = this };
-            if (dialog.ShowDialog() == true && dialog.Created)
+            dialog.ShowDialog();
+            if (dialog.Created)
             {
                 await LoadProductsAsync();
             }
@@ -1049,7 +1069,8 @@ public partial class MainWindow : Window
         }
 
         var dialog = new CreateWorkOrderWindow(_apiClient, products, areas) { Owner = this };
-        if (dialog.ShowDialog() == true && dialog.Created)
+        dialog.ShowDialog();
+        if (dialog.Created)
         {
             await LoadWorkOrdersAsync();
         }
@@ -1111,7 +1132,8 @@ public partial class MainWindow : Window
             var areas = await _apiClient.GetAreasAsync();
             var existing = await _apiClient.GetWorkOrderAsync(_selectedWorkOrder.Id);
             var dialog = new CreateWorkOrderWindow(_apiClient, products, areas, existing) { Owner = this };
-            if (dialog.ShowDialog() == true && dialog.Created)
+            dialog.ShowDialog();
+            if (dialog.Created)
             {
                 await LoadWorkOrdersAsync();
             }
@@ -1160,7 +1182,8 @@ public partial class MainWindow : Window
     private async void NewMaterialLotButton_Click(object sender, RoutedEventArgs e)
     {
         var dialog = new CreateMaterialLotWindow(_apiClient) { Owner = this };
-        if (dialog.ShowDialog() == true && dialog.Created)
+        dialog.ShowDialog();
+        if (dialog.Created)
         {
             await LoadMaterialLotsAsync();
         }
@@ -1249,7 +1272,8 @@ public partial class MainWindow : Window
             var areas = await _apiClient.GetAreasAsync();
             var existing = await _apiClient.GetWithdrawalSlipAsync(_selectedSlip.Id);
             var dialog = new CreateWithdrawalSlipWindow(_apiClient, areas, _currentUserId, existing) { Owner = this };
-            if (dialog.ShowDialog() == true && dialog.Created)
+            dialog.ShowDialog();
+            if (dialog.Created)
             {
                 await LoadWithdrawalSlipsAsync();
             }
@@ -1380,7 +1404,8 @@ public partial class MainWindow : Window
             var suppliers = await _apiClient.GetSuppliersAsync();
             var existing = await _apiClient.GetPurchaseOrderAsync(_selectedOrder.Id);
             var dialog = new CreatePurchaseOrderWindow(_apiClient, suppliers, existing) { Owner = this };
-            if (dialog.ShowDialog() == true && dialog.Created)
+            dialog.ShowDialog();
+            if (dialog.Created)
             {
                 await LoadPurchaseOrdersAsync();
             }

@@ -10,6 +10,7 @@
     <local:OperationStatusToActionTextConverter x:Key="OperationStatusToActionText" />
     <local:StatusNotEqualToVisibilityConverter x:Key="StatusNotEqualToVisibility" />
     <local:PlanningTypeToBrushConverter x:Key="PlanningTypeToBrush" />
+    <local:BoolToVisibilityConverter x:Key="BoolToVisibility" />
 
     <!-- ===================================================================
          DESIGN SYSTEM — "Fusione": sintesi delle tre direzioni provate.

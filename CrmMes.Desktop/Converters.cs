@@ -1,4 +1,5 @@
 using System.Globalization;
+using System.Windows;
 using System.Windows.Data;
 using System.Windows.Media;
 
@@ -123,6 +124,25 @@ public sealed class BoolToTextConverter : IValueConverter
         var parts = (parameter as string ?? "Sì|No").Split('|');
         var isTrue = value is true;
         return isTrue ? parts[0] : parts.Length > 1 ? parts[1] : "No";
+    }
+
+    public object ConvertBack(object value, Type targetType, object? parameter, CultureInfo culture)
+        => throw new NotSupportedException();
+}
+
+/// <summary>Shows/collapses an element based on a boolean — true means Visible unless parameter
+/// "Invert" is passed, in which case true means Collapsed.</summary>
+public sealed class BoolToVisibilityConverter : IValueConverter
+{
+    public object Convert(object? value, Type targetType, object? parameter, CultureInfo culture)
+    {
+        var isTrue = value is true;
+        if (parameter as string == "Invert")
+        {
+            isTrue = !isTrue;
+        }
+
+        return isTrue ? Visibility.Visible : Visibility.Collapsed;
     }
 
     public object ConvertBack(object value, Type targetType, object? parameter, CultureInfo culture)

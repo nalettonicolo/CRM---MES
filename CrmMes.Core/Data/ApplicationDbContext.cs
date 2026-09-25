@@ -41,6 +41,9 @@ public class ApplicationDbContext : DbContext
     public DbSet<QualityMeasurement> QualityMeasurements => Set<QualityMeasurement>();
     public DbSet<WorkOrderUnitOperation> WorkOrderUnitOperations => Set<WorkOrderUnitOperation>();
     public DbSet<WorkOrderUnitMaterialLot> WorkOrderUnitMaterialLots => Set<WorkOrderUnitMaterialLot>();
+    public DbSet<PlanningCategory> PlanningCategories => Set<PlanningCategory>();
+    public DbSet<PlanningProject> PlanningProjects => Set<PlanningProject>();
+    public DbSet<PlanningCell> PlanningCells => Set<PlanningCell>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -438,6 +441,38 @@ public class ApplicationDbContext : DbContext
             entity.HasOne(l => l.MaterialLot)
                 .WithMany()
                 .HasForeignKey(l => l.MaterialLotId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<PlanningCategory>(entity =>
+        {
+            entity.Property(c => c.Code).HasMaxLength(10);
+            entity.Property(c => c.Name).HasMaxLength(120);
+            entity.Property(c => c.ColorHex).HasMaxLength(9);
+            entity.HasIndex(c => c.Code).IsUnique();
+        });
+
+        modelBuilder.Entity<PlanningProject>(entity =>
+        {
+            entity.Property(p => p.Name).HasMaxLength(200);
+            entity.Property(p => p.Status).HasMaxLength(30);
+            entity.Property(p => p.Notes).HasMaxLength(2000);
+            entity.HasOne(p => p.WorkOrder)
+                .WithMany()
+                .HasForeignKey(p => p.WorkOrderId)
+                .OnDelete(DeleteBehavior.SetNull);
+        });
+
+        modelBuilder.Entity<PlanningCell>(entity =>
+        {
+            entity.HasIndex(c => new { c.PlanningProjectId, c.PlanningCategoryId, c.WeekStart }).IsUnique();
+            entity.HasOne(c => c.Project)
+                .WithMany(p => p.Cells)
+                .HasForeignKey(c => c.PlanningProjectId)
+                .OnDelete(DeleteBehavior.Cascade);
+            entity.HasOne(c => c.Category)
+                .WithMany()
+                .HasForeignKey(c => c.PlanningCategoryId)
                 .OnDelete(DeleteBehavior.Cascade);
         });
 

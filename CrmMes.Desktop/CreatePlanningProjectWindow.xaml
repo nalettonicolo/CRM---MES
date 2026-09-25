@@ -1,0 +1,33 @@
+<Window x:Class="CrmMes.Desktop.CreatePlanningProjectWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Nuovo progetto macchina" Icon="Assets/logo.ico" Width="420" SizeToContent="Height"
+        WindowStartupLocation="CenterOwner" ResizeMode="NoResize"
+        Background="{StaticResource BackgroundBrush}">
+    <StackPanel Margin="24">
+        <TextBlock x:Name="TitleText" Text="Nuovo progetto macchina" FontSize="18" FontWeight="SemiBold" Foreground="{StaticResource TextPrimaryBrush}" Margin="0,0,0,18" />
+
+        <TextBlock Text="Nome" Foreground="{StaticResource TextSecondaryBrush}" FontSize="12.5" Margin="0,0,0,5" />
+        <TextBox x:Name="NameBox" Margin="0,0,0,14" />
+
+        <TextBlock Text="Stato" Foreground="{StaticResource TextSecondaryBrush}" FontSize="12.5" Margin="0,0,0,5" />
+        <ComboBox x:Name="StatusCombo" Height="34" Margin="0,0,0,14">
+            <ComboBoxItem Content="In valutazione" Tag="InValutazione" IsSelected="True" />
+            <ComboBoxItem Content="Confermata" Tag="Confermata" />
+            <ComboBoxItem Content="In produzione" Tag="InProduzione" />
+            <ComboBoxItem Content="Sospesa" Tag="Sospesa" />
+            <ComboBoxItem Content="Consegnata" Tag="Consegnata" />
+        </ComboBox>
+
+        <TextBlock Text="Note (opzionale)" Foreground="{StaticResource TextSecondaryBrush}" FontSize="12.5" Margin="0,0,0,5" />
+        <TextBox x:Name="NotesBox" Height="60" TextWrapping="Wrap" AcceptsReturn="True" Margin="0,0,0,14" />
+
+        <TextBlock x:Name="ErrorText" Foreground="{StaticResource DangerBrush}" TextWrapping="Wrap" Margin="0,0,0,10" />
+
+        <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+            <Button x:Name="DeactivateButton" Style="{StaticResource DangerButton}" Content="Disattiva" Width="100" Height="36" Margin="0,0,10,0" Click="Deactivate_Click" Visibility="Collapsed" />
+            <Button Style="{StaticResource SecondaryButton}" Content="Annulla" Width="100" Height="36" Margin="0,0,10,0" Click="Cancel_Click" />
+            <Button x:Name="SaveButton" Content="Salva" Width="120" Height="36" Click="Save_Click" />
+        </StackPanel>
+    </StackPanel>
+</Window>
