@@ -247,4 +247,32 @@ public class ProcurementTests : IClassFixture<AdminSeededApiTestFixture>
         var missingAfterEdit = await db.MissingMaterials.SingleAsync(m => m.Id == missing.Id);
         Assert.Equal("Open", missingAfterEdit.Status);
     }
+
+    [Fact]
+    public async Task SetExpectedDelivery_AppearsInBothDetailAndListEndpoints()
+    {
+        var material = await CreateMaterialAsync(stock: 10, minStock: 0);
+        var supplier = await CreateSupplierAsync();
+
+        var createResponse = await _adminClient.PostAsJsonAsync(
+            "/api/procurement/purchase-orders",
+            new CreatePurchaseOrderRequest(supplier.Id, null,
+                [new CreatePurchaseOrderItemRequest(material.Code, 5, null, 1m, null)]));
+        var order = (await createResponse.Content.ReadFromJsonAsync<PurchaseOrderResponse>())!;
+        Assert.Null(order.ExpectedDeliveryDate);
+
+        var expectedDate = DateTime.UtcNow.Date.AddDays(10);
+        var setResponse = await _adminClient.PutAsJsonAsync(
+            $"/api/procurement/purchase-orders/{order.Id}/expected-delivery", new SetExpectedDeliveryRequest(expectedDate));
+        Assert.Equal(HttpStatusCode.OK, setResponse.StatusCode);
+        var updated = (await setResponse.Content.ReadFromJsonAsync<PurchaseOrderResponse>())!;
+        Assert.Equal(expectedDate, updated.ExpectedDeliveryDate);
+
+        var detail = await _adminClient.GetFromJsonAsync<PurchaseOrderResponse>($"/api/procurement/purchase-orders/{order.Id}");
+        Assert.Equal(expectedDate, detail!.ExpectedDeliveryDate);
+
+        var list = await _adminClient.GetFromJsonAsync<List<PurchaseOrderSummaryResponse>>("/api/procurement/purchase-orders");
+        var listEntry = list!.Single(o => o.Id == order.Id);
+        Assert.Equal(expectedDate, listEntry.ExpectedDeliveryDate);
+    }
 }

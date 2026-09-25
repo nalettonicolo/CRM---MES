@@ -1159,7 +1159,8 @@ public sealed record PurchaseOrderSummaryDto(
     DateTime CreatedAt,
     DateTime? ConfirmedAt,
     DateTime? ReceivedAt,
-    int ItemCount);
+    int ItemCount,
+    DateTime? ExpectedDeliveryDate);
 
 public sealed record PurchaseOrderDetailDto(
     Guid Id,

@@ -464,6 +464,7 @@
                                                 <GridViewColumn Header="Creato il" DisplayMemberBinding="{Binding CreatedAt}" Width="140" />
                                                 <GridViewColumn Header="Confermato il" DisplayMemberBinding="{Binding ConfirmedAt}" Width="140" />
                                                 <GridViewColumn Header="Ricevuto il" DisplayMemberBinding="{Binding ReceivedAt}" Width="140" />
+                                                <GridViewColumn Header="Consegna prevista" DisplayMemberBinding="{Binding ExpectedDeliveryDate}" Width="140" />
                                             </GridView>
                                         </ListView.View>
                                     </ListView>

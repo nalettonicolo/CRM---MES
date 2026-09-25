@@ -160,7 +160,8 @@ public class ProcurementController : ControllerBase
                 order.CreatedAt,
                 order.ConfirmedAt,
                 order.ReceivedAt,
-                order.Items.Count))
+                order.Items.Count,
+                order.ExpectedDeliveryDate))
             .ToListAsync(cancellationToken);
 
         return Ok(orders);
@@ -728,7 +729,8 @@ public sealed record PurchaseOrderSummaryResponse(
     DateTime CreatedAt,
     DateTime? ConfirmedAt,
     DateTime? ReceivedAt,
-    int ItemCount);
+    int ItemCount,
+    DateTime? ExpectedDeliveryDate);
 
 public sealed record PurchaseOrderItemResponse(
     Guid Id,
