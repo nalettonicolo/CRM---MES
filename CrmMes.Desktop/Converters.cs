@@ -12,15 +12,15 @@ public sealed class StatusToBrushConverter : IValueConverter
 {
     private static readonly Dictionary<string, string> Palette = new(StringComparer.OrdinalIgnoreCase)
     {
-        ["Draft"] = "#8C7F6A",
-        ["Pending"] = "#8C7F6A",
-        ["Open"] = "#C57821",
-        ["PartiallyReceived"] = "#C57821",
-        ["InProgress"] = "#C57821",
-        ["Ordered"] = "#B36F1B",
-        ["Ready"] = "#B36F1B",
-        ["Confirmed"] = "#B36F1B",
-        ["Released"] = "#B36F1B",
+        ["Draft"] = "#71717A",
+        ["Pending"] = "#71717A",
+        ["Open"] = "#A15C07",
+        ["PartiallyReceived"] = "#A15C07",
+        ["InProgress"] = "#A15C07",
+        ["Ordered"] = "#2E6F9E",
+        ["Ready"] = "#2E6F9E",
+        ["Confirmed"] = "#2E6F9E",
+        ["Released"] = "#2E6F9E",
         ["Received"] = "#3D7A4C",
         ["Resolved"] = "#3D7A4C",
         ["Closed"] = "#3D7A4C",
@@ -29,8 +29,8 @@ public sealed class StatusToBrushConverter : IValueConverter
         ["Good"] = "#3D7A4C",
         ["Cancelled"] = "#C0392B",
         ["Scrapped"] = "#C0392B",
-        ["Preparing"] = "#8C7F6A",
-        ["Shipped"] = "#B36F1B",
+        ["Preparing"] = "#71717A",
+        ["Shipped"] = "#2E6F9E",
         ["Delivered"] = "#3D7A4C",
     };
 
@@ -42,7 +42,7 @@ public sealed class StatusToBrushConverter : IValueConverter
         }
 
         var key = value as string ?? string.Empty;
-        var hex = Palette.TryGetValue(key, out var color) ? color : "#8C7F6A";
+        var hex = Palette.TryGetValue(key, out var color) ? color : "#71717A";
         return new SolidColorBrush((Color)ColorConverter.ConvertFromString(hex));
     }
 
@@ -59,7 +59,7 @@ public sealed class PlanningTypeToBrushConverter : IValueConverter
     private static readonly Dictionary<string, string> Palette = new(StringComparer.OrdinalIgnoreCase)
     {
         ["WorkOrder"] = "#2E6F9E",
-        ["PurchaseOrder"] = "#B36F1B",
+        ["PurchaseOrder"] = "#A15C07",
         ["Shipment"] = "#3D7A4C",
         ["MaintenanceTask"] = "#7B4FA3",
     };
@@ -67,7 +67,7 @@ public sealed class PlanningTypeToBrushConverter : IValueConverter
     public object Convert(object? value, Type targetType, object? parameter, CultureInfo culture)
     {
         var key = value as string ?? string.Empty;
-        var hex = Palette.TryGetValue(key, out var color) ? color : "#8C7F6A";
+        var hex = Palette.TryGetValue(key, out var color) ? color : "#71717A";
         return new SolidColorBrush((Color)ColorConverter.ConvertFromString(hex));
     }
 
@@ -150,7 +150,7 @@ public sealed class BoolToVisibilityConverter : IValueConverter
 }
 
 /// <summary>Picks the status-tag color for a boolean value. No fill (see "Pill" style) — only the text
-/// color changes. Parameter "warning" makes true render amber instead of lime.</summary>
+/// color changes. Parameter "warning" makes true render amber instead of green.</summary>
 public sealed class BoolToBrushConverter : IValueConverter
 {
     public object Convert(object? value, Type targetType, object? parameter, CultureInfo culture)
@@ -164,7 +164,7 @@ public sealed class BoolToBrushConverter : IValueConverter
             return Brushes.Transparent;
         }
 
-        var hex = !isTrue ? "#8C7F6A" : warning ? "#C57821" : "#B36F1B";
+        var hex = !isTrue ? "#71717A" : warning ? "#A15C07" : "#2F6B3F";
         return new SolidColorBrush((Color)ColorConverter.ConvertFromString(hex));
     }
 

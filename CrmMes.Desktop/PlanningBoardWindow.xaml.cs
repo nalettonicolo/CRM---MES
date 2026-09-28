@@ -31,9 +31,9 @@ public partial class PlanningBoardWindow : Window
 
     private static readonly Dictionary<string, string> StatusColors = new()
     {
-        ["Confermata"] = "#B36F1B",
-        ["InValutazione"] = "#8C7F6A",
-        ["InProduzione"] = "#2E6F9E",
+        ["Confermata"] = "#2E6F9E",
+        ["InValutazione"] = "#71717A",
+        ["InProduzione"] = "#A15C07",
         ["Sospesa"] = "#C0392B",
         ["Consegnata"] = "#3D7A4C",
     };

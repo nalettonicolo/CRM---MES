@@ -18,10 +18,10 @@ public class StatusToBrushConverterTests
     }
 
     [Theory]
-    [InlineData("Draft", "#8C7F6A")]
+    [InlineData("Draft", "#71717A")]
     [InlineData("Cancelled", "#C0392B")]
     [InlineData("Done", "#3D7A4C")]
-    [InlineData("InProgress", "#C57821")]
+    [InlineData("InProgress", "#A15C07")]
     public void Convert_WithForegroundParameter_ReturnsExpectedColorForKnownStatus(string status, string expectedHex)
     {
         var result = _converter.Convert(status, typeof(Brush), "Foreground", CultureInfo.InvariantCulture);
@@ -44,7 +44,7 @@ public class StatusToBrushConverterTests
     {
         var result = _converter.Convert("SomeUnknownStatus", typeof(Brush), "Foreground", CultureInfo.InvariantCulture);
 
-        var expected = (Color)ColorConverter.ConvertFromString("#8C7F6A");
+        var expected = (Color)ColorConverter.ConvertFromString("#71717A");
         Assert.Equal(expected, Assert.IsType<SolidColorBrush>(result).Color);
     }
 
@@ -138,7 +138,7 @@ public class BoolToBrushConverterTests
     {
         var result = _converter.Convert(false, typeof(Brush), "Foreground", CultureInfo.InvariantCulture);
 
-        var expected = (Color)ColorConverter.ConvertFromString("#8C7F6A");
+        var expected = (Color)ColorConverter.ConvertFromString("#71717A");
         Assert.Equal(expected, Assert.IsType<SolidColorBrush>(result).Color);
     }
 
@@ -147,16 +147,16 @@ public class BoolToBrushConverterTests
     {
         var result = _converter.Convert(true, typeof(Brush), "Foreground_warning", CultureInfo.InvariantCulture);
 
-        var expected = (Color)ColorConverter.ConvertFromString("#C57821");
+        var expected = (Color)ColorConverter.ConvertFromString("#A15C07");
         Assert.Equal(expected, Assert.IsType<SolidColorBrush>(result).Color);
     }
 
     [Fact]
-    public void Convert_TrueNonWarning_ReturnsAccent()
+    public void Convert_TrueNonWarning_ReturnsGreen()
     {
         var result = _converter.Convert(true, typeof(Brush), "Foreground", CultureInfo.InvariantCulture);
 
-        var expected = (Color)ColorConverter.ConvertFromString("#B36F1B");
+        var expected = (Color)ColorConverter.ConvertFromString("#2F6B3F");
         Assert.Equal(expected, Assert.IsType<SolidColorBrush>(result).Color);
     }
 }

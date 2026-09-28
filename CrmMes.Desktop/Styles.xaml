@@ -13,61 +13,75 @@
     <local:BoolToVisibilityConverter x:Key="BoolToVisibility" />
 
     <!-- ===================================================================
-         DESIGN SYSTEM — "Fusione": sintesi delle tre direzioni provate.
-         Dock di navigazione scuro (l'occhio non ci sosta a lungo) + area di
-         lavoro color carta calda, non bianco/grigio neutro da SaaS, dove le
-         tabelle si leggono per ore senza affaticare. Titoli in serif
-         editoriale, un solo accento ambra usato con parsimonia, angoli
-         morbidi, bordi a 1px ad alto contrasto invece di ombre. Vedi la nota
-         in fondo a MainWindow.xaml per i concetti guida.
+         DESIGN SYSTEM — "Quadro": gestionale da leggere per ore.
+         Una sola famiglia di grigi freddi (zinco) sia nel dock scuro sia
+         nell'area di lavoro, un solo accento blu cobalto riservato alle
+         azioni (mai agli stati), e colori di stato separati e semantici:
+         grigio = bozza, blu = pianificato/confermato, ambra = in corso,
+         verde = concluso, rosso = annullato. Tutti i testi rispettano il
+         contrasto WCAG AA (>= 4.5:1). Bordi a 1px invece di ombre, nessun
+         glow, angoli coerenti a 6px (controlli) / 8px (pannelli).
          =================================================================== -->
 
-    <!-- Base: carta calda, non bianco puro -->
-    <SolidColorBrush x:Key="BackgroundBrush" Color="#F5EFDF" />
+    <!-- Base: grigio zinco freddo, stessa temperatura del dock scuro -->
+    <SolidColorBrush x:Key="BackgroundBrush" Color="#F4F4F5" />
     <SolidColorBrush x:Key="SurfaceBrush" Color="#FFFFFF" />
-    <SolidColorBrush x:Key="SurfaceRaisedBrush" Color="#FBF6EC" />
-    <SolidColorBrush x:Key="BorderBrush0" Color="#E7DBBA" />
-    <SolidColorBrush x:Key="TextPrimaryBrush" Color="#2B2620" />
-    <SolidColorBrush x:Key="TextSecondaryBrush" Color="#8C7F6A" />
-    <SolidColorBrush x:Key="TextMutedBrush" Color="#A79883" />
+    <SolidColorBrush x:Key="SurfaceRaisedBrush" Color="#FAFAFA" />
+    <SolidColorBrush x:Key="BorderBrush0" Color="#E4E4E7" />
+    <SolidColorBrush x:Key="TextPrimaryBrush" Color="#18181B" />
+    <SolidColorBrush x:Key="TextSecondaryBrush" Color="#52525B" />
+    <SolidColorBrush x:Key="TextMutedBrush" Color="#6B6B74" />
 
-    <!-- The one accent: warm amber/voltage. -->
-    <SolidColorBrush x:Key="PrimaryBrush" Color="#D98C2B" />
-    <SolidColorBrush x:Key="PrimaryHoverBrush" Color="#C57821" />
-    <SolidColorBrush x:Key="PrimaryPressedBrush" Color="#A8661A" />
-    <SolidColorBrush x:Key="PrimaryDisabledBrush" Color="#EBDFC4" />
-    <SolidColorBrush x:Key="PrimarySoftBrush" Color="#FBF0DC" />
-    <!-- Text painted ON TOP of the amber accent needs near-black, not white -->
-    <SolidColorBrush x:Key="OnAccentTextBrush" Color="#211605" />
+    <!-- L'unico accento: blu cobalto, solo per azioni e selezione -->
+    <SolidColorBrush x:Key="PrimaryBrush" Color="#2F5BDA" />
+    <SolidColorBrush x:Key="PrimaryHoverBrush" Color="#2549B8" />
+    <SolidColorBrush x:Key="PrimaryPressedBrush" Color="#1D3B96" />
+    <SolidColorBrush x:Key="PrimaryDisabledBrush" Color="#E4E4E7" />
+    <SolidColorBrush x:Key="PrimarySoftBrush" Color="#EEF2FD" />
+    <!-- Testo sopra l'accento: quasi bianco (contrasto 5.8:1) -->
+    <SolidColorBrush x:Key="OnAccentTextBrush" Color="#FAFAFA" />
 
-    <SolidColorBrush x:Key="SuccessBgBrush" Color="#EAF3EA" />
-    <SolidColorBrush x:Key="SuccessTextBrush" Color="#3D7A4C" />
+    <SolidColorBrush x:Key="SuccessBgBrush" Color="#EAF5EC" />
+    <SolidColorBrush x:Key="SuccessTextBrush" Color="#2F6B3F" />
 
     <SolidColorBrush x:Key="DangerBrush" Color="#C0392B" />
     <SolidColorBrush x:Key="DangerHoverBrush" Color="#A5301F" />
 
     <SolidColorBrush x:Key="OutlineBgBrush" Color="#FFFFFF" />
-    <SolidColorBrush x:Key="OutlineBorderBrush" Color="#DECFB0" />
-    <SolidColorBrush x:Key="OutlineHoverBgBrush" Color="#FFF8EC" />
+    <SolidColorBrush x:Key="OutlineBorderBrush" Color="#D4D4D8" />
+    <SolidColorBrush x:Key="OutlineHoverBgBrush" Color="#F4F4F5" />
+    <SolidColorBrush x:Key="OutlinePressedBgBrush" Color="#E4E4E7" />
 
-    <SolidColorBrush x:Key="RowHoverBrush" Color="#FCF8EF" />
-    <SolidColorBrush x:Key="RowAlternateBrush" Color="#FAF5E9" />
-    <SolidColorBrush x:Key="RowSelectedBrush" Color="#FBF0DC" />
+    <SolidColorBrush x:Key="RowHoverBrush" Color="#F7F7F8" />
+    <SolidColorBrush x:Key="RowAlternateBrush" Color="#FAFAFA" />
+    <SolidColorBrush x:Key="RowSelectedBrush" Color="#E8EEFC" />
     <SolidColorBrush x:Key="HeaderBgBrush" Color="#FFFFFF" />
 
     <!-- Sidebar / dock: stays dark on purpose — the only dark surface left -->
     <SolidColorBrush x:Key="SidebarBgBrush" Color="#131316" />
     <SolidColorBrush x:Key="SidebarActiveBgBrush" Color="#232329" />
     <SolidColorBrush x:Key="SidebarHoverBgBrush" Color="#1C1C21" />
-    <SolidColorBrush x:Key="SidebarTextBrush" Color="#A9A9B1" />
-    <SolidColorBrush x:Key="SidebarTextActiveBrush" Color="#F2F2EF" />
+    <SolidColorBrush x:Key="SidebarTextBrush" Color="#A1A1AA" />
+    <SolidColorBrush x:Key="SidebarMutedBrush" Color="#8A8A93" />
+    <SolidColorBrush x:Key="SidebarTextActiveBrush" Color="#F4F4F5" />
     <SolidColorBrush x:Key="SidebarBorderBrush" Color="#26262C" />
 
     <!-- Title bar: matches the dark dock -->
     <SolidColorBrush x:Key="TitleBarBgBrush" Color="#131316" />
-    <SolidColorBrush x:Key="TitleBarTextBrush" Color="#F2F2EF" />
+    <SolidColorBrush x:Key="TitleBarTextBrush" Color="#F4F4F5" />
     <SolidColorBrush x:Key="TitleBarHoverBrush" Color="#232329" />
     <SolidColorBrush x:Key="TitleBarCloseHoverBrush" Color="#C0392B" />
+
+    <!-- Keyboard focus ring: visible only when navigating with Tab, never on mouse click -->
+    <Style x:Key="FocusRing">
+        <Setter Property="Control.Template">
+            <Setter.Value>
+                <ControlTemplate>
+                    <Rectangle Margin="-3" RadiusX="8" RadiusY="8" Stroke="{StaticResource PrimaryBrush}" StrokeThickness="2" SnapsToDevicePixels="True" />
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
 
     <!-- Window default font -->
     <Style TargetType="Window">
@@ -80,12 +94,12 @@
         <Setter Property="TextOptions.TextFormattingMode" Value="Display" />
     </Style>
 
-    <!-- Oversized editorial page title, e.g. "Materiali" at the top of a screen. Serif — the one
-         deliberate typographic flourish borrowed from the "Editoriale caldo" direction. -->
+    <!-- Page title, e.g. "Materiali" at the top of a screen. Same family as the UI (no serif in a
+         data tool): hierarchy comes from size and weight, not from a second typeface. -->
     <Style x:Key="EditorialTitle" TargetType="TextBlock">
-        <Setter Property="FontFamily" Value="Georgia" />
-        <Setter Property="FontSize" Value="34" />
-        <Setter Property="FontWeight" Value="Bold" />
+        <Setter Property="FontFamily" Value="Segoe UI" />
+        <Setter Property="FontSize" Value="28" />
+        <Setter Property="FontWeight" Value="SemiBold" />
         <Setter Property="Foreground" Value="{StaticResource TextPrimaryBrush}" />
         <Setter Property="Margin" Value="0,0,0,0" />
     </Style>
@@ -98,19 +112,20 @@
         <Setter Property="Foreground" Value="{StaticResource TextMutedBrush}" />
     </Style>
 
-    <!-- Primary button (default for plain <Button/>) — sharp edges, lime fill, black text -->
+    <!-- Primary button (default for plain <Button/>) — cobalt fill, near-white text -->
     <Style TargetType="Button">
         <Setter Property="Background" Value="{StaticResource PrimaryBrush}" />
         <Setter Property="Foreground" Value="{StaticResource OnAccentTextBrush}" />
-        <Setter Property="FontWeight" Value="Bold" />
+        <Setter Property="FontWeight" Value="SemiBold" />
         <Setter Property="FontSize" Value="13" />
         <Setter Property="BorderThickness" Value="0" />
         <Setter Property="Cursor" Value="Hand" />
         <Setter Property="SnapsToDevicePixels" Value="True" />
+        <Setter Property="FocusVisualStyle" Value="{StaticResource FocusRing}" />
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="Button">
-                    <Border x:Name="Bg" Background="{TemplateBinding Background}" CornerRadius="6" SnapsToDevicePixels="True">
+                    <Border x:Name="Bg" Background="{TemplateBinding Background}" CornerRadius="6" SnapsToDevicePixels="True" RenderTransformOrigin="0.5,0.5">
                         <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" Margin="10,0" />
                     </Border>
                     <ControlTemplate.Triggers>
@@ -119,6 +134,11 @@
                         </Trigger>
                         <Trigger Property="IsPressed" Value="True">
                             <Setter TargetName="Bg" Property="Background" Value="{StaticResource PrimaryPressedBrush}" />
+                            <Setter TargetName="Bg" Property="RenderTransform">
+                                <Setter.Value>
+                                    <ScaleTransform ScaleX="0.98" ScaleY="0.98" />
+                                </Setter.Value>
+                            </Setter>
                         </Trigger>
                         <Trigger Property="IsEnabled" Value="False">
                             <Setter TargetName="Bg" Property="Background" Value="{StaticResource PrimaryDisabledBrush}" />
@@ -139,16 +159,25 @@
         <Setter Property="FontSize" Value="13" />
         <Setter Property="Cursor" Value="Hand" />
         <Setter Property="SnapsToDevicePixels" Value="True" />
+        <Setter Property="FocusVisualStyle" Value="{StaticResource FocusRing}" />
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="Button">
-                    <Border x:Name="Bg" Background="{TemplateBinding Background}" BorderBrush="{StaticResource OutlineBorderBrush}" BorderThickness="1" CornerRadius="6" SnapsToDevicePixels="True">
+                    <Border x:Name="Bg" Background="{TemplateBinding Background}" BorderBrush="{StaticResource OutlineBorderBrush}" BorderThickness="1" CornerRadius="6" SnapsToDevicePixels="True" RenderTransformOrigin="0.5,0.5">
                         <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" Margin="10,0" />
                     </Border>
                     <ControlTemplate.Triggers>
                         <Trigger Property="IsMouseOver" Value="True">
                             <Setter TargetName="Bg" Property="Background" Value="{StaticResource OutlineHoverBgBrush}" />
                             <Setter TargetName="Bg" Property="BorderBrush" Value="{StaticResource PrimaryBrush}" />
+                        </Trigger>
+                        <Trigger Property="IsPressed" Value="True">
+                            <Setter TargetName="Bg" Property="Background" Value="{StaticResource OutlinePressedBgBrush}" />
+                            <Setter TargetName="Bg" Property="RenderTransform">
+                                <Setter.Value>
+                                    <ScaleTransform ScaleX="0.98" ScaleY="0.98" />
+                                </Setter.Value>
+                            </Setter>
                         </Trigger>
                         <Trigger Property="IsEnabled" Value="False">
                             <Setter Property="Foreground" Value="{StaticResource TextMutedBrush}" />
@@ -167,13 +196,23 @@
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="Button">
-                    <Border x:Name="Bg" Background="{TemplateBinding Background}" BorderBrush="{StaticResource DangerBrush}" BorderThickness="1" CornerRadius="6" SnapsToDevicePixels="True">
-                        <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" Margin="10,0" TextElement.Foreground="{StaticResource DangerBrush}" />
+                    <!-- Foreground via TemplateBinding: a hard-coded red here made the hover state
+                         red text on a red fill (unreadable). -->
+                    <Border x:Name="Bg" Background="{TemplateBinding Background}" BorderBrush="{StaticResource DangerBrush}" BorderThickness="1" CornerRadius="6" SnapsToDevicePixels="True" RenderTransformOrigin="0.5,0.5">
+                        <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" Margin="10,0" TextElement.Foreground="{TemplateBinding Foreground}" />
                     </Border>
                     <ControlTemplate.Triggers>
                         <Trigger Property="IsMouseOver" Value="True">
                             <Setter TargetName="Bg" Property="Background" Value="{StaticResource DangerBrush}" />
-                            <Setter Property="Foreground" Value="{StaticResource BackgroundBrush}" />
+                            <Setter Property="Foreground" Value="{StaticResource OnAccentTextBrush}" />
+                        </Trigger>
+                        <Trigger Property="IsPressed" Value="True">
+                            <Setter TargetName="Bg" Property="Background" Value="{StaticResource DangerHoverBrush}" />
+                            <Setter TargetName="Bg" Property="RenderTransform">
+                                <Setter.Value>
+                                    <ScaleTransform ScaleX="0.98" ScaleY="0.98" />
+                                </Setter.Value>
+                            </Setter>
                         </Trigger>
                         <Trigger Property="IsEnabled" Value="False">
                             <Setter TargetName="Bg" Property="BorderBrush" Value="{StaticResource TextMutedBrush}" />
@@ -199,11 +238,21 @@
         <Setter Property="SelectionBrush" Value="{StaticResource RowSelectedBrush}" />
         <Setter Property="Template">
             <Setter.Value>
+                <!-- Tag doubles as an inline hint ("Codice materiale", "Nome fase"...) shown while the
+                     box is empty: many compact inline forms rely on it instead of a separate label. -->
                 <ControlTemplate TargetType="TextBox">
                     <Border x:Name="Bd" Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}" CornerRadius="6" Padding="{TemplateBinding Padding}" SnapsToDevicePixels="True">
-                        <ScrollViewer x:Name="PART_ContentHost" VerticalScrollBarVisibility="Hidden" HorizontalScrollBarVisibility="Hidden" />
+                        <Grid>
+                            <TextBlock x:Name="Hint" Text="{TemplateBinding Tag}" Foreground="{StaticResource TextMutedBrush}"
+                                       Margin="2,0,0,0" VerticalAlignment="{TemplateBinding VerticalContentAlignment}"
+                                       IsHitTestVisible="False" Visibility="Collapsed" TextTrimming="CharacterEllipsis" />
+                            <ScrollViewer x:Name="PART_ContentHost" VerticalScrollBarVisibility="Hidden" HorizontalScrollBarVisibility="Hidden" />
+                        </Grid>
                     </Border>
                     <ControlTemplate.Triggers>
+                        <Trigger Property="Text" Value="">
+                            <Setter TargetName="Hint" Property="Visibility" Value="Visible" />
+                        </Trigger>
                         <Trigger Property="IsFocused" Value="True">
                             <Setter TargetName="Bd" Property="BorderBrush" Value="{StaticResource PrimaryBrush}" />
                         </Trigger>
@@ -280,10 +329,10 @@
                                             </Grid.ColumnDefinitions>
                                             <TextBlock Grid.Column="0"
                                                        Text="{Binding Header, RelativeSource={RelativeSource AncestorType=Expander}}"
-                                                       Style="{StaticResource MicroLabel}" VerticalAlignment="Center" />
+                                                       Style="{StaticResource MicroLabel}" Foreground="{StaticResource SidebarMutedBrush}" VerticalAlignment="Center" />
                                             <TextBlock x:Name="Chevron" Grid.Column="1" Text="&#xE70D;"
                                                        FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets" FontSize="9"
-                                                       Foreground="{StaticResource TextMutedBrush}" VerticalAlignment="Center" Margin="0,0,2,0"
+                                                       Foreground="{StaticResource SidebarMutedBrush}" VerticalAlignment="Center" Margin="0,0,2,0"
                                                        RenderTransformOrigin="0.5,0.5">
                                                 <TextBlock.RenderTransform>
                                                     <RotateTransform Angle="0" />
@@ -315,8 +364,8 @@
         </Setter>
     </Style>
 
-    <!-- Nav item — active state reads as a lit contact, not a filled pill: a 2px lime edge
-         that glows, transparent fill, uppercase-ish weight shift on the label. -->
+    <!-- Nav item — active state: raised dark fill + a solid 3px accent edge (no glow), and the
+         label switches to near-white SemiBold. -->
     <Style x:Key="NavItem" TargetType="RadioButton">
         <Setter Property="Foreground" Value="{StaticResource SidebarTextBrush}" />
         <Setter Property="FontSize" Value="13" />
@@ -324,29 +373,28 @@
         <Setter Property="Height" Value="40" />
         <Setter Property="Cursor" Value="Hand" />
         <Setter Property="HorizontalContentAlignment" Value="Left" />
+        <Setter Property="FocusVisualStyle" Value="{StaticResource FocusRing}" />
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="RadioButton">
                     <Border x:Name="Bg" Margin="10,1,10,1" CornerRadius="6" Background="Transparent" SnapsToDevicePixels="True">
                         <Grid>
-                            <Border x:Name="Indicator" Width="2" HorizontalAlignment="Left"
-                                    Background="{StaticResource PrimaryBrush}" Opacity="0">
-                                <Border.Effect>
-                                    <DropShadowEffect Color="#D98C2B" Opacity="0.9" BlurRadius="10" ShadowDepth="0" />
-                                </Border.Effect>
-                            </Border>
+                            <Border x:Name="Indicator" Width="3" Margin="0,9" HorizontalAlignment="Left" CornerRadius="2"
+                                    Background="{StaticResource PrimaryBrush}" Opacity="0" />
                             <ContentPresenter Margin="16,0,10,0" VerticalAlignment="Center" />
                         </Grid>
                     </Border>
                     <ControlTemplate.Triggers>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter TargetName="Bg" Property="Background" Value="{StaticResource SidebarHoverBgBrush}" />
+                            <Setter Property="Foreground" Value="{StaticResource SidebarTextActiveBrush}" />
+                        </Trigger>
+                        <!-- Declared after IsMouseOver so the active item keeps its fill when hovered -->
                         <Trigger Property="IsChecked" Value="True">
                             <Setter TargetName="Bg" Property="Background" Value="{StaticResource SidebarActiveBgBrush}" />
                             <Setter TargetName="Indicator" Property="Opacity" Value="1" />
                             <Setter Property="Foreground" Value="{StaticResource SidebarTextActiveBrush}" />
-                            <Setter Property="FontWeight" Value="Bold" />
-                        </Trigger>
-                        <Trigger Property="IsMouseOver" Value="True">
-                            <Setter TargetName="Bg" Property="Background" Value="{StaticResource SidebarHoverBgBrush}" />
+                            <Setter Property="FontWeight" Value="SemiBold" />
                         </Trigger>
                     </ControlTemplate.Triggers>
                 </ControlTemplate>
@@ -444,6 +492,90 @@
         <Setter Property="CornerRadius" Value="8" />
     </Style>
 
+    <!-- Slim scrollbar: no arrows, no track fill, a neutral rounded thumb that reads on both the
+         dark dock and the light work area (the stock gray Windows bar clashed with the dock). -->
+    <Style x:Key="ScrollThumb" TargetType="Thumb">
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="Thumb">
+                    <Border x:Name="T" Background="#8A8A93" Opacity="0.55" CornerRadius="3" />
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter TargetName="T" Property="Opacity" Value="0.85" />
+                        </Trigger>
+                        <Trigger Property="IsDragging" Value="True">
+                            <Setter TargetName="T" Property="Opacity" Value="1" />
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <Style x:Key="ScrollPageButton" TargetType="RepeatButton">
+        <Setter Property="Focusable" Value="False" />
+        <Setter Property="IsTabStop" Value="False" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="RepeatButton">
+                    <Border Background="Transparent" />
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <Style TargetType="ScrollBar">
+        <Setter Property="Background" Value="Transparent" />
+        <Setter Property="Width" Value="10" />
+        <Setter Property="MinWidth" Value="10" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="ScrollBar">
+                    <Grid Background="{TemplateBinding Background}">
+                        <Track x:Name="PART_Track" IsDirectionReversed="True" Margin="2">
+                            <Track.DecreaseRepeatButton>
+                                <RepeatButton Style="{StaticResource ScrollPageButton}" Command="ScrollBar.PageUpCommand" />
+                            </Track.DecreaseRepeatButton>
+                            <Track.IncreaseRepeatButton>
+                                <RepeatButton Style="{StaticResource ScrollPageButton}" Command="ScrollBar.PageDownCommand" />
+                            </Track.IncreaseRepeatButton>
+                            <Track.Thumb>
+                                <Thumb Style="{StaticResource ScrollThumb}" />
+                            </Track.Thumb>
+                        </Track>
+                    </Grid>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+        <Style.Triggers>
+            <Trigger Property="Orientation" Value="Horizontal">
+                <Setter Property="Width" Value="Auto" />
+                <Setter Property="MinWidth" Value="0" />
+                <Setter Property="Height" Value="10" />
+                <Setter Property="MinHeight" Value="10" />
+                <Setter Property="Template">
+                    <Setter.Value>
+                        <ControlTemplate TargetType="ScrollBar">
+                            <Grid Background="{TemplateBinding Background}">
+                                <Track x:Name="PART_Track" IsDirectionReversed="False" Margin="2">
+                                    <Track.DecreaseRepeatButton>
+                                        <RepeatButton Style="{StaticResource ScrollPageButton}" Command="ScrollBar.PageLeftCommand" />
+                                    </Track.DecreaseRepeatButton>
+                                    <Track.IncreaseRepeatButton>
+                                        <RepeatButton Style="{StaticResource ScrollPageButton}" Command="ScrollBar.PageRightCommand" />
+                                    </Track.IncreaseRepeatButton>
+                                    <Track.Thumb>
+                                        <Thumb Style="{StaticResource ScrollThumb}" />
+                                    </Track.Thumb>
+                                </Track>
+                            </Grid>
+                        </ControlTemplate>
+                    </Setter.Value>
+                </Setter>
+            </Trigger>
+        </Style.Triggers>
+    </Style>
+
     <!-- ListView / GridView -->
     <Style TargetType="ListView">
         <Setter Property="Background" Value="Transparent" />
@@ -475,16 +607,16 @@
         <Setter Property="Foreground" Value="{StaticResource TextPrimaryBrush}" />
         <Setter Property="FontSize" Value="13" />
         <Setter Property="Padding" Value="10,10" />
+        <!-- Tabular figures: quantities and codes line up in columns -->
+        <Setter Property="Typography.NumeralAlignment" Value="Tabular" />
         <Setter Property="Template">
             <Setter.Value>
+                <!-- One separator per row (hairline), no zebra striping on top of it -->
                 <ControlTemplate TargetType="ListViewItem">
                     <Border x:Name="Bd" Background="{TemplateBinding Background}" Padding="{TemplateBinding Padding}" BorderBrush="{StaticResource BorderBrush0}" BorderThickness="0,0,0,1" SnapsToDevicePixels="True">
                         <GridViewRowPresenter Margin="0" />
                     </Border>
                     <ControlTemplate.Triggers>
-                        <Trigger Property="ItemsControl.AlternationIndex" Value="1">
-                            <Setter TargetName="Bd" Property="Background" Value="{StaticResource RowAlternateBrush}" />
-                        </Trigger>
                         <Trigger Property="IsMouseOver" Value="True">
                             <Setter TargetName="Bd" Property="Background" Value="{StaticResource RowHoverBrush}" />
                         </Trigger>

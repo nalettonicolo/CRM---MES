@@ -42,13 +42,9 @@
         <Grid Grid.Row="1">
             <!-- Login -->
             <Grid x:Name="LoginPanel" Visibility="Visible" HorizontalAlignment="Center" VerticalAlignment="Center" Width="380">
-                <!-- Oversized watermark numeral behind the card — pure typographic decoration, no data -->
-                <TextBlock Text="01" FontSize="220" FontWeight="Black" Foreground="{StaticResource SurfaceRaisedBrush}"
-                           HorizontalAlignment="Right" VerticalAlignment="Top" Margin="0,-150,-40,0" />
                 <Border Style="{StaticResource CardBorder}" Padding="32,30">
                     <StackPanel>
-                        <TextBlock Text="A C C E S S O" Style="{StaticResource MicroLabel}" Foreground="{StaticResource PrimaryBrush}" Margin="0,0,0,4" />
-                        <TextBlock Text="Accedi" FontSize="34" FontWeight="Black" Foreground="{StaticResource TextPrimaryBrush}" Margin="0,0,0,24" />
+                        <TextBlock Text="Accedi" FontSize="28" FontWeight="SemiBold" Foreground="{StaticResource TextPrimaryBrush}" Margin="0,0,0,24" />
                         <TextBlock Text="Email" Margin="0,0,0,5" Foreground="{StaticResource TextSecondaryBrush}" FontSize="11" />
                         <TextBox x:Name="EmailBox" />
                         <TextBlock Text="Password" Margin="0,18,0,5" Foreground="{StaticResource TextSecondaryBrush}" FontSize="11" />
@@ -74,14 +70,10 @@
                         <Border DockPanel.Dock="Bottom" BorderBrush="{StaticResource SidebarBorderBrush}" BorderThickness="0,1,0,0" Padding="18,16">
                             <StackPanel>
                                 <StackPanel Orientation="Horizontal">
-                                    <Border Width="6" Height="6" Background="{StaticResource PrimaryBrush}" Margin="0,0,8,0">
-                                        <Border.Effect>
-                                            <DropShadowEffect Color="#D98C2B" Opacity="1" BlurRadius="8" ShadowDepth="0" />
-                                        </Border.Effect>
-                                    </Border>
-                                    <TextBlock x:Name="ConnectionStatus" Text="Connessione..." Foreground="{StaticResource TextPrimaryBrush}" FontWeight="Bold" FontSize="11" VerticalAlignment="Center" />
+                                    <Border Width="6" Height="6" CornerRadius="3" Background="{StaticResource PrimaryBrush}" Margin="0,0,8,0" />
+                                    <TextBlock x:Name="ConnectionStatus" Text="Connessione..." Foreground="{StaticResource SidebarTextActiveBrush}" FontWeight="Bold" FontSize="11" VerticalAlignment="Center" />
                                 </StackPanel>
-                                <TextBlock x:Name="BusyIndicator" Text="" Foreground="{StaticResource TextMutedBrush}" FontStyle="Italic" FontSize="11" Margin="0,8,0,0" />
+                                <TextBlock x:Name="BusyIndicator" Text="" Foreground="{StaticResource SidebarTextBrush}" FontStyle="Italic" FontSize="11" Margin="0,8,0,0" />
                                 <Button x:Name="UpdateButton" Style="{StaticResource SidebarLinkButton}" Content="Controlla aggiornamenti" Margin="0,10,0,0" Click="UpdateButton_Click" />
                                 <Button x:Name="SidebarSettingsButton" Style="{StaticResource SidebarLinkButton}" Content="Impostazioni server" Margin="0,6,0,0" Click="SettingsButton_Click" Visibility="Collapsed" />
                             </StackPanel>
@@ -261,20 +253,8 @@
                         <RowDefinition Height="*" />
                     </Grid.RowDefinitions>
 
-                    <!-- Background anchor: fills the generous negative space below short lists/forms so
-                         it reads as deliberate editorial whitespace instead of an empty, unfinished void
-                         once the window is maximized. A dial/gauge motif (fits an MES telemetry tool),
-                         monochrome so it never fights the single-accent rule. Never intercepts clicks. -->
-                    <Grid Grid.Row="0" Grid.RowSpan="2" HorizontalAlignment="Right" VerticalAlignment="Bottom"
-                          Margin="0,0,-140,-140" IsHitTestVisible="False">
-                        <Ellipse Width="620" Height="620" Stroke="{StaticResource BorderBrush0}" StrokeThickness="1.5" />
-                        <Ellipse Width="460" Height="460" Stroke="{StaticResource BorderBrush0}" StrokeThickness="1.5" />
-                        <TextBlock Text="M E S" FontSize="13" FontWeight="Bold" Foreground="{StaticResource BorderBrush0}"
-                                   HorizontalAlignment="Center" VerticalAlignment="Top" Margin="0,150,0,0" />
-                    </Grid>
-
                     <StackPanel Grid.Row="0" Margin="0,0,0,26">
-                        <TextBlock x:Name="PageEyebrow" Text="M A G A Z Z I N O" Style="{StaticResource MicroLabel}" Foreground="{StaticResource PrimaryBrush}" Margin="2,0,0,-6" />
+                        <TextBlock x:Name="PageEyebrow" Text="M A G A Z Z I N O" Style="{StaticResource MicroLabel}" Margin="2,0,0,-2" />
                         <StackPanel Orientation="Horizontal">
                             <TextBlock x:Name="PageTitle" Text="Materiali" Style="{StaticResource EditorialTitle}" VerticalAlignment="Center" />
                             <local:HelpIcon x:Name="PageHelpIcon" Margin="12,10,0,0" VerticalAlignment="Top" />
@@ -302,7 +282,7 @@
                                             </ContextMenu>
                                         </Button.ContextMenu>
                                     </Button>
-                                    <TextBox x:Name="SearchBox" Margin="0,0,12,0" Text="" KeyDown="SearchBox_KeyDown" />
+                                    <TextBox x:Name="SearchBox" Height="36" Padding="12,0" Margin="0,0,12,0" Text="" Tag="Cerca per codice o descrizione" KeyDown="SearchBox_KeyDown" />
                                 </DockPanel>
                                 <Border Grid.Row="1" Style="{StaticResource CardBorder}" Padding="4">
                                     <ListView x:Name="MaterialsList">
@@ -1123,7 +1103,7 @@
                                     </CheckBox>
                                     <CheckBox x:Name="PlanningFilterPurchaseOrder" Content="Ordini fornitore" IsChecked="True" Margin="0,0,18,0" VerticalAlignment="Center" Checked="PlanningTypeFilter_Changed" Unchecked="PlanningTypeFilter_Changed">
                                         <CheckBox.Foreground>
-                                            <SolidColorBrush Color="#B36F1B" />
+                                            <SolidColorBrush Color="#A15C07" />
                                         </CheckBox.Foreground>
                                     </CheckBox>
                                     <CheckBox x:Name="PlanningFilterShipment" Content="Spedizioni" IsChecked="True" Margin="0,0,18,0" VerticalAlignment="Center" Checked="PlanningTypeFilter_Changed" Unchecked="PlanningTypeFilter_Changed">
