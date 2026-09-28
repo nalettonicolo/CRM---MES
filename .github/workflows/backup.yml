@@ -12,7 +12,9 @@ on:
 
 jobs:
   backup:
-    runs-on: ubuntu-latest
+    # Versione fissata: dal 19/10/2026 ubuntu-latest passa a Ubuntu 26, e il repository apt di
+    # PostgreSQL potrebbe non avere ancora i pacchetti per la nuova release (lsb_release -cs sotto).
+    runs-on: ubuntu-24.04
     steps:
       - name: Install PostgreSQL 18 client
         run: |
@@ -31,7 +33,47 @@ jobs:
             exit 1
           fi
           FILENAME="crmmes-backup-$(date -u +%Y%m%d-%H%M%S).dump"
-          /usr/lib/postgresql/18/bin/pg_dump "$DATABASE_URL" --format=custom --no-owner --no-privileges -f "$FILENAME"
+
+          # Il secret è la stessa stringa usata da Render/dall'API, cioè in formato Npgsql
+          # ("Host=...;Port=5432;Database=...;Username=...;Password=...;SSL Mode=Require"), che pg_dump
+          # (libpq) non capisce: falliva subito, ogni notte. Se non è già un URI postgres://, la
+          # traduciamo nelle variabili d'ambiente standard di libpq (niente problemi di quoting).
+          if [[ "$DATABASE_URL" == postgres://* || "$DATABASE_URL" == postgresql://* ]]; then
+            TARGET="$DATABASE_URL"
+          else
+            IFS=';' read -ra PARTS <<< "$DATABASE_URL"
+            for PART in "${PARTS[@]}"; do
+              [ -z "${PART// /}" ] && continue
+              KEY="$(echo "${PART%%=*}" | tr -d ' ' | tr '[:upper:]' '[:lower:]')"
+              VALUE="$(echo "${PART#*=}" | sed 's/^ *//;s/ *$//')"
+              case "$KEY" in
+                host|server) export PGHOST="$VALUE" ;;
+                port) export PGPORT="$VALUE" ;;
+                database|db) export PGDATABASE="$VALUE" ;;
+                username|userid|user|uid) export PGUSER="$VALUE" ;;
+                password|pwd) echo "::add-mask::$VALUE"; export PGPASSWORD="$VALUE" ;;
+                sslmode) export PGSSLMODE="$(echo "$VALUE" | tr '[:upper:]' '[:lower:]')" ;;
+                channelbinding) export PGCHANNELBINDING="$(echo "$VALUE" | tr '[:upper:]' '[:lower:]')" ;;
+              esac
+            done
+            if [ -z "$PGHOST" ] || [ -z "$PGDATABASE" ] || [ -z "$PGUSER" ]; then
+              echo "La connection string non contiene Host, Database e Username: formato non riconosciuto." >&2
+              exit 1
+            fi
+            # "Require" di Npgsql non verifica il certificato, come "require" di libpq: equivalenti.
+            export PGSSLMODE="${PGSSLMODE:-require}"
+            TARGET=""
+          fi
+
+          if [ -n "$TARGET" ]; then
+            /usr/lib/postgresql/18/bin/pg_dump "$TARGET" --format=custom --no-owner --no-privileges -f "$FILENAME"
+          else
+            /usr/lib/postgresql/18/bin/pg_dump --format=custom --no-owner --no-privileges -f "$FILENAME"
+          fi
+
+          # Un dump vuoto o troncato non è un backup: meglio fallire che archiviarlo come valido.
+          /usr/lib/postgresql/18/bin/pg_restore --list "$FILENAME" > /dev/null
+          echo "Backup creato: $FILENAME ($(du -h "$FILENAME" | cut -f1))"
           echo "FILENAME=$FILENAME" >> "$GITHUB_ENV"
 
       - name: Upload backup artifact

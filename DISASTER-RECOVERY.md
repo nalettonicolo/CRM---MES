@@ -12,6 +12,8 @@ Stato del database di produzione (Neon, progetto "MES", piano Free) e procedura 
 
 Aggiungere il secret del repository `NEON_DATABASE_URL` (Settings → Secrets and variables → Actions) con la stessa connection string usata da Render/dallo sviluppo locale (variabile `NEON_DATABASE_URL` o `DATABASE_URL`). Senza questo secret il workflow fallisce esplicitamente con un messaggio chiaro, invece di fallire in silenzio.
 
+Il secret può essere in entrambi i formati: quello Npgsql usato da Render (`Host=...;Port=5432;Database=...;Username=...;Password=...;SSL Mode=Require`) oppure l'URI `postgresql://utente:password@host/neondb?sslmode=require` copiato dal pulsante "Connect" della dashboard Neon. Fino al 2026-09-28 il workflow passava la stringa direttamente a `pg_dump`, che non capisce il formato Npgsql: ogni esecuzione notturna falliva nel passo "Dump database". Ora il formato Npgsql viene tradotto nelle variabili standard di libpq (`PGHOST`, `PGUSER`, `PGPASSWORD`, `PGSSLMODE`...), e dopo il dump il file viene verificato con `pg_restore --list`, così un dump vuoto o troncato fa fallire la run invece di essere archiviato come valido.
+
 ## Limite noto del piano Free
 
 Con solo 6 ore di PITR e nessuno snapshot automatico, un problema scoperto dopo più di un giorno può essere recuperato solo dall'ultimo dump giornaliero (fino a 24 ore di dati persi nel caso peggiore). Passare a un piano Neon a pagamento estenderebbe il PITR fino a 30 giorni e abiliterebbe gli snapshot automatici — una decisione di costo, non tecnica.
