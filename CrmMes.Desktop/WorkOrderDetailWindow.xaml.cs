@@ -17,7 +17,15 @@ public partial class WorkOrderDetailWindow : Window
         _workOrderId = workOrderId;
         _productNames = productNames;
         Loaded += WorkOrderDetailWindow_Loaded;
+        // Costs and margins are management-only; the API refuses them to other roles anyway.
+        CostButton.Visibility = apiClient.CanViewMargins ? Visibility.Visible : Visibility.Collapsed;
     }
+
+    private void Cost_Click(object sender, RoutedEventArgs e) =>
+        new WorkOrderCostWindow(_apiClient, _workOrderId) { Owner = this }.ShowDialog();
+
+    private void Labor_Click(object sender, RoutedEventArgs e) =>
+        new LaborEntriesWindow(_apiClient, _workOrderId) { Owner = this }.ShowDialog();
 
     private async void WorkOrderDetailWindow_Loaded(object sender, RoutedEventArgs e)
     {

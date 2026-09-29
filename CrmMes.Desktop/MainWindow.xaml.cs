@@ -52,6 +52,7 @@ public partial class MainWindow : Window
     private int _planningWeeks = 4;
     private bool _customersLoaded;
     private bool _quotesLoaded;
+    private bool _marginsLoaded;
 
     private static readonly Dictionary<int, string> PageTitles = new()
     {
@@ -77,6 +78,7 @@ public partial class MainWindow : Window
         [19] = "Pianificazione",
         [20] = "Clienti",
         [21] = "Preventivi",
+        [22] = "Controllo margini",
     };
 
     private static readonly Dictionary<int, string> PageEyebrows = new()
@@ -103,6 +105,7 @@ public partial class MainWindow : Window
         [19] = "P R O D U Z I O N E",
         [20] = "V E N D I T E",
         [21] = "V E N D I T E",
+        [22] = "D I R E Z I O N E",
     };
 
     private static readonly Dictionary<int, string> PageHelpTexts = new()
@@ -128,24 +131,24 @@ public partial class MainWindow : Window
         [18] = "Interventi di manutenzione preventiva (pianificata, con scadenza ed eventuale ricorrenza — completandolo genera subito la prossima occorrenza) o correttiva (a fronte di un guasto). È il pezzo che permette di intervenire sul fattore Disponibilità dell'OEE, non solo misurarlo.",
         [19] = "Board settimanale che aggrega tutte le scadenze già tracciate altrove — consegne commesse, consegne previste ordini fornitore, spedizioni, interventi di manutenzione — colorate per tipo, filtrabili per tipo/stato/sede, con un cruscotto di riepilogo (in ritardo/questa settimana/prossima settimana/totale). Non introduce nuovi dati: aggrega e colora quello che esiste già nelle rispettive sezioni.",
         [20] = "Anagrafica clienti: a chi si fanno i preventivi e per chi si costruiscono le commesse. Doppio click su un cliente per il dettaglio: preventivi e commesse collegati. Crea e modifica: Admin e ruolo Sales.",
+        [22] = "Riservato ad Admin e Management. Per le commesse più recenti: prezzo di vendita, costo stimato (distinta e ciclo), costo reale (materiali prelevati al prezzo d'acquisto del lotto o a listino, minuti delle fasi e ore registrate per la tariffa oraria del centro di lavoro) e margine. I totali contano solo le commesse con un prezzo di vendita. Gli avvisi segnalano dati mancanti (prezzi, tariffe) che rendono il costo incompleto.",
         [21] = "Preventivi ai clienti. Bozza -> Inviato -> Accettato o Rifiutato; solo una bozza si può modificare (doppio click o \"Modifica\"). \"Crea commesse\" trasforma un preventivo accettato in una commessa in bozza per ogni riga collegata a un prodotto, una volta sola. Nell'editor, \"Stima prezzo da distinta\" calcola il costo materiali dai listini fornitori più il ricarico indicato (manodopera esclusa).",
     };
 
 #if DEBUG
-    // TEMPORANEO: login disabilitato su richiesta per velocizzare i test in build di sviluppo.
-    // Racchiuso in #if DEBUG (non un semplice flag a runtime) perché il compilatore esclude
-    // interamente questo blocco — condizione, credenziali comprese — dalle build Release, inclusa
-    // quella pubblicata dalla pipeline di release su GitHub: non può quindi mai raggiungere un
-    // eseguibile distribuito, nemmeno per una dimenticanza. Per riattivare il login manuale anche
-    // in Debug: impostare SkipLoginForTesting a false.
-    private const bool SkipLoginForTesting = true;
-    private const string TestEmail = "nicolo.test@gestionale.local";
-    private const string TestPassword = "Gestionale2026!";
+    // Login automatico solo nelle build di sviluppo (#if DEBUG: assente dalle build Release e dalle
+    // release pubblicate). Le credenziali NON stanno nel codice: il repository è pubblico, e fino al
+    // 2026-09-29 email e password di un account Admin reale erano scritte qui, leggibili da chiunque.
+    // Si leggono dalle variabili d'ambiente utente CRMMES_DEV_EMAIL e CRMMES_DEV_PASSWORD del PC di
+    // sviluppo; se mancano, si fa il login a mano come in produzione.
+    private static readonly string? DevLoginEmail = Environment.GetEnvironmentVariable("CRMMES_DEV_EMAIL");
+    private static readonly string? DevLoginPassword = Environment.GetEnvironmentVariable("CRMMES_DEV_PASSWORD");
 #endif
 
     public MainWindow()
     {
         InitializeComponent();
+        MaximizeToWorkArea.Attach(this);
         NavMaterials.IsChecked = true;
         Loaded += MainWindow_Loaded;
         Closing += MainWindow_Closing;
@@ -202,7 +205,8 @@ public partial class MainWindow : Window
     private void Window_StateChanged(object sender, EventArgs e)
     {
         MaximizeButton.Content = WindowState == WindowState.Maximized ? "" : "";
-        RootGrid.Margin = WindowState == WindowState.Maximized ? new Thickness(7) : new Thickness(0);
+        // Maximize is bounded to the monitor work area (MaximizeToWorkArea), so no border compensation is needed.
+        RootGrid.Margin = new Thickness(0);
     }
 
     private void NavItem_Checked(object sender, RoutedEventArgs e)
@@ -271,11 +275,11 @@ public partial class MainWindow : Window
             LoginButton.IsEnabled = healthy;
 
 #if DEBUG
-            if (healthy && SkipLoginForTesting)
+            if (healthy && !string.IsNullOrWhiteSpace(DevLoginEmail) && !string.IsNullOrWhiteSpace(DevLoginPassword))
             {
                 try
                 {
-                    var auth = await _apiClient.LoginAsync(TestEmail, TestPassword);
+                    var auth = await _apiClient.LoginAsync(DevLoginEmail, DevLoginPassword);
                     CompleteLogin(auth);
                 }
                 catch (InvalidOperationException exception)
@@ -312,6 +316,11 @@ public partial class MainWindow : Window
         _isAuthenticated = true;
         _currentUserId = auth.UserId;
         _currentRole = auth.Role;
+        _apiClient.CurrentRole = auth.Role;
+        _ = FlagAvailableUpdateAsync();
+        var canViewMargins = _apiClient.CanViewMargins;
+        NavManagementSection.Visibility = canViewMargins ? Visibility.Visible : Visibility.Collapsed;
+        WorkCenterRateButton.Visibility = canViewMargins ? Visibility.Visible : Visibility.Collapsed;
         _refreshToken = auth.RefreshToken;
         ScheduleTokenRefresh(auth.ExpiresAt);
         LoginPanel.Visibility = Visibility.Collapsed;
@@ -409,6 +418,9 @@ public partial class MainWindow : Window
                 break;
             case "Preventivi" when !_quotesLoaded:
                 await LoadQuotesAsync();
+                break;
+            case "Controllo margini" when !_marginsLoaded:
+                await LoadMarginsAsync();
                 break;
         }
     }
@@ -1057,6 +1069,59 @@ public partial class MainWindow : Window
         }
     }
 
+    private Task LoadMarginsAsync() => RunBusyAsync("Calcolo dei margini...", async () =>
+    {
+        var status = (MarginsStatusCombo.SelectedItem as ComboBoxItem)?.Tag as string;
+        var overview = await _apiClient.GetMarginsAsync(status);
+        var italian = System.Globalization.CultureInfo.GetCultureInfo("it-IT");
+        MarginsRevenueText.Text = $"{overview.Revenue.ToString("N2", italian)} €";
+        MarginsCostText.Text = $"{overview.ActualCost.ToString("N2", italian)} €";
+        MarginsMarginText.Text = overview.MarginRatio is { } ratio
+            ? $"{overview.Margin.ToString("N2", italian)} € ({ratio.ToString("P1", italian)})"
+            : "-";
+        MarginsLossText.Text = overview.LossMakingCount.ToString(italian);
+        MarginsInfoText.Text =
+            $"{overview.WorkOrderCount} commesse, {overview.PricedWorkOrderCount} con prezzo di vendita. " +
+            "Doppio click per il dettaglio. Margine sotto il 15% in ambra, in perdita in rosso.";
+        MarginsList.ItemsSource = overview.WorkOrders;
+        _marginsLoaded = true;
+    });
+
+    private async void RefreshMargins_Click(object sender, RoutedEventArgs e) => await LoadMarginsAsync();
+
+    private async void MarginsStatusCombo_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (_marginsLoaded)
+        {
+            await LoadMarginsAsync();
+        }
+    }
+
+    private async void MarginsList_MouseDoubleClick(object sender, MouseButtonEventArgs e)
+    {
+        if (MarginsList.SelectedItem is MarginRowDto row)
+        {
+            new WorkOrderCostWindow(_apiClient, row.WorkOrderId) { Owner = this }.ShowDialog();
+            await LoadMarginsAsync();
+        }
+    }
+
+    private async void WorkCenterRate_Click(object sender, RoutedEventArgs e)
+    {
+        if (WorkCentersList.SelectedItem is not WorkCenterDto workCenter)
+        {
+            MessageBox.Show("Seleziona prima un centro di lavoro nell'elenco.", "Tariffa oraria", MessageBoxButton.OK, MessageBoxImage.Information);
+            return;
+        }
+
+        var dialog = new HourlyRateWindow(_apiClient, workCenter) { Owner = this };
+        dialog.ShowDialog();
+        if (dialog.Saved)
+        {
+            await LoadWorkCentersAsync();
+        }
+    }
+
     private async void NewCarrierButton_Click(object sender, RoutedEventArgs e)
     {
         var dialog = new CreateCarrierWindow(_apiClient) { Owner = this };
@@ -1197,6 +1262,32 @@ public partial class MainWindow : Window
     private void UsersList_SelectionChanged(object sender, SelectionChangedEventArgs e)
     {
         SetPinButton.IsEnabled = UsersList.SelectedItem is UserRowDto;
+        ResetPasswordButton.IsEnabled = UsersList.SelectedItem is UserRowDto;
+    }
+
+    private void ResetPasswordButton_Click(object sender, RoutedEventArgs e)
+    {
+        if (UsersList.SelectedItem is UserRowDto user)
+        {
+            var dialog = new PasswordWindow(_apiClient, user) { Owner = this };
+            dialog.ShowDialog();
+            if (dialog.Saved)
+            {
+                MessageBox.Show($"Password di {user.Name} reimpostata. Le sue sessioni aperte sono state chiuse.",
+                    "Reimposta password", MessageBoxButton.OK, MessageBoxImage.Information);
+            }
+        }
+    }
+
+    private void ChangePasswordButton_Click(object sender, RoutedEventArgs e)
+    {
+        var dialog = new PasswordWindow(_apiClient) { Owner = this };
+        dialog.ShowDialog();
+        if (dialog.Saved)
+        {
+            MessageBox.Show("Password cambiata. Le sessioni aperte con questo account su altri PC termineranno a breve.",
+                "Cambia password", MessageBoxButton.OK, MessageBoxImage.Information);
+        }
     }
 
     private void SetPinButton_Click(object sender, RoutedEventArgs e)
@@ -1696,6 +1787,31 @@ public partial class MainWindow : Window
         });
     }
 
+    /// <summary>Checks for a newer release in the background after login and, if there is one, turns the
+    /// sidebar's update link into a visible notice. Silent on any failure (offline, GitHub rate limit):
+    /// the manual "Controlla aggiornamenti" still reports errors.</summary>
+    private async Task FlagAvailableUpdateAsync()
+    {
+        if (_updateService.IsDevelopmentBuild)
+        {
+            return;
+        }
+
+        try
+        {
+            if (await _updateService.CheckAsync() is { } release)
+            {
+                UpdateButton.Content = $"Aggiornamento disponibile: {release.TagName}";
+                UpdateButton.Foreground = (System.Windows.Media.Brush)FindResource("SidebarTextActiveBrush");
+                UpdateButton.FontWeight = FontWeights.Bold;
+            }
+        }
+        catch
+        {
+            // Background convenience only.
+        }
+    }
+
     private async void UpdateButton_Click(object sender, RoutedEventArgs e)
     {
         UpdateButton.IsEnabled = false;
@@ -1704,18 +1820,21 @@ public partial class MainWindow : Window
             var release = await _updateService.CheckAsync();
             if (release is null)
             {
-                MessageBox.Show($"Il programma è aggiornato ({_updateService.CurrentVersion}).", "Aggiornamenti", MessageBoxButton.OK, MessageBoxImage.Information);
+                MessageBox.Show($"Il programma è aggiornato ({_updateService.CurrentVersion.ToString(3)}).", "Aggiornamenti", MessageBoxButton.OK, MessageBoxImage.Information);
                 return;
             }
 
+            var notes = release.Notes.Length > 800 ? release.Notes[..800] + "…" : release.Notes;
             var result = MessageBox.Show(
-                $"È disponibile la release {release.TagName}.\n\n{release.Notes}\n\nInstallarla ora?",
+                $"È disponibile la versione {release.TagName} (installata: {_updateService.CurrentVersion.ToString(3)}).\n\n{notes}\n\n" +
+                "Aggiornare ora? Il programma si chiude, si aggiorna e si riapre da solo.",
                 "Aggiornamento disponibile",
                 MessageBoxButton.YesNo,
                 MessageBoxImage.Information);
             if (result == MessageBoxResult.Yes)
             {
-                await _updateService.InstallAsync(release);
+                BusyIndicator.Text = "Download dell'aggiornamento...";
+                await _updateService.StartUpdateAsync(release);
                 Application.Current.Shutdown();
             }
         }

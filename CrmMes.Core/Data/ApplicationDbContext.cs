@@ -47,6 +47,7 @@ public class ApplicationDbContext : DbContext
     public DbSet<Customer> Customers => Set<Customer>();
     public DbSet<Quote> Quotes => Set<Quote>();
     public DbSet<QuoteItem> QuoteItems => Set<QuoteItem>();
+    public DbSet<LaborEntry> LaborEntries => Set<LaborEntry>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -282,6 +283,29 @@ public class ApplicationDbContext : DbContext
             entity.HasOne(w => w.Quote)
                 .WithMany()
                 .HasForeignKey(w => w.QuoteId)
+                .OnDelete(DeleteBehavior.SetNull);
+        });
+
+        modelBuilder.Entity<LaborEntry>(entity =>
+        {
+            entity.Property(l => l.OperatorName).HasMaxLength(200);
+            entity.Property(l => l.Notes).HasMaxLength(1000);
+            entity.Property(l => l.CreatedBy).HasMaxLength(200);
+            entity.HasOne(l => l.WorkOrder)
+                .WithMany()
+                .HasForeignKey(l => l.WorkOrderId)
+                .OnDelete(DeleteBehavior.Cascade);
+            entity.HasOne(l => l.Operation)
+                .WithMany()
+                .HasForeignKey(l => l.WorkOrderOperationId)
+                .OnDelete(DeleteBehavior.SetNull);
+            entity.HasOne(l => l.WorkCenter)
+                .WithMany()
+                .HasForeignKey(l => l.WorkCenterId)
+                .OnDelete(DeleteBehavior.SetNull);
+            entity.HasOne(l => l.User)
+                .WithMany()
+                .HasForeignKey(l => l.UserId)
                 .OnDelete(DeleteBehavior.SetNull);
         });
 

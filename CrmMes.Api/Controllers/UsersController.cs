@@ -15,7 +15,7 @@ public class UsersController : ControllerBase
 {
     private static readonly HashSet<string> AllowedRoles = new(StringComparer.OrdinalIgnoreCase)
     {
-        "Admin", "Warehouse", "Purchasing", "Sales", "Operator"
+        "Admin", "Management", "Warehouse", "Purchasing", "Sales", "Operator"
     };
 
     private readonly ApplicationDbContext _dbContext;
@@ -28,7 +28,7 @@ public class UsersController : ControllerBase
     }
 
     [HttpGet]
-    public async Task<ActionResult<IEnumerable<User>>> GetUsers(CancellationToken cancellationToken = default)
+    public async Task<ActionResult<IEnumerable<UserResponse>>> GetUsers(CancellationToken cancellationToken = default)
     {
         var users = await _dbContext.Users.AsNoTracking()
             .OrderBy(user => user.Name)
@@ -163,6 +163,16 @@ public class UsersController : ControllerBase
             return NotFound();
         }
 
+        // The terminal identifies an operator by PIN alone and takes the first match: two users with the
+        // same PIN would have one's actions silently attributed to the other.
+        var othersWithPin = await _dbContext.Users.AsNoTracking()
+            .Where(u => u.Id != id && u.IsActive && u.PinHash != null)
+            .ToListAsync(cancellationToken);
+        if (othersWithPin.Any(other => _passwordHasher.VerifyHashedPassword(other, other.PinHash!, pin) != PasswordVerificationResult.Failed))
+        {
+            return Conflict(new { message = "Questo PIN è già usato da un altro utente: scegline uno diverso." });
+        }
+
         user.PinHash = _passwordHasher.HashPassword(user, pin);
         _dbContext.AuditLogs.Add(new AuditLog
         {
@@ -177,9 +187,41 @@ public class UsersController : ControllerBase
         return NoContent();
     }
 
+    /// <summary>Admin sets a new password for a user (forgotten password, or an account whose password
+    /// may be exposed): clears any lockout and ends the user's sessions on every PC.</summary>
+    [Authorize(Policy = "AdminOnly")]
+    [HttpPut("{id:guid}/password")]
+    public async Task<IActionResult> ResetUserPassword(Guid id, ResetUserPasswordRequest request, CancellationToken cancellationToken = default)
+    {
+        var validation = AuthController.ValidateNewPassword(request.NewPassword);
+        if (validation is not null)
+        {
+            return BadRequest(new { message = validation });
+        }
+
+        var user = await _dbContext.Users.SingleOrDefaultAsync(u => u.Id == id, cancellationToken);
+        if (user is null)
+        {
+            return NotFound();
+        }
+
+        await AuthController.SetPasswordAsync(_dbContext, _passwordHasher, user, request.NewPassword!, cancellationToken);
+        _dbContext.AuditLogs.Add(new AuditLog
+        {
+            Action = "PasswordReset",
+            EntityType = "User",
+            EntityId = user.Id,
+            UserName = User.FindFirstValue(ClaimTypes.Name),
+            Details = $"Password di {user.Email} reimpostata da un Admin; sessioni aperte revocate."
+        });
+        await _dbContext.SaveChangesAsync(cancellationToken);
+        return NoContent();
+    }
+
     /// <summary>What the shop-floor terminal calls after an operator types their PIN: finds which active
     /// user it belongs to. Checked against every active user with a PIN set — fine for a small team, and
     /// avoids an indexable plaintext PIN lookup that would defeat hashing it in the first place.</summary>
+    [Microsoft.AspNetCore.RateLimiting.EnableRateLimiting(CrmMes.Api.Services.RateLimits.Pin)]
     [HttpPost("identify-by-pin")]
     public async Task<ActionResult<IdentifyByPinResponse>> IdentifyByPin(IdentifyByPinRequest request, CancellationToken cancellationToken = default)
     {
@@ -205,6 +247,7 @@ public class UsersController : ControllerBase
 public sealed record CreateUserRequest(string? Name, string? Email, string? Password, string? Role);
 public sealed record UserResponse(Guid Id, string Name, string Email, string Role, bool IsActive, DateTime CreatedAt);
 public sealed record SetUserPinRequest(string? Pin);
+public sealed record ResetUserPasswordRequest(string? NewPassword);
 public sealed record IdentifyByPinRequest(string? Pin);
 public sealed record IdentifyByPinResponse(Guid Id, string Name);
 

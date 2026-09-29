@@ -179,11 +179,11 @@
                                 </Setter.Value>
                             </Setter>
                         </Trigger>
-                        <!-- Disabled reads as "not available now": no border, sunk fill, muted text -
-                             a bordered white button with slightly greyer text looked clickable. -->
+                        <!-- Disabled: still recognisably a button (light border, pale fill) with muted text.
+                             A borderless version read as plain text and looked like a layout gap. -->
                         <Trigger Property="IsEnabled" Value="False">
-                            <Setter TargetName="Bg" Property="Background" Value="{StaticResource OutlineHoverBgBrush}" />
-                            <Setter TargetName="Bg" Property="BorderBrush" Value="{StaticResource OutlineHoverBgBrush}" />
+                            <Setter TargetName="Bg" Property="Background" Value="{StaticResource SurfaceRaisedBrush}" />
+                            <Setter TargetName="Bg" Property="BorderBrush" Value="{StaticResource BorderBrush0}" />
                             <Setter Property="Foreground" Value="{StaticResource TextMutedBrush}" />
                             <Setter Property="Cursor" Value="Arrow" />
                         </Trigger>
@@ -679,6 +679,9 @@
 
     <!-- ListView / GridView -->
     <Style TargetType="ListView">
+        <!-- Columns fill the whole width instead of stopping halfway on wide screens (GridViewFill.cs). -->
+        <Setter Property="local:GridViewFill.IsEnabled" Value="True" />
+        <Setter Property="ScrollViewer.HorizontalScrollBarVisibility" Value="Auto" />
         <Setter Property="Background" Value="Transparent" />
         <Setter Property="BorderThickness" Value="0" />
         <Setter Property="AlternationCount" Value="2" />

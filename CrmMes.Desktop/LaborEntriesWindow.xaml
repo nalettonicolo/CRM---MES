@@ -1,0 +1,73 @@
+<Window x:Class="CrmMes.Desktop.LaborEntriesWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Ore lavorate" Icon="Assets/logo.ico" Height="600" Width="900"
+        WindowStartupLocation="CenterOwner" ResizeMode="CanResize" MinHeight="420" MinWidth="760"
+        Background="{StaticResource BackgroundBrush}">
+    <Grid Margin="24">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
+        <StackPanel Grid.Row="0" Margin="0,0,0,6">
+            <TextBlock Text="P R O D U Z I O N E" Style="{StaticResource MicroLabel}" />
+            <TextBlock x:Name="HeaderText" Text="Ore lavorate" Style="{StaticResource EditorialTitle}" FontSize="24" />
+        </StackPanel>
+        <TextBlock Grid.Row="1" Foreground="{StaticResource TextSecondaryBrush}" FontSize="12.5" TextWrapping="Wrap" Margin="0,0,0,14"
+                   Text="Ore svolte fuori dall'avvio/fine delle fasi al terminale: cablaggio fuori ciclo, installazione dal cliente, collaudo in cantiere, rilavorazioni. Il tempo delle fasi è già conteggiato da solo." />
+
+        <!-- New entry strip -->
+        <Grid Grid.Row="2" Margin="0,0,0,10">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="130" />
+                <ColumnDefinition Width="10" />
+                <ColumnDefinition Width="90" />
+                <ColumnDefinition Width="10" />
+                <ColumnDefinition Width="170" />
+                <ColumnDefinition Width="10" />
+                <ColumnDefinition Width="170" />
+                <ColumnDefinition Width="10" />
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="10" />
+                <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+            <DatePicker Grid.Column="0" x:Name="WorkDatePicker" Height="34" />
+            <TextBox Grid.Column="2" x:Name="DurationBox" Height="34" Tag="Ore (1,5 o 1:30)" />
+            <ComboBox Grid.Column="4" x:Name="WorkCenterCombo" Height="34" DisplayMemberPath="Name" />
+            <ComboBox Grid.Column="6" x:Name="OperationCombo" Height="34" DisplayMemberPath="Label" />
+            <TextBox Grid.Column="8" x:Name="NotesBox" Height="34" Tag="Cosa è stato fatto" />
+            <Button Grid.Column="10" Content="Registra" Width="100" Height="34" Click="Add_Click" />
+        </Grid>
+
+        <Border Grid.Row="3" Style="{StaticResource CardBorder}" Padding="4">
+            <ListView x:Name="EntriesList">
+                <ListView.View>
+                    <GridView>
+                        <GridViewColumn Header="Data" DisplayMemberBinding="{Binding WorkDate, StringFormat=dd/MM/yyyy}" Width="100" />
+                        <GridViewColumn Header="Durata" DisplayMemberBinding="{Binding HoursLabel}" Width="90" />
+                        <GridViewColumn Header="Operatore" DisplayMemberBinding="{Binding OperatorName}" Width="150" />
+                        <GridViewColumn Header="Centro di lavoro" DisplayMemberBinding="{Binding WorkCenterName}" Width="150" />
+                        <GridViewColumn Header="Note" DisplayMemberBinding="{Binding Notes}" Width="200" />
+                        <GridViewColumn Header="" Width="100">
+                            <GridViewColumn.CellTemplate>
+                                <DataTemplate>
+                                    <Button Content="Elimina" Style="{StaticResource SecondaryButton}" Height="28" Click="Delete_Click" Tag="{Binding}" />
+                                </DataTemplate>
+                            </GridViewColumn.CellTemplate>
+                        </GridViewColumn>
+                    </GridView>
+                </ListView.View>
+            </ListView>
+        </Border>
+
+        <DockPanel Grid.Row="4" Margin="0,14,0,0">
+            <Button DockPanel.Dock="Right" Style="{StaticResource SecondaryButton}" Content="Chiudi" Width="100" Height="36" Click="Close_Click" />
+            <TextBlock x:Name="TotalText" FontSize="14" FontWeight="SemiBold" Foreground="{StaticResource TextPrimaryBrush}" VerticalAlignment="Center" />
+            <TextBlock x:Name="ErrorText" Foreground="{StaticResource DangerBrush}" TextWrapping="Wrap" VerticalAlignment="Center" Margin="20,0,20,0" />
+        </DockPanel>
+    </Grid>
+</Window>

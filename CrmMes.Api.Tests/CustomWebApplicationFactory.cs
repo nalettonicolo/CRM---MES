@@ -17,6 +17,9 @@ public sealed class CustomWebApplicationFactory : WebApplicationFactory<Program>
 {
     private SqliteConnection? _connection;
 
+    /// <summary>Set before first use to test the production rate limits instead of the relaxed ones.</summary>
+    public (int Auth, int Pin)? RateLimitOverride { get; init; }
+
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
         builder.UseEnvironment("Development");
@@ -25,6 +28,10 @@ public sealed class CustomWebApplicationFactory : WebApplicationFactory<Program>
         // we replace the DbContext registration below; this satisfies that check.
         builder.UseSetting("ConnectionStrings:DefaultConnection", "Host=localhost;Database=test;Username=test;Password=test");
         builder.UseSetting("Jwt:Key", "integration-test-signing-key-at-least-32-chars-long");
+        // The suite logs in hundreds of times from one address; the real limits are exercised by
+        // SecurityTests with their own factory.
+        builder.UseSetting("RateLimits:AuthPerMinute", RateLimitOverride?.Auth.ToString() ?? "100000");
+        builder.UseSetting("RateLimits:PinPerMinute", RateLimitOverride?.Pin.ToString() ?? "100000");
 
         builder.ConfigureServices(services =>
         {

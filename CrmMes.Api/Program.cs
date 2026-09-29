@@ -91,10 +91,27 @@ builder.Services.AddAuthorization(options =>
     // warehouse/production staff may also do, hence the combined policy for that one action.
     options.AddPolicy("Sales", policy => policy.RequireRole("Admin", "Sales"));
     options.AddPolicy("SalesOrWarehouse", policy => policy.RequireRole("Admin", "Sales", "Warehouse"));
+    // Costs, hourly rates and margins: company-confidential, visible only to management.
+    options.AddPolicy("ViewMargins", policy => policy.RequireRole(CrmMes.Api.Services.MarginAccess.Roles));
 });
 builder.Services.AddSingleton<IPasswordHasher<CrmMes.Core.Models.User>, PasswordHasher<CrmMes.Core.Models.User>>();
+
+// Render terminates TLS on its proxy: without this every request would look like it came from the
+// proxy's address, and the per-IP rate limit below would become one shared global bucket. ForwardLimit=1
+// takes only the address appended by the proxy itself, not whatever a client wrote into the header.
+builder.Services.Configure<Microsoft.AspNetCore.Builder.ForwardedHeadersOptions>(options =>
+{
+    options.ForwardedHeaders = Microsoft.AspNetCore.HttpOverrides.ForwardedHeaders.XForwardedFor |
+                               Microsoft.AspNetCore.HttpOverrides.ForwardedHeaders.XForwardedProto;
+    options.ForwardLimit = 1;
+    options.KnownNetworks.Clear();
+    options.KnownProxies.Clear();
+});
+CrmMes.Api.Services.RateLimits.Add(builder.Services, builder.Configuration);
 builder.Services.AddScoped<CrmMes.Api.Services.WithdrawalItemBuilder>();
 builder.Services.AddSingleton<CrmMes.Api.Services.WorkOrderFactory>();
+builder.Services.AddScoped<CrmMes.Api.Services.MaterialPricing>();
+builder.Services.AddScoped<CrmMes.Api.Services.WorkOrderCosting>();
 
 var connectionString = Environment.GetEnvironmentVariable("NEON_DATABASE_URL")
     ?? Environment.GetEnvironmentVariable("DATABASE_URL")
@@ -113,6 +130,7 @@ builder.Services.AddDbContext<ApplicationDbContext>(options =>
 
 var app = builder.Build();
 
+app.UseForwardedHeaders();
 app.UseExceptionHandler();
 app.UseStaticFiles(); // serves wwwroot/favicon.ico, picked up automatically by the browser and by Swagger UI
 
@@ -130,6 +148,7 @@ app.UseSerilogRequestLogging();
 app.UseResponseCompression();
 app.UseHttpsRedirection();
 app.UseAuthentication();
+app.UseRateLimiter();
 app.UseAuthorization();
 app.MapControllers();
 

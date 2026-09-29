@@ -4,24 +4,36 @@ using System.Net.Http;
 using System.Net.Http.Json;
 using System.Reflection;
 using System.Security.Cryptography;
-using System.Text;
 using System.Text.Json.Serialization;
 
 namespace CrmMes.Desktop;
 
+/// <summary>Checks GitHub Releases for a newer client and updates through the installer
+/// (installer/NicoloMES.iss).
+///
+/// Until v1.2 the update unzipped the release over the running folder from a .cmd script that waited a
+/// fixed 2 seconds: the app often hadn't finished closing (its logout call can take much longer while the
+/// free Render instance wakes up), files were still locked, Expand-Archive failed in a console window
+/// that closed by itself, and nothing restarted the program. Now the installer does it: it closes the app
+/// through Windows Restart Manager and waits until it has really exited, shows real errors, and reopens
+/// the program when done.</summary>
 public sealed class UpdateService
 {
     private const string ReleasesEndpoint = "https://api.github.com/repos/nalettonicolo/CRM---MES/releases/latest";
-    private const string AssetName = "CrmMes.Desktop-win-x64.zip";
-    private const string ChecksumAssetName = AssetName + ".sha256";
+    internal const string SetupAssetName = "NicoloMES-Setup.exe";
+    internal const string ChecksumAssetName = SetupAssetName + ".sha256";
     private readonly HttpClient _httpClient = new();
 
     public UpdateService()
     {
-        _httpClient.DefaultRequestHeaders.UserAgent.ParseAdd("CrmMes-Desktop-Updater/1.0");
+        _httpClient.DefaultRequestHeaders.UserAgent.ParseAdd("CrmMes-Desktop-Updater/2.0");
     }
 
     public Version CurrentVersion => Assembly.GetEntryAssembly()?.GetName().Version ?? new Version(1, 0, 0);
+
+    /// <summary>Development builds carry the placeholder version 0.x from the .csproj: they would always
+    /// "find" an update, so the automatic check at login skips them.</summary>
+    public bool IsDevelopmentBuild => CurrentVersion.Major == 0;
 
     public async Task<ReleaseInfo?> CheckAsync(CancellationToken cancellationToken = default)
     {
@@ -31,63 +43,79 @@ public sealed class UpdateService
             return null;
         }
 
-        var versionText = release.TagName.TrimStart('v', 'V');
-        return Version.TryParse(versionText, out var version) && version > CurrentVersion
+        return IsNewer(release.TagName, CurrentVersion, out var version)
             ? new ReleaseInfo(
                 version, release.TagName, release.Name, release.Body,
-                release.Assets.FirstOrDefault(asset => asset.Name == AssetName)?.BrowserDownloadUrl,
+                release.Assets.FirstOrDefault(asset => asset.Name == SetupAssetName)?.BrowserDownloadUrl,
                 release.Assets.FirstOrDefault(asset => asset.Name == ChecksumAssetName)?.BrowserDownloadUrl)
             : null;
     }
 
-    public async Task InstallAsync(ReleaseInfo release, CancellationToken cancellationToken = default)
+    /// <summary>"v1.2.0" vs the running assembly version, comparing major.minor.build only (the assembly's
+    /// 4th component is always 0 and must not make 1.2.0 look newer than 1.2.0.0).</summary>
+    internal static bool IsNewer(string tagName, Version current, out Version version)
+    {
+        if (!Version.TryParse(tagName.TrimStart('v', 'V'), out var parsed))
+        {
+            version = new Version(0, 0);
+            return false;
+        }
+
+        version = parsed;
+        var normalizedCurrent = new Version(current.Major, current.Minor, Math.Max(current.Build, 0));
+        var normalizedRelease = new Version(parsed.Major, parsed.Minor, Math.Max(parsed.Build, 0));
+        return normalizedRelease > normalizedCurrent;
+    }
+
+    /// <summary>Downloads the installer, verifies its SHA-256 against the checksum published by the release
+    /// pipeline, and starts it in update mode. The caller then closes the application; the installer waits
+    /// for that, updates and reopens the program.</summary>
+    public async Task StartUpdateAsync(ReleaseInfo release, CancellationToken cancellationToken = default)
     {
         if (string.IsNullOrWhiteSpace(release.DownloadUrl))
         {
-            throw new InvalidOperationException($"La release {release.TagName} non contiene l'asset {AssetName}.");
+            throw new InvalidOperationException(
+                $"La release {release.TagName} non contiene l'installer {SetupAssetName}. Scaricalo a mano dalla pagina delle release su GitHub.");
         }
 
-        var packagePath = Path.Combine(Path.GetTempPath(), AssetName);
-        await using (var input = await _httpClient.GetStreamAsync(release.DownloadUrl, cancellationToken))
-        await using (var output = File.Create(packagePath))
-        {
-            await input.CopyToAsync(output, cancellationToken);
-        }
-
-        // Non essendo ancora firmato digitalmente (vedi RIEPILOGO-SVILUPPO.md), l'unica difesa contro un
-        // download corrotto o un asset alterato è verificarne il checksum SHA-256 pubblicato dalla
-        // pipeline di release accanto allo zip, prima di scompattarlo sopra l'installazione esistente.
         if (string.IsNullOrWhiteSpace(release.ChecksumUrl))
         {
-            File.Delete(packagePath);
             throw new InvalidOperationException(
                 $"La release {release.TagName} non pubblica il checksum {ChecksumAssetName}: impossibile verificarne l'integrità, aggiornamento annullato.");
         }
 
+        var setupPath = Path.Combine(Path.GetTempPath(), $"NicoloMES-Setup-{release.Version}.exe");
+        await using (var input = await _httpClient.GetStreamAsync(release.DownloadUrl, cancellationToken))
+        await using (var output = File.Create(setupPath))
+        {
+            await input.CopyToAsync(output, cancellationToken);
+        }
+
+        // Until the installer is code-signed, the published SHA-256 is the only integrity check: a corrupted
+        // download or a replaced asset (without also replacing the checksum) is refused, never executed.
         var expectedHash = (await _httpClient.GetStringAsync(release.ChecksumUrl, cancellationToken)).Trim();
         string actualHash;
-        await using (var packageStream = File.OpenRead(packagePath))
+        await using (var setupStream = File.OpenRead(setupPath))
         {
-            actualHash = Convert.ToHexString(await SHA256.HashDataAsync(packageStream, cancellationToken));
+            actualHash = Convert.ToHexString(await SHA256.HashDataAsync(setupStream, cancellationToken));
         }
 
         if (!string.Equals(expectedHash, actualHash, StringComparison.OrdinalIgnoreCase))
         {
-            File.Delete(packagePath);
+            File.Delete(setupPath);
             throw new InvalidOperationException(
-                $"Il pacchetto scaricato per {release.TagName} non corrisponde al checksum pubblicato: potrebbe essere corrotto o alterato. Aggiornamento annullato.");
+                $"L'installer scaricato per {release.TagName} non corrisponde al checksum pubblicato: potrebbe essere corrotto o alterato. Aggiornamento annullato.");
         }
 
-        var applicationPath = AppContext.BaseDirectory.TrimEnd(Path.DirectorySeparatorChar);
-        var scriptPath = Path.Combine(Path.GetTempPath(), $"crmmes-update-{Guid.NewGuid():N}.cmd");
-        var script = $"@echo off\r\ntimeout /t 2 /nobreak > nul\r\npowershell -NoProfile -ExecutionPolicy Bypass -Command \"Expand-Archive -LiteralPath '{packagePath.Replace("'", "''")}' -DestinationPath '{applicationPath.Replace("'", "''")}' -Force\"\r\ndel \"%~f0\"\r\n";
-        await File.WriteAllTextAsync(scriptPath, script, Encoding.ASCII, cancellationToken);
-
+        var logPath = Path.Combine(Path.GetTempPath(), "NicoloMES-update.log");
         Process.Start(new ProcessStartInfo
         {
-            FileName = scriptPath,
-            UseShellExecute = true,
-            WorkingDirectory = applicationPath
+            FileName = setupPath,
+            // /SILENT: progress window only, no questions; real errors are still shown.
+            // /CLOSEAPPLICATIONS: waits for this program to close (Restart Manager) before replacing files.
+            // /UPDATE=1: the installer reopens the program when done (see [Run] in NicoloMES.iss).
+            Arguments = $"/SILENT /SP- /NOCANCEL /CLOSEAPPLICATIONS /UPDATE=1 /LOG=\"{logPath}\"",
+            UseShellExecute = true
         });
     }
 

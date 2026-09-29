@@ -75,6 +75,7 @@
                                 </StackPanel>
                                 <TextBlock x:Name="BusyIndicator" Text="" Foreground="{StaticResource SidebarTextBrush}" FontStyle="Italic" FontSize="11" Margin="0,8,0,0" />
                                 <Button x:Name="UpdateButton" Style="{StaticResource SidebarLinkButton}" Content="Controlla aggiornamenti" Margin="0,10,0,0" Click="UpdateButton_Click" />
+                                <Button x:Name="ChangePasswordButton" Style="{StaticResource SidebarLinkButton}" Content="Cambia password" Margin="0,6,0,0" Click="ChangePasswordButton_Click" />
                                 <Button x:Name="SidebarSettingsButton" Style="{StaticResource SidebarLinkButton}" Content="Impostazioni server" Margin="0,6,0,0" Click="SettingsButton_Click" Visibility="Collapsed" />
                             </StackPanel>
                         </Border>
@@ -187,13 +188,13 @@
                                             <TextBlock Text="Pianificazione" Margin="6,0,0,0" />
                                         </StackPanel>
                                     </RadioButton>
-                                    <Button x:Name="ShopFloorTerminalButton" Style="{StaticResource SidebarLinkButton}" HorizontalAlignment="Stretch" HorizontalContentAlignment="Left" Margin="0,6,0,0" Click="ShopFloorTerminalButton_Click">
+                                    <Button x:Name="ShopFloorTerminalButton" Style="{StaticResource SidebarLinkButton}" HorizontalAlignment="Stretch" HorizontalContentAlignment="Left" Margin="26,6,10,0" Click="ShopFloorTerminalButton_Click">
                                         <StackPanel Orientation="Horizontal">
                                             <TextBlock Text="&#xE8FD;" FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets" FontSize="16" Width="24" />
                                             <TextBlock Text="Terminale di reparto" Margin="6,0,0,0" />
                                         </StackPanel>
                                     </Button>
-                                    <Button x:Name="PlanningBoardButton" Style="{StaticResource SidebarLinkButton}" HorizontalAlignment="Stretch" HorizontalContentAlignment="Left" Margin="0,6,0,0" Click="PlanningBoardButton_Click">
+                                    <Button x:Name="PlanningBoardButton" Style="{StaticResource SidebarLinkButton}" HorizontalAlignment="Stretch" HorizontalContentAlignment="Left" Margin="26,6,10,0" Click="PlanningBoardButton_Click">
                                         <StackPanel Orientation="Horizontal">
                                             <TextBlock Text="&#xE787;" FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets" FontSize="16" Width="24" />
                                             <TextBlock Text="Planning produzione" Margin="6,0,0,0" />
@@ -231,6 +232,19 @@
                                         <StackPanel Orientation="Horizontal">
                                             <TextBlock Text="&#xE709;" FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets" FontSize="16" Width="24" />
                                             <TextBlock Text="Spedizioni" Margin="6,0,0,0" />
+                                        </StackPanel>
+                                    </RadioButton>
+                                </StackPanel>
+                            </Expander>
+
+                            <!-- Management-only area: shown after login to Admin/Management (see CompleteLogin).
+                                 The API enforces the same rule, this only avoids offering what would be refused. -->
+                            <Expander x:Name="NavManagementSection" Style="{StaticResource NavSectionExpander}" Header="D I R E Z I O N E" Visibility="Collapsed">
+                                <StackPanel>
+                                    <RadioButton x:Name="NavMargins" Style="{StaticResource NavItem}" GroupName="Nav" Tag="22" Checked="NavItem_Checked">
+                                        <StackPanel Orientation="Horizontal">
+                                            <TextBlock Text="&#xE9D2;" FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets" FontSize="16" Width="24" />
+                                            <TextBlock Text="Controllo margini" Margin="6,0,0,0" />
                                         </StackPanel>
                                     </RadioButton>
                                 </StackPanel>
@@ -528,6 +542,7 @@
                                     <Button DockPanel.Dock="Right" Content="Nuovo utente" Width="130" Height="36" Click="NewUserButton_Click" />
                                     <Button DockPanel.Dock="Right" Style="{StaticResource SecondaryButton}" Content="Aggiorna" Width="100" Height="36" Margin="0,0,10,0" Click="RefreshUsersButton_Click" />
                                     <Button DockPanel.Dock="Right" x:Name="SetPinButton" Style="{StaticResource SecondaryButton}" Content="Imposta PIN terminale" Width="170" Height="36" Margin="0,0,10,0" Click="SetPinButton_Click" IsEnabled="False" />
+                                    <Button DockPanel.Dock="Right" x:Name="ResetPasswordButton" Style="{StaticResource SecondaryButton}" Content="Reimposta password" Width="160" Height="36" Margin="0,0,10,0" Click="ResetPasswordButton_Click" IsEnabled="False" />
                                     <TextBlock Text="Utenti registrati" VerticalAlignment="Center" Foreground="{StaticResource TextSecondaryBrush}" />
                                 </DockPanel>
                                 <Border Grid.Row="1" Style="{StaticResource CardBorder}" Padding="4">
@@ -751,6 +766,7 @@
                                 </DockPanel>
                                 <DockPanel Grid.Row="1" Margin="0,0,0,8">
                                     <ComboBox x:Name="WorkCentersSiteFilterCombo" DockPanel.Dock="Right" Width="170" Height="30" DisplayMemberPath="Name" SelectionChanged="SiteFilter_SelectionChanged" />
+                                    <Button x:Name="WorkCenterRateButton" DockPanel.Dock="Right" Style="{StaticResource SecondaryButton}" Content="Tariffa oraria" Width="130" Height="30" Margin="0,0,10,0" Click="WorkCenterRate_Click" Visibility="Collapsed" />
                                     <TextBlock x:Name="WorkCenterErrorText" Foreground="{StaticResource DangerBrush}" TextWrapping="Wrap" VerticalAlignment="Center" />
                                 </DockPanel>
 
@@ -761,6 +777,7 @@
                                                 <GridViewColumn Header="Codice" DisplayMemberBinding="{Binding Code}" Width="120" />
                                                 <GridViewColumn Header="Nome" DisplayMemberBinding="{Binding Name}" Width="220" />
                                                 <GridViewColumn Header="Capacità min/giorno" DisplayMemberBinding="{Binding DailyCapacityMinutes}" Width="140" />
+                                                <GridViewColumn Header="€/ora" DisplayMemberBinding="{Binding HourlyRate, StringFormat=N2}" Width="90" />
                                                 <GridViewColumn Header="" Width="100">
                                                     <GridViewColumn.CellTemplate>
                                                         <DataTemplate>
@@ -1271,6 +1288,110 @@
                                                 <GridViewColumn Header="Valido fino" DisplayMemberBinding="{Binding ValidUntil, StringFormat=dd/MM/yyyy}" Width="100" />
                                                 <GridViewColumn Header="Righe" DisplayMemberBinding="{Binding ItemCount}" Width="60" />
                                                 <GridViewColumn Header="Totale €" DisplayMemberBinding="{Binding Total, StringFormat=N2}" Width="120" />
+                                            </GridView>
+                                        </ListView.View>
+                                    </ListView>
+                                </Border>
+                            </Grid>
+                        </TabItem>
+
+                        <TabItem Header="Controllo margini">
+                            <Grid>
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto" />
+                                    <RowDefinition Height="Auto" />
+                                    <RowDefinition Height="*" />
+                                </Grid.RowDefinitions>
+                                <Grid Grid.Row="0" Margin="0,0,0,14">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="12" />
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="12" />
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="12" />
+                                        <ColumnDefinition Width="*" />
+                                    </Grid.ColumnDefinitions>
+                                    <Border Grid.Column="0" Style="{StaticResource CardBorder}" Padding="16,12">
+                                        <StackPanel>
+                                            <TextBlock Text="Ricavi (commesse con prezzo)" FontSize="12" Foreground="{StaticResource TextSecondaryBrush}" />
+                                            <TextBlock x:Name="MarginsRevenueText" FontSize="20" FontWeight="SemiBold" Foreground="{StaticResource TextPrimaryBrush}" Margin="0,4,0,0" Text="-" />
+                                        </StackPanel>
+                                    </Border>
+                                    <Border Grid.Column="2" Style="{StaticResource CardBorder}" Padding="16,12">
+                                        <StackPanel>
+                                            <TextBlock Text="Costo reale" FontSize="12" Foreground="{StaticResource TextSecondaryBrush}" />
+                                            <TextBlock x:Name="MarginsCostText" FontSize="20" FontWeight="SemiBold" Foreground="{StaticResource TextPrimaryBrush}" Margin="0,4,0,0" Text="-" />
+                                        </StackPanel>
+                                    </Border>
+                                    <Border Grid.Column="4" Style="{StaticResource CardBorder}" Padding="16,12">
+                                        <StackPanel>
+                                            <TextBlock Text="Margine" FontSize="12" Foreground="{StaticResource TextSecondaryBrush}" />
+                                            <TextBlock x:Name="MarginsMarginText" FontSize="20" FontWeight="SemiBold" Foreground="{StaticResource TextPrimaryBrush}" Margin="0,4,0,0" Text="-" />
+                                        </StackPanel>
+                                    </Border>
+                                    <Border Grid.Column="6" Style="{StaticResource CardBorder}" Padding="16,12">
+                                        <StackPanel>
+                                            <TextBlock Text="Commesse in perdita" FontSize="12" Foreground="{StaticResource TextSecondaryBrush}" />
+                                            <TextBlock x:Name="MarginsLossText" FontSize="20" FontWeight="SemiBold" Foreground="{StaticResource TextPrimaryBrush}" Margin="0,4,0,0" Text="-" />
+                                        </StackPanel>
+                                    </Border>
+                                </Grid>
+                                <DockPanel Grid.Row="1" Margin="0,0,0,10">
+                                    <Button DockPanel.Dock="Right" Style="{StaticResource SecondaryButton}" Content="Aggiorna" Width="100" Height="34" Click="RefreshMargins_Click" />
+                                    <ComboBox x:Name="MarginsStatusCombo" DockPanel.Dock="Right" Width="170" Height="34" Margin="0,0,10,0" SelectedIndex="0" SelectionChanged="MarginsStatusCombo_SelectionChanged">
+                                        <ComboBoxItem Content="Tutte le commesse" Tag="" />
+                                        <ComboBoxItem Content="In corso" Tag="InProgress" />
+                                        <ComboBoxItem Content="Rilasciate" Tag="Released" />
+                                        <ComboBoxItem Content="Completate" Tag="Completed" />
+                                        <ComboBoxItem Content="In bozza" Tag="Draft" />
+                                    </ComboBox>
+                                    <TextBlock x:Name="MarginsInfoText" VerticalAlignment="Center" Foreground="{StaticResource TextSecondaryBrush}" TextWrapping="Wrap"
+                                               Text="Ultime 50 commesse. Doppio click per il dettaglio. Margine sotto il 15% in ambra, in perdita in rosso." />
+                                </DockPanel>
+                                <Border Grid.Row="2" Style="{StaticResource CardBorder}" Padding="4">
+                                    <ListView x:Name="MarginsList" MouseDoubleClick="MarginsList_MouseDoubleClick">
+                                        <ListView.View>
+                                            <GridView>
+                                                <GridViewColumn Header="Commessa" DisplayMemberBinding="{Binding WorkOrderCode}" Width="190" />
+                                                <GridViewColumn Header="Prodotto" DisplayMemberBinding="{Binding ProductName}" Width="160" />
+                                                <GridViewColumn Header="Cliente" DisplayMemberBinding="{Binding CustomerName}" Width="160" />
+                                                <GridViewColumn Header="Stato" Width="100">
+                                                    <GridViewColumn.CellTemplate>
+                                                        <DataTemplate>
+                                                            <TextBlock Style="{StaticResource PillText}" Text="{Binding Status, Converter={StaticResource StatusToItalianText}}" Foreground="{Binding Status, Converter={StaticResource StatusToBrush}, ConverterParameter=Foreground}" />
+                                                        </DataTemplate>
+                                                    </GridViewColumn.CellTemplate>
+                                                </GridViewColumn>
+                                                <GridViewColumn Header="Prezzo €" DisplayMemberBinding="{Binding SalePrice, StringFormat=N2}" Width="100" />
+                                                <GridViewColumn Header="Costo stim. €" DisplayMemberBinding="{Binding EstimatedCost, StringFormat=N2}" Width="105" />
+                                                <GridViewColumn Header="Costo reale €" DisplayMemberBinding="{Binding ActualCost, StringFormat=N2}" Width="105" />
+                                                <GridViewColumn Header="Margine €" DisplayMemberBinding="{Binding ActualMargin, StringFormat=N2}" Width="100" />
+                                                <GridViewColumn Header="Margine %" Width="90">
+                                                    <GridViewColumn.CellTemplate>
+                                                        <DataTemplate>
+                                                            <TextBlock Text="{Binding ActualMarginRatio, StringFormat=P1}" FontWeight="SemiBold">
+                                                                <TextBlock.Style>
+                                                                    <Style TargetType="TextBlock">
+                                                                        <Setter Property="Foreground" Value="#2F6B3F" />
+                                                                        <Style.Triggers>
+                                                                            <DataTrigger Binding="{Binding MarginLevel}" Value="Low">
+                                                                                <Setter Property="Foreground" Value="#A15C07" />
+                                                                            </DataTrigger>
+                                                                            <DataTrigger Binding="{Binding MarginLevel}" Value="Loss">
+                                                                                <Setter Property="Foreground" Value="#C0392B" />
+                                                                            </DataTrigger>
+                                                                            <DataTrigger Binding="{Binding MarginLevel}" Value="Unknown">
+                                                                                <Setter Property="Foreground" Value="{StaticResource TextMutedBrush}" />
+                                                                            </DataTrigger>
+                                                                        </Style.Triggers>
+                                                                    </Style>
+                                                                </TextBlock.Style>
+                                                            </TextBlock>
+                                                        </DataTemplate>
+                                                    </GridViewColumn.CellTemplate>
+                                                </GridViewColumn>
+                                                <GridViewColumn Header="Avvisi" DisplayMemberBinding="{Binding WarningCount}" Width="60" />
                                             </GridView>
                                         </ListView.View>
                                     </ListView>

@@ -6,6 +6,25 @@ Sintesi ad alto livello di cosa è stato costruito finora e cosa manca ancora. P
 
 ## Cosa è stato fatto
 
+### Costi, ore e controllo margini (2026-09-29, passo 3 del piano)
+- **Tariffa oraria** per centro di lavoro (endpoint dedicato, solo Admin) e **prezzo di vendita** per commessa, impostato in automatico dalla riga del preventivo alla conversione.
+- **Ore lavorate** registrate a mano sulla commessa (cablaggio fuori ciclo, installazione, rilavorazioni), da qualunque ruolo; eliminabili da Magazzino/Admin. La finestra preseleziona il centro di lavoro delle fasi.
+- **Costo di commessa** stimato (distinta base e ciclo, come il preventivo) e reale: materiali delle distinte di prelievo chiuse al prezzo d'acquisto del lotto consumato, o a listino; minuti delle fasi e ore registrate per la tariffa oraria. Ogni dato mancante (prezzo, tariffa, prezzo di vendita) e ogni fase più lunga di un turno è segnalato negli avvisi, mai contato come zero in silenzio.
+- **Controllo margini**: area "Direzione" con le commesse recenti, costo stimato/reale, margine e totali; costi, margini e tariffe sono visibili **solo ad Admin e al nuovo ruolo Management**, e l'API li nega agli altri ruoli (non solo l'interfaccia). Calcolo in blocco con un numero fisso di interrogazioni al database.
+
+### Verifica di sicurezza (2026-09-29)
+- **Credenziali Admin nel codice pubblico**: il login automatico di sviluppo aveva email e password di un account Admin reale scritte in `MainWindow.xaml.cs`, in un repository GitHub pubblico. Rimosse: ora si leggono dalle variabili d'ambiente `CRMMES_DEV_EMAIL`/`CRMMES_DEV_PASSWORD` del PC di sviluppo. Restano nella storia di Git, quindi **la password di quell'account va cambiata**.
+- **Blocco account** dopo 5 password errate per 15 minuti, **limiti di richieste** per IP su login/rinnovo/registrazione e per utente sul riconoscimento PIN (4 cifre = 10.000 tentativi), risposta del login uguale per email inesistente e password errata (niente scoperta delle email registrate).
+- **PIN terminale unici** (due utenti con lo stesso PIN venivano confusi), **import cataloghi** riservati ad Acquisti/Magazzino/Admin (i prezzi a listino entrano in preventivi e costi).
+- **Cambia password** per ogni utente e **reimposta password** per l'Admin, con revoca delle sessioni aperte: prima non esisteva alcun modo di mettere in sicurezza un account compromesso.
+- Dipendenza `System.IO.Packaging` portata a 8.0.1 (CVE-2024-43484, blocco del server con file Excel costruiti ad arte). Segreto del certificato non più interpolato nello script della pipeline.
+- Verificato e in ordine: segreti fuori dal codice e dai file di configurazione, password e PIN cifrati, rotazione dei token di rinnovo, registrazione pubblica chiusa, errori dettagliati e Swagger solo in sviluppo, HTTPS/HSTS, token del client solo in memoria, workflow GitHub senza segreti esposti alle pull request esterne.
+
+### Installer e aggiornamenti (2026-09-29)
+- **Installer** (`installer/NicoloMES.iss`, Inno Setup) prodotto dalla pipeline di release: installazione per utente senza permessi di amministratore, collegamenti, disinstallazione da Windows, controllo di .NET 8 Desktop Runtime, pagina "Server" alla prima installazione.
+- **Aggiornamento automatico** rifatto sull'installer: prima uno script aspettava 2 secondi fissi e scompattava lo zip sopra il programma ancora aperto, falliva in silenzio e non riapriva l'app. Ora l'installer chiude il programma attendendo che sia davvero chiuso, mostra gli errori e lo riapre; controllo automatico dopo il login con avviso nella barra laterale.
+- Interfaccia: tabelle a tutta larghezza, finestra massimizzata che non finisce più sotto la barra di Windows.
+
 ### Vendite (aggiunto il 2026-09-29, primo passo del piano "punti deboli" dell'analisi di mercato)
 - **Clienti**: anagrafica con codice, partita IVA, contatti, indirizzo; ricerca non sensibile a maiuscole; dettaglio con preventivi e commesse collegati.
 - **Preventivi**: righe collegate a un prodotto o libere (trasporto, installazione...), sconto di riga, totali arrotondati al centesimo in un solo punto (`QuotePricing`). Ciclo Bozza → Inviato → Accettato/Rifiutato, modificabile solo in bozza. PDF del preventivo dal client.
@@ -91,7 +110,7 @@ Sintesi ad alto livello di cosa è stato costruito finora e cosa manca ancora. P
 
 ## Cosa manca
 
-- **Login reale disattivato nelle build Debug**: `SkipLoginForTesting = true` in `MainWindow.xaml.cs` bypassa l'autenticazione per velocizzare lo sviluppo — dalla correzione di sicurezza appena fatta questo codice è racchiuso in `#if DEBUG` e non esiste più nelle build Release/pubblicate, quindi non può più raggiungere un utente reale per errore; resta comunque **da disattivare (`false`) anche per lo sviluppo quotidiano** una volta che si passa a testare con account reali.
+- **Password dell'account di sviluppo da cambiare**: le credenziali erano nel codice pubblico fino al 2026-09-29 e restano nella storia di Git (vedi "Verifica di sicurezza").
 - **Import PDF cataloghi non validato nel mondo reale**: euristica generica (raggruppamento parole per riga/colonna), testata solo su PDF generati sinteticamente in fase di test — va riverificata al primo catalogo fornitore reale disponibile.
 - **Firma digitale non ancora attiva**: la pipeline di release è pronta a firmare (vedi sopra), ma senza un certificato di firma del codice — a pagamento, da acquistare presso un'autorità come DigiCert o Sectigo (circa 70-400€/anno) — le release restano non firmate.
 - **Grafana Cloud non ancora collegato**: il logging centralizzato è pronto lato codice, ma serve creare l'account gratuito e impostare `LOKI_URL`/`LOKI_USER`/`LOKI_PASSWORD` su Render per attivarlo davvero.

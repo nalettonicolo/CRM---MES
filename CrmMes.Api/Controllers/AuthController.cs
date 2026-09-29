@@ -13,10 +13,20 @@ namespace CrmMes.Api.Controllers;
 
 [ApiController]
 [Route("api/auth")]
+[Microsoft.AspNetCore.RateLimiting.EnableRateLimiting(CrmMes.Api.Services.RateLimits.Auth)]
 public class AuthController : ControllerBase
 {
     private static readonly TimeSpan AccessTokenLifetime = TimeSpan.FromMinutes(30);
     private static readonly TimeSpan RefreshTokenLifetime = TimeSpan.FromDays(30);
+
+    /// <summary>Wrong passwords in a row before the account is locked, and for how long.</summary>
+    public const int MaxFailedLogins = 5;
+    public static readonly TimeSpan LockoutDuration = TimeSpan.FromMinutes(15);
+
+    /// <summary>A throwaway hash verified when the email doesn't exist, so a login for an unknown email
+    /// costs the same time as a wrong password: otherwise response timing reveals which emails exist.</summary>
+    private static readonly string DummyPasswordHash =
+        new PasswordHasher<User>().HashPassword(new User(), "timing-equalizer-not-a-real-password");
 
     private readonly ApplicationDbContext _dbContext;
     private readonly IConfiguration _configuration;
@@ -81,10 +91,46 @@ public class AuthController : ControllerBase
         var email = request.Email?.Trim().ToLowerInvariant();
         var user = await _dbContext.Users.SingleOrDefaultAsync(item => item.Email == email && item.IsActive, cancellationToken);
 
-        if (user is null || string.IsNullOrWhiteSpace(user.PasswordHash) ||
-            _passwordHasher.VerifyHashedPassword(user, user.PasswordHash, request.Password ?? string.Empty) == PasswordVerificationResult.Failed)
+        if (user is null || string.IsNullOrWhiteSpace(user.PasswordHash))
         {
+            _passwordHasher.VerifyHashedPassword(new User(), DummyPasswordHash, request.Password ?? string.Empty);
             return Unauthorized(new { message = "Credenziali non valide." });
+        }
+
+        var now = DateTime.UtcNow;
+        if (user.LockoutEndsAt is { } lockedUntil && lockedUntil > now)
+        {
+            // Same answer whether or not the password is right: a locked account gives no signal.
+            var minutes = (int)Math.Ceiling((lockedUntil - now).TotalMinutes);
+            return StatusCode(StatusCodes.Status429TooManyRequests,
+                new { message = $"Troppi tentativi errati: account bloccato per {minutes} minuti." });
+        }
+
+        if (_passwordHasher.VerifyHashedPassword(user, user.PasswordHash, request.Password ?? string.Empty) == PasswordVerificationResult.Failed)
+        {
+            user.FailedLoginCount++;
+            if (user.FailedLoginCount >= MaxFailedLogins)
+            {
+                user.FailedLoginCount = 0;
+                user.LockoutEndsAt = now.Add(LockoutDuration);
+                _dbContext.AuditLogs.Add(new AuditLog
+                {
+                    Action = "UserLockedOut",
+                    EntityType = "User",
+                    EntityId = user.Id,
+                    UserName = user.Email,
+                    Details = $"Account {user.Email} bloccato per {LockoutDuration.TotalMinutes:0} minuti dopo {MaxFailedLogins} password errate."
+                });
+            }
+
+            await _dbContext.SaveChangesAsync(cancellationToken);
+            return Unauthorized(new { message = "Credenziali non valide." });
+        }
+
+        if (user.FailedLoginCount != 0 || user.LockoutEndsAt is not null)
+        {
+            user.FailedLoginCount = 0;
+            user.LockoutEndsAt = null;
         }
 
         return Ok(await CreateResponseAsync(user, cancellationToken));
@@ -113,6 +159,85 @@ public class AuthController : ControllerBase
         existing.RevokedAt = DateTime.UtcNow;
         var response = await CreateResponseAsync(existing.User, cancellationToken, replaces: existing);
         return Ok(response);
+    }
+
+    /// <summary>Changes the caller's own password. The current one is required (a stolen, still-valid
+    /// access token alone can't take over the account), the new one must differ and be at least 8
+    /// characters. Every refresh token of the user is revoked: sessions on other PCs end at their next
+    /// token renewal, at most 30 minutes later.</summary>
+    [Microsoft.AspNetCore.Authorization.Authorize]
+    [HttpPost("change-password")]
+    public async Task<IActionResult> ChangePassword(ChangePasswordRequest request, CancellationToken cancellationToken = default)
+    {
+        var userIdText = User.FindFirstValue(JwtRegisteredClaimNames.Sub) ?? User.FindFirstValue(ClaimTypes.NameIdentifier);
+        if (!Guid.TryParse(userIdText, out var userId))
+        {
+            return Unauthorized();
+        }
+
+        var user = await _dbContext.Users.SingleOrDefaultAsync(u => u.Id == userId && u.IsActive, cancellationToken);
+        if (user is null)
+        {
+            return Unauthorized();
+        }
+
+        if (_passwordHasher.VerifyHashedPassword(user, user.PasswordHash, request.CurrentPassword ?? string.Empty) == PasswordVerificationResult.Failed)
+        {
+            return BadRequest(new { message = "La password attuale non è corretta." });
+        }
+
+        var validation = ValidateNewPassword(request.NewPassword, request.CurrentPassword);
+        if (validation is not null)
+        {
+            return BadRequest(new { message = validation });
+        }
+
+        await SetPasswordAsync(_dbContext, _passwordHasher, user, request.NewPassword!, cancellationToken);
+        _dbContext.AuditLogs.Add(new AuditLog
+        {
+            Action = "PasswordChanged",
+            EntityType = "User",
+            EntityId = user.Id,
+            UserName = user.Email,
+            Details = $"Password cambiata da {user.Email}; sessioni aperte revocate."
+        });
+        await _dbContext.SaveChangesAsync(cancellationToken);
+        return NoContent();
+    }
+
+    /// <summary>Minimum rules for a new password; null when acceptable.</summary>
+    internal static string? ValidateNewPassword(string? newPassword, string? currentPassword = null)
+    {
+        if (string.IsNullOrWhiteSpace(newPassword) || newPassword.Length < 8)
+        {
+            return "La nuova password deve avere almeno 8 caratteri.";
+        }
+
+        if (currentPassword is not null && newPassword == currentPassword)
+        {
+            return "La nuova password deve essere diversa da quella attuale.";
+        }
+
+        return null;
+    }
+
+    /// <summary>Sets a new password hash, clears any lockout and revokes every refresh token of the user
+    /// (caller saves). Shared by self-service change and Admin reset.</summary>
+    internal static async Task SetPasswordAsync(
+        ApplicationDbContext dbContext, IPasswordHasher<User> passwordHasher, User user, string newPassword, CancellationToken cancellationToken)
+    {
+        user.PasswordHash = passwordHasher.HashPassword(user, newPassword);
+        user.FailedLoginCount = 0;
+        user.LockoutEndsAt = null;
+
+        var now = DateTime.UtcNow;
+        var activeTokens = await dbContext.RefreshTokens
+            .Where(rt => rt.UserId == user.Id && rt.RevokedAt == null)
+            .ToListAsync(cancellationToken);
+        foreach (var token in activeTokens)
+        {
+            token.RevokedAt = now;
+        }
     }
 
     [HttpPost("logout")]
@@ -186,6 +311,7 @@ public class AuthController : ControllerBase
 
 public sealed record RegisterRequest(string? Name, string? Email, string? Password);
 public sealed record LoginRequest(string? Email, string? Password);
+public sealed record ChangePasswordRequest(string? CurrentPassword, string? NewPassword);
 public sealed record RefreshRequest(string? RefreshToken);
 public sealed record AuthResponse(
     string Token,

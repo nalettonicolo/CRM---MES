@@ -27,6 +27,11 @@ public class WorkOrder
     /// <summary>The quote this work order was converted from, if any.</summary>
     public Guid? QuoteId { get; set; }
     public Quote? Quote { get; set; }
+
+    /// <summary>Ricavo della commessa (imponibile), la base del margine. Impostato dalla riga del
+    /// preventivo quando la commessa nasce da una conversione, modificabile per quelle create a mano.</summary>
+    public decimal? SalePrice { get; set; }
+
     public string Status { get; set; } = "Draft";
     public DateTime? DueDate { get; set; }
     public string? Notes { get; set; }

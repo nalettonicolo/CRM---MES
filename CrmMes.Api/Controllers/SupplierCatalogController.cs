@@ -62,6 +62,7 @@ public class SupplierCatalogController : ControllerBase
         return Ok(results);
     }
 
+    [Authorize(Policy = "PurchasingOrWarehouse")]
     [HttpPost("import-csv")]
     [RequestSizeLimit(25_000_000)]
     public async Task<IActionResult> ImportCsv(
@@ -94,6 +95,7 @@ public class SupplierCatalogController : ControllerBase
         return Ok(summary);
     }
 
+    [Authorize(Policy = "PurchasingOrWarehouse")]
     [HttpPost("import-excel")]
     [RequestSizeLimit(25_000_000)]
     public async Task<IActionResult> ImportExcel(
@@ -134,6 +136,7 @@ public class SupplierCatalogController : ControllerBase
     /// layout (multi-column brochures, merged cells, etc.), which is what most real supplier catalogs
     /// (Schneider, Pizzato...) actually look like. This was built without a real sample catalog to test
     /// against — treat it as a starting point to tune once one is available, not a finished parser.</summary>
+    [Authorize(Policy = "PurchasingOrWarehouse")]
     [HttpPost("import-pdf")]
     [RequestSizeLimit(25_000_000)]
     public async Task<IActionResult> ImportPdf(

@@ -1,0 +1,19 @@
+<Window x:Class="CrmMes.Desktop.HourlyRateWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Tariffa oraria" Icon="Assets/logo.ico" Width="400" SizeToContent="Height"
+        WindowStartupLocation="CenterOwner" ResizeMode="NoResize"
+        Background="{StaticResource BackgroundBrush}">
+    <StackPanel Margin="24">
+        <TextBlock x:Name="HeaderText" FontSize="18" FontWeight="SemiBold" Foreground="{StaticResource TextPrimaryBrush}" Margin="0,0,0,8" />
+        <TextBlock Foreground="{StaticResource TextSecondaryBrush}" FontSize="12.5" TextWrapping="Wrap" Margin="0,0,0,16"
+                   Text="Costo di un'ora di lavoro su questo centro (manodopera più macchina). Valorizza i minuti delle fasi e le ore registrate nel costo di commessa. Lascia vuoto per toglierla." />
+        <TextBlock Text="€ all'ora" Foreground="{StaticResource TextSecondaryBrush}" FontSize="12.5" Margin="0,0,0,5" />
+        <TextBox x:Name="RateBox" Margin="0,0,0,14" />
+        <TextBlock x:Name="ErrorText" Foreground="{StaticResource DangerBrush}" TextWrapping="Wrap" Margin="0,0,0,10" />
+        <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+            <Button Style="{StaticResource SecondaryButton}" Content="Annulla" Width="100" Height="36" Margin="0,0,10,0" Click="Cancel_Click" />
+            <Button x:Name="SaveButton" Content="Salva" Width="110" Height="36" Click="Save_Click" />
+        </StackPanel>
+    </StackPanel>
+</Window>

@@ -48,8 +48,10 @@ jobs:
       - name: Check for a code-signing certificate
         id: cert_check
         shell: pwsh
+        env:
+          CERT_BASE64: ${{ secrets.WINDOWS_CERTIFICATE_BASE64 }}
         run: |
-          $hasCert = -not [string]::IsNullOrEmpty('${{ secrets.WINDOWS_CERTIFICATE_BASE64 }}')
+          $hasCert = -not [string]::IsNullOrEmpty($env:CERT_BASE64)
           "has_cert=$hasCert" >> $env:GITHUB_OUTPUT
 
       # Inactive until WINDOWS_CERTIFICATE_BASE64 (the .pfx, base64-encoded) and
@@ -96,10 +98,27 @@ jobs:
           $hash = Get-FileHash -Path CrmMes.Desktop-win-x64.zip -Algorithm SHA256
           $hash.Hash | Out-File -FilePath CrmMes.Desktop-win-x64.zip.sha256 -Encoding ascii -NoNewline
 
+      # Installer (installer/NicoloMES.iss): what new PCs install and what clients from v1.2 on use to
+      # update themselves. The zip above stays for clients up to v1.1, whose updater only knows the zip.
+      - name: Build installer
+        shell: pwsh
+        run: |
+          choco install innosetup --no-progress -y
+          $iscc = Get-ChildItem "C:\Program Files (x86)\Inno Setup 6", "C:\Program Files\Inno Setup 6" -Filter ISCC.exe -ErrorAction SilentlyContinue |
+            Select-Object -First 1 -ExpandProperty FullName
+          if (-not $iscc) { throw "ISCC.exe non trovato dopo l'installazione di Inno Setup." }
+          & $iscc "/DMyAppVersion=${{ steps.version.outputs.version }}" installer\NicoloMES.iss
+          if ($LASTEXITCODE -ne 0) { throw "Compilazione dell'installer fallita." }
+          Copy-Item installer-output\NicoloMES-Setup.exe NicoloMES-Setup.exe
+          $hash = Get-FileHash -Path NicoloMES-Setup.exe -Algorithm SHA256
+          $hash.Hash | Out-File -FilePath NicoloMES-Setup.exe.sha256 -Encoding ascii -NoNewline
+
       - name: Publish GitHub release
         uses: softprops/action-gh-release@v2
         with:
           files: |
+            NicoloMES-Setup.exe
+            NicoloMES-Setup.exe.sha256
             CrmMes.Desktop-win-x64.zip
             CrmMes.Desktop-win-x64.zip.sha256
           generate_release_notes: true

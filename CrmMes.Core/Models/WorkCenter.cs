@@ -15,6 +15,11 @@ public class WorkCenter
     /// indicative backlog-in-days figure — not a calendar-based finite-capacity schedule.</summary>
     public decimal DailyCapacityMinutes { get; set; }
 
+    /// <summary>Costo orario (€/h) del centro di lavoro, manodopera e macchina: valorizza i minuti delle
+    /// fasi e le ore registrate nel costo di commessa. Null = non impostato, segnalato nel calcolo invece di
+    /// essere contato come zero.</summary>
+    public decimal? HourlyRate { get; set; }
+
     public bool IsActive { get; set; } = true;
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 

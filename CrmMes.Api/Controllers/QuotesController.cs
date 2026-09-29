@@ -18,11 +18,13 @@ public class QuotesController : ControllerBase
 {
     private readonly ApplicationDbContext _dbContext;
     private readonly WorkOrderFactory _workOrderFactory;
+    private readonly MaterialPricing _materialPricing;
 
-    public QuotesController(ApplicationDbContext dbContext, WorkOrderFactory workOrderFactory)
+    public QuotesController(ApplicationDbContext dbContext, WorkOrderFactory workOrderFactory, MaterialPricing materialPricing)
     {
         _dbContext = dbContext;
         _workOrderFactory = workOrderFactory;
+        _materialPricing = materialPricing;
     }
 
     [HttpGet]
@@ -222,6 +224,8 @@ public class QuotesController : ControllerBase
                 quoteId: quote.Id,
                 dueDate: request?.DueDate,
                 notes: line.Description);
+            // The sold amount of this line becomes the work order's revenue, the base of its margin.
+            order.SalePrice = QuotePricing.LineTotal(line);
 
             _dbContext.WorkOrders.Add(order);
             created.Add(new ConvertedWorkOrderResponse(order.Id, order.Code, product.Code, order.Quantity));
@@ -251,13 +255,8 @@ public class QuotesController : ControllerBase
             return NotFound();
         }
 
-        var codes = product.BillOfMaterial.Select(item => item.MaterialCode).Distinct().ToList();
-        var prices = (await _dbContext.MaterialSuppliers.AsNoTracking()
-                .Where(link => codes.Contains(link.Material.Code) && link.UnitPrice > 0)
-                .Select(link => new { link.Material.Code, link.UnitPrice })
-                .ToListAsync(cancellationToken))
-            .GroupBy(entry => entry.Code, StringComparer.OrdinalIgnoreCase)
-            .ToDictionary(group => group.Key, group => group.Min(entry => entry.UnitPrice), StringComparer.OrdinalIgnoreCase);
+        var prices = await _materialPricing.CheapestCatalogPricesAsync(
+            product.BillOfMaterial.Select(item => item.MaterialCode), cancellationToken);
 
         var lines = product.BillOfMaterial
             .OrderBy(item => item.MaterialCode)

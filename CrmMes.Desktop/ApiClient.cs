@@ -13,6 +13,14 @@ public sealed class ApiClient
 
     public Uri BaseAddress => _httpClient.BaseAddress!;
 
+    /// <summary>Role of the logged-in user, set at login. Only drives what the UI offers: every
+    /// restriction is enforced again by the API.</summary>
+    public string? CurrentRole { get; set; }
+
+    /// <summary>Costs, margins and hourly rates: Admin and Management only (mirrors the API's
+    /// "ViewMargins" policy).</summary>
+    public bool CanViewMargins => CurrentRole is "Admin" or "Management";
+
     public ApiClient()
     {
         SetBaseUrl(ClientSettings.DefaultApiBaseUrl);
@@ -510,6 +518,72 @@ public sealed class ApiClient
         await EnsureSuccessAsync(response, cancellationToken);
         return await response.Content.ReadFromJsonAsync<ProductMaterialCostDto>(cancellationToken: cancellationToken)
             ?? throw new InvalidOperationException("Risposta costo materiali non valida.");
+    }
+
+    public async Task<WorkOrderCostingDto> GetWorkOrderCostingAsync(Guid workOrderId, CancellationToken cancellationToken = default)
+    {
+        using var response = await _httpClient.GetAsync($"api/work-orders/{workOrderId}/costing", cancellationToken);
+        await EnsureSuccessAsync(response, cancellationToken);
+        return await response.Content.ReadFromJsonAsync<WorkOrderCostingDto>(cancellationToken: cancellationToken)
+            ?? throw new InvalidOperationException("Risposta costi commessa non valida.");
+    }
+
+    public async Task SetWorkOrderSalePriceAsync(Guid workOrderId, decimal? salePrice, CancellationToken cancellationToken = default)
+    {
+        using var response = await _httpClient.PutAsJsonAsync($"api/work-orders/{workOrderId}/sale-price", new { salePrice }, cancellationToken);
+        await EnsureSuccessAsync(response, cancellationToken);
+    }
+
+    public Task<IReadOnlyList<LaborEntryDto>> GetLaborEntriesAsync(Guid workOrderId, CancellationToken cancellationToken = default)
+        => GetAsync<LaborEntryDto>($"api/work-orders/{workOrderId}/labor", cancellationToken);
+
+    public async Task AddLaborEntryAsync(
+        Guid workOrderId, decimal minutes, DateTime workDate, Guid? workCenterId, Guid? operationId, string? notes,
+        CancellationToken cancellationToken = default)
+    {
+        using var response = await _httpClient.PostAsJsonAsync(
+            $"api/work-orders/{workOrderId}/labor",
+            new { minutes, workDate, workCenterId, operationId, notes },
+            cancellationToken);
+        await EnsureSuccessAsync(response, cancellationToken);
+    }
+
+    public async Task DeleteLaborEntryAsync(Guid workOrderId, Guid entryId, CancellationToken cancellationToken = default)
+    {
+        using var response = await _httpClient.DeleteAsync($"api/work-orders/{workOrderId}/labor/{entryId}", cancellationToken);
+        await EnsureSuccessAsync(response, cancellationToken);
+    }
+
+    public async Task SetWorkCenterHourlyRateAsync(Guid workCenterId, decimal? hourlyRate, CancellationToken cancellationToken = default)
+    {
+        using var response = await _httpClient.PutAsJsonAsync($"api/work-centers/{workCenterId}/hourly-rate", new { hourlyRate }, cancellationToken);
+        await EnsureSuccessAsync(response, cancellationToken);
+    }
+
+    public async Task<MarginOverviewDto> GetMarginsAsync(string? status = null, int take = 50, CancellationToken cancellationToken = default)
+    {
+        var path = $"api/margins?take={take}";
+        if (!string.IsNullOrWhiteSpace(status))
+        {
+            path += $"&status={Uri.EscapeDataString(status)}";
+        }
+
+        using var response = await _httpClient.GetAsync(path, cancellationToken);
+        await EnsureSuccessAsync(response, cancellationToken);
+        return await response.Content.ReadFromJsonAsync<MarginOverviewDto>(cancellationToken: cancellationToken)
+            ?? throw new InvalidOperationException("Risposta controllo margini non valida.");
+    }
+
+    public async Task ChangePasswordAsync(string currentPassword, string newPassword, CancellationToken cancellationToken = default)
+    {
+        using var response = await _httpClient.PostAsJsonAsync("api/auth/change-password", new { currentPassword, newPassword }, cancellationToken);
+        await EnsureSuccessAsync(response, cancellationToken);
+    }
+
+    public async Task ResetUserPasswordAsync(Guid userId, string newPassword, CancellationToken cancellationToken = default)
+    {
+        using var response = await _httpClient.PutAsJsonAsync($"api/users/{userId}/password", new { newPassword }, cancellationToken);
+        await EnsureSuccessAsync(response, cancellationToken);
     }
 
     public Task<IReadOnlyList<CarrierDto>> GetCarriersAsync(bool activeOnly = true, CancellationToken cancellationToken = default)
@@ -1382,7 +1456,7 @@ public sealed record QualityCertificateDto(
     Guid WorkOrderId, string WorkOrderCode, string ProductLotNumber, string ProductCode, string ProductName,
     bool AllPassed, List<QualityMeasurementDto> Measurements);
 
-public sealed record WorkCenterDto(Guid Id, string Code, string Name, string? Description, decimal DailyCapacityMinutes, bool IsActive);
+public sealed record WorkCenterDto(Guid Id, string Code, string Name, string? Description, decimal DailyCapacityMinutes, bool IsActive, Guid? SiteId = null, decimal? HourlyRate = null);
 
 public sealed record WorkCenterLoadDto(
     Guid? Id,
@@ -1458,6 +1532,48 @@ public sealed record MaterialCostLineDto(string MaterialCode, decimal Quantity, 
 
 public sealed record ProductMaterialCostDto(
     Guid ProductId, string ProductCode, decimal MaterialCost, int MissingPriceCount, List<MaterialCostLineDto> Lines);
+
+public sealed record CostBreakdownDto(decimal Material, decimal Labor, decimal Total);
+
+public sealed record MarginDto(decimal Amount, decimal? Ratio);
+
+public sealed record WorkOrderMaterialCostDto(string MaterialCode, decimal Quantity, decimal Cost, string PriceSource, decimal UnpricedQuantity);
+
+public sealed record LaborCostLineDto(
+    string Kind, string Description, string? WorkCenter, string? Operator, decimal Minutes,
+    decimal? HourlyRate, decimal? Cost, bool InProgress, Guid? LaborEntryId);
+
+public sealed record WorkOrderCostingDto(
+    Guid WorkOrderId, string WorkOrderCode, string ProductCode, string ProductName, decimal Quantity, string Status,
+    decimal? SalePrice, CostBreakdownDto Estimated, CostBreakdownDto Actual,
+    MarginDto? EstimatedMargin, MarginDto? ActualMargin, decimal ActualMinutes,
+    List<WorkOrderMaterialCostDto> Materials, List<LaborCostLineDto> Labor, List<string> Warnings);
+
+public sealed record LaborEntryDto(
+    Guid Id, DateTime WorkDate, decimal Minutes, string? OperatorName, Guid? UserId,
+    Guid? WorkCenterId, string? WorkCenterName, Guid? OperationId, string? Notes)
+{
+    public string HoursLabel => $"{Math.Floor(Minutes / 60):0}h {Minutes % 60:00}m";
+}
+
+public sealed record MarginRowDto(
+    Guid WorkOrderId, string WorkOrderCode, string ProductName, string? CustomerName, string Status,
+    decimal? SalePrice, decimal EstimatedCost, decimal ActualCost,
+    decimal? EstimatedMarginRatio, decimal? ActualMargin, decimal? ActualMarginRatio, int WarningCount)
+{
+    /// <summary>Semaphore for the margin column: negative is a loss, under 15% needs attention.</summary>
+    public string MarginLevel => ActualMarginRatio switch
+    {
+        null => "Unknown",
+        < 0 => "Loss",
+        < 0.15m => "Low",
+        _ => "Good"
+    };
+}
+
+public sealed record MarginOverviewDto(
+    int WorkOrderCount, int PricedWorkOrderCount, decimal Revenue, decimal ActualCost, decimal Margin,
+    decimal? MarginRatio, int LossMakingCount, List<MarginRowDto> WorkOrders);
 
 public sealed record CarrierDto(Guid Id, string Name, string Code, string? Email, string? Phone, bool IsActive);
 

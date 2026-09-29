@@ -1,3 +1,4 @@
+using CrmMes.Api.Services;
 using CrmMes.Core.Data;
 using CrmMes.Core.Models;
 using Microsoft.AspNetCore.Authorization;
@@ -45,8 +46,14 @@ public class WorkCentersController : ControllerBase
 
         var workCenters = await query
             .OrderBy(w => w.Name)
-            .Select(w => new WorkCenterResponse(w.Id, w.Code, w.Name, w.Description, w.DailyCapacityMinutes, w.IsActive, w.SiteId))
+            .Select(w => new WorkCenterResponse(w.Id, w.Code, w.Name, w.Description, w.DailyCapacityMinutes, w.IsActive, w.SiteId, w.HourlyRate))
             .ToListAsync(cancellationToken);
+
+        // Hourly rates are company cost data: only management sees them (see MarginAccess).
+        if (!MarginAccess.CanView(User))
+        {
+            workCenters = workCenters.Select(w => w with { HourlyRate = null }).ToList();
+        }
 
         return Ok(workCenters);
     }
@@ -91,7 +98,7 @@ public class WorkCentersController : ControllerBase
         _dbContext.WorkCenters.Add(workCenter);
         await _dbContext.SaveChangesAsync(cancellationToken);
 
-        return Ok(new WorkCenterResponse(workCenter.Id, workCenter.Code, workCenter.Name, workCenter.Description, workCenter.DailyCapacityMinutes, workCenter.IsActive, workCenter.SiteId));
+        return Ok(new WorkCenterResponse(workCenter.Id, workCenter.Code, workCenter.Name, workCenter.Description, workCenter.DailyCapacityMinutes, workCenter.IsActive, workCenter.SiteId, MarginAccess.CanView(User) ? workCenter.HourlyRate : null));
     }
 
     [Authorize(Policy = "Warehouse")]
@@ -129,7 +136,30 @@ public class WorkCentersController : ControllerBase
         workCenter.SiteId = request.SiteId;
 
         await _dbContext.SaveChangesAsync(cancellationToken);
-        return Ok(new WorkCenterResponse(workCenter.Id, workCenter.Code, workCenter.Name, workCenter.Description, workCenter.DailyCapacityMinutes, workCenter.IsActive, workCenter.SiteId));
+        return Ok(new WorkCenterResponse(workCenter.Id, workCenter.Code, workCenter.Name, workCenter.Description, workCenter.DailyCapacityMinutes, workCenter.IsActive, workCenter.SiteId, MarginAccess.CanView(User) ? workCenter.HourlyRate : null));
+    }
+
+    /// <summary>Costo orario del centro di lavoro (null = non impostato). Endpoint separato dalla modifica
+    /// anagrafica, così un client che non conosce la tariffa non la azzera modificando nome o capacità.
+    /// Solo Admin: è un dato di costo aziendale.</summary>
+    [Authorize(Policy = "AdminOnly")]
+    [HttpPut("{id:guid}/hourly-rate")]
+    public async Task<IActionResult> SetHourlyRate(Guid id, SetHourlyRateRequest request, CancellationToken cancellationToken = default)
+    {
+        if (request.HourlyRate is < 0)
+        {
+            return BadRequest(new { message = "La tariffa oraria non può essere negativa." });
+        }
+
+        var workCenter = await _dbContext.WorkCenters.SingleOrDefaultAsync(w => w.Id == id, cancellationToken);
+        if (workCenter is null)
+        {
+            return NotFound();
+        }
+
+        workCenter.HourlyRate = request.HourlyRate;
+        await _dbContext.SaveChangesAsync(cancellationToken);
+        return NoContent();
     }
 
     [Authorize(Policy = "Warehouse")]
@@ -235,7 +265,9 @@ public class WorkCentersController : ControllerBase
 
 public sealed record CreateWorkCenterRequest(string Code, string Name, string? Description, decimal DailyCapacityMinutes, Guid? SiteId = null);
 public sealed record EditWorkCenterRequest(string Name, string? Description, decimal DailyCapacityMinutes, Guid? SiteId = null);
-public sealed record WorkCenterResponse(Guid Id, string Code, string Name, string? Description, decimal DailyCapacityMinutes, bool IsActive, Guid? SiteId = null);
+public sealed record WorkCenterResponse(Guid Id, string Code, string Name, string? Description, decimal DailyCapacityMinutes, bool IsActive, Guid? SiteId = null, decimal? HourlyRate = null);
+
+public sealed record SetHourlyRateRequest(decimal? HourlyRate);
 
 /// <summary>Id/Code are null for a work center used on the floor (free text on a routing step / operation)
 /// that has no matching registered WorkCenter record — its capacity and backlog-in-days are unknown.</summary>
