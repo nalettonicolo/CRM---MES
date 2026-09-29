@@ -1,10 +1,24 @@
 # Riepilogo sviluppi e stato del progetto
 
-Aggiornato: 2026-09-25
+Aggiornato: 2026-09-29
 
 Sintesi ad alto livello di cosa è stato costruito finora e cosa manca ancora. Per il dettaglio fase-per-fase con motivazioni tecniche vedi [DEVELOPMENT-PLAN.md](DEVELOPMENT-PLAN.md); per la mappa di file e architettura vedi [PROJECT-MAP.md](PROJECT-MAP.md).
 
 ## Cosa è stato fatto
+
+### Vendite (aggiunto il 2026-09-29, primo passo del piano "punti deboli" dell'analisi di mercato)
+- **Clienti**: anagrafica con codice, partita IVA, contatti, indirizzo; ricerca non sensibile a maiuscole; dettaglio con preventivi e commesse collegati.
+- **Preventivi**: righe collegate a un prodotto o libere (trasporto, installazione...), sconto di riga, totali arrotondati al centesimo in un solo punto (`QuotePricing`). Ciclo Bozza → Inviato → Accettato/Rifiutato, modificabile solo in bozza. PDF del preventivo dal client.
+- **Conversione in commesse**: un preventivo accettato genera, una sola volta, una commessa in bozza per ogni riga prodotto, collegata a cliente e preventivo. La costruzione della commessa è in `WorkOrderFactory`, condivisa con la creazione manuale.
+- **Stima prezzo**: costo materiali dalla distinta base al prezzo più basso a listino fornitori, più ricarico; i materiali senza prezzo sono segnalati. La manodopera non è ancora inclusa (passo successivo: ore e costo di commessa).
+- Nuovo ruolo **Sales** (clienti e preventivi; la conversione è permessa anche a Warehouse).
+- Verificato con 13 test di integrazione e sul flusso reale in un branch Neon di prova prima della migrazione in produzione.
+
+### Correzioni trasversali del client (2026-09-29)
+- **Numeri digitati**: prima "1.5" diventava 15 in quasi tutte le schermate e "12,5" diventava 125 nelle finestre qualità, senza errori visibili. Ora un unico lettore (`NumberInput`) accetta sia virgola sia punto decimale.
+- **Formato italiano** di numeri, importi e date in tutta l'app (prima WPF usava l'inglese: "2,550.90").
+- **Campi di testo ad altezza fissa** che mostravano vuoto il valore (margine interno applicato due volte); menu a tendina con lo stile dell'app.
+- **Backup notturno** che falliva a ogni esecuzione: il workflow ora accetta la stringa di connessione nel formato di Render oltre all'URI `postgresql://`.
 
 ### Fondamenta e sicurezza
 - Autenticazione JWT con refresh token (rotazione a ogni utilizzo, revoca su logout).
