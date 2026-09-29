@@ -15,7 +15,7 @@ public class UsersController : ControllerBase
 {
     private static readonly HashSet<string> AllowedRoles = new(StringComparer.OrdinalIgnoreCase)
     {
-        "Admin", "Warehouse", "Purchasing", "Operator"
+        "Admin", "Warehouse", "Purchasing", "Sales", "Operator"
     };
 
     private readonly ApplicationDbContext _dbContext;

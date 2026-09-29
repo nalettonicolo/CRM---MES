@@ -18,11 +18,13 @@ public class WorkOrdersController : ControllerBase
 {
     private readonly ApplicationDbContext _dbContext;
     private readonly WithdrawalItemBuilder _itemBuilder;
+    private readonly WorkOrderFactory _workOrderFactory;
 
-    public WorkOrdersController(ApplicationDbContext dbContext, WithdrawalItemBuilder itemBuilder)
+    public WorkOrdersController(ApplicationDbContext dbContext, WithdrawalItemBuilder itemBuilder, WorkOrderFactory workOrderFactory)
     {
         _dbContext = dbContext;
         _itemBuilder = itemBuilder;
+        _workOrderFactory = workOrderFactory;
     }
 
     [HttpGet]
@@ -114,72 +116,22 @@ public class WorkOrdersController : ControllerBase
             return BadRequest(new { message = "Area non trovata o non attiva." });
         }
 
-        var order = new WorkOrder
+        if (request.CustomerId.HasValue &&
+            !await _dbContext.Customers.AnyAsync(customer => customer.Id == request.CustomerId && customer.IsActive, cancellationToken))
         {
-            // Random suffix avoids collisions when two work orders are created within the same second.
-            Code = string.IsNullOrWhiteSpace(request.Code)
-                ? $"WO-{DateTime.UtcNow:yyyyMMdd-HHmmss}-{Guid.NewGuid().ToString("N")[..6]}"
-                : request.Code.Trim(),
-            ProductLotNumber = string.IsNullOrWhiteSpace(request.ProductLotNumber)
-                ? $"LOT-{DateTime.UtcNow:yyyyMMdd-HHmmss}-{Guid.NewGuid().ToString("N")[..6]}"
-                : request.ProductLotNumber.Trim(),
-            ProductId = product.Id,
-            Quantity = request.Quantity,
-            AreaId = request.AreaId,
-            CustomerReference = string.IsNullOrWhiteSpace(request.CustomerReference) ? null : request.CustomerReference.Trim(),
-            DueDate = request.DueDate,
-            Notes = string.IsNullOrWhiteSpace(request.Notes) ? null : request.Notes.Trim(),
-            Status = "Draft"
-        };
-
-        // Snapshot the product's routing now: later edits to the product's template must not
-        // retroactively change a job that may already be on the floor.
-        foreach (var step in product.RoutingSteps.OrderBy(s => s.SequenceNumber))
-        {
-            order.Operations.Add(new WorkOrderOperation
-            {
-                WorkOrderId = order.Id,
-                SequenceNumber = step.SequenceNumber,
-                Name = step.Name,
-                Description = step.Description,
-                WorkCenter = step.WorkCenter,
-                EstimatedMinutes = step.EstimatedMinutes,
-                Status = "Pending"
-            });
+            return BadRequest(new { message = "Cliente non trovato o non attivo." });
         }
 
-        // Per-serial tracking only makes sense for a whole number of discrete units — a continuous or
-        // bulk quantity (e.g. 2.5 kg) has nothing to number, so no units are generated for it and it
-        // keeps using the batch-level lot number and quality approximation instead.
-        if (order.Quantity == Math.Floor(order.Quantity) && order.Quantity > 0)
-        {
-            for (var sequence = 1; sequence <= (int)order.Quantity; sequence++)
-            {
-                var unit = new WorkOrderUnit
-                {
-                    WorkOrderId = order.Id,
-                    SequenceNumber = sequence,
-                    SerialNumber = $"{order.Code}-{sequence:000}",
-                    Status = "Pending"
-                };
-
-                // Per-unit phase history starts as a full Pending grid — one row per operation — so
-                // querying "what has unit N gone through" always has an answer, even before the first
-                // phase starts. StartOperation/CompleteOperation below project the batch-level timing
-                // onto these rows for every unit that's still Pending.
-                foreach (var operation in order.Operations)
-                {
-                    unit.Operations.Add(new WorkOrderUnitOperation
-                    {
-                        WorkOrderUnitId = unit.Id,
-                        WorkOrderOperationId = operation.Id,
-                        Status = "Pending"
-                    });
-                }
-
-                order.Units.Add(unit);
-            }
-        }
+        var order = _workOrderFactory.Build(
+            product,
+            request.Quantity,
+            code: request.Code,
+            productLotNumber: request.ProductLotNumber,
+            areaId: request.AreaId,
+            customerReference: request.CustomerReference,
+            customerId: request.CustomerId,
+            dueDate: request.DueDate,
+            notes: request.Notes);
 
         _dbContext.WorkOrders.Add(order);
         _dbContext.AuditLogs.Add(new AuditLog
@@ -1023,7 +975,9 @@ public class WorkOrdersController : ControllerBase
                     op.EstimatedMinutes, op.Status, op.StartedAt, op.CompletedAt,
                     ActualMinutes(op), PerformanceRatio(op), op.PlannedStartAt, op.PlannedEndAt,
                     op.StartedBy, op.CompletedBy))
-                .ToList());
+                .ToList(),
+            order.CustomerId,
+            order.QuoteId);
     }
 
     /// <summary>Minutes actually spent on a finished operation, or null while it's still open — the raw
@@ -1155,7 +1109,8 @@ public sealed record CreateWorkOrderRequest(
     string? CustomerReference,
     DateTime? DueDate,
     string? Notes,
-    string? ProductLotNumber = null);
+    string? ProductLotNumber = null,
+    Guid? CustomerId = null);
 
 public sealed record EditWorkOrderRequest(
     decimal Quantity,
@@ -1192,7 +1147,9 @@ public sealed record WorkOrderResponse(
     DateTime CreatedAt,
     DateTime? ReleasedAt,
     DateTime? CompletedAt,
-    IReadOnlyList<WorkOrderOperationResponse> Operations);
+    IReadOnlyList<WorkOrderOperationResponse> Operations,
+    Guid? CustomerId = null,
+    Guid? QuoteId = null);
 
 public sealed record WorkOrderOperationResponse(
     Guid Id,

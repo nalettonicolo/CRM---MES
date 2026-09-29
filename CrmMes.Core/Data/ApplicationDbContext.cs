@@ -44,6 +44,9 @@ public class ApplicationDbContext : DbContext
     public DbSet<PlanningCategory> PlanningCategories => Set<PlanningCategory>();
     public DbSet<PlanningProject> PlanningProjects => Set<PlanningProject>();
     public DbSet<PlanningCell> PlanningCells => Set<PlanningCell>();
+    public DbSet<Customer> Customers => Set<Customer>();
+    public DbSet<Quote> Quotes => Set<Quote>();
+    public DbSet<QuoteItem> QuoteItems => Set<QuoteItem>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -272,6 +275,51 @@ public class ApplicationDbContext : DbContext
                 .WithMany()
                 .HasForeignKey(w => w.AreaId)
                 .OnDelete(DeleteBehavior.SetNull);
+            entity.HasOne(w => w.Customer)
+                .WithMany()
+                .HasForeignKey(w => w.CustomerId)
+                .OnDelete(DeleteBehavior.SetNull);
+            entity.HasOne(w => w.Quote)
+                .WithMany()
+                .HasForeignKey(w => w.QuoteId)
+                .OnDelete(DeleteBehavior.SetNull);
+        });
+
+        modelBuilder.Entity<Customer>(entity =>
+        {
+            entity.Property(c => c.Code).HasMaxLength(80);
+            entity.Property(c => c.Name).HasMaxLength(250);
+            entity.Property(c => c.VatNumber).HasMaxLength(40);
+            entity.Property(c => c.Email).HasMaxLength(200);
+            entity.Property(c => c.Phone).HasMaxLength(50);
+            entity.Property(c => c.Address).HasMaxLength(500);
+            entity.Property(c => c.Notes).HasMaxLength(1000);
+            entity.HasIndex(c => c.Code).IsUnique();
+        });
+
+        modelBuilder.Entity<Quote>(entity =>
+        {
+            entity.Property(q => q.Code).HasMaxLength(80);
+            entity.Property(q => q.Status).HasMaxLength(30);
+            entity.Property(q => q.Notes).HasMaxLength(2000);
+            entity.HasIndex(q => q.Code).IsUnique();
+            entity.HasOne(q => q.Customer)
+                .WithMany()
+                .HasForeignKey(q => q.CustomerId)
+                .OnDelete(DeleteBehavior.Restrict);
+        });
+
+        modelBuilder.Entity<QuoteItem>(entity =>
+        {
+            entity.Property(i => i.Description).HasMaxLength(500);
+            entity.HasOne(i => i.Quote)
+                .WithMany(q => q.Items)
+                .HasForeignKey(i => i.QuoteId)
+                .OnDelete(DeleteBehavior.Cascade);
+            entity.HasOne(i => i.Product)
+                .WithMany()
+                .HasForeignKey(i => i.ProductId)
+                .OnDelete(DeleteBehavior.Restrict);
         });
 
         modelBuilder.Entity<WorkOrderOperation>(entity =>

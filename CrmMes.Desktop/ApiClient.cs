@@ -433,6 +433,85 @@ public sealed class ApiClient
     public Task<IReadOnlyList<CatalogSearchResultDto>> SearchCatalogAsync(string query, CancellationToken cancellationToken = default)
         => GetAsync<CatalogSearchResultDto>($"api/supplier-catalog/search?q={Uri.EscapeDataString(query)}", cancellationToken);
 
+    public Task<IReadOnlyList<CustomerDto>> GetCustomersAsync(bool activeOnly = true, string? q = null, CancellationToken cancellationToken = default)
+    {
+        var path = $"api/customers?activeOnly={activeOnly}";
+        if (!string.IsNullOrWhiteSpace(q))
+        {
+            path += $"&q={Uri.EscapeDataString(q.Trim())}";
+        }
+
+        return GetAsync<CustomerDto>(path, cancellationToken);
+    }
+
+    public async Task<CustomerDetailDto> GetCustomerDetailAsync(Guid id, CancellationToken cancellationToken = default)
+    {
+        using var response = await _httpClient.GetAsync($"api/customers/{id}/detail", cancellationToken);
+        await EnsureSuccessAsync(response, cancellationToken);
+        return await response.Content.ReadFromJsonAsync<CustomerDetailDto>(cancellationToken: cancellationToken)
+            ?? throw new InvalidOperationException("Risposta dettaglio cliente non valida.");
+    }
+
+    public async Task SaveCustomerAsync(Guid? id, SaveCustomerDto customer, CancellationToken cancellationToken = default)
+    {
+        using var response = id.HasValue
+            ? await _httpClient.PutAsJsonAsync($"api/customers/{id}", customer, cancellationToken)
+            : await _httpClient.PostAsJsonAsync("api/customers", customer, cancellationToken);
+        await EnsureSuccessAsync(response, cancellationToken);
+    }
+
+    public async Task DeactivateCustomerAsync(Guid id, CancellationToken cancellationToken = default)
+    {
+        using var response = await _httpClient.DeleteAsync($"api/customers/{id}", cancellationToken);
+        await EnsureSuccessAsync(response, cancellationToken);
+    }
+
+    public Task<IReadOnlyList<QuoteSummaryDto>> GetQuotesAsync(string? status = null, CancellationToken cancellationToken = default)
+        => GetAsync<QuoteSummaryDto>(
+            string.IsNullOrWhiteSpace(status) ? "api/quotes" : $"api/quotes?status={Uri.EscapeDataString(status)}",
+            cancellationToken);
+
+    public async Task<QuoteDto> GetQuoteAsync(Guid id, CancellationToken cancellationToken = default)
+    {
+        using var response = await _httpClient.GetAsync($"api/quotes/{id}", cancellationToken);
+        await EnsureSuccessAsync(response, cancellationToken);
+        return await response.Content.ReadFromJsonAsync<QuoteDto>(cancellationToken: cancellationToken)
+            ?? throw new InvalidOperationException("Risposta preventivo non valida.");
+    }
+
+    public async Task<QuoteDto> SaveQuoteAsync(Guid? id, SaveQuoteDto quote, CancellationToken cancellationToken = default)
+    {
+        using var response = id.HasValue
+            ? await _httpClient.PutAsJsonAsync($"api/quotes/{id}", quote, cancellationToken)
+            : await _httpClient.PostAsJsonAsync("api/quotes", quote, cancellationToken);
+        await EnsureSuccessAsync(response, cancellationToken);
+        return await response.Content.ReadFromJsonAsync<QuoteDto>(cancellationToken: cancellationToken)
+            ?? throw new InvalidOperationException("Risposta preventivo non valida.");
+    }
+
+    /// <summary>Stato del preventivo: "send", "accept" o "reject".</summary>
+    public async Task ChangeQuoteStatusAsync(Guid id, string action, CancellationToken cancellationToken = default)
+    {
+        using var response = await _httpClient.PostAsync($"api/quotes/{id}/{action}", null, cancellationToken);
+        await EnsureSuccessAsync(response, cancellationToken);
+    }
+
+    public async Task<ConvertQuoteResultDto> ConvertQuoteAsync(Guid id, DateTime? dueDate, Guid? areaId, CancellationToken cancellationToken = default)
+    {
+        using var response = await _httpClient.PostAsJsonAsync($"api/quotes/{id}/convert", new { dueDate, areaId }, cancellationToken);
+        await EnsureSuccessAsync(response, cancellationToken);
+        return await response.Content.ReadFromJsonAsync<ConvertQuoteResultDto>(cancellationToken: cancellationToken)
+            ?? throw new InvalidOperationException("Risposta conversione non valida.");
+    }
+
+    public async Task<ProductMaterialCostDto> GetProductMaterialCostAsync(Guid productId, CancellationToken cancellationToken = default)
+    {
+        using var response = await _httpClient.GetAsync($"api/products/{productId}/material-cost", cancellationToken);
+        await EnsureSuccessAsync(response, cancellationToken);
+        return await response.Content.ReadFromJsonAsync<ProductMaterialCostDto>(cancellationToken: cancellationToken)
+            ?? throw new InvalidOperationException("Risposta costo materiali non valida.");
+    }
+
     public Task<IReadOnlyList<CarrierDto>> GetCarriersAsync(bool activeOnly = true, CancellationToken cancellationToken = default)
         => GetAsync<CarrierDto>($"api/carriers?activeOnly={activeOnly}", cancellationToken);
 
@@ -1337,6 +1416,48 @@ public sealed record SupplierDetailDto(
 public sealed record CatalogSearchResultDto(
     string MaterialCode, string MaterialName, Guid SupplierId, string SupplierName, string SupplierCode,
     string? SupplierWebsite, string PartNumber, string? Description, decimal UnitPrice, decimal LeadTimeDays);
+
+public sealed record CustomerDto(
+    Guid Id, string Code, string Name, string? VatNumber, string? Email, string? Phone, string? Address, string? Notes, bool IsActive);
+
+public sealed record SaveCustomerDto(
+    string Name, string Code, string? VatNumber, string? Email, string? Phone, string? Address, string? Notes);
+
+public sealed record CustomerQuoteDto(Guid Id, string Code, string Status, DateTime CreatedAt, DateTime? ValidUntil, decimal Total);
+
+public sealed record CustomerWorkOrderDto(
+    Guid Id, string Code, string ProductCode, string ProductName, decimal Quantity, string Status, DateTime? DueDate);
+
+public sealed record CustomerDetailDto(CustomerDto Customer, List<CustomerQuoteDto> Quotes, List<CustomerWorkOrderDto> WorkOrders);
+
+public sealed record QuoteSummaryDto(
+    Guid Id, string Code, Guid CustomerId, string CustomerName, string Status,
+    DateTime CreatedAt, DateTime? ValidUntil, DateTime? ConvertedAt, int ItemCount, decimal Total)
+{
+    public bool IsConverted => ConvertedAt.HasValue;
+}
+
+public sealed record QuoteItemDto(
+    Guid Id, int SequenceNumber, Guid? ProductId, string? ProductCode, string? ProductName,
+    string Description, decimal Quantity, decimal UnitPrice, decimal DiscountPercent, decimal LineTotal);
+
+public sealed record QuoteDto(
+    Guid Id, string Code, Guid CustomerId, string CustomerName, string CustomerCode, string Status,
+    DateTime? ValidUntil, string? Notes, DateTime CreatedAt, DateTime? SentAt, DateTime? AcceptedAt,
+    DateTime? RejectedAt, DateTime? ConvertedAt, decimal Total, List<QuoteItemDto> Items);
+
+public sealed record SaveQuoteItemDto(Guid? ProductId, string Description, decimal Quantity, decimal UnitPrice, decimal DiscountPercent);
+
+public sealed record SaveQuoteDto(Guid CustomerId, DateTime? ValidUntil, string? Notes, List<SaveQuoteItemDto> Items);
+
+public sealed record ConvertedWorkOrderDto(Guid Id, string Code, string ProductCode, decimal Quantity);
+
+public sealed record ConvertQuoteResultDto(Guid QuoteId, string QuoteCode, List<ConvertedWorkOrderDto> WorkOrders);
+
+public sealed record MaterialCostLineDto(string MaterialCode, decimal Quantity, decimal? UnitPrice, decimal? LineCost);
+
+public sealed record ProductMaterialCostDto(
+    Guid ProductId, string ProductCode, decimal MaterialCost, int MissingPriceCount, List<MaterialCostLineDto> Lines);
 
 public sealed record CarrierDto(Guid Id, string Name, string Code, string? Email, string? Phone, bool IsActive);
 

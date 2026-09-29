@@ -50,6 +50,8 @@ public partial class MainWindow : Window
     private Guid? _siteFilterId;
     private bool _planningLoaded;
     private int _planningWeeks = 4;
+    private bool _customersLoaded;
+    private bool _quotesLoaded;
 
     private static readonly Dictionary<int, string> PageTitles = new()
     {
@@ -73,6 +75,8 @@ public partial class MainWindow : Window
         [17] = "Macchine",
         [18] = "Manutenzione",
         [19] = "Pianificazione",
+        [20] = "Clienti",
+        [21] = "Preventivi",
     };
 
     private static readonly Dictionary<int, string> PageEyebrows = new()
@@ -97,6 +101,8 @@ public partial class MainWindow : Window
         [12] = "S P E D I Z I O N I",
         [13] = "S P E D I Z I O N I",
         [19] = "P R O D U Z I O N E",
+        [20] = "V E N D I T E",
+        [21] = "V E N D I T E",
     };
 
     private static readonly Dictionary<int, string> PageHelpTexts = new()
@@ -107,7 +113,7 @@ public partial class MainWindow : Window
         [3] = "Documenti di prelievo materiale da magazzino verso un'area (es. reparto produzione). Bozza -> Pronta -> Chiusa (scarica davvero la giacenza) oppure Annullata. Solo le distinte in bozza si possono modificare.",
         [4] = "Ordini di acquisto verso i fornitori. Bozza -> Confermato -> ricevuto (anche parzialmente). Ricevere un ordine carica la giacenza e crea un lotto materiale tracciabile per ogni riga.",
         [5] = "Aree/reparti dell'azienda a cui è possibile destinare una distinta di prelievo o assegnare una commessa.",
-        [6] = "Utenti abilitati ad accedere al gestionale, con il rispettivo ruolo (Admin, Warehouse, Purchasing, Operator). Solo un Admin può crearne di nuovi. Doppio click su una riga per il dettaglio: aree assegnate e attività recente (fasi, fermi, non conformità, collegate per identità PIN, non più solo per nome libero).",
+        [6] = "Utenti abilitati ad accedere al gestionale, con il rispettivo ruolo (Admin, Warehouse, Purchasing, Sales per clienti e preventivi, Operator). Solo un Admin può crearne di nuovi. Doppio click su una riga per il dettaglio: aree assegnate e attività recente (fasi, fermi, non conformità, collegate per identità PIN, non più solo per nome libero).",
         [7] = "Anagrafica dei prodotti che si costruiscono: distinta base (materiali necessari) e ciclo di lavoro (fasi di produzione). Da qui si genera automaticamente la struttura di ogni nuova commessa.",
         [8] = "Commesse di produzione: quantità da costruire di un prodotto, con le fasi del ciclo di lavoro tracciate una per una (avvio/completamento, minuti effettivi, performance). Rilasciare una commessa verifica la disponibilità dei materiali.",
         [9] = "Tracciabilità dei lotti materiale: ogni ingresso di giacenza (ricezione ordine, carico manuale) genera un lotto. Il consumo nelle distinte di prelievo avviene FIFO dal lotto più vecchio; aprendo un lotto si vede dove è stato usato.",
@@ -121,6 +127,8 @@ public partial class MainWindow : Window
         [17] = "Anagrafica macchine/asset per la manutenzione — il controparte di Centri di lavoro, che resta l'unità di capacità. Doppio click su una macchina per lo storico degli interventi di manutenzione registrati su di essa.",
         [18] = "Interventi di manutenzione preventiva (pianificata, con scadenza ed eventuale ricorrenza — completandolo genera subito la prossima occorrenza) o correttiva (a fronte di un guasto). È il pezzo che permette di intervenire sul fattore Disponibilità dell'OEE, non solo misurarlo.",
         [19] = "Board settimanale che aggrega tutte le scadenze già tracciate altrove — consegne commesse, consegne previste ordini fornitore, spedizioni, interventi di manutenzione — colorate per tipo, filtrabili per tipo/stato/sede, con un cruscotto di riepilogo (in ritardo/questa settimana/prossima settimana/totale). Non introduce nuovi dati: aggrega e colora quello che esiste già nelle rispettive sezioni.",
+        [20] = "Anagrafica clienti: a chi si fanno i preventivi e per chi si costruiscono le commesse. Doppio click su un cliente per il dettaglio: preventivi e commesse collegati. Crea e modifica: Admin e ruolo Sales.",
+        [21] = "Preventivi ai clienti. Bozza -> Inviato -> Accettato o Rifiutato; solo una bozza si può modificare (doppio click o \"Modifica\"). \"Crea commesse\" trasforma un preventivo accettato in una commessa in bozza per ogni riga collegata a un prodotto, una volta sola. Nell'editor, \"Stima prezzo da distinta\" calcola il costo materiali dai listini fornitori più il ricarico indicato (manodopera esclusa).",
     };
 
 #if DEBUG
@@ -395,6 +403,12 @@ public partial class MainWindow : Window
             case "Pianificazione" when !_planningLoaded:
                 await EnsureSiteFilterOptionsAsync();
                 await LoadPlanningAsync();
+                break;
+            case "Clienti" when !_customersLoaded:
+                await LoadCustomersAsync();
+                break;
+            case "Preventivi" when !_quotesLoaded:
+                await LoadQuotesAsync();
                 break;
         }
     }
@@ -824,6 +838,222 @@ public partial class MainWindow : Window
         if (dialog.Created)
         {
             await LoadAreasAsync();
+        }
+    }
+
+    private async void NewCustomerButton_Click(object sender, RoutedEventArgs e)
+    {
+        var dialog = new CustomerEditWindow(_apiClient) { Owner = this };
+        dialog.ShowDialog();
+        if (dialog.Created)
+        {
+            await LoadCustomersAsync();
+        }
+    }
+
+    private async void SearchCustomersButton_Click(object sender, RoutedEventArgs e) => await LoadCustomersAsync();
+
+    private async void CustomerSearchBox_KeyDown(object sender, KeyEventArgs e)
+    {
+        if (e.Key == Key.Enter)
+        {
+            await LoadCustomersAsync();
+        }
+    }
+
+    private async void CustomersList_MouseDoubleClick(object sender, MouseButtonEventArgs e)
+    {
+        if (CustomersList.SelectedItem is not CustomerDto customer)
+        {
+            return;
+        }
+
+        var dialog = new CustomerDetailWindow(_apiClient, customer.Id) { Owner = this };
+        dialog.ShowDialog();
+        if (dialog.Changed)
+        {
+            await LoadCustomersAsync();
+        }
+    }
+
+    private async void DeactivateCustomer_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is not Button { Tag: CustomerDto customer })
+        {
+            return;
+        }
+
+        if (MessageBox.Show($"Disattivare il cliente {customer.Name}? Preventivi e commesse esistenti restano intatti.",
+                "Conferma", MessageBoxButton.YesNo, MessageBoxImage.Question) != MessageBoxResult.Yes)
+        {
+            return;
+        }
+
+        await RunBusyAsync("Disattivazione in corso...", async () =>
+        {
+            await _apiClient.DeactivateCustomerAsync(customer.Id);
+            await LoadCustomersAsync();
+        });
+    }
+
+    private Task LoadCustomersAsync() => RunBusyAsync(string.Empty, async () =>
+    {
+        CustomersList.ItemsSource = await _apiClient.GetCustomersAsync(activeOnly: true, q: CustomerSearchBox.Text);
+        _customersLoaded = true;
+    });
+
+    private Task LoadQuotesAsync() => RunBusyAsync(string.Empty, async () =>
+    {
+        var selectedId = (QuotesList.SelectedItem as QuoteSummaryDto)?.Id;
+        var quotes = await _apiClient.GetQuotesAsync();
+        QuotesList.ItemsSource = quotes;
+        QuotesList.SelectedItem = quotes.FirstOrDefault(q => q.Id == selectedId);
+        _quotesLoaded = true;
+        UpdateQuoteButtons();
+    });
+
+    private async void RefreshQuotesButton_Click(object sender, RoutedEventArgs e) => await LoadQuotesAsync();
+
+    private void QuotesList_SelectionChanged(object sender, SelectionChangedEventArgs e) => UpdateQuoteButtons();
+
+    /// <summary>Only the actions valid for the selected quote's state are enabled, so an impossible
+    /// transition is never offered in the first place (the API refuses it anyway).</summary>
+    private void UpdateQuoteButtons()
+    {
+        var quote = QuotesList.SelectedItem as QuoteSummaryDto;
+        var status = quote?.Status;
+        EditQuoteButton.IsEnabled = status == "Draft";
+        SendQuoteButton.IsEnabled = status == "Draft";
+        AcceptQuoteButton.IsEnabled = status is "Draft" or "Sent";
+        RejectQuoteButton.IsEnabled = status is "Draft" or "Sent";
+        ConvertQuoteButton.IsEnabled = status == "Accepted" && quote?.IsConverted == false;
+        QuotePdfButton.IsEnabled = quote is not null;
+    }
+
+    private async void NewQuoteButton_Click(object sender, RoutedEventArgs e)
+    {
+        var dialog = new QuoteEditorWindow(_apiClient) { Owner = this };
+        dialog.ShowDialog();
+        if (dialog.Created)
+        {
+            await LoadQuotesAsync();
+        }
+    }
+
+    private void QuotesList_MouseDoubleClick(object sender, MouseButtonEventArgs e) => EditQuoteButton_Click(sender, e);
+
+    private async void EditQuoteButton_Click(object sender, RoutedEventArgs e)
+    {
+        if (QuotesList.SelectedItem is not QuoteSummaryDto { Status: "Draft" } summary)
+        {
+            return;
+        }
+
+        QuoteDto quote;
+        try
+        {
+            quote = await _apiClient.GetQuoteAsync(summary.Id);
+        }
+        catch (Exception exception)
+        {
+            MessageBox.Show(exception.Message, "Errore", MessageBoxButton.OK, MessageBoxImage.Warning);
+            return;
+        }
+
+        var dialog = new QuoteEditorWindow(_apiClient, quote) { Owner = this };
+        dialog.ShowDialog();
+        if (dialog.Created)
+        {
+            await LoadQuotesAsync();
+        }
+    }
+
+    private async void QuoteStatusButton_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is not Button { Tag: string action } || QuotesList.SelectedItem is not QuoteSummaryDto quote)
+        {
+            return;
+        }
+
+        var question = action switch
+        {
+            "send" => $"Segnare il preventivo {quote.Code} come inviato al cliente? Dopo non sarà più modificabile.",
+            "accept" => $"Il cliente {quote.CustomerName} ha accettato il preventivo {quote.Code}?",
+            _ => $"Segnare il preventivo {quote.Code} come rifiutato?"
+        };
+        if (MessageBox.Show(question, "Conferma", MessageBoxButton.YesNo, MessageBoxImage.Question) != MessageBoxResult.Yes)
+        {
+            return;
+        }
+
+        await RunBusyAsync("Aggiornamento preventivo...", async () =>
+        {
+            await _apiClient.ChangeQuoteStatusAsync(quote.Id, action);
+            await LoadQuotesAsync();
+        });
+    }
+
+    private async void ConvertQuoteButton_Click(object sender, RoutedEventArgs e)
+    {
+        if (QuotesList.SelectedItem is not QuoteSummaryDto quote)
+        {
+            return;
+        }
+
+        var dialog = new ConvertQuoteWindow(_apiClient, quote) { Owner = this };
+        dialog.ShowDialog();
+        if (dialog.Result is not { } result)
+        {
+            return;
+        }
+
+        // The work orders tab caches its list per session: force a reload so the new jobs appear there.
+        _workOrdersLoaded = false;
+        await LoadQuotesAsync();
+        MessageBox.Show(
+            $"Create {result.WorkOrders.Count} commesse in bozza:\n" +
+            string.Join("\n", result.WorkOrders.Select(w => $"{w.Code}  ({w.ProductCode} x {w.Quantity:0.##})")) +
+            "\n\nLe trovi in Produzione > Commesse, pronte da rilasciare.",
+            "Commesse create", MessageBoxButton.OK, MessageBoxImage.Information);
+    }
+
+    private async void QuotePdfButton_Click(object sender, RoutedEventArgs e)
+    {
+        if (QuotesList.SelectedItem is not QuoteSummaryDto summary)
+        {
+            return;
+        }
+
+        QuoteDto quote;
+        CustomerDto? customer;
+        try
+        {
+            quote = await _apiClient.GetQuoteAsync(summary.Id);
+            customer = (await _apiClient.GetCustomerDetailAsync(quote.CustomerId)).Customer;
+        }
+        catch (Exception exception)
+        {
+            MessageBox.Show(exception.Message, "Errore", MessageBoxButton.OK, MessageBoxImage.Warning);
+            return;
+        }
+
+        var dialog = new Microsoft.Win32.SaveFileDialog
+        {
+            FileName = $"{quote.Code}.pdf",
+            Filter = "File PDF (*.pdf)|*.pdf"
+        };
+        if (dialog.ShowDialog(this) != true)
+        {
+            return;
+        }
+
+        try
+        {
+            ListExporter.ExportQuote(quote, customer, dialog.FileName);
+        }
+        catch (Exception exception)
+        {
+            MessageBox.Show(exception.Message, "Errore", MessageBoxButton.OK, MessageBoxImage.Warning);
         }
     }
 
@@ -1840,7 +2070,7 @@ public partial class MainWindow : Window
         var code = WorkCenterCodeBox.Text.Trim();
         var name = WorkCenterNameBox.Text.Trim();
         if (string.IsNullOrWhiteSpace(code) || string.IsNullOrWhiteSpace(name) ||
-            !decimal.TryParse(WorkCenterCapacityBox.Text, out var capacity) || capacity < 0)
+            !NumberInput.TryParseDecimal(WorkCenterCapacityBox.Text, out var capacity) || capacity < 0)
         {
             WorkCenterErrorText.Text = "Inserisci codice, nome e una capacità giornaliera valida.";
             return;

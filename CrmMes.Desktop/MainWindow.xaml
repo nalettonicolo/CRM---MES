@@ -80,6 +80,23 @@
                         </Border>
                         <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
                         <StackPanel Margin="0,10,0,0">
+                            <Expander Style="{StaticResource NavSectionExpander}" Header="V E N D I T E">
+                                <StackPanel>
+                                    <RadioButton x:Name="NavCustomers" Style="{StaticResource NavItem}" GroupName="Nav" Tag="20" Checked="NavItem_Checked">
+                                        <StackPanel Orientation="Horizontal">
+                                            <TextBlock Text="&#xE77B;" FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets" FontSize="16" Width="24" />
+                                            <TextBlock Text="Clienti" Margin="6,0,0,0" />
+                                        </StackPanel>
+                                    </RadioButton>
+                                    <RadioButton x:Name="NavQuotes" Style="{StaticResource NavItem}" GroupName="Nav" Tag="21" Checked="NavItem_Checked">
+                                        <StackPanel Orientation="Horizontal">
+                                            <TextBlock Text="&#xE8A5;" FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets" FontSize="16" Width="24" />
+                                            <TextBlock Text="Preventivi" Margin="6,0,0,0" />
+                                        </StackPanel>
+                                    </RadioButton>
+                                </StackPanel>
+                            </Expander>
+
                             <Expander Style="{StaticResource NavSectionExpander}" Header="M A G A Z Z I N O">
                                 <StackPanel>
                                     <RadioButton x:Name="NavMaterials" Style="{StaticResource NavItem}" GroupName="Nav" Tag="0" Checked="NavItem_Checked">
@@ -1169,6 +1186,91 @@
                                                 <GridViewColumn Header="Dettaglio" DisplayMemberBinding="{Binding Detail}" Width="220" />
                                                 <GridViewColumn Header="Stato" DisplayMemberBinding="{Binding Status}" Width="110" />
                                                 <GridViewColumn Header="Data" DisplayMemberBinding="{Binding DateLabel}" Width="110" />
+                                            </GridView>
+                                        </ListView.View>
+                                    </ListView>
+                                </Border>
+                            </Grid>
+                        </TabItem>
+
+                        <TabItem Header="Clienti">
+                            <Grid>
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto" />
+                                    <RowDefinition Height="*" />
+                                </Grid.RowDefinitions>
+                                <DockPanel Grid.Row="0" Margin="0,0,0,14">
+                                    <Button DockPanel.Dock="Right" Content="Nuovo cliente" Width="130" Height="36" Click="NewCustomerButton_Click" />
+                                    <Button DockPanel.Dock="Right" Style="{StaticResource SecondaryButton}" Content="Cerca" Width="90" Height="36" Margin="0,0,10,0" Click="SearchCustomersButton_Click" />
+                                    <TextBox x:Name="CustomerSearchBox" Height="36" Padding="12,0" Margin="0,0,12,0" Tag="Cerca per nome, codice o partita IVA" KeyDown="CustomerSearchBox_KeyDown" />
+                                </DockPanel>
+                                <Border Grid.Row="1" Style="{StaticResource CardBorder}" Padding="4">
+                                    <ListView x:Name="CustomersList" MouseDoubleClick="CustomersList_MouseDoubleClick">
+                                        <ListView.View>
+                                            <GridView>
+                                                <GridViewColumn Header="Codice" DisplayMemberBinding="{Binding Code}" Width="120" />
+                                                <GridViewColumn Header="Ragione sociale" DisplayMemberBinding="{Binding Name}" Width="240" />
+                                                <GridViewColumn Header="Partita IVA" DisplayMemberBinding="{Binding VatNumber}" Width="140" />
+                                                <GridViewColumn Header="Email" DisplayMemberBinding="{Binding Email}" Width="190" />
+                                                <GridViewColumn Header="Telefono" DisplayMemberBinding="{Binding Phone}" Width="120" />
+                                                <GridViewColumn Header="" Width="100">
+                                                    <GridViewColumn.CellTemplate>
+                                                        <DataTemplate>
+                                                            <Button Content="Disattiva" Style="{StaticResource SecondaryButton}" Height="28" Click="DeactivateCustomer_Click" Tag="{Binding}" />
+                                                        </DataTemplate>
+                                                    </GridViewColumn.CellTemplate>
+                                                </GridViewColumn>
+                                            </GridView>
+                                        </ListView.View>
+                                    </ListView>
+                                </Border>
+                            </Grid>
+                        </TabItem>
+
+                        <TabItem Header="Preventivi">
+                            <Grid>
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto" />
+                                    <RowDefinition Height="*" />
+                                </Grid.RowDefinitions>
+                                <DockPanel Grid.Row="0" Margin="0,0,0,14">
+                                    <Button DockPanel.Dock="Right" Content="Nuovo preventivo" Width="150" Height="36" Click="NewQuoteButton_Click" />
+                                    <Button DockPanel.Dock="Right" Style="{StaticResource SecondaryButton}" Content="Aggiorna" Width="100" Height="36" Margin="0,0,10,0" Click="RefreshQuotesButton_Click" />
+                                    <WrapPanel VerticalAlignment="Center">
+                                        <Button x:Name="EditQuoteButton" Style="{StaticResource SecondaryButton}" Content="Modifica" Width="90" Height="36" Margin="0,0,8,0" Click="EditQuoteButton_Click" />
+                                        <Button x:Name="SendQuoteButton" Style="{StaticResource SecondaryButton}" Content="Segna inviato" Width="120" Height="36" Margin="0,0,8,0" Click="QuoteStatusButton_Click" Tag="send" />
+                                        <Button x:Name="AcceptQuoteButton" Style="{StaticResource SecondaryButton}" Content="Accettato" Width="100" Height="36" Margin="0,0,8,0" Click="QuoteStatusButton_Click" Tag="accept" />
+                                        <Button x:Name="RejectQuoteButton" Style="{StaticResource SecondaryButton}" Content="Rifiutato" Width="100" Height="36" Margin="0,0,8,0" Click="QuoteStatusButton_Click" Tag="reject" />
+                                        <Button x:Name="ConvertQuoteButton" Style="{StaticResource SecondaryButton}" Content="Crea commesse" Width="130" Height="36" Margin="0,0,8,0" Click="ConvertQuoteButton_Click" />
+                                        <Button x:Name="QuotePdfButton" Style="{StaticResource SecondaryButton}" Content="PDF" Width="70" Height="36" Margin="0,0,8,0" Click="QuotePdfButton_Click" />
+                                    </WrapPanel>
+                                </DockPanel>
+                                <Border Grid.Row="1" Style="{StaticResource CardBorder}" Padding="4">
+                                    <ListView x:Name="QuotesList" SelectionMode="Single" SelectionChanged="QuotesList_SelectionChanged" MouseDoubleClick="QuotesList_MouseDoubleClick">
+                                        <ListView.View>
+                                            <GridView>
+                                                <GridViewColumn Header="Codice" DisplayMemberBinding="{Binding Code}" Width="200" />
+                                                <GridViewColumn Header="Cliente" DisplayMemberBinding="{Binding CustomerName}" Width="200" />
+                                                <GridViewColumn Header="Stato" Width="110">
+                                                    <GridViewColumn.CellTemplate>
+                                                        <DataTemplate>
+                                                            <Border Style="{StaticResource Pill}">
+                                                                <TextBlock Style="{StaticResource PillText}" Text="{Binding Status, Converter={StaticResource StatusToItalianText}}" Foreground="{Binding Status, Converter={StaticResource StatusToBrush}, ConverterParameter=Foreground}" />
+                                                            </Border>
+                                                        </DataTemplate>
+                                                    </GridViewColumn.CellTemplate>
+                                                </GridViewColumn>
+                                                <GridViewColumn Header="Commesse" Width="100">
+                                                    <GridViewColumn.CellTemplate>
+                                                        <DataTemplate>
+                                                            <TextBlock Text="{Binding IsConverted, Converter={StaticResource BoolToText}, ConverterParameter=Create|-}" Foreground="{StaticResource TextSecondaryBrush}" />
+                                                        </DataTemplate>
+                                                    </GridViewColumn.CellTemplate>
+                                                </GridViewColumn>
+                                                <GridViewColumn Header="Creato" DisplayMemberBinding="{Binding CreatedAt, StringFormat=dd/MM/yyyy}" Width="100" />
+                                                <GridViewColumn Header="Valido fino" DisplayMemberBinding="{Binding ValidUntil, StringFormat=dd/MM/yyyy}" Width="100" />
+                                                <GridViewColumn Header="Righe" DisplayMemberBinding="{Binding ItemCount}" Width="60" />
+                                                <GridViewColumn Header="Totale €" DisplayMemberBinding="{Binding Total, StringFormat=N2}" Width="120" />
                                             </GridView>
                                         </ListView.View>
                                     </ListView>

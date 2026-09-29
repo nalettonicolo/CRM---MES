@@ -18,6 +18,15 @@ public class WorkOrder
     public Guid? AreaId { get; set; }
     public Area? Area { get; set; }
     public string? CustomerReference { get; set; }
+
+    /// <summary>Optional link to the customer registry; <see cref="CustomerReference"/> stays as the
+    /// free-text fallback (and the customer's order reference) for work orders created without one.</summary>
+    public Guid? CustomerId { get; set; }
+    public Customer? Customer { get; set; }
+
+    /// <summary>The quote this work order was converted from, if any.</summary>
+    public Guid? QuoteId { get; set; }
+    public Quote? Quote { get; set; }
     public string Status { get; set; } = "Draft";
     public DateTime? DueDate { get; set; }
     public string? Notes { get; set; }

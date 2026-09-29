@@ -204,6 +204,113 @@ public static class ListExporter
         }).GeneratePdf(filePath);
     }
 
+    /// <summary>Preventivo da inviare al cliente: intestazione con cliente e validità, righe con
+    /// quantità/prezzo/sconto/totale, totale imponibile in fondo. Importi IVA esclusa: l'IVA la
+    /// calcola il gestionale fiscale in fattura.</summary>
+    public static void ExportQuote(QuoteDto quote, CustomerDto? customer, string filePath)
+    {
+        var euro = System.Globalization.CultureInfo.GetCultureInfo("it-IT");
+
+        Document.Create(container =>
+        {
+            container.Page(page =>
+            {
+                page.Size(PageSizes.A4);
+                page.Margin(40);
+                page.DefaultTextStyle(style => style.FontSize(10));
+
+                page.Header().Column(column =>
+                {
+                    column.Item().Row(row =>
+                    {
+                        row.RelativeItem().Column(left =>
+                        {
+                            left.Item().Text("Preventivo").FontSize(22).Bold();
+                            left.Item().Text(quote.Code).FontSize(11).FontColor(Colors.Grey.Darken1);
+                            left.Item().PaddingTop(4).Text($"Data {quote.CreatedAt.ToLocalTime():dd/MM/yyyy}").FontSize(10);
+                            if (quote.ValidUntil.HasValue)
+                            {
+                                left.Item().Text($"Valido fino al {quote.ValidUntil.Value:dd/MM/yyyy}").FontSize(10);
+                            }
+                        });
+                        row.ConstantItem(220).Column(right =>
+                        {
+                            right.Item().Text("Spett.le").FontSize(9).FontColor(Colors.Grey.Darken1);
+                            right.Item().Text(quote.CustomerName).FontSize(12).Bold();
+                            if (!string.IsNullOrWhiteSpace(customer?.Address))
+                            {
+                                right.Item().Text(customer.Address);
+                            }
+
+                            if (!string.IsNullOrWhiteSpace(customer?.VatNumber))
+                            {
+                                right.Item().Text($"P.IVA {customer.VatNumber}");
+                            }
+                        });
+                    });
+                    column.Item().PaddingTop(14).LineHorizontal(0.75f).LineColor(Colors.Grey.Lighten1);
+                });
+
+                page.Content().PaddingTop(12).Column(content =>
+                {
+                    content.Item().Table(table =>
+                    {
+                        table.ColumnsDefinition(columnsDef =>
+                        {
+                            columnsDef.RelativeColumn(4);
+                            columnsDef.RelativeColumn(1);
+                            columnsDef.RelativeColumn(1.4f);
+                            columnsDef.RelativeColumn(1);
+                            columnsDef.RelativeColumn(1.5f);
+                        });
+
+                        table.Header(header =>
+                        {
+                            header.Cell().BorderBottom(1).BorderColor(Colors.Grey.Darken1).PaddingBottom(4).Text("Descrizione").Bold();
+                            foreach (var text in new[] { "Q.tà", "Prezzo €", "Sconto", "Totale €" })
+                            {
+                                header.Cell().BorderBottom(1).BorderColor(Colors.Grey.Darken1).PaddingBottom(4).AlignRight().Text(text).Bold();
+                            }
+                        });
+
+                        foreach (var item in quote.Items)
+                        {
+                            table.Cell().BorderBottom(0.5f).BorderColor(Colors.Grey.Lighten2).PaddingVertical(5).Column(cell =>
+                            {
+                                cell.Item().Text(item.Description);
+                                if (item.ProductCode is not null)
+                                {
+                                    cell.Item().Text($"Cod. {item.ProductCode}").FontSize(8).FontColor(Colors.Grey.Darken1);
+                                }
+                            });
+                            table.Cell().BorderBottom(0.5f).BorderColor(Colors.Grey.Lighten2).PaddingVertical(5).AlignRight().Text(item.Quantity.ToString("0.##", euro));
+                            table.Cell().BorderBottom(0.5f).BorderColor(Colors.Grey.Lighten2).PaddingVertical(5).AlignRight().Text(item.UnitPrice.ToString("N2", euro));
+                            table.Cell().BorderBottom(0.5f).BorderColor(Colors.Grey.Lighten2).PaddingVertical(5).AlignRight()
+                                .Text(item.DiscountPercent > 0 ? $"{item.DiscountPercent.ToString("0.##", euro)}%" : "-");
+                            table.Cell().BorderBottom(0.5f).BorderColor(Colors.Grey.Lighten2).PaddingVertical(5).AlignRight().Text(item.LineTotal.ToString("N2", euro));
+                        }
+                    });
+
+                    content.Item().PaddingTop(12).AlignRight().Text($"Totale imponibile {quote.Total.ToString("N2", euro)} €").FontSize(13).Bold();
+                    content.Item().AlignRight().Text("Importi IVA esclusa.").FontSize(9).FontColor(Colors.Grey.Darken1);
+
+                    if (!string.IsNullOrWhiteSpace(quote.Notes))
+                    {
+                        content.Item().PaddingTop(20).Text("Note").Bold();
+                        content.Item().Text(quote.Notes);
+                    }
+                });
+
+                page.Footer().AlignCenter().Text(text =>
+                {
+                    text.CurrentPageNumber();
+                    text.Span(" / ");
+                    text.TotalPages();
+                });
+            });
+        }).GeneratePdf(filePath);
+    }
+
     private static string Sanitize(string sheetName)
     {
         var invalid = new[] { '\\', '/', '?', '*', '[', ']', ':' };
