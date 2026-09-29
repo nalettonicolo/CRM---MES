@@ -51,7 +51,7 @@ public partial class CreateWithdrawalSlipWindow : Window
     private void AddItem_Click(object sender, RoutedEventArgs e)
     {
         var code = ItemCodeBox.Text.Trim();
-        if (string.IsNullOrWhiteSpace(code) || !decimal.TryParse(ItemQuantityBox.Text, out var quantity) || quantity <= 0)
+        if (string.IsNullOrWhiteSpace(code) || !NumberInput.TryParseDecimal(ItemQuantityBox.Text, out var quantity) || quantity <= 0)
         {
             ErrorText.Text = "Inserisci un codice materiale e una quantità valida.";
             return;

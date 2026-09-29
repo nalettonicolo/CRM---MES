@@ -19,7 +19,7 @@ public partial class CreateMaterialLotWindow : Window
         var materialCode = MaterialCodeBox.Text.Trim();
         var lotNumber = LotNumberBox.Text.Trim();
         if (string.IsNullOrWhiteSpace(materialCode) || string.IsNullOrWhiteSpace(lotNumber) ||
-            !decimal.TryParse(QuantityBox.Text, out var quantity) || quantity <= 0)
+            !NumberInput.TryParseDecimal(QuantityBox.Text, out var quantity) || quantity <= 0)
         {
             ErrorText.Text = "Codice materiale, numero lotto e quantità (maggiore di zero) sono obbligatori.";
             return;

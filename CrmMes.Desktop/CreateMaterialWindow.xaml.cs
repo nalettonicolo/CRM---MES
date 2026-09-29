@@ -26,8 +26,8 @@ public partial class CreateMaterialWindow : Window
             return;
         }
 
-        if (!decimal.TryParse(StockBox.Text, out var stock) || stock < 0 ||
-            !decimal.TryParse(MinStockBox.Text, out var minStock) || minStock < 0)
+        if (!NumberInput.TryParseDecimal(StockBox.Text, out var stock) || stock < 0 ||
+            !NumberInput.TryParseDecimal(MinStockBox.Text, out var minStock) || minStock < 0)
         {
             ErrorText.Text = "Giacenza e scorta minima devono essere numeri non negativi.";
             return;

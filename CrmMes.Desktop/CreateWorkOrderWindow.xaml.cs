@@ -47,7 +47,7 @@ public partial class CreateWorkOrderWindow : Window
 
     private async void Create_Click(object sender, RoutedEventArgs e)
     {
-        if (!decimal.TryParse(QuantityBox.Text, out var quantity) || quantity <= 0)
+        if (!NumberInput.TryParseDecimal(QuantityBox.Text, out var quantity) || quantity <= 0)
         {
             ErrorText.Text = "Inserisci una quantità valida (maggiore di zero).";
             return;

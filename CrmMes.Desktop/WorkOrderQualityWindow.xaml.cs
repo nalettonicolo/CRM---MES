@@ -45,7 +45,7 @@ public partial class WorkOrderQualityWindow : Window
             return;
         }
 
-        if (!decimal.TryParse(ValueBox.Text, NumberStyles.Any, CultureInfo.InvariantCulture, out var value))
+        if (!NumberInput.TryParseDecimal(ValueBox.Text, out var value))
         {
             ErrorText.Text = "Inserisci un valore numerico valido.";
             return;

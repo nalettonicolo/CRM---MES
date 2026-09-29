@@ -47,8 +47,8 @@ public partial class CreatePurchaseOrderWindow : Window
     {
         var code = ItemCodeBox.Text.Trim();
         if (string.IsNullOrWhiteSpace(code) ||
-            !decimal.TryParse(ItemQuantityBox.Text, out var quantity) || quantity <= 0 ||
-            !decimal.TryParse(ItemPriceBox.Text, out var unitPrice) || unitPrice < 0)
+            !NumberInput.TryParseDecimal(ItemQuantityBox.Text, out var quantity) || quantity <= 0 ||
+            !NumberInput.TryParseDecimal(ItemPriceBox.Text, out var unitPrice) || unitPrice < 0)
         {
             ErrorText.Text = "Inserisci un codice materiale, una quantità e un prezzo validi.";
             return;

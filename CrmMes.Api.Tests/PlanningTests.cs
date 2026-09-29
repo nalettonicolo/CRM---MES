@@ -98,7 +98,10 @@ public class PlanningTests : IClassFixture<AdminSeededApiTestFixture>
         var overdueOrder = await CreateWorkOrderWithDueDateAsync(DateTime.UtcNow.Date.AddDays(-3));
         var thisWeekOrder = await CreateWorkOrderWithDueDateAsync(DateTime.UtcNow.Date);
 
-        var planning = await _adminClient.GetFromJsonAsync<PlanningResponse>("/api/planning?weeks=8");
+        // The default window starts on this week's Monday: an order due 3 days ago falls before it on
+        // Mondays-Wednesdays, so the window is anchored two weeks back to keep this test day-independent.
+        var from = DateTime.UtcNow.Date.AddDays(-14).ToString("yyyy-MM-dd");
+        var planning = await _adminClient.GetFromJsonAsync<PlanningResponse>($"/api/planning?weeks=8&from={from}");
 
         Assert.NotNull(planning);
         var overdueEntry = planning!.Entries.Single(e => e.Id == overdueOrder.Id);

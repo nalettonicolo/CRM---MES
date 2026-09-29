@@ -31,7 +31,7 @@ public partial class ProductQualityPlanWindow : Window
     }
 
     private static decimal? ParseOptionalDecimal(string text) =>
-        decimal.TryParse(text, NumberStyles.Any, CultureInfo.InvariantCulture, out var value) ? value : null;
+        NumberInput.ParseOptionalDecimal(text);
 
     private async void AddCheckpoint_Click(object sender, RoutedEventArgs e)
     {

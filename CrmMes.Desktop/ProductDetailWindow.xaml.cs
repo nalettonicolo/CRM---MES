@@ -66,7 +66,7 @@ public partial class ProductDetailWindow : Window
     private void AddBomItem_Click(object sender, RoutedEventArgs e)
     {
         var code = BomMaterialCodeBox.Text.Trim();
-        if (string.IsNullOrWhiteSpace(code) || !decimal.TryParse(BomQuantityBox.Text, out var quantity) || quantity <= 0)
+        if (string.IsNullOrWhiteSpace(code) || !NumberInput.TryParseDecimal(BomQuantityBox.Text, out var quantity) || quantity <= 0)
         {
             BomErrorText.Text = "Inserisci un codice materiale e una quantità valida.";
             return;
@@ -150,7 +150,7 @@ public partial class ProductDetailWindow : Window
     private void AddRoutingStep_Click(object sender, RoutedEventArgs e)
     {
         var name = RoutingNameBox.Text.Trim();
-        if (string.IsNullOrWhiteSpace(name) || !decimal.TryParse(RoutingMinutesBox.Text, out var minutes) || minutes < 0)
+        if (string.IsNullOrWhiteSpace(name) || !NumberInput.TryParseDecimal(RoutingMinutesBox.Text, out var minutes) || minutes < 0)
         {
             RoutingErrorText.Text = "Inserisci un nome fase e una durata stimata valida.";
             return;

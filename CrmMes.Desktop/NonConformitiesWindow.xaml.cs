@@ -84,7 +84,7 @@ public partial class NonConformitiesWindow : Window
             return;
         }
 
-        if (!decimal.TryParse(ScrapQuantityBox.Text, NumberStyles.Number, CultureInfo.CurrentCulture, out var scrapQuantity) || scrapQuantity <= 0)
+        if (!NumberInput.TryParseDecimal(ScrapQuantityBox.Text, out var scrapQuantity) || scrapQuantity <= 0)
         {
             ErrorText.Text = "Indica una quantità scarto maggiore di zero.";
             return;
