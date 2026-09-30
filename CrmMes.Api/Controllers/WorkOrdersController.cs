@@ -111,16 +111,7 @@ public class WorkOrdersController : ControllerBase
         var query = _dbContext.WorkOrders.AsNoTracking();
         if (string.Equals(department, "mine", StringComparison.OrdinalIgnoreCase))
         {
-            var userId = forUser ?? (Guid.TryParse(User.FindFirstValue(System.IdentityModel.Tokens.Jwt.JwtRegisteredClaimNames.Sub)
-                ?? User.FindFirstValue(ClaimTypes.NameIdentifier), out var id) ? id : Guid.Empty);
-            var areaIds = await _dbContext.Users.Where(u => u.Id == userId).SelectMany(u => u.Areas.Select(a => a.Id)).ToListAsync(cancellationToken);
-            if (areaIds.Count > 0)
-            {
-                var workCenterNames = await _dbContext.WorkCenters.Where(w => w.AreaId != null && areaIds.Contains(w.AreaId.Value))
-                    .Select(w => w.Name).ToListAsync(cancellationToken);
-                query = query.Where(order => (order.AreaId != null && areaIds.Contains(order.AreaId.Value))
-                    || order.Operations.Any(op => op.Status != "Completed" && op.WorkCenter != null && workCenterNames.Contains(op.WorkCenter)));
-            }
+            query = await DepartmentFilter.ApplyAsync(query, _dbContext, forUser ?? DepartmentFilter.CurrentUserId(User), cancellationToken);
         }
 
         if (term.Length == 0)

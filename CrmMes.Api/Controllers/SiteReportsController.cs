@@ -1,4 +1,5 @@
 using System.Security.Claims;
+using CrmMes.Api.Services;
 using CrmMes.Core.Data;
 using CrmMes.Core.Models;
 using Microsoft.AspNetCore.Authorization;
@@ -28,11 +29,16 @@ public class SiteReportsController : ControllerBase
     /// <summary>Work orders a technician can report on: not completed nor cancelled, with the customer.</summary>
     [HttpGet("open-work-orders")]
     public async Task<ActionResult<IEnumerable<SiteWorkOrderResponse>>> GetOpenWorkOrders(
-        [FromQuery] string? q = null, CancellationToken cancellationToken = default)
+        [FromQuery] string? q = null, [FromQuery] string? department = null, CancellationToken cancellationToken = default)
     {
-        var query = _dbContext.WorkOrders.AsNoTracking()
+        IQueryable<WorkOrder> query = _dbContext.WorkOrders.AsNoTracking()
             .Include(o => o.Product).Include(o => o.Customer)
             .Where(o => o.Status != "Completed" && o.Status != "Cancelled");
+        if (string.Equals(department, "mine", StringComparison.OrdinalIgnoreCase))
+        {
+            query = await DepartmentFilter.ApplyAsync(query, _dbContext, DepartmentFilter.CurrentUserId(User), cancellationToken);
+        }
+
         if (!string.IsNullOrWhiteSpace(q))
         {
             var term = q.Trim().ToLower();

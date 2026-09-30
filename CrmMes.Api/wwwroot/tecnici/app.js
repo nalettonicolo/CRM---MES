@@ -218,6 +218,7 @@
       openPicker(item.dataset.section);
     }
   }));
+  $("pick-mine").addEventListener("change", loadWorkOrders);
   $("pick-search").addEventListener("input", () => {
     clearTimeout(searchTimer);
     searchTimer = setTimeout(loadWorkOrders, 300);
@@ -231,7 +232,11 @@
     info.textContent = "Caricamento...";
     try {
       const q = $("pick-search").value.trim();
-      const orders = await api(`/api/site-reports/open-work-orders${q ? `?q=${encodeURIComponent(q)}` : ""}`);
+      const params = new URLSearchParams();
+      if (q) params.set("q", q);
+      if ($("pick-mine").checked) params.set("department", "mine");
+      const query = params.toString();
+      const orders = await api(`/api/site-reports/open-work-orders${query ? `?${query}` : ""}`);
       info.textContent = orders.length ? "" : "Nessuna commessa aperta trovata.";
       orders.forEach((order) => list.append(el("li", {},
         el("button", { class: "card", type: "button", onclick: () => pickWorkOrder(order) },

@@ -1354,6 +1354,22 @@ public sealed class ApiClient
     public Task<IReadOnlyList<WorkOrderLookupDto>> LookupWorkOrdersAsync(string? q, CancellationToken cancellationToken = default)
         => GetAsync<WorkOrderLookupDto>("api/work-orders/lookup" + (string.IsNullOrWhiteSpace(q) ? string.Empty : $"?q={Uri.EscapeDataString(q.Trim())}"), cancellationToken);
 
+    /// <summary>Open jobs of the departments of a user (the operator identified by PIN at the terminal).</summary>
+    public Task<IReadOnlyList<WorkOrderLookupDto>> LookupDepartmentWorkOrdersAsync(Guid userId, CancellationToken cancellationToken = default)
+        => GetAsync<WorkOrderLookupDto>($"api/work-orders/lookup?department=mine&forUser={userId}", cancellationToken);
+
+    public async Task<IReadOnlyList<UserDepartmentDto>> GetUserDepartmentsAsync(Guid userId, CancellationToken cancellationToken = default)
+    {
+        using var response = await _httpClient.GetAsync($"api/areas/of-user?userId={userId}", cancellationToken);
+        if (response.StatusCode == HttpStatusCode.NotFound)
+        {
+            return [];
+        }
+
+        await EnsureSuccessAsync(response, cancellationToken);
+        return await response.Content.ReadFromJsonAsync<List<UserDepartmentDto>>(cancellationToken: cancellationToken) ?? [];
+    }
+
     public async Task<WorkOrderDetailDto> GetWorkOrderByCodeAsync(string code, CancellationToken cancellationToken = default)
     {
         using var response = await _httpClient.GetAsync($"api/work-orders/by-code/{Uri.EscapeDataString(code)}", cancellationToken);
@@ -2247,6 +2263,8 @@ public sealed record ModuleDto(string Key, string Name, string Description, bool
 public sealed record CompanyCatalogDto(List<SectorDto> Sectors, List<ModuleDto> Modules, List<DepartmentCatalogDto>? Departments = null);
 
 public sealed record AccessAreaDto(string Key, string Name, string? Module);
+
+public sealed record UserDepartmentDto(Guid Id, string Name, string Code, string? DepartmentType);
 
 public sealed record AccessChannelsDto(
     List<string> Channels,

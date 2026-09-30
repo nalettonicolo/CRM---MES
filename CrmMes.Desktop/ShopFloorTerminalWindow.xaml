@@ -54,7 +54,11 @@
 
             <!-- Search results, or the open jobs to pick from: one tap opens the job. -->
             <DockPanel Grid.Row="1" x:Name="LookupPanel" Visibility="Collapsed" Margin="0,14,0,0">
-                <TextBlock DockPanel.Dock="Top" x:Name="LookupTitle" FontWeight="SemiBold" FontSize="15" Foreground="{StaticResource TextPrimaryBrush}" Margin="0,0,0,8" />
+                <DockPanel DockPanel.Dock="Top" Margin="0,0,0,8">
+                    <CheckBox DockPanel.Dock="Right" x:Name="MyDepartmentBox" Content="Solo il mio reparto" IsChecked="True" FontSize="14"
+                              VerticalAlignment="Center" Visibility="Collapsed" Click="MyDepartmentBox_Click" />
+                    <TextBlock x:Name="LookupTitle" FontWeight="SemiBold" FontSize="15" Foreground="{StaticResource TextPrimaryBrush}" TextWrapping="Wrap" />
+                </DockPanel>
                 <Border Style="{StaticResource CardBorder}" Padding="4">
                     <ListView x:Name="LookupList" SelectionMode="Single" MouseLeftButtonUp="LookupList_MouseLeftButtonUp" KeyDown="LookupList_KeyDown" FontSize="15">
                         <ListView.View>

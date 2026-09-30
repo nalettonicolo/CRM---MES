@@ -142,6 +142,13 @@ public class CompanyStructureTests : IClassFixture<AdminSeededApiTestFixture>
         var forWirer = await _admin.GetFromJsonAsync<List<WorkOrderLookupResponse>>($"/api/work-orders/lookup?department=mine&forUser={wirer.UserId}");
         Assert.DoesNotContain(forWirer!, o => o.Id == testJob);
 
+        // The technicians' phone page: the same filter on the jobs it offers.
+        var phoneMine = await wirerClient.GetFromJsonAsync<List<SiteWorkOrderResponse>>("/api/site-reports/open-work-orders?department=mine");
+        Assert.Contains(phoneMine!, o => o.Id == wiringJob);
+        Assert.DoesNotContain(phoneMine!, o => o.Id == testJob);
+        var phoneAll = await wirerClient.GetFromJsonAsync<List<SiteWorkOrderResponse>>("/api/site-reports/open-work-orders");
+        Assert.Contains(phoneAll!, o => o.Id == testJob);
+
         var departments = await wirerClient.GetFromJsonAsync<List<UserDepartmentResponse>>("/api/areas/of-user");
         Assert.Equal("panels", departments!.Single().DepartmentType);
 

@@ -177,19 +177,45 @@ public partial class ShopFloorTerminalWindow : Window
 
     /// <summary>Office roles see the jobs released or in progress right away, to pick one with a tap
     /// instead of typing its code; operators keep the plain scan box.</summary>
-    private bool ShowsOpenJobs => _apiClient.CurrentRole is "Admin" or "Management" or "Warehouse";
+    private bool ShowsOpenJobs => _apiClient.CurrentRole is "Admin" or "Management" or "Warehouse" || _departments.Count > 0;
+
+    /// <summary>Departments of the operator identified by PIN: with at least one, the terminal opens on the
+    /// work of their department ("Solo il mio reparto"), and a tap shows everything.</summary>
+    private IReadOnlyList<UserDepartmentDto> _departments = [];
 
     private async Task ShowOpenJobsAsync()
     {
-        if (!ShowsOpenJobs || _order is not null)
+        if (_order is not null)
         {
             return;
         }
 
         try
         {
-            var jobs = await _apiClient.LookupWorkOrdersAsync(null);
-            LookupTitle.Text = jobs.Count == 0 ? "Nessuna commessa aperta o in lavorazione." : $"Commesse aperte e in lavorazione ({jobs.Count})";
+            _departments = _operatorId is { } operatorId ? await _apiClient.GetUserDepartmentsAsync(operatorId) : [];
+        }
+        catch (Exception)
+        {
+            _departments = []; // older server: no departments, everything as before
+        }
+
+        if (!ShowsOpenJobs)
+        {
+            return;
+        }
+
+        MyDepartmentBox.Visibility = _departments.Count > 0 ? Visibility.Visible : Visibility.Collapsed;
+        MyDepartmentBox.Content = _departments.Count == 1 ? $"Solo {_departments[0].Name}" : "Solo i miei reparti";
+        var onlyMine = _departments.Count > 0 && MyDepartmentBox.IsChecked == true;
+
+        try
+        {
+            var jobs = onlyMine
+                ? await _apiClient.LookupDepartmentWorkOrdersAsync(_operatorId!.Value)
+                : await _apiClient.LookupWorkOrdersAsync(null);
+            LookupTitle.Text = jobs.Count == 0
+                ? onlyMine ? "Nessuna commessa aperta per il tuo reparto." : "Nessuna commessa aperta o in lavorazione."
+                : onlyMine ? $"Commesse del tuo reparto ({jobs.Count})" : $"Commesse aperte e in lavorazione ({jobs.Count})";
             LookupList.ItemsSource = jobs;
             LookupPanel.Visibility = Visibility.Visible;
         }
@@ -198,6 +224,8 @@ public partial class ShopFloorTerminalWindow : Window
             ErrorText.Text = exception.Message;
         }
     }
+
+    private void MyDepartmentBox_Click(object sender, RoutedEventArgs e) => _ = ShowOpenJobsAsync();
 
     /// <summary>The scanned or typed text: a full code opens the job at once; the last digits of a code
     /// (or part of a lot) open it when only one job matches, otherwise the matches are listed.</summary>
