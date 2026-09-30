@@ -38,6 +38,9 @@ jobs:
       - name: Test Desktop client
         run: dotnet test CrmMes.Desktop.Tests/CrmMes.Desktop.Tests.csproj --configuration Release
 
+      - name: Test vendor console
+        run: dotnet test CrmMes.Console.Tests/CrmMes.Console.Tests.csproj --configuration Release
+
       - name: Test web platform
         run: dotnet test CrmMes.Web.Tests/CrmMes.Web.Tests.csproj --configuration Release
 

@@ -4,6 +4,7 @@ using System.Security.Cryptography;
 using System.Text;
 using CrmMes.Api.Services;
 using CrmMes.Core.Data;
+using CrmMes.Core.Security;
 using CrmMes.Core.Models;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;

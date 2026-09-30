@@ -1,0 +1,38 @@
+@page
+@model PaymentsModel
+@{ ViewData["Title"] = "Pagamenti"; }
+<div class="page-head">
+    <div>
+        <div class="eyebrow">Console fornitore</div>
+        <h1>Pagamenti</h1>
+        <p class="sub">Bonifici registrati a mano e, con Stripe collegato, i pagamenti mensili registrati all'istante.</p>
+    </div>
+</div>
+<div class="card">
+    @if (Model.Rows.Count == 0)
+    {
+        <div class="state">Nessun pagamento registrato.</div>
+    }
+    else
+    {
+        <div class="table-wrap">
+            <table>
+                <thead><tr><th>Data</th><th>Cliente</th><th class="num">Importo</th><th>Metodo</th><th>Copre fino al</th><th>Riferimento</th><th>Esito</th></tr></thead>
+                <tbody>
+                    @foreach (var p in Model.Rows)
+                    {
+                        <tr>
+                            <td>@Fmt.Date(p.PaidAt)</td>
+                            <td><a asp-page="/Customers/Details" asp-route-id="@p.CustomerId">@p.Customer.Name</a></td>
+                            <td class="num">@Fmt.Money(p.Amount)</td>
+                            <td>@(p.Method == BillingMethods.Stripe ? "Stripe" : "Bonifico")</td>
+                            <td>@Fmt.Date(p.PeriodEnd)</td>
+                            <td class="muted">@(p.Reference ?? p.StripeInvoiceId ?? "—")</td>
+                            <td><span class="badge @(p.Status == "paid" ? "ok" : "danger")">@(p.Status == "paid" ? "Pagato" : "Non riuscito")</span></td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    }
+</div>

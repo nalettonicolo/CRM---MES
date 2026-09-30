@@ -29,6 +29,9 @@ jobs:
       - name: Test Desktop client
         run: dotnet test CrmMes.Desktop.Tests/CrmMes.Desktop.Tests.csproj --no-build --configuration Release --logger "trx;LogFileName=test-results.trx"
 
+      - name: Test vendor console
+        run: dotnet test CrmMes.Console.Tests/CrmMes.Console.Tests.csproj --no-build --configuration Release
+
       - name: Test web platform
         run: dotnet test CrmMes.Web.Tests/CrmMes.Web.Tests.csproj --no-build --configuration Release --logger "trx;LogFileName=test-results.trx"
 

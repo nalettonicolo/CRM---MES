@@ -1,0 +1,41 @@
+@page
+@model InstallationsModel
+@{ ViewData["Title"] = "Installazioni"; }
+<div class="page-head">
+    <div>
+        <div class="eyebrow">Console fornitore</div>
+        <h1>Installazioni</h1>
+        <p class="sub">Ogni installazione si collega una volta all'ora: oltre due ore senza notizie risulta offline.</p>
+    </div>
+</div>
+<div class="card">
+    @if (Model.Rows.Count == 0)
+    {
+        <div class="state">Nessuna installazione: si creano dalla scheda del cliente.</div>
+    }
+    else
+    {
+        <div class="table-wrap">
+            <table>
+                <thead><tr><th>Cliente</th><th>Installazione</th><th>Stato</th><th>Ultimo contatto</th><th>Versione</th><th>Tipo</th><th class="num">Utenti</th><th>Database</th><th>Licenza inviata</th></tr></thead>
+                <tbody>
+                    @foreach (var i in Model.Rows)
+                    {
+                        var online = SubscriptionRules.IsOnline(i, DateTime.UtcNow);
+                        <tr>
+                            <td><a asp-page="/Customers/Details" asp-route-id="@i.CustomerId">@i.Customer.Name</a></td>
+                            <td>@i.Name</td>
+                            <td><span class="badge @(online ? "ok" : "danger")">@(online ? "Online" : "Offline")</span></td>
+                            <td>@Fmt.DateTime(i.LastHeartbeatAt)</td>
+                            <td>@(i.Version ?? "—")</td>
+                            <td>@(i.Hosting ?? "—")</td>
+                            <td class="num">@(i.ActiveUsers?.ToString() ?? "—")</td>
+                            <td>@(i.DatabaseOk == false ? "problemi" : Fmt.Size(i.DatabaseSizeBytes))</td>
+                            <td>@(i.LastStatusSent is null ? "—" : SubscriptionRules.StatusName(i.LastStatusSent))</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    }
+</div>

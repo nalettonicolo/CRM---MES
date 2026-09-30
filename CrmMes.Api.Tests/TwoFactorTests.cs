@@ -5,6 +5,7 @@ using System.Text;
 using CrmMes.Api.Controllers;
 using CrmMes.Api.Services;
 using CrmMes.Core.Data;
+using CrmMes.Core.Security;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 

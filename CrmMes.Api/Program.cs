@@ -122,7 +122,7 @@ builder.Services.AddAuthorization(options =>
     options.AddPolicy("ViewMargins", policy => policy.RequireRole(CrmMes.Api.Services.MarginAccess.Roles));
 });
 builder.Services.AddSingleton<IPasswordHasher<CrmMes.Core.Models.User>, PasswordHasher<CrmMes.Core.Models.User>>();
-builder.Services.AddSingleton(new CrmMes.Api.Services.SecretProtector(jwtKey));
+builder.Services.AddSingleton(new CrmMes.Core.Security.SecretProtector(jwtKey));
 builder.Services.AddSingleton(new CrmMes.Api.Services.TwoFactorChallenges(jwtKey));
 
 // Render terminates TLS on its proxy: without this every request would look like it came from the

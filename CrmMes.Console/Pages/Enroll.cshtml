@@ -1,0 +1,16 @@
+@page
+@model EnrollModel
+@{ ViewData["Title"] = "Verifica in due passaggi"; }
+<div class="login">
+    <form method="post" class="login-card wide">
+        <div class="brand-line">Console Nicolò MES</div>
+        <h1>Attiva la verifica in due passaggi</h1>
+        <p class="muted">La console gestisce pagamenti e licenze di tutti i clienti: senza il codice del tuo telefono nessuno entra, nemmeno con la password.</p>
+        <p class="small">1. Nell'app di autenticazione aggiungi un account e inquadra il codice (oppure digita la chiave).</p>
+        <img class="qr" src="@Model.QrCode" alt="Codice QR per l'app di autenticazione" width="200" height="200" />
+        <div class="code">@Model.SecretText</div>
+        <label>2. Codice di 6 cifre<input asp-for="Code" inputmode="numeric" autocomplete="one-time-code" maxlength="6" required /></label>
+        @if (Model.Error is not null) { <div class="alert" role="alert">@Model.Error</div> }
+        <button type="submit">Attiva ed entra</button>
+    </form>
+</div>

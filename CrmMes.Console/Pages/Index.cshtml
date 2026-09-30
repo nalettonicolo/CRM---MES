@@ -1,0 +1,47 @@
+@page
+@model IndexModel
+@{ ViewData["Title"] = "Cruscotto"; }
+<div class="page-head">
+    <div>
+        <div class="eyebrow">Console fornitore</div>
+        <h1>Cruscotto</h1>
+        <p class="sub">Clienti, incassi mensili e installazioni collegate.</p>
+    </div>
+    <a class="button" asp-page="/Customers/New">Nuovo cliente</a>
+</div>
+
+<div class="kpis">
+    <div class="card kpi"><div class="label">Clienti</div><div class="value">@Model.Customers</div></div>
+    <div class="card kpi"><div class="label">In regola</div><div class="value">@Model.Active</div></div>
+    <div class="card kpi"><div class="label">In ritardo</div><div class="value">@Model.Late</div></div>
+    <div class="card kpi"><div class="label">Sospesi</div><div class="value">@Model.Suspended</div></div>
+    <div class="card kpi"><div class="label">Canoni mensili attivi</div><div class="value">@Fmt.Money(Model.MonthlyRevenue)</div></div>
+    <div class="card kpi"><div class="label">Installazioni online</div><div class="value">@Model.Online / @(Model.Online + Model.Offline)</div></div>
+</div>
+
+<div class="card">
+    <div class="card-pad"><h2>Da seguire</h2></div>
+    @if (Model.Attention.Count == 0)
+    {
+        <div class="state">Nessun cliente in ritardo o sospeso.</div>
+    }
+    else
+    {
+        <div class="table-wrap">
+            <table>
+                <thead><tr><th>Cliente</th><th>Stato</th><th>Dettaglio</th><th class="num">Canone</th></tr></thead>
+                <tbody>
+                    @foreach (var (customer, status, message) in Model.Attention)
+                    {
+                        <tr>
+                            <td><a asp-page="/Customers/Details" asp-route-id="@customer.Id">@customer.Name</a></td>
+                            <td><span class="badge @Fmt.StatusClass(status)">@SubscriptionRules.StatusName(status)</span></td>
+                            <td class="muted small">@message</td>
+                            <td class="num">@Fmt.Money(customer.MonthlyTotal)</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    }
+</div>

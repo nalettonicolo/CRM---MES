@@ -1,0 +1,44 @@
+@page
+@model CrmMes.Console.Pages.CustomersIndexModel
+@{ ViewData["Title"] = "Clienti"; }
+<div class="page-head">
+    <div>
+        <div class="eyebrow">Console fornitore</div>
+        <h1>Clienti</h1>
+    </div>
+    <a class="button" asp-page="/Customers/New">Nuovo cliente</a>
+</div>
+
+<form method="get" class="actions">
+    <input name="q" value="@Model.Q" placeholder="Nome o partita IVA" aria-label="Cerca cliente" />
+    <button class="secondary" type="submit">Cerca</button>
+</form>
+
+<div class="card">
+    @if (Model.Rows.Count == 0)
+    {
+        <div class="state">Nessun cliente. Crea il primo con "Nuovo cliente".</div>
+    }
+    else
+    {
+        <div class="table-wrap">
+            <table>
+                <thead><tr><th>Cliente</th><th>Partita IVA</th><th>Pagamento</th><th>Pagato fino al</th><th class="num">Canone</th><th>Installazioni</th><th>Stato</th></tr></thead>
+                <tbody>
+                    @foreach (var (customer, status, installations, online) in Model.Rows)
+                    {
+                        <tr>
+                            <td><a asp-page="/Customers/Details" asp-route-id="@customer.Id">@customer.Name</a></td>
+                            <td class="muted">@(customer.VatNumber ?? "—")</td>
+                            <td>@(customer.BillingMethod == BillingMethods.Stripe ? "Stripe" : "Bonifico")</td>
+                            <td>@Fmt.Date(customer.PaidUntil)</td>
+                            <td class="num">@Fmt.Money(customer.MonthlyTotal)</td>
+                            <td>@online / @installations online</td>
+                            <td><span class="badge @Fmt.StatusClass(status)">@SubscriptionRules.StatusName(status)</span></td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    }
+</div>

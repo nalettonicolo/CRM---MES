@@ -1,0 +1,22 @@
+# Blueprint della console fornitore, da usare quando decidi di pubblicarla (non è nel render.yaml
+# principale, così Render non crea il servizio da solo).
+#   Render -> New -> Blueprint -> questo repository, file "CrmMes.Console/render-console.yaml".
+# Segreti da impostare nella dashboard del servizio:
+#   CONSOLE_DATABASE_URL  database Postgres dedicato alla console (non quello del gestionale)
+#   CONSOLE_SECRET        almeno 32 caratteri casuali; se cambia, la chiave di firma diventa illeggibile
+#                         e le installazioni rifiutano le licenze: conservalo in un posto sicuro.
+services:
+  - type: web
+    name: crmmes-console
+    runtime: docker
+    plan: starter
+    dockerfilePath: ./CrmMes.Console/Dockerfile
+    dockerContext: .
+    healthCheckPath: /health
+    envVars:
+      - key: ASPNETCORE_ENVIRONMENT
+        value: Production
+      - key: CONSOLE_DATABASE_URL
+        sync: false
+      - key: CONSOLE_SECRET
+        sync: false

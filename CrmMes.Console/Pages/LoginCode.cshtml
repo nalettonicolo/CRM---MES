@@ -1,0 +1,13 @@
+@page
+@model LoginCodeModel
+@{ ViewData["Title"] = "Codice"; }
+<div class="login">
+    <form method="post" class="login-card">
+        <div class="brand-line">Console Nicolò MES</div>
+        <h1>Codice di verifica</h1>
+        <p class="muted">Inserisci il codice di 6 cifre dell'app di autenticazione.</p>
+        <label>Codice<input asp-for="Code" inputmode="numeric" autocomplete="one-time-code" maxlength="6" required autofocus /></label>
+        @if (Model.Error is not null) { <div class="alert" role="alert">@Model.Error</div> }
+        <button type="submit">Accedi</button>
+    </form>
+</div>

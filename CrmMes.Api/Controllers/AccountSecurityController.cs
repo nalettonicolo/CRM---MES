@@ -1,6 +1,7 @@
 using System.Security.Claims;
 using CrmMes.Api.Services;
 using CrmMes.Core.Data;
+using CrmMes.Core.Security;
 using CrmMes.Core.Models;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;

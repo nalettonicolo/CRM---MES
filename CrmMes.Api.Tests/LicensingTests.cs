@@ -204,3 +204,14 @@ public class LicensingTests : IAsyncLifetime
         Assert.Contains("2 utenti", await second.Content.ReadAsStringAsync());
     }
 }
+
+public class ModuleCatalogAlignmentTests
+{
+    /// <summary>The vendor console sells the modules by these keys: a module added to the management software
+    /// and forgotten in the catalog (or vice versa) would be impossible to sell or impossible to switch on.</summary>
+    [Fact]
+    public void ConsoleCatalog_MatchesTheManagementSoftwareModules() =>
+        Assert.Equal(
+            Sectors.Modules.Select(m => m.Key).OrderBy(k => k),
+            ModuleCatalog.All.Select(m => m.Key).OrderBy(k => k));
+}

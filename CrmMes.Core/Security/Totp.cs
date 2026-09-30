@@ -1,7 +1,7 @@
 using System.Security.Cryptography;
 using System.Text;
 
-namespace CrmMes.Api.Services;
+namespace CrmMes.Core.Security;
 
 /// <summary>Time-based one-time codes (RFC 6238: HMAC-SHA1, 30-second steps, 6 digits), the ones shown by
 /// Google Authenticator, Microsoft Authenticator, Authy and the like. One step either side is accepted for

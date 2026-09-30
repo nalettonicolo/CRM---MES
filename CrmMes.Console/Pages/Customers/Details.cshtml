@@ -1,0 +1,158 @@
+@page "{id:guid}"
+@model CrmMes.Console.Pages.CustomerDetailsModel
+@{ ViewData["Title"] = Model.Customer.Name; var c = Model.Customer; }
+<div class="page-head">
+    <div>
+        <div class="eyebrow"><a asp-page="/Customers/Index">Clienti</a></div>
+        <h1>@c.Name</h1>
+        <p class="sub">Canone mensile @Fmt.Money(c.MonthlyTotal) · pagato fino al @Fmt.Date(c.PaidUntil) · @(c.BillingMethod == BillingMethods.Stripe ? "Stripe" : "Bonifico")</p>
+    </div>
+    <span class="badge @Fmt.StatusClass(Model.Status)">@SubscriptionRules.StatusName(Model.Status)@(c.ForcedStatus is null ? "" : " (manuale)")</span>
+</div>
+
+<div class="stack">
+    @if (Model.Info is not null) { <div class="success" role="status">@Model.Info</div> }
+    @if (Model.Error is not null) { <div class="alert" role="alert">@Model.Error</div> }
+    @if (Model.StatusMessage is not null) { <div class="notice">@Model.StatusMessage</div> }
+
+    @if (Model.NewKey is not null)
+    {
+        <div class="card card-pad stack">
+            <h2>Chiave di licenza di "@Model.NewKeyInstallation"</h2>
+            <p class="muted small">Copiala ora: non verrà più mostrata. Va nella configurazione del gestionale del cliente:</p>
+            <div class="key-once">@Model.NewKey</div>
+            <p class="small">Server del cliente: in <span class="code">C:\ProgramData\NicoloMES\server.json</span> aggiungi
+                <span class="code">"License": { "ConsoleUrl": "@($"{Request.Scheme}://{Request.Host}")", "Key": "…" }</span> e riavvia il servizio.
+                Cloud: variabili <span class="code">License__ConsoleUrl</span> e <span class="code">License__Key</span>.</p>
+        </div>
+    }
+
+    <div class="grid-2">
+        <form method="post" asp-page-handler="Subscription" asp-route-id="@c.Id" class="card card-pad stack">
+            <h2>Abbonamento</h2>
+            <div class="form-grid">
+                <label>Piano
+                    <select asp-for="PlanKey">
+                        @foreach (var plan in Model.Prices.Where(p => p.Kind == "plan"))
+                        {
+                            <option value="@plan.Key" selected="@(plan.Key == c.PlanKey)">@plan.Name · @Fmt.Money(plan.MonthlyPrice) · @plan.IncludedUsers utenti</option>
+                        }
+                    </select>
+                </label>
+                <label>Utenti aggiuntivi<input asp-for="ExtraUsers" type="number" min="0" /></label>
+            </div>
+            <div class="checks">
+                @foreach (var module in Model.Prices.Where(p => p.Kind == "module"))
+                {
+                    <label class="check"><input type="checkbox" name="Modules" value="@module.Key" checked="@Model.IsSelected(module.Key)" /> @module.Name · @Fmt.Money(module.MonthlyPrice)</label>
+                }
+            </div>
+            <div class="actions"><button type="submit">Salva e ricalcola il canone</button></div>
+        </form>
+
+        <div class="stack">
+            <form method="post" asp-page-handler="Payment" asp-route-id="@c.Id" class="card card-pad stack">
+                <h2>Registra un bonifico</h2>
+                <div class="form-grid">
+                    <label>Importo<input asp-for="PaymentAmount" type="number" step="0.01" min="0" /></label>
+                    <label>Data<input asp-for="PaymentDate" type="date" /></label>
+                    <label>Copre fino al<input asp-for="PaidUntil" type="date" /></label>
+                    <label>Riferimento<input asp-for="PaymentReference" placeholder="CRO, causale" /></label>
+                </div>
+                <div class="actions"><button type="submit">Registra</button></div>
+            </form>
+
+            <div class="card card-pad">
+                <h2>Stato manuale</h2>
+                <p class="muted small">Per casi particolari. "Sospendi" porta le installazioni alla sola consultazione entro un'ora.</p>
+                <div class="actions">
+                    <form method="post" asp-page-handler="Status" asp-route-id="@c.Id"><input type="hidden" name="forced" value="suspended" /><button class="danger" type="submit">Sospendi</button></form>
+                    <form method="post" asp-page-handler="Status" asp-route-id="@c.Id"><input type="hidden" name="forced" value="active" /><button class="secondary" type="submit">Riattiva sempre</button></form>
+                    <form method="post" asp-page-handler="Status" asp-route-id="@c.Id"><input type="hidden" name="forced" value="" /><button class="secondary" type="submit">Segui i pagamenti</button></form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-pad"><h2>Installazioni</h2></div>
+        <div class="table-wrap">
+            <table>
+                <thead><tr><th>Nome</th><th>Chiave</th><th>Ultimo contatto</th><th>Versione</th><th>Tipo</th><th class="num">Utenti</th><th>Database</th><th>Moduli in uso</th><th></th></tr></thead>
+                <tbody>
+                    @foreach (var i in c.Installations.OrderBy(i => i.Revoked).ThenBy(i => i.Name))
+                    {
+                        <tr>
+                            <td>@i.Name @if (i.Revoked) {<span class="badge danger">Revocata</span>}</td>
+                            <td class="code">@i.KeyPrefix…</td>
+                            <td>@Fmt.DateTime(i.LastHeartbeatAt) @if (!i.Revoked) {<span class="badge @(SubscriptionRules.IsOnline(i, DateTime.UtcNow) ? "ok" : "danger")">@(SubscriptionRules.IsOnline(i, DateTime.UtcNow) ? "online" : "offline")</span>}</td>
+                            <td>@(i.Version ?? "—")</td>
+                            <td>@(i.Hosting ?? "—")</td>
+                            <td class="num">@(i.ActiveUsers?.ToString() ?? "—")</td>
+                            <td>@Fmt.Size(i.DatabaseSizeBytes)</td>
+                            <td class="small muted">@(string.IsNullOrEmpty(i.EnabledModules) ? "—" : string.Join(", ", i.EnabledModules.Split(',').Select(ModuleCatalog.NameOf)))</td>
+                            <td>
+                                @if (!i.Revoked)
+                                {
+                                    <form method="post" asp-page-handler="Revoke" asp-route-id="@c.Id"><input type="hidden" name="installationId" value="@i.Id" /><button class="secondary small" type="submit">Revoca</button></form>
+                                }
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+        <form method="post" asp-page-handler="Installation" asp-route-id="@c.Id" class="card-pad actions">
+            <input asp-for="InstallationName" placeholder="Nome (es. Server sede Bergamo)" aria-label="Nome installazione" />
+            <button type="submit">Nuova installazione e chiave</button>
+        </form>
+    </div>
+
+    <div class="card">
+        <div class="card-pad"><h2>Pagamenti</h2></div>
+        @if (c.Payments.Count == 0)
+        {
+            <div class="state">Nessun pagamento registrato.</div>
+        }
+        else
+        {
+            <div class="table-wrap">
+                <table>
+                    <thead><tr><th>Data</th><th class="num">Importo</th><th>Metodo</th><th>Copre fino al</th><th>Riferimento</th><th>Esito</th></tr></thead>
+                    <tbody>
+                        @foreach (var p in c.Payments.OrderByDescending(p => p.PaidAt))
+                        {
+                            <tr>
+                                <td>@Fmt.Date(p.PaidAt)</td>
+                                <td class="num">@Fmt.Money(p.Amount)</td>
+                                <td>@(p.Method == BillingMethods.Stripe ? "Stripe" : "Bonifico")</td>
+                                <td>@Fmt.Date(p.PeriodEnd)</td>
+                                <td class="muted">@(p.Reference ?? p.StripeInvoiceId ?? "—")</td>
+                                <td><span class="badge @(p.Status == "paid" ? "ok" : "danger")">@(p.Status == "paid" ? "Pagato" : "Non riuscito")</span></td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        }
+    </div>
+
+    <form method="post" asp-page-handler="Data" asp-route-id="@c.Id" class="card card-pad stack">
+        <h2>Dati del cliente</h2>
+        <div class="form-grid">
+            <label>Ragione sociale<input asp-for="Name" required /></label>
+            <label>Partita IVA<input asp-for="VatNumber" /></label>
+            <label>Email<input asp-for="Email" type="email" /></label>
+            <label>Telefono<input asp-for="Phone" /></label>
+            <label>Pagamento
+                <select asp-for="BillingMethod">
+                    <option value="stripe">Stripe</option>
+                    <option value="transfer">Bonifico</option>
+                </select>
+            </label>
+            <label>Giorni di tolleranza prima della sospensione<input asp-for="GraceDays" type="number" min="0" max="90" /></label>
+        </div>
+        <label>Note<textarea asp-for="Notes"></textarea></label>
+        <div class="actions"><button class="secondary" type="submit">Salva i dati</button></div>
+    </form>
+</div>

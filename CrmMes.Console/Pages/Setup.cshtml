@@ -1,0 +1,15 @@
+@page
+@model SetupModel
+@{ ViewData["Title"] = "Primo avvio"; }
+<div class="login">
+    <form method="post" class="login-card">
+        <div class="brand-line">Console Nicolò MES</div>
+        <h1>Primo avvio</h1>
+        <p class="muted">Crea il tuo account di amministratore della console. Subito dopo configurerai l'app di autenticazione: è obbligatoria.</p>
+        <label>Nome<input asp-for="Name" autocomplete="name" required /></label>
+        <label>Email<input asp-for="Email" type="email" autocomplete="username" required /></label>
+        <label>Password (almeno 12 caratteri)<input asp-for="Password" type="password" autocomplete="new-password" required minlength="12" /></label>
+        @if (Model.Error is not null) { <div class="alert" role="alert">@Model.Error</div> }
+        <button type="submit">Crea l'account</button>
+    </form>
+</div>

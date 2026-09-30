@@ -1,0 +1,38 @@
+@page
+@model PricesModel
+@{ ViewData["Title"] = "Listino"; }
+<div class="page-head">
+    <div>
+        <div class="eyebrow">Console fornitore</div>
+        <h1>Listino</h1>
+        <p class="sub">Prezzi mensili di piani, moduli e utenti aggiuntivi. I prezzi iniziali sono solo un punto di partenza.</p>
+    </div>
+</div>
+@if (Model.Info is not null) { <div class="success" role="status">@Model.Info</div> }
+<form method="post" class="card">
+    <div class="table-wrap">
+        <table>
+            <thead><tr><th>Voce</th><th>Tipo</th><th class="num">Prezzo mensile (€)</th><th class="num">Utenti inclusi</th></tr></thead>
+            <tbody>
+                @foreach (var item in Model.Rows)
+                {
+                    <tr>
+                        <td>@item.Name</td>
+                        <td class="muted">@(item.Kind switch { "plan" => "Piano", "user" => "Utente", _ => "Modulo" })</td>
+                        <td class="num"><input name="Price[@item.Key]" value="@item.MonthlyPrice.ToString(System.Globalization.CultureInfo.InvariantCulture)" type="number" step="0.01" min="0" aria-label="Prezzo @item.Name" /></td>
+                        <td class="num">
+                            @if (item.Kind == "plan")
+                            {
+                                <input name="Users[@item.Key]" value="@item.IncludedUsers" type="number" min="1" aria-label="Utenti inclusi @item.Name" />
+                            }
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+    <div class="card-pad actions">
+        <label class="check"><input type="checkbox" name="Recompute" value="true" /> Ricalcola subito i canoni di tutti i clienti</label>
+        <button type="submit">Salva il listino</button>
+    </div>
+</form>

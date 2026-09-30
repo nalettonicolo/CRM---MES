@@ -1,0 +1,24 @@
+@page
+@model CrmMes.Console.Pages.CustomerNewModel
+@{ ViewData["Title"] = "Nuovo cliente"; }
+<div class="page-head">
+    <div>
+        <div class="eyebrow"><a asp-page="/Customers/Index">Clienti</a></div>
+        <h1>Nuovo cliente</h1>
+    </div>
+</div>
+<form method="post" class="card card-pad stack">
+    <div class="form-grid">
+        <label>Ragione sociale *<input asp-for="Name" required /></label>
+        <label>Partita IVA<input asp-for="VatNumber" /></label>
+        <label>Email amministrativa<input asp-for="Email" type="email" /></label>
+        <label>Pagamento
+            <select asp-for="BillingMethod">
+                <option value="stripe">Stripe (carta o addebito SEPA, mensile)</option>
+                <option value="transfer">Bonifico bancario</option>
+            </select>
+        </label>
+    </div>
+    @if (Model.Error is not null) { <div class="alert" role="alert">@Model.Error</div> }
+    <div class="actions"><button type="submit">Crea il cliente</button></div>
+</form>

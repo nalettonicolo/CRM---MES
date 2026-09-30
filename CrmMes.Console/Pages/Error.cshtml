@@ -1,0 +1,9 @@
+@page
+@model ErrorModel
+@{ ViewData["Title"] = "Errore"; }
+<div class="card card-pad">
+    <h1>Si è verificato un errore</h1>
+    <p class="muted">L'operazione non è riuscita. Riprova; se succede ancora, controlla i log del servizio.</p>
+    @if (Model.ShowRequestId) { <p class="small">Codice richiesta: <span class="code">@Model.RequestId</span></p> }
+    <a class="button secondary" href="/">Torna al cruscotto</a>
+</div>

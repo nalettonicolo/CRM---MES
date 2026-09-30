@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="color-scheme" content="light dark" />
+    <title>@ViewData["Title"] · Console Nicolò MES</title>
+    <link rel="stylesheet" href="~/css/site.css" asp-append-version="true" />
+</head>
+<body>
+    @{ var full = User.HasClaim(ConsoleAuth.StageClaim, ConsoleAuth.StageFull); }
+    <div class="shell @(full ? "" : "bare")">
+        @if (full)
+        {
+            <nav class="sidebar" aria-label="Menu principale">
+                <div class="brand">Nicolò MES</div>
+                <div class="company">Console fornitore</div>
+                <div class="nav-group">
+                    <a class="nav-link" asp-page="/Index">Cruscotto</a>
+                    <a class="nav-link" asp-page="/Customers/Index">Clienti</a>
+                    <a class="nav-link" asp-page="/Installations">Installazioni</a>
+                    <a class="nav-link" asp-page="/Payments">Pagamenti</a>
+                    <a class="nav-link" asp-page="/Prices">Listino</a>
+                </div>
+                <div class="user">
+                    <div class="name">@User.Identity?.Name</div>
+                    <form method="post" asp-page="/Logout"><button class="secondary small" type="submit">Esci</button></form>
+                </div>
+            </nav>
+        }
+        <main class="main">
+            @RenderBody()
+        </main>
+    </div>
+</body>
+</html>
