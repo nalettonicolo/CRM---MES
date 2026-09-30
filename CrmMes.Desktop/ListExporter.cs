@@ -21,6 +21,11 @@ public static class ListExporter
         QuestPDF.Settings.License = LicenseType.Community;
     }
 
+    /// <summary>Base text style of every PDF: no typographic ligatures. The embedded font draws "ff", "fi",
+    /// "fb", "tt"... as single glyphs that carry no letters, so copying a code or a lot number out of a
+    /// PDF (or a supplier reading it with a text tool) would lose them: "L-2026-ffb1" came out as "L-2026- 1".</summary>
+    private static TextStyle Plain(TextStyle style) => style.DisableFontFeature(FontFeatures.StandardLigatures);
+
     public static void ExportToExcel(string title, IReadOnlyList<ExportColumn> columns, IEnumerable<object> rows, string filePath)
     {
         using var workbook = new XLWorkbook();
@@ -57,7 +62,7 @@ public static class ListExporter
             {
                 page.Size(PageSizes.A4.Landscape());
                 page.Margin(30);
-                page.DefaultTextStyle(style => style.FontSize(9));
+                page.DefaultTextStyle(style => Plain(style).FontSize(9));
 
                 page.Header().Column(column =>
                 {
@@ -115,6 +120,7 @@ public static class ListExporter
             {
                 page.Size(340, 420);
                 page.Margin(20);
+                page.DefaultTextStyle(Plain);
                 page.Content().Column(column =>
                 {
                     column.Item().AlignCenter().Height(220).Image(qrPngBytes);
@@ -136,7 +142,7 @@ public static class ListExporter
             {
                 page.Size(PageSizes.A4);
                 page.Margin(36);
-                page.DefaultTextStyle(style => style.FontSize(10));
+                page.DefaultTextStyle(style => Plain(style).FontSize(10));
 
                 page.Header().Column(column =>
                 {
@@ -217,7 +223,7 @@ public static class ListExporter
             {
                 page.Size(PageSizes.A4);
                 page.Margin(40);
-                page.DefaultTextStyle(style => style.FontSize(10));
+                page.DefaultTextStyle(style => Plain(style).FontSize(10));
 
                 page.Header().Column(column =>
                 {
@@ -338,7 +344,7 @@ public static class ListExporter
             {
                 page.Size(PageSizes.A4);
                 page.Margin(36);
-                page.DefaultTextStyle(style => style.FontSize(9.5f));
+                page.DefaultTextStyle(style => Plain(style).FontSize(9.5f));
 
                 page.Header().Column(column =>
                 {
@@ -565,7 +571,7 @@ public static class ListExporter
             {
                 page.Size(PageSizes.A4);
                 page.Margin(40);
-                page.DefaultTextStyle(style => style.FontSize(10));
+                page.DefaultTextStyle(style => Plain(style).FontSize(10));
                 page.Header().Element(c => Header(c, "DICHIARAZIONE DI CONFORMITÀ"));
                 page.Content().PaddingTop(14).Column(content =>
                 {
@@ -617,7 +623,7 @@ public static class ListExporter
             {
                 page.Size(PageSizes.A4);
                 page.Margin(40);
-                page.DefaultTextStyle(style => style.FontSize(10));
+                page.DefaultTextStyle(style => Plain(style).FontSize(10));
                 page.Header().Element(c => Header(c, "RAPPORTO DI VERIFICA INDIVIDUALE"));
                 page.Content().PaddingTop(14).Column(content =>
                 {
@@ -688,7 +694,7 @@ public static class ListExporter
             {
                 page.Size(PageSizes.A6);
                 page.Margin(16);
-                page.DefaultTextStyle(style => style.FontSize(8.5f));
+                page.DefaultTextStyle(style => Plain(style).FontSize(8.5f));
                 page.Content().Column(column =>
                 {
                     column.Spacing(5);
@@ -768,7 +774,7 @@ public static class ListExporter
             {
                 page.Size(new PageSize(100, 150, Unit.Millimetre));
                 page.Margin(6, Unit.Millimetre);
-                page.DefaultTextStyle(style => style.FontSize(9));
+                page.DefaultTextStyle(style => Plain(style).FontSize(9));
                 page.Content().Column(column =>
                 {
                     column.Spacing(4);
@@ -824,7 +830,7 @@ public static class ListExporter
             {
                 page.Size(PageSizes.A4);
                 page.Margin(36);
-                page.DefaultTextStyle(style => style.FontSize(9.5f));
+                page.DefaultTextStyle(style => Plain(style).FontSize(9.5f));
                 page.Header().Column(column =>
                 {
                     column.Item().Row(row =>
@@ -934,7 +940,7 @@ public static class ListExporter
             {
                 page.Size(PageSizes.A4);
                 page.Margin(36);
-                page.DefaultTextStyle(style => style.FontSize(10));
+                page.DefaultTextStyle(style => Plain(style).FontSize(10));
                 page.Header().Column(column =>
                 {
                     column.Item().Row(row =>
@@ -1065,7 +1071,7 @@ public static class ListExporter
             {
                 page.Size(PageSizes.A4);
                 page.Margin(36);
-                page.DefaultTextStyle(style => style.FontSize(9.5f));
+                page.DefaultTextStyle(style => Plain(style).FontSize(9.5f));
                 page.Header().Column(column =>
                 {
                     column.Item().Row(row =>

@@ -28,15 +28,19 @@ public class SupplierCatalogPdfImportTests : IClassFixture<AdminSeededApiTestFix
         _adminClient = fixture.Factory.AuthenticatedClient(fixture.Admin.Token);
     }
 
+    /// <summary>A simple catalog table. Landscape and a small font on purpose: with five narrow columns an
+    /// A4 portrait page made some random codes wrap inside their cell (hex digits have different widths),
+    /// splitting the row in two and making the tests fail at random. The importer handles single-line
+    /// rows only, as documented; wrapping belongs to "complex layouts".</summary>
     private static byte[] BuildCatalogPdf(string[] headers, string[][] rows)
     {
         return Document.Create(container =>
         {
             container.Page(page =>
             {
-                page.Size(PageSizes.A4);
+                page.Size(PageSizes.A4.Landscape());
                 page.Margin(30);
-                page.DefaultTextStyle(style => style.FontSize(11));
+                page.DefaultTextStyle(style => style.FontSize(9).DisableFontFeature(FontFeatures.StandardLigatures));
 
                 page.Content().Table(table =>
                 {
@@ -50,14 +54,14 @@ public class SupplierCatalogPdfImportTests : IClassFixture<AdminSeededApiTestFix
 
                     foreach (var header in headers)
                     {
-                        table.Cell().Padding(12).Text(header).Bold();
+                        table.Cell().Padding(6).Text(header).Bold();
                     }
 
                     foreach (var row in rows)
                     {
                         foreach (var cell in row)
                         {
-                            table.Cell().Padding(12).Text(cell);
+                            table.Cell().Padding(6).Text(cell);
                         }
                     }
                 });

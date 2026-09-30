@@ -1,10 +1,15 @@
-# Riepilogo sviluppi e stato del progetto
+﻿# Riepilogo sviluppi e stato del progetto
 
 Aggiornato: 2026-09-29
 
 Sintesi ad alto livello di cosa è stato costruito finora e cosa manca ancora. Per il dettaglio fase-per-fase con motivazioni tecniche vedi [DEVELOPMENT-PLAN.md](DEVELOPMENT-PLAN.md); per la mappa di file e architettura vedi [PROJECT-MAP.md](PROJECT-MAP.md).
 
 ## Cosa è stato fatto
+
+### Backtest completo e PDF senza legature (2026-09-30, v1.5.1)
+- **Backtest end-to-end**: 68 passi su 68 superati su un database vuoto e isolato, con tutti i ruoli (commerciale, acquisti, magazzino, reparto, qualità, capocantiere, direzione) e 14 controlli di sicurezza. Esito per area in STATO-PROGETTO.md, sezione "Backtest".
+- **PDF**: disattivate le legature tipografiche in tutti i documenti generati (DDT, fatture, etichette, rapportini, richiami); prima, copiando un codice che conteneva "ff", "fi", "fl" o "tt", alcune lettere sparivano. Test dedicato con controllo positivo.
+- **Release v1.5.0 fermata**: un test dell'import catalogo PDF falliva a caso per lo stesso motivo; corretto, suite stabile in 15 esecuzioni complete.
 
 ### Interconnessione macchine, Industria 4.0 e 5.0 (2026-09-30, v1.5.0)
 - **Ingresso dati macchina**: ogni macchina ha un token proprio (salvato solo come hash, rigenerabile e revocabile, gestito dall'Admin), con cui invia stato (marcia, attesa, attrezzaggio, ferma, allarme, spenta), contapezzi, scarti e allarmi, anche a pacchetti. Letture duplicate ignorate, limite di richieste per macchina.

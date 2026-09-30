@@ -5,9 +5,10 @@ Aggiornato: 30 settembre 2026. Questo file si aggiorna a ogni sessione di lavoro
 ## In sintesi
 
 - **Cos'è**: gestionale di produzione (MES) con parte commerciale e documentale, per piccole e medie aziende manifatturiere. Nato per un quadrista, oggi si configura per cinque settori.
-- **Versione pubblicata**: v1.5.0 (30/09/2026), con installer per Windows e aggiornamento automatico.
+- **Versione pubblicata**: v1.4.0 (30/09/2026), con installer per Windows e aggiornamento automatico. La release v1.5.0 si è fermata sui test automatici: il difetto è corretto e verificato, va pubblicata come v1.5.1.
 - **Architettura**: client Windows (WPF, .NET 8) + API web (ASP.NET Core 8) su Render + database Postgres su Neon. Una pagina web per i tecnici è servita dalla stessa API.
-- **Test automatici**: 264 sull'API e 111 sul client, tutti verdi all'ultima misura (30/09/2026). Le fatture elettroniche sono validate contro lo schema ufficiale FatturaPA.
+- **Test automatici**: 264 sull'API e 112 sul client, tutti verdi e stabili in 15 esecuzioni complete consecutive (30/09/2026). Le fatture elettroniche sono validate contro lo schema ufficiale FatturaPA.
+- **Backtest end-to-end** (30/09/2026): 68 passi su 68 superati su un database vuoto e isolato, percorrendo tutti i ruoli, dal preventivo alla fattura, più cantiere, alimentare, macchine e 14 controlli di sicurezza. Dettaglio nella sezione "Backtest".
 - **Uso attuale**: interno, un'azienda con due sedi.
 
 ## Cosa c'è
@@ -66,6 +67,26 @@ Aggiornato: 30 settembre 2026. Questo file si aggiorna a ogni sessione di lavoro
 - Pipeline GitHub: test a ogni push, release a ogni tag, firma del codice pronta ma inattiva.
 - Server sempre sveglio: il server chiama se stesso ogni 4 minuti; nelle ore di lavoro tiene sveglio anche il database; GitHub lo riaccende ogni 5 minuti. Il client riprova per un minuto se trova il server in avvio.
 
+## Backtest
+
+Ultima esecuzione: 30/09/2026, API avviata in locale su un database dedicato e vuoto (nel branch Neon di prova), nessun dato reale. Esito: **68/68 passi superati**.
+
+| Area | Passi | Cosa è stato verificato |
+|---|---|---|
+| Configurazione e utenti | 9 | Primo Admin, registrazione pubblica poi chiusa, un utente per ruolo, preset di settore, dati fiscali con controllo IBAN, prefisso GS1 |
+| Vendite e direzione | 6 | Cliente e dati SDI, preventivo inviato, accettato e convertito in commessa; costo reale e margine (vendita 9.120 €), controllo margini |
+| Magazzino e acquisti | 8 | Materiali, lotti, prelievo dalla commessa con scarico FIFO, conto lavoro con rientro parziale e scarto (residuo esatto) |
+| Produzione e reparto | 11 | Fasi dal ciclo, rilascio, ricerca per ultime 4 cifre, elenco commesse aperte, PIN, fasi avviate e chiuse, ore; verifica CEI EN 61439 completata |
+| Documenti e fatturazione | 10 | DDT numerato, fattura differita dal DDT con prezzo e sconto del preventivo, emissione, XML TD24 con totale corretto, stesso DDT non fatturabile due volte |
+| Tracciabilità e alimentare | 4 | Etichetta dalla distinta, pallet con SSCC, richiamo del lotto fino a DDT e cliente, HACCP con azione correttiva obbligatoria |
+| Cantiere | 4 | Rapportino negato su commessa chiusa, creato, firmato con immagine reale, ore e materiali nei costi |
+| Industria 4.0 | 2 | Dati macchina accettati col token e rifiutati senza; giornata con 100 pezzi e 1 allarme |
+| Sicurezza | 14 | Accesso richiesto su cinque aree, operatore senza permessi admin, margini negati al commerciale, token JWT falso respinto, intestazioni CSP, blocco dei tentativi di login (429) |
+
+Difetto trovato e corretto durante il backtest: nei PDF generati le coppie di lettere "ff", "fi", "fl", "tt" venivano disegnate come un solo simbolo tipografico; copiando un codice dal PDF alcune lettere sparivano. Ora le legature sono disattivate in tutti i PDF del client, con test dedicato.
+
+Non ancora provato: la pagina web dei tecnici dal browser con accesso reale (il login automatico con credenziali è bloccato dalle regole di sicurezza dell'assistente); i suoi flussi sono coperti dai test automatici e dal backtest sulle stesse API.
+
 ## Cosa manca
 
 | Punto | Stato | Cosa serve |
@@ -91,7 +112,8 @@ Aggiornato: 30 settembre 2026. Questo file si aggiorna a ogni sessione di lavoro
 | 29/09/2026 | v1.2.0 | Clienti e preventivi; costi, ore e margini con area direzione; verifica di sicurezza e correzioni; installer e aggiornamento affidabile; tabelle a tutta larghezza |
 | 29-30/09/2026 | v1.3.0 | Configurazione multi-settore; DDT, conto lavoro, esportazione per la contabilità; verifica CEI EN 61439; alimentare completo (scadenze, richiamo, allergeni ed etichette, SSCC, HACCP); rapportini di cantiere con pagina web per i tecnici |
 | 30/09/2026 | v1.4.0 | Fattura elettronica FatturaPA; terminale con ricerca per ultime cifre ed elenco commesse aperte; filtro commesse; codici copiabili; server sempre sveglio e login più rapido; pagina web con Fasi e Ore; istruzioni per hosting e firma |
-| 30/09/2026 | v1.5.0 | Interconnessione macchine (token per macchina, giornata con disponibilità e pezzi, gateway OPC UA/MQTT); corretto l'import catalogo PDF con codici contenenti ff/fi/fl |
+| 30/09/2026 | v1.5.1 (da pubblicare) | Backtest end-to-end 68/68; legature disattivate nei PDF (codici copiabili senza lettere perse), test PDF resi stabili |
+| 30/09/2026 | v1.5.0 (release fermata dai test) | Interconnessione macchine (token per macchina, giornata con disponibilità e pezzi, gateway OPC UA/MQTT); corretto l'import catalogo PDF con codici contenenti ff/fi/fl |
 | prossimo | - | OEE dai dati macchina nel cruscotto; importatore Metel appena arriva un file reale |
 
 ## Pubblicazione e ambienti
@@ -105,4 +127,4 @@ Aggiornato: 30 settembre 2026. Questo file si aggiorna a ogni sessione di lavoro
 
 1. Acquisto dell'hosting a pagamento su Render e del certificato di firma: vedi le istruzioni in fondo a [RIEPILOGO-SVILUPPO.md](RIEPILOGO-SVILUPPO.md), sezione "Hosting e firma".
 2. Invio delle fatture elettroniche: caricamento manuale gratuito sul portale "Fatture e Corrispettivi" oppure intermediario a pagamento (invio automatico).
-3. Eliminare il branch Neon `test-multisettore`.
+3. Eliminare il branch Neon `test-multisettore` (contiene anche il database `backtest`).

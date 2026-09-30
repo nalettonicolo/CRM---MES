@@ -52,6 +52,27 @@ public class SectorDocumentsTests : IDisposable
         AssertIsPdf(path);
     }
 
+    /// <summary>Regression: the PDF font drew "ff", "fi", "fb", "tt" as ligature glyphs without letters, so
+    /// copying a lot or a code out of a DDT lost them ("Lotto" read as "Loo"). All documents now disable
+    /// ligatures: the text extracted from the PDF must contain the codes exactly as written.</summary>
+    [Fact]
+    public void GeneratedPdfs_KeepCodesCopyable_WithoutLigatures()
+    {
+        var document = Document("Issued") with
+        {
+            Lines = [new(Guid.NewGuid(), 1, null, null, "STAFFA-ffb1", "Staffa fissaggio attrezzatura", 3, "pz", "L-fbtt-fi42", null, null, null, null, [])]
+        };
+        var path = Path.Combine(_dir, "ddt-ligatures.pdf");
+        ListExporter.ExportTransportDocument(document, Company, path);
+
+        using var pdf = UglyToad.PdfPig.PdfDocument.Open(path);
+        var text = string.Join(" ", pdf.GetPages().SelectMany(page => page.GetWords()).Select(word => word.Text));
+        Assert.Contains("STAFFA-ffb1", text);
+        Assert.Contains("L-fbtt-fi42", text);
+        Assert.Contains("Lotto", text);
+        Assert.Contains("attrezzatura", text);
+    }
+
     [Fact]
     public void ExportTransportDocument_WorksBeforeTheCompanyIsConfigured()
     {
