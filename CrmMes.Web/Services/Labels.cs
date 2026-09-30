@@ -53,6 +53,25 @@ public static class Labels
         _ => string.Empty,
     };
 
+    public static string QuoteStatus(string status, DateTime? convertedAt = null) => convertedAt is not null ? "Convertito" : status switch
+    {
+        "Draft" => "Bozza",
+        "Sent" => "Inviato",
+        "Accepted" => "Accettato",
+        "Rejected" => "Rifiutato",
+        _ => status,
+    };
+
+    public static string QuoteStatusClass(string status, DateTime? convertedAt = null) => convertedAt is not null ? "ok" : status switch
+    {
+        "Sent" => "info",
+        "Accepted" => "ok",
+        "Rejected" => "danger",
+        _ => string.Empty,
+    };
+
+    public static string Money(decimal value) => value.ToString("C", Italian);
+
     public static string Channel(string channel) => channel switch
     {
         "desktop" => "Desktop",

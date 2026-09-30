@@ -11,6 +11,8 @@ public static class Navigation
     [
         new("dashboard", "Cruscotto", "cruscotto", "Produzione"),
         new("production", "Commesse", "commesse", "Produzione"),
+        new("sales", "Clienti", "clienti", "Vendite"),
+        new("sales", "Preventivi", "preventivi", "Vendite"),
         new("warehouse", "Materiali", "materiali", "Magazzino"),
     ];
 

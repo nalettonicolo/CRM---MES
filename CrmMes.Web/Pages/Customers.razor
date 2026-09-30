@@ -1,0 +1,97 @@
+@page "/clienti"
+@implements IDisposable
+@inject Api Api
+@inject NavigationManager Nav
+
+<PageTitle>Clienti · Nicolò MES</PageTitle>
+
+<div class="page-head">
+    <div>
+        <div class="eyebrow">Vendite</div>
+        <h1>Clienti</h1>
+        <p class="sub">Anagrafica clienti con i loro preventivi e le commesse.</p>
+    </div>
+</div>
+
+<div class="toolbar">
+    <input class="search" type="search" placeholder="Nome, codice o partita IVA" aria-label="Cerca cliente" value="@_search" @oninput="OnSearchInput" />
+</div>
+
+<div class="card">
+    @if (_error is not null)
+    {
+        <div class="state"><strong>Impossibile caricare i clienti</strong>@_error
+            <div class="actions"><button class="secondary small" @onclick="LoadAsync">Riprova</button></div></div>
+    }
+    else if (_customers is null)
+    {
+        <div class="state">Caricamento...</div>
+    }
+    else if (_customers.Count == 0)
+    {
+        <div class="state"><strong>Nessun cliente</strong>@(string.IsNullOrWhiteSpace(_search) ? "I clienti si aggiungono dal programma desktop." : $"Nessun cliente corrisponde a \"{_search}\".")</div>
+    }
+    else
+    {
+        <div class="table-wrap">
+            <table class="cards">
+                <thead><tr><th>Codice</th><th>Ragione sociale</th><th>Partita IVA</th><th>Telefono</th><th>Email</th></tr></thead>
+                <tbody>
+                    @foreach (var customer in _customers)
+                    {
+                        <tr class="link" @onclick="() => Nav.NavigateTo(customer.DetailHref())">
+                            <td data-label="Codice" class="code">@customer.Code</td>
+                            <td data-label="Ragione sociale">@customer.Name</td>
+                            <td data-label="Partita IVA" class="muted">@(customer.VatNumber ?? "—")</td>
+                            <td data-label="Telefono" class="muted">@(customer.Phone ?? "—")</td>
+                            <td data-label="Email" class="muted">@(customer.Email ?? "—")</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    }
+</div>
+
+@code {
+    private string _search = string.Empty;
+    private List<Customer>? _customers;
+    private string? _error;
+    private CancellationTokenSource? _debounce;
+
+    protected override Task OnInitializedAsync() => LoadAsync();
+
+    private async Task OnSearchInput(ChangeEventArgs e)
+    {
+        _search = e.Value?.ToString() ?? string.Empty;
+        _debounce?.Cancel();
+        _debounce = new CancellationTokenSource();
+        try
+        {
+            await Task.Delay(300, _debounce.Token);
+        }
+        catch (TaskCanceledException)
+        {
+            return;
+        }
+
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        _error = null;
+        _customers = null;
+        try
+        {
+            var query = string.IsNullOrWhiteSpace(_search) ? "api/customers" : "api/customers?q=" + Uri.EscapeDataString(_search.Trim());
+            _customers = await Api.GetAsync<List<Customer>>(query);
+        }
+        catch (ApiException exception)
+        {
+            _error = exception.Message;
+        }
+    }
+
+    public void Dispose() => _debounce?.Cancel();
+}

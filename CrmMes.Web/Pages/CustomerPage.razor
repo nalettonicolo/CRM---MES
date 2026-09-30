@@ -1,0 +1,117 @@
+@page "/clienti/{Id:guid}"
+@inject Api Api
+@inject NavigationManager Nav
+
+<PageTitle>@(_detail?.Customer.Name ?? "Cliente") · Nicolò MES</PageTitle>
+
+<div class="page-head">
+    <div>
+        <div class="eyebrow"><a href="clienti">Clienti</a></div>
+        <h1>@(_detail?.Customer.Name ?? "Cliente")</h1>
+    </div>
+</div>
+
+@if (_error is not null)
+{
+    <div class="card state"><strong>Impossibile aprire il cliente</strong>@_error</div>
+}
+else if (_detail is null)
+{
+    <div class="card state">Caricamento...</div>
+}
+else
+{
+    var customer = _detail.Customer;
+    <div class="stack">
+        <div class="card card-pad">
+            <div class="facts">
+                <div class="fact"><div class="label">Codice</div><div class="value"><CopyCode Value="@customer.Code" /></div></div>
+                <div class="fact"><div class="label">Partita IVA</div><div class="value">@(customer.VatNumber ?? "—")</div></div>
+                <div class="fact"><div class="label">Telefono</div><div class="value">@(customer.Phone ?? "—")</div></div>
+                <div class="fact"><div class="label">Email</div><div class="value">@(customer.Email ?? "—")</div></div>
+                <div class="fact"><div class="label">Indirizzo</div><div class="value">@(customer.Address ?? "—")</div></div>
+            </div>
+            @if (!string.IsNullOrWhiteSpace(customer.Notes))
+            {
+                <p class="muted small">@customer.Notes</p>
+            }
+        </div>
+
+        <div class="grid-2">
+            <div class="card">
+                <div class="section-head"><h2>Preventivi</h2><span class="small muted">@_detail.Quotes.Count</span></div>
+                @if (_detail.Quotes.Count == 0)
+                {
+                    <div class="state">Nessun preventivo per questo cliente.</div>
+                }
+                else
+                {
+                    <div class="table-wrap">
+                        <table class="cards">
+                            <thead><tr><th>Preventivo</th><th>Data</th><th class="num">Totale</th><th>Stato</th></tr></thead>
+                            <tbody>
+                                @foreach (var quote in _detail.Quotes.OrderByDescending(q => q.CreatedAt))
+                                {
+                                    <tr class="link" @onclick="@(() => Nav.NavigateTo($"preventivi/{quote.Id}"))">
+                                        <td data-label="Preventivo" class="code">@quote.Code</td>
+                                        <td data-label="Data">@Labels.Date(quote.CreatedAt)</td>
+                                        <td data-label="Totale" class="num">@Labels.Money(quote.Total)</td>
+                                        <td data-label="Stato"><span class="badge @Labels.QuoteStatusClass(quote.Status)">@Labels.QuoteStatus(quote.Status)</span></td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                }
+            </div>
+
+            <div class="card">
+                <div class="section-head"><h2>Commesse</h2><span class="small muted">@_detail.WorkOrders.Count</span></div>
+                @if (_detail.WorkOrders.Count == 0)
+                {
+                    <div class="state">Nessuna commessa per questo cliente.</div>
+                }
+                else
+                {
+                    <div class="table-wrap">
+                        <table class="cards">
+                            <thead><tr><th>Commessa</th><th>Prodotto</th><th>Consegna</th><th>Stato</th></tr></thead>
+                            <tbody>
+                                @foreach (var order in _detail.WorkOrders)
+                                {
+                                    <tr class="link" @onclick="@(() => Nav.NavigateTo($"commesse/{order.Id}"))">
+                                        <td data-label="Commessa" class="code">@order.Code</td>
+                                        <td data-label="Prodotto">@order.ProductName</td>
+                                        <td data-label="Consegna">@Labels.Date(order.DueDate)</td>
+                                        <td data-label="Stato"><StatusBadge Status="@order.Status" /></td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                }
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    [Parameter] public Guid Id { get; set; }
+
+    private CustomerDetail? _detail;
+    private string? _error;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        _detail = null;
+        _error = null;
+        try
+        {
+            _detail = await Api.GetAsync<CustomerDetail>($"api/customers/{Id}/detail");
+        }
+        catch (ApiException exception)
+        {
+            _error = exception.Message;
+        }
+    }
+}

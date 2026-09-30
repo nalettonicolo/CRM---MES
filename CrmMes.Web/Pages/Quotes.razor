@@ -1,0 +1,107 @@
+@page "/preventivi"
+@inject Api Api
+@inject NavigationManager Nav
+
+<PageTitle>Preventivi · Nicolò MES</PageTitle>
+
+<div class="page-head">
+    <div>
+        <div class="eyebrow">Vendite</div>
+        <h1>Preventivi</h1>
+        <p class="sub">Dall'invio al cliente alla commessa.</p>
+    </div>
+</div>
+
+<div class="toolbar">
+    <input class="search" type="search" placeholder="Codice o cliente" aria-label="Filtra preventivi" @bind="_search" @bind:event="oninput" />
+    <div class="chips" role="group" aria-label="Stato">
+        @foreach (var (key, label) in Filters)
+        {
+            <button class="chip @(_status == key ? "active" : "")" aria-pressed="@(_status == key)" @onclick="() => ChangeStatusAsync(key)">@label</button>
+        }
+    </div>
+</div>
+
+<div class="card">
+    @if (_error is not null)
+    {
+        <div class="state"><strong>Impossibile caricare i preventivi</strong>@_error
+            <div class="actions"><button class="secondary small" @onclick="LoadAsync">Riprova</button></div></div>
+    }
+    else if (_quotes is null)
+    {
+        <div class="state">Caricamento...</div>
+    }
+    else if (Visible.Count == 0)
+    {
+        <div class="state"><strong>Nessun preventivo</strong>@(string.IsNullOrWhiteSpace(_search) ? "Nessun preventivo in questo stato." : $"Nessun preventivo corrisponde a \"{_search}\".")</div>
+    }
+    else
+    {
+        <div class="table-wrap">
+            <table class="cards">
+                <thead><tr><th>Preventivo</th><th>Cliente</th><th>Data</th><th>Validità</th><th class="num">Righe</th><th class="num">Totale</th><th>Stato</th></tr></thead>
+                <tbody>
+                    @foreach (var quote in Visible)
+                    {
+                        <tr class="link" @onclick="@(() => Nav.NavigateTo($"preventivi/{quote.Id}"))">
+                            <td data-label="Preventivo"><CopyCode Value="@quote.Code" /></td>
+                            <td data-label="Cliente">@quote.CustomerName</td>
+                            <td data-label="Data">@Labels.Date(quote.CreatedAt)</td>
+                            <td data-label="Validità" class="muted">@Labels.Date(quote.ValidUntil)</td>
+                            <td data-label="Righe" class="num">@quote.ItemCount</td>
+                            <td data-label="Totale" class="num">@Labels.Money(quote.Total)</td>
+                            <td data-label="Stato"><span class="badge @Labels.QuoteStatusClass(quote.Status, quote.ConvertedAt)">@Labels.QuoteStatus(quote.Status, quote.ConvertedAt)</span></td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+        <div class="section-head small muted">
+            <span>@Visible.Count preventivi</span>
+            <span>Totale @Labels.Money(Visible.Sum(q => q.Total))</span>
+        </div>
+    }
+</div>
+
+@code {
+    private static readonly (string Key, string Label)[] Filters =
+    [
+        ("", "Tutti"), ("Draft", "Bozze"), ("Sent", "Inviati"), ("Accepted", "Accettati"), ("Rejected", "Rifiutati"),
+    ];
+
+    private string _status = string.Empty;
+    private string _search = string.Empty;
+    private List<QuoteSummary>? _quotes;
+    private string? _error;
+
+    /// <summary>Filtered on the page: the list is per status and small enough to narrow as you type.</summary>
+    private List<QuoteSummary> Visible => (_quotes ?? [])
+        .Where(q => string.IsNullOrWhiteSpace(_search)
+            || q.Code.Contains(_search.Trim(), StringComparison.OrdinalIgnoreCase)
+            || q.CustomerName.Contains(_search.Trim(), StringComparison.OrdinalIgnoreCase))
+        .OrderByDescending(q => q.CreatedAt)
+        .ToList();
+
+    protected override Task OnInitializedAsync() => LoadAsync();
+
+    private async Task ChangeStatusAsync(string status)
+    {
+        _status = status;
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        _error = null;
+        _quotes = null;
+        try
+        {
+            _quotes = await Api.GetAsync<List<QuoteSummary>>(_status.Length == 0 ? "api/quotes" : $"api/quotes?status={_status}");
+        }
+        catch (ApiException exception)
+        {
+            _error = exception.Message;
+        }
+    }
+}

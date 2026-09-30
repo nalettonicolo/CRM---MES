@@ -53,10 +53,10 @@ public class NavigationTests
     [Fact]
     public void Menu_ShowsOnlyAreasTheAdminKeepsOnTheWeb()
     {
-        var entries = Navigation.Visible(["production", "sales"], "Sales");
+        var entries = Navigation.Visible(["production", "invoicing"], "Sales");
 
         Assert.Equal(["Commesse"], entries.Select(e => e.Title));
-        Assert.Equal(["sales"], Navigation.DesktopOnly(["production", "sales"]));
+        Assert.Equal(["invoicing"], Navigation.DesktopOnly(["production", "invoicing"]));
     }
 
     [Fact]
