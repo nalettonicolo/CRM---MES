@@ -113,8 +113,12 @@ public class CustomerNewModel(ConsoleDbContext db) : PageModel
 
 /// <summary>Everything about one customer: data, subscription (plan, modules, users → monthly fee), status
 /// and manual override, installations with their license keys, payments.</summary>
-public class CustomerDetailsModel(ConsoleDbContext db) : PageModel
+public class CustomerDetailsModel(ConsoleDbContext db, StripeOptions stripe, IStripeGateway gateway) : PageModel
 {
+    public bool StripeEnabled => stripe.Enabled;
+    public bool StripeTestMode => stripe.IsTestMode;
+    public string? PaymentLink { get; private set; }
+
     public Customer Customer { get; private set; } = null!;
     public List<PriceItem> Prices { get; private set; } = [];
     public string Status { get; private set; } = LicenseStatus.Active;
@@ -192,7 +196,24 @@ public class CustomerDetailsModel(ConsoleDbContext db) : PageModel
         await db.SaveChangesAsync();
         await ConsoleAuth.AuditAsync(db, User, "SubscriptionChanged",
             $"{Customer.Name}: piano {PlanKey}, moduli {Customer.Modules}, utenti extra {Customer.ExtraUsers}, canone {Fmt.Money(before)} → {Fmt.Money(Customer.MonthlyTotal)}");
-        return await ReloadAsync(id, $"Abbonamento aggiornato: canone mensile {Fmt.Money(Customer.MonthlyTotal)}. Le installazioni lo ricevono entro un'ora.");
+
+        // Stripe subscription running: the new fee becomes its price at once, with a proportional adjustment.
+        var stripeNote = string.Empty;
+        if (stripe.Enabled && Customer.StripeSubscriptionId is not null && Customer.MonthlyTotal != before && Customer.MonthlyTotal > 0)
+        {
+            try
+            {
+                var price = await gateway.CreateMonthlyPriceAsync(Customer.MonthlyTotal, $"{Customer.Name} - {Customer.PlanKey}", HttpContext.RequestAborted);
+                await gateway.ChangeSubscriptionPriceAsync(Customer.StripeSubscriptionId, price, HttpContext.RequestAborted);
+                stripeNote = " Canone aggiornato anche su Stripe (con conguaglio proporzionale).";
+            }
+            catch (Exception exception) when (exception is InvalidOperationException or HttpRequestException)
+            {
+                Error = $"Canone salvato qui, ma non su Stripe: {exception.Message}";
+            }
+        }
+
+        return await ReloadAsync(id, $"Abbonamento aggiornato: canone mensile {Fmt.Money(Customer.MonthlyTotal)}. Le installazioni lo ricevono entro un'ora.{stripeNote}");
     }
 
     public async Task<IActionResult> OnPostStatusAsync(Guid id, string? forced)
@@ -211,6 +232,66 @@ public class CustomerDetailsModel(ConsoleDbContext db) : PageModel
             LicenseStatus.Active => "Cliente attivo a prescindere dai pagamenti.",
             _ => "Lo stato torna a dipendere dai pagamenti.",
         });
+    }
+
+    /// <summary>The Stripe payment link to send to the customer: card or SEPA direct debit, monthly, at the
+    /// current fee. Paying it links the subscription (webhook) and every monthly payment is then recorded.</summary>
+    public async Task<IActionResult> OnPostStripeCheckoutAsync(Guid id)
+    {
+        if (!await LoadAsync(id, tracking: true))
+        {
+            return NotFound();
+        }
+
+        if (!stripe.Enabled || Customer.MonthlyTotal <= 0)
+        {
+            Error = stripe.Enabled ? "Imposta prima piano e moduli: il canone è zero." : "Stripe non è collegato.";
+            return Page();
+        }
+
+        try
+        {
+            Customer.StripeCustomerId ??= await gateway.CreateCustomerAsync(Customer.Name, Customer.Email, Customer.Id, HttpContext.RequestAborted);
+            await db.SaveChangesAsync();
+            var price = await gateway.CreateMonthlyPriceAsync(Customer.MonthlyTotal, $"{Customer.Name} - {Customer.PlanKey}", HttpContext.RequestAborted);
+            var back = $"{Request.Scheme}://{Request.Host}/";
+            PaymentLink = await gateway.CreateCheckoutAsync(Customer.StripeCustomerId, price, Customer.Id, back + "?pagato=1", back, HttpContext.RequestAborted);
+            await ConsoleAuth.AuditAsync(db, User, "StripeCheckoutCreated", Customer.Name);
+            Info = "Link di pagamento creato: invialo al cliente. Quando paga, l'abbonamento si collega da solo.";
+        }
+        catch (Exception exception) when (exception is InvalidOperationException or HttpRequestException)
+        {
+            Error = exception.Message;
+        }
+
+        return Page();
+    }
+
+    /// <summary>Link for the customer to change card or bank account on Stripe's own page.</summary>
+    public async Task<IActionResult> OnPostStripePortalAsync(Guid id)
+    {
+        if (!await LoadAsync(id))
+        {
+            return NotFound();
+        }
+
+        if (!stripe.Enabled || Customer.StripeCustomerId is null)
+        {
+            Error = "Il cliente non ha ancora un profilo Stripe.";
+            return Page();
+        }
+
+        try
+        {
+            PaymentLink = await gateway.CreatePortalAsync(Customer.StripeCustomerId, $"{Request.Scheme}://{Request.Host}/", HttpContext.RequestAborted);
+            Info = "Link per aggiornare il metodo di pagamento: invialo al cliente (vale per poco tempo).";
+        }
+        catch (Exception exception) when (exception is InvalidOperationException or HttpRequestException)
+        {
+            Error = exception.Message;
+        }
+
+        return Page();
     }
 
     /// <summary>A new installation and its license key, shown this one time only.</summary>

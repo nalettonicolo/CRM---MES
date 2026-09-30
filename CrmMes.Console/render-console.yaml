@@ -5,6 +5,10 @@
 #   CONSOLE_DATABASE_URL  database Postgres dedicato alla console (non quello del gestionale)
 #   CONSOLE_SECRET        almeno 32 caratteri casuali; se cambia, la chiave di firma diventa illeggibile
 #                         e le installazioni rifiutano le licenze: conservalo in un posto sicuro.
+#   STRIPE_SECRET_KEY     chiave segreta Stripe (sk_live_... o, per provare, sk_test_...)
+#   STRIPE_WEBHOOK_SECRET segreto del webhook (whsec_...): in Stripe, Sviluppatori > Webhook, indirizzo
+#                         https://<console>/api/stripe/webhook con gli eventi checkout.session.completed,
+#                         invoice.paid, invoice.payment_failed, customer.subscription.deleted
 services:
   - type: web
     name: crmmes-console
@@ -19,4 +23,8 @@ services:
       - key: CONSOLE_DATABASE_URL
         sync: false
       - key: CONSOLE_SECRET
+        sync: false
+      - key: STRIPE_SECRET_KEY
+        sync: false
+      - key: STRIPE_WEBHOOK_SECRET
         sync: false

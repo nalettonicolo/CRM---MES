@@ -15,6 +15,39 @@
     @if (Model.Error is not null) { <div class="alert" role="alert">@Model.Error</div> }
     @if (Model.StatusMessage is not null) { <div class="notice">@Model.StatusMessage</div> }
 
+    @if (c.BillingMethod == BillingMethods.Stripe)
+    {
+        <div class="card card-pad stack">
+            <h2>Stripe @if (Model.StripeTestMode) {<span class="badge warn">modalità di prova</span>}</h2>
+            @if (!Model.StripeEnabled)
+            {
+                <p class="muted small">Stripe non è ancora collegato alla console (servono le chiavi STRIPE_SECRET_KEY e STRIPE_WEBHOOK_SECRET). Nel frattempo registra i pagamenti a mano.</p>
+            }
+            else
+            {
+                <p class="muted small">
+                    @(c.StripeSubscriptionId is null
+                        ? "Nessun abbonamento Stripe attivo: crea il link di pagamento e invialo al cliente."
+                        : "Abbonamento Stripe attivo: i pagamenti mensili si registrano da soli e i cambi di canone si applicano subito.")
+                </p>
+                @if (Model.PaymentLink is not null)
+                {
+                    <div class="key-once">@Model.PaymentLink</div>
+                }
+                <div class="actions">
+                    @if (c.StripeSubscriptionId is null)
+                    {
+                        <form method="post" asp-page-handler="StripeCheckout" asp-route-id="@c.Id"><button type="submit">Crea link di pagamento (@Fmt.Money(c.MonthlyTotal) al mese)</button></form>
+                    }
+                    @if (c.StripeCustomerId is not null)
+                    {
+                        <form method="post" asp-page-handler="StripePortal" asp-route-id="@c.Id"><button class="secondary" type="submit">Link per aggiornare carta o conto</button></form>
+                    }
+                </div>
+            }
+        </div>
+    }
+
     @if (Model.NewKey is not null)
     {
         <div class="card card-pad stack">

@@ -25,6 +25,9 @@ if (string.IsNullOrWhiteSpace(secret) || secret.Length < 32)
 builder.Services.AddDbContext<ConsoleDbContext>(options => options.UseNpgsql(connectionString));
 builder.Services.AddSingleton(new SecretProtector(secret));
 builder.Services.AddSingleton<ConsoleKeyStore>();
+builder.Services.AddSingleton<StripeOptions>();
+builder.Services.AddSingleton<IStripeGateway, StripeHttpGateway>();
+builder.Services.AddHttpClient(StripeHttpGateway.HttpClientName, client => client.Timeout = TimeSpan.FromSeconds(30));
 builder.Services.AddSingleton<IPasswordHasher<ConsoleUser>, PasswordHasher<ConsoleUser>>();
 builder.Services.AddDataProtection().PersistKeysToDbContext<ConsoleDbContext>().SetApplicationName("nicolomes-console");
 
@@ -119,6 +122,7 @@ app.UseAuthorization();
 app.MapPost("/api/installations/heartbeat", HeartbeatEndpoint.HandleAsync).RequireRateLimiting("heartbeat").AllowAnonymous();
 app.MapPost("/api/installations/support", SupportEndpoint.CreateAsync).RequireRateLimiting("heartbeat").AllowAnonymous();
 app.MapGet("/api/installations/support", SupportEndpoint.ListAsync).RequireRateLimiting("heartbeat").AllowAnonymous();
+app.MapPost("/api/stripe/webhook", StripeWebhookEndpoint.HandleAsync).AllowAnonymous();
 app.MapGet("/api/public-key", async (ConsoleKeyStore keys, CancellationToken ct) => Results.Ok(new { publicKey = (await keys.GetAsync(ct)).PublicKey }))
     .AllowAnonymous();
 app.MapGet("/health", async (ConsoleDbContext db) => await db.Database.CanConnectAsync() ? Results.Ok(new { status = "healthy" }) : Results.StatusCode(503))
