@@ -136,7 +136,7 @@ Non ancora provato: la pagina web dei tecnici dal browser con accesso reale (il 
 | 30/09/2026 | v1.5.0 (release fermata dai test) | Interconnessione macchine (token per macchina, giornata con disponibilità e pezzi, gateway OPC UA/MQTT); corretto l'import catalogo PDF con codici contenenti ff/fi/fl |
 | 30/09/2026 | (prossima release) | Ufficio tecnico: documenti versionati per fase, revisioni del prodotto, modifiche tecniche con approvazione e aggiornamento delle commesse in bozza; documenti al terminale e sul web; migrazione AddEngineering applicata al database di produzione |
 | 30/09/2026 | v1.6.0 | Installer da collegare in seguito; piattaforma web `/app/` con vendite, DDT e fatture; (cruscotto, commesse, materiali); canali di accesso configurabili dall'amministratore; basi per server presso il cliente (servizio Windows, configurazione, migrazioni automatiche, log) e per la teleassistenza (contatti e diagnostica) |
-| prossimo | - | Altre aree sulla piattaforma web; installer del server e teleassistenza nel client; OEE dai dati macchina |
+| prossimo | - | Collaudo macchine e CE, Service post-vendita, monitoraggio energetico, fatture passive e scadenziario, MRP, ubicazioni, capacità finita, pacchetti di settore, altre aree sul web |
 
 ## Pubblicazione e ambienti
 
