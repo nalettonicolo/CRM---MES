@@ -258,6 +258,7 @@ public sealed class Api
     internal static string DefaultMessage(HttpStatusCode status) => status switch
     {
         HttpStatusCode.Forbidden => "Il tuo ruolo non ha i permessi per questa operazione.",
+        HttpStatusCode.PaymentRequired => "Abbonamento sospeso: è disponibile solo la consultazione generale.",
         HttpStatusCode.NotFound => "Elemento non trovato: potrebbe essere stato eliminato.",
         HttpStatusCode.TooManyRequests => "Troppe richieste ravvicinate: attendi un minuto e riprova.",
         HttpStatusCode.ServiceUnavailable or HttpStatusCode.BadGateway or HttpStatusCode.GatewayTimeout

@@ -32,6 +32,7 @@
   <ItemGroup>
     <ProjectReference Include="..\CrmMes.Api\CrmMes.Api.csproj" />
     <ProjectReference Include="..\CrmMes.Core\CrmMes.Core.csproj" />
+    <ProjectReference Include="..\CrmMes.Licensing\CrmMes.Licensing.csproj" />
   </ItemGroup>
 
 </Project>

@@ -1,4 +1,4 @@
-using System.Security.Claims;
+﻿using System.Security.Claims;
 using CrmMes.Core.Data;
 using CrmMes.Core.Models;
 using Microsoft.AspNetCore.Authorization;
@@ -20,11 +20,13 @@ public class UsersController : ControllerBase
 
     private readonly ApplicationDbContext _dbContext;
     private readonly IPasswordHasher<User> _passwordHasher;
+    private readonly CrmMes.Api.Services.LicenseState _license;
 
-    public UsersController(ApplicationDbContext dbContext, IPasswordHasher<User> passwordHasher)
+    public UsersController(ApplicationDbContext dbContext, IPasswordHasher<User> passwordHasher, CrmMes.Api.Services.LicenseState license)
     {
         _dbContext = dbContext;
         _passwordHasher = passwordHasher;
+        _license = license;
     }
 
     [HttpGet]
@@ -61,6 +63,12 @@ public class UsersController : ControllerBase
         if (await _dbContext.Users.AnyAsync(user => user.Email == email, cancellationToken))
         {
             return Conflict(new { message = "Esiste già un utente con questa email." });
+        }
+
+        var license = await _license.CurrentAsync(cancellationToken);
+        if (license.MaxUsers is { } maxUsers && await _dbContext.Users.CountAsync(u => u.IsActive, cancellationToken) >= maxUsers)
+        {
+            return Conflict(new { message = $"Il piano comprende {maxUsers} utenti attivi, tutti in uso: disattiva un utente o chiedi di ampliare il piano." });
         }
 
         var user = new User

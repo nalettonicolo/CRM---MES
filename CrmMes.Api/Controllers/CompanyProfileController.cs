@@ -16,10 +16,12 @@ namespace CrmMes.Api.Controllers;
 public class CompanyProfileController : ControllerBase
 {
     private readonly ApplicationDbContext _dbContext;
+    private readonly LicenseState _license;
 
-    public CompanyProfileController(ApplicationDbContext dbContext)
+    public CompanyProfileController(ApplicationDbContext dbContext, LicenseState license)
     {
         _dbContext = dbContext;
+        _license = license;
     }
 
     /// <summary>The profile, or IsConfigured=false with every module enabled when nobody has configured
@@ -28,10 +30,13 @@ public class CompanyProfileController : ControllerBase
     public async Task<ActionResult<CompanyProfileResponse>> GetProfile(CancellationToken cancellationToken = default)
     {
         var profile = await _dbContext.CompanyProfiles.AsNoTracking().FirstOrDefaultAsync(cancellationToken);
-        return Ok(profile is null
+        var license = await _license.CurrentAsync(cancellationToken);
+        var response = profile is null
             ? new CompanyProfileResponse(false, string.Empty, null, null, null, null, "generic",
                 Sectors.Modules.Select(module => module.Key).ToList(), null, ["generic"])
-            : ToResponse(profile));
+            : ToResponse(profile);
+        // Modules the subscription doesn't include are off, whatever was configured.
+        return Ok(response with { EnabledModules = license.Allow(response.EnabledModules).ToList() });
     }
 
     /// <summary>Sectors and modules the configuration wizard offers, with each sector's default modules.</summary>
@@ -202,6 +207,15 @@ public class CompanyProfileController : ControllerBase
         }
 
         var modules = Sectors.Parse(string.Join(',', request.EnabledModules ?? activities.SelectMany(a => a!.Modules).Distinct().ToList()));
+        var license = await _license.CurrentAsync(cancellationToken);
+        var notLicensed = modules.Except(license.Allow(modules)).ToList();
+        if (request.EnabledModules is not null && notLicensed.Count > 0)
+        {
+            var names = notLicensed.Select(key => Sectors.Modules.FirstOrDefault(m => m.Key == key)?.Name ?? key);
+            return BadRequest(new { message = $"Non inclusi nell'abbonamento: {string.Join(", ", names)}. Per attivarli contatta l'assistenza." });
+        }
+
+        modules = license.Allow(modules).ToList();
 
         var profile = await _dbContext.CompanyProfiles.FirstOrDefaultAsync(cancellationToken);
         if (profile is null)
@@ -291,9 +305,9 @@ public class CompanyProfileController : ControllerBase
         }
 
         var profile = await _dbContext.CompanyProfiles.AsNoTracking().FirstOrDefaultAsync(cancellationToken);
-        var modules = profile is null
+        var modules = (await _license.CurrentAsync(cancellationToken)).Allow(profile is null
             ? Sectors.Modules.Select(module => module.Key).ToList()
-            : Sectors.Parse(profile.EnabledModules).ToList();
+            : Sectors.Parse(profile.EnabledModules).ToList()).ToList();
         return Ok(AccessChannels.AreasFor(AccessChannels.Parse(profile?.AccessChannels), modules, normalized));
     }
 

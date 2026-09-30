@@ -486,6 +486,7 @@ public partial class MainWindow : Window
         _currentRole = auth.Role;
         _apiClient.CurrentRole = auth.Role;
         _ = FlagAvailableUpdateAsync();
+        _ = ShowLicenseStateAsync();
         ApplyEnabledModules();
         CompanySetupButton.Visibility = auth.Role == "Admin" ? Visibility.Visible : Visibility.Collapsed;
         if (reloadMaterials && auth.Role is "Admin" or "Management")
@@ -2614,6 +2615,30 @@ public partial class MainWindow : Window
     /// <summary>Checks for a newer release in the background after login and, if there is one, turns the
     /// sidebar's update link into a visible notice. Silent on any failure (offline, GitHub rate limit):
     /// the manual "Controlla aggiornamenti" still reports errors.</summary>
+    /// <summary>A banner when the subscription is late (everything works) or suspended (only the overall
+    /// view: details and changes are refused with the reason).</summary>
+    private async Task ShowLicenseStateAsync()
+    {
+        try
+        {
+            var license = await _apiClient.GetLicenseAsync();
+            if (license is not { Enabled: true } || license.Status == "active")
+            {
+                LicenseBanner.Visibility = Visibility.Collapsed;
+                return;
+            }
+
+            LicenseBannerText.Text = license.Status == "suspended"
+                ? $"Abbonamento sospeso. {license.Message ?? "È disponibile solo la consultazione generale: contatta l'assistenza per riattivarlo."}"
+                : $"Attenzione: {license.Message ?? "pagamento dell'abbonamento in ritardo."} Tutto funziona normalmente.";
+            LicenseBanner.Visibility = Visibility.Visible;
+        }
+        catch
+        {
+            LicenseBanner.Visibility = Visibility.Collapsed;
+        }
+    }
+
     private async Task FlagAvailableUpdateAsync()
     {
         if (_updateService.IsDevelopmentBuild)

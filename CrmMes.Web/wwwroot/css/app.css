@@ -184,6 +184,7 @@ td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
 .recovery-codes .code { padding: 8px 10px; background: var(--bg); border-radius: var(--radius-sm); text-align: center; }
 .inline-form { display: flex; gap: 10px; align-items: center; max-width: 360px; }
 .stack-gap { margin-bottom: 16px; }
+.license-banner { margin-bottom: 18px; font-weight: 600; }
 details summary { cursor: pointer; font-weight: 600; }
 details ul { margin: 8px 0 0; padding-left: 18px; max-height: 240px; overflow-y: auto; }
 .actions { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; justify-content: flex-end; margin-top: 16px; }

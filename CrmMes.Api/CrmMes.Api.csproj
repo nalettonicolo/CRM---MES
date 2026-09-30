@@ -11,6 +11,7 @@
     <ProjectReference Include="..\CrmMes.Core\CrmMes.Core.csproj" />
     <!-- The web platform (Blazor WebAssembly), published with the API and served under /app/. -->
     <ProjectReference Include="..\CrmMes.Web\CrmMes.Web.csproj" />
+    <ProjectReference Include="..\CrmMes.Licensing\CrmMes.Licensing.csproj" />
   </ItemGroup>
 
   <ItemGroup>

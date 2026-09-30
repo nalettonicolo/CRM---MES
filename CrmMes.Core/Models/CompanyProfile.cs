@@ -49,6 +49,12 @@ public class CompanyProfile
     /// <summary>Roles that must use two-factor authentication, comma-separated. Empty: optional for all.</summary>
     public string TwoFactorRoles { get; set; } = string.Empty;
 
+    /// <summary>Subscription from the vendor console (see LicenseState in CrmMes.Api): the last signed license
+    /// received, the console's public key pinned at the first contact, and when it was last checked.</summary>
+    public string? LicenseToken { get; set; }
+    public string? LicensePublicKey { get; set; }
+    public DateTime? LicenseCheckedAt { get; set; }
+
     public DateTime ConfiguredAt { get; set; } = DateTime.UtcNow;
     public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
 }

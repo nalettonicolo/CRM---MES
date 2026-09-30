@@ -82,6 +82,10 @@ else
         </nav>
 
         <main class="main">
+            @if (_license is { Enabled: true } && _license.Status != "active")
+            {
+                <div class="@(_license.Status == "suspended" ? "alert" : "notice") license-banner" role="status">@LicenseBannerText</div>
+            }
             @Body
         </main>
     </div>
@@ -92,6 +96,11 @@ else
     private bool _menuOpen;
     private string? _loadError;
     private Dictionary<string, string> _areaNames = [];
+    private LicenseInfo? _license;
+
+    private string LicenseBannerText => _license?.Status == "suspended"
+        ? "Abbonamento sospeso. " + (_license.Message ?? "È disponibile solo la consultazione generale: contatta l'assistenza per riattivarlo.")
+        : "Attenzione: " + (_license?.Message ?? "pagamento dell'abbonamento in ritardo.") + " Tutto funziona normalmente.";
     private Guid? _loadedFor;
 
     protected override async Task OnInitializedAsync()
@@ -122,6 +131,15 @@ else
         {
             Session.Company = await Api.GetAsync<CompanyProfile>("api/company-profile");
             Session.WebAreas = await Api.GetAsync<List<string>>("api/company-profile/areas?channel=web");
+            try
+            {
+                _license = await Api.GetAsync<LicenseInfo>("api/license");
+            }
+            catch (ApiException)
+            {
+                _license = null; // server older than licensing
+            }
+
             var access = await Api.GetAsync<AccessChannels>("api/company-profile/access");
             _areaNames = access.KnownAreas.ToDictionary(area => area.Key, area => area.Name);
 

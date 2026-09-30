@@ -142,6 +142,10 @@ builder.Services.AddSingleton<CrmMes.Api.Services.WorkOrderFactory>();
 builder.Services.AddScoped<CrmMes.Api.Services.MaterialPricing>();
 builder.Services.AddScoped<CrmMes.Api.Services.WorkOrderCosting>();
 builder.Services.AddHostedService<CrmMes.Api.Services.KeepWarmService>();
+builder.Services.AddSingleton<CrmMes.Api.Services.LicenseState>();
+builder.Services.AddSingleton<CrmMes.Api.Services.LicenseHeartbeatService>();
+builder.Services.AddHostedService(sp => sp.GetRequiredService<CrmMes.Api.Services.LicenseHeartbeatService>());
+builder.Services.AddHttpClient(CrmMes.Api.Services.LicenseHeartbeatService.HttpClientName, client => client.Timeout = TimeSpan.FromSeconds(30));
 builder.Services.AddHttpClient(CrmMes.Api.Services.KeepWarmService.HttpClientName);
 
 var connectionString = Environment.GetEnvironmentVariable("NEON_DATABASE_URL")
@@ -251,6 +255,29 @@ app.Use(async (context, next) =>
         context.Response.StatusCode = StatusCodes.Status403Forbidden;
         await context.Response.WriteAsJsonAsync(new { message = "Per il tuo ruolo serve la verifica in due passaggi: attivala per continuare.", twoFactorSetupRequired = true });
         return;
+    }
+
+    await next();
+});
+// Subscription suspended by the vendor console: only a limited overall view answers (dashboard, lists);
+// details and every change get 402 with the reason, which the clients show.
+app.Use(async (context, next) =>
+{
+    var license = context.RequestServices.GetRequiredService<CrmMes.Api.Services.LicenseState>();
+    if (license.Enabled && context.User.Identity?.IsAuthenticated == true
+        && !CrmMes.Api.Services.LicenseState.IsAllowedWhenSuspended(context.Request))
+    {
+        var snapshot = await license.CurrentAsync(context.RequestAborted);
+        if (snapshot.IsSuspended)
+        {
+            context.Response.StatusCode = StatusCodes.Status402PaymentRequired;
+            await context.Response.WriteAsJsonAsync(new
+            {
+                message = snapshot.Message ?? "Abbonamento sospeso: è disponibile solo la consultazione generale. Contatta l'assistenza per riattivarlo.",
+                licenseSuspended = true,
+            });
+            return;
+        }
     }
 
     await next();

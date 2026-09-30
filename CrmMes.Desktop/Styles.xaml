@@ -46,6 +46,8 @@
 
     <SolidColorBrush x:Key="DangerBrush" Color="#C0392B" />
     <SolidColorBrush x:Key="DangerHoverBrush" Color="#A5301F" />
+    <SolidColorBrush x:Key="WarningSoftBrush" Color="#FBF1E3" />
+    <SolidColorBrush x:Key="WarningTextBrush" Color="#A15C07" />
 
     <SolidColorBrush x:Key="OutlineBgBrush" Color="#FFFFFF" />
     <SolidColorBrush x:Key="OutlineBorderBrush" Color="#D4D4D8" />

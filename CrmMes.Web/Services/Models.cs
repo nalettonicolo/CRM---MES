@@ -14,6 +14,10 @@ public sealed record RecoveryCodeList(List<string> RecoveryCodes);
 
 public sealed record SecuritySettings(List<string> TwoFactorRoles, List<string> KnownRoles);
 
+public sealed record LicenseInfo(
+    bool Enabled, string Status, string? Message, string? Plan, List<string>? Modules, int? MaxUsers,
+    DateTime? ValidUntil, DateTime? CheckedAt, string? Customer);
+
 public sealed record SupportInfo(
     string? Name, string? Email, string? Phone, string? Hours, string? RustDeskIdServer, string? RustDeskKey,
     string? RemoteToolUrl, string ServerVersion, string Hosting);

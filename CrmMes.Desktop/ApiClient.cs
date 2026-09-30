@@ -189,6 +189,18 @@ public sealed class ApiClient
         return await response.Content.ReadFromJsonAsync<System.Text.Json.JsonElement>(cancellationToken: cancellationToken);
     }
 
+    /// <summary>The subscription state for the banner; null on a server older than licensing.</summary>
+    public async Task<LicenseDto?> GetLicenseAsync(CancellationToken cancellationToken = default)
+    {
+        using var response = await _httpClient.GetAsync("api/license", cancellationToken);
+        if (!response.IsSuccessStatusCode)
+        {
+            return null;
+        }
+
+        return await response.Content.ReadFromJsonAsync<LicenseDto>(cancellationToken: cancellationToken);
+    }
+
     public Task<TwoFactorStatusDto> GetTwoFactorStatusAsync(CancellationToken cancellationToken = default)
         => GetOneAsync<TwoFactorStatusDto>("api/account/2fa", cancellationToken);
 
@@ -1829,12 +1841,18 @@ public sealed class ApiClient
             return;
         }
 
-        if (response.StatusCode == HttpStatusCode.Forbidden)
+        var body = await response.Content.ReadAsStringAsync(cancellationToken);
+        if (response.StatusCode == HttpStatusCode.PaymentRequired)
         {
-            throw new InvalidOperationException("Il tuo ruolo utente non ha i permessi per questa operazione.");
+            // Subscription suspended: the server says why and what still works.
+            throw new InvalidOperationException(TryExtractMessage(body) ?? "Abbonamento sospeso: è disponibile solo la consultazione generale.");
         }
 
-        var body = await response.Content.ReadAsStringAsync(cancellationToken);
+        if (response.StatusCode == HttpStatusCode.Forbidden)
+        {
+            throw new InvalidOperationException(TryExtractMessage(body) ?? "Il tuo ruolo utente non ha i permessi per questa operazione.");
+        }
+
         throw new InvalidOperationException($"Errore API ({(int)response.StatusCode}): {TryExtractMessage(body) ?? body}");
     }
 
@@ -1885,6 +1903,10 @@ public sealed record AuthDto(
     bool TwoFactorSetupRequired = false);
 
 public sealed record TwoFactorStatusDto(bool Enabled, bool Required, int RecoveryCodesLeft);
+
+public sealed record LicenseDto(
+    bool Enabled, string Status, string? Message, string? Plan, List<string>? Modules, int? MaxUsers,
+    DateTime? ValidUntil, DateTime? CheckedAt, string? Customer);
 
 public sealed record SupportInfoDto(
     string? Name, string? Email, string? Phone, string? Hours, string? RustDeskIdServer, string? RustDeskKey,
