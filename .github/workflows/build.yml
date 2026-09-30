@@ -32,6 +32,19 @@ jobs:
       - name: Test web platform
         run: dotnet test CrmMes.Web.Tests/CrmMes.Web.Tests.csproj --no-build --configuration Release --logger "trx;LogFileName=test-results.trx"
 
+      # The installer is otherwise compiled only when a release tag is pushed: a mistake in the .iss
+      # would surface as a failed release. Compiling it here too catches it at the first push.
+      - name: Verify installer compiles
+        shell: pwsh
+        run: |
+          dotnet publish CrmMes.Desktop/CrmMes.Desktop.csproj -c Release -r win-x64 --self-contained false -o publish
+          choco install innosetup --no-progress -y
+          $iscc = Get-ChildItem "C:\Program Files (x86)\Inno Setup 6", "C:\Program Files\Inno Setup 6" -Filter ISCC.exe -ErrorAction SilentlyContinue |
+            Select-Object -First 1 -ExpandProperty FullName
+          if (-not $iscc) { throw "ISCC.exe non trovato dopo l'installazione di Inno Setup." }
+          & $iscc "/DMyAppVersion=0.0.0" installer\NicoloMES.iss
+          if ($LASTEXITCODE -ne 0) { throw "Compilazione dell'installer fallita." }
+
       - name: Publish test results
         if: always()
         uses: actions/upload-artifact@v4
