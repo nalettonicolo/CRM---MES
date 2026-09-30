@@ -1,0 +1,170 @@
+@page "/fatture/{Id:guid}"
+@inject Api Api
+@inject IJSRuntime Js
+
+<PageTitle>@(_invoice?.Code ?? "Fattura") · Nicolò MES</PageTitle>
+
+<div class="page-head">
+    <div>
+        <div class="eyebrow"><a href="fatture">Fatture</a></div>
+        <h1>@(_invoice is null ? "Fattura" : $"Fattura {_invoice.Code}")</h1>
+        @if (_invoice is not null)
+        {
+            <p class="sub"><a href="clienti/@_invoice.CustomerId">@_invoice.CustomerName</a> · @Labels.InvoiceType(_invoice.DocumentType)</p>
+        }
+    </div>
+    @if (_invoice is not null)
+    {
+        <span class="badge @Labels.DocumentStatusClass(_invoice.Status)">@(_invoice.Status == "Issued" ? "Emessa" : Labels.DocumentStatus(_invoice.Status))</span>
+    }
+</div>
+
+@if (_error is not null)
+{
+    <div class="card state"><strong>Impossibile aprire la fattura</strong>@_error</div>
+}
+else if (_invoice is null)
+{
+    <div class="card state">Caricamento...</div>
+}
+else
+{
+    <div class="stack">
+        @if (_invoice.Warnings.Count > 0)
+        {
+            <div class="notice">
+                @foreach (var warning in _invoice.Warnings)
+                {
+                    <div>@warning</div>
+                }
+            </div>
+        }
+        @if (_invoice.Status == "Draft")
+        {
+            <div class="notice">Bozza: si emette dal programma desktop, che assegna il numero e controlla i dati per lo SdI.</div>
+        }
+
+        <div class="card card-pad">
+            <div class="facts">
+                <div class="fact"><div class="label">Numero</div><div class="value">@(_invoice.Number is null ? "—" : $"{_invoice.Number}/{_invoice.Year}")</div></div>
+                <div class="fact"><div class="label">Data</div><div class="value">@Labels.Date(_invoice.IssueDate)</div></div>
+                <div class="fact"><div class="label">Pagamento</div><div class="value">@_invoice.PaymentMethod</div></div>
+                <div class="fact"><div class="label">Scadenza</div><div class="value">@Labels.Date(_invoice.PaymentDueDate)</div></div>
+                <div class="fact"><div class="label">DDT collegati</div>
+                    <div class="value">
+                        @if (_invoice.TransportDocuments.Count == 0)
+                        {
+                            <span>—</span>
+                        }
+                        @foreach (var document in _invoice.TransportDocuments)
+                        {
+                            <a href="ddt/@document.Id" class="code">@document.DocumentCode</a><span> </span>
+                        }
+                    </div>
+                </div>
+                <div class="fact"><div class="label">Totale documento</div><div class="value">@Labels.Money(_invoice.Total)</div></div>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="section-head"><h2>Righe</h2></div>
+            <div class="table-wrap">
+                <table class="cards">
+                    <thead><tr><th>#</th><th>Descrizione</th><th class="num">Quantità</th><th class="num">Prezzo</th><th class="num">Sconto</th><th class="num">IVA</th><th class="num">Importo</th></tr></thead>
+                    <tbody>
+                        @foreach (var line in _invoice.Lines.OrderBy(l => l.LineNumber))
+                        {
+                            <tr>
+                                <td data-label="#" class="muted">@line.LineNumber</td>
+                                <td data-label="Descrizione">@line.Description @if (line.Code is not null) {<div class="small muted code">@line.Code</div>}</td>
+                                <td data-label="Quantità" class="num">@Labels.Number(line.Quantity) @line.Unit</td>
+                                <td data-label="Prezzo" class="num">@Labels.Money(line.UnitPrice)</td>
+                                <td data-label="Sconto" class="num">@(line.DiscountPercent == 0 ? "—" : Labels.Number(line.DiscountPercent) + "%")</td>
+                                <td data-label="IVA" class="num">@(line.VatNature ?? Labels.Number(line.VatRate) + "%")</td>
+                                <td data-label="Importo" class="num">@Labels.Money(line.LineTotal)</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="section-head"><h2>Riepilogo IVA</h2></div>
+            <div class="table-wrap">
+                <table class="cards">
+                    <thead><tr><th>Aliquota</th><th class="num">Imponibile</th><th class="num">Imposta</th></tr></thead>
+                    <tbody>
+                        @foreach (var vat in _invoice.VatSummary)
+                        {
+                            <tr>
+                                <td data-label="Aliquota">@(vat.Nature is null ? Labels.Number(vat.Rate) + "%" : $"Natura {vat.Nature}")</td>
+                                <td data-label="Imponibile" class="num">@Labels.Money(vat.Taxable)</td>
+                                <td data-label="Imposta" class="num">@Labels.Money(vat.Tax)</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        @if (_downloadError is not null)
+        {
+            <div class="alert" role="alert">@_downloadError</div>
+        }
+        @if (_invoice.Status == "Issued")
+        {
+            <div class="actions">
+                <button @onclick="DownloadXmlAsync" disabled="@_downloading">@(_downloading ? "Preparazione..." : "Scarica XML FatturaPA")</button>
+            </div>
+        }
+    </div>
+}
+
+@code {
+    [Parameter] public Guid Id { get; set; }
+
+    private Invoice? _invoice;
+    private string? _error;
+    private string? _downloadError;
+    private bool _downloading;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        _invoice = null;
+        _error = null;
+        try
+        {
+            _invoice = await Api.GetAsync<Invoice>($"api/invoices/{Id}");
+        }
+        catch (ApiException exception)
+        {
+            _error = exception.Message;
+        }
+    }
+
+    /// <summary>The same file the desktop program saves, ready for the "Fatture e Corrispettivi" portal
+    /// or an intermediary.</summary>
+    private async Task DownloadXmlAsync()
+    {
+        _downloading = true;
+        _downloadError = null;
+        try
+        {
+            var file = await Api.GetFileAsync($"api/invoices/{Id}/xml", $"{_invoice!.Code}.xml");
+            await Js.InvokeVoidAsync("nicolomes.saveFile", file.FileName, file.ContentType, Convert.ToBase64String(file.Content));
+        }
+        catch (ApiException exception)
+        {
+            _downloadError = exception.Message;
+        }
+        catch (JSException)
+        {
+            _downloadError = "Il browser non ha permesso di salvare il file.";
+        }
+        finally
+        {
+            _downloading = false;
+        }
+    }
+}

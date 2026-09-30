@@ -47,10 +47,14 @@ public class WebPlatformTests : IClassFixture<AdminSeededApiTestFixture>
     }
 
     [Fact]
-    public async Task Stylesheet_IsServed()
+    public async Task StylesheetAndDownloadScript_AreServedFromTheSite()
     {
         var css = await _client.GetAsync("/app/css/app.css");
         Assert.Equal(HttpStatusCode.OK, css.StatusCode);
         Assert.Contains("prefers-color-scheme: dark", await css.Content.ReadAsStringAsync());
+
+        var script = await _client.GetAsync("/app/js/files.js");
+        Assert.Equal(HttpStatusCode.OK, script.StatusCode);
+        Assert.Contains("saveFile", await script.Content.ReadAsStringAsync());
     }
 }

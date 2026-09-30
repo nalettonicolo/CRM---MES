@@ -13,6 +13,8 @@ public static class Navigation
         new("production", "Commesse", "commesse", "Produzione"),
         new("sales", "Clienti", "clienti", "Vendite"),
         new("sales", "Preventivi", "preventivi", "Vendite"),
+        new("shipping", "Documenti di trasporto", "ddt", "Documenti"),
+        new("invoicing", "Fatture", "fatture", "Documenti", ["Admin", "Sales", "Management"]),
         new("warehouse", "Materiali", "materiali", "Magazzino"),
     ];
 

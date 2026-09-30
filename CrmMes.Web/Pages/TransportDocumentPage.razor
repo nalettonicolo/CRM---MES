@@ -1,0 +1,138 @@
+@page "/ddt/{Id:guid}"
+@inject Api Api
+
+<PageTitle>@(_document?.DocumentCode ?? "Documento di trasporto") · Nicolò MES</PageTitle>
+
+<div class="page-head">
+    <div>
+        <div class="eyebrow"><a href="ddt">Documenti di trasporto</a></div>
+        <h1>@(_document is null ? "Documento di trasporto" : $"DDT {_document.DocumentCode}")</h1>
+        @if (_document is not null)
+        {
+            <p class="sub">@_document.ReasonLabel@(string.IsNullOrWhiteSpace(_document.ReasonDetail) ? "" : $" · {_document.ReasonDetail}")</p>
+        }
+    </div>
+    @if (_document is not null)
+    {
+        <span class="badge @Labels.DocumentStatusClass(_document.Status)">@Labels.DocumentStatus(_document.Status)</span>
+    }
+</div>
+
+@if (_error is not null)
+{
+    <div class="card state"><strong>Impossibile aprire il documento</strong>@_error</div>
+}
+else if (_document is null)
+{
+    <div class="card state">Caricamento...</div>
+}
+else
+{
+    <div class="stack">
+        @if (_document.Status == "Cancelled")
+        {
+            <div class="alert">Annullato il @Labels.DateTime(_document.CancelledAt)@(string.IsNullOrWhiteSpace(_document.CancellationReason) ? "." : $": {_document.CancellationReason}")</div>
+        }
+        else if (_document.Status == "Draft")
+        {
+            <div class="notice">Bozza: il numero si assegna all'emissione, dal programma desktop.</div>
+        }
+
+        <div class="card card-pad">
+            <div class="facts">
+                <div class="fact"><div class="label">Destinatario</div><div class="value">@_document.RecipientName</div></div>
+                <div class="fact"><div class="label">Indirizzo</div><div class="value">@(_document.RecipientAddress ?? "—")</div></div>
+                <div class="fact"><div class="label">Partita IVA</div><div class="value">@(_document.RecipientVatNumber ?? "—")</div></div>
+                <div class="fact"><div class="label">Destinazione</div><div class="value">@(_document.DestinationAddress ?? "Come destinatario")</div></div>
+                <div class="fact"><div class="label">Trasporto a cura</div><div class="value">@Labels.TransportBy(_document.TransportBy)@(_document.CarrierName is null ? "" : $" · {_document.CarrierName}")</div></div>
+                <div class="fact"><div class="label">Porto</div><div class="value">@(_document.Port ?? "—")</div></div>
+                <div class="fact"><div class="label">Colli e peso</div><div class="value">@(_document.Packages?.ToString() ?? "—") colli · @(_document.GrossWeightKg is null ? "—" : Labels.Number(_document.GrossWeightKg.Value) + " kg")</div></div>
+                <div class="fact"><div class="label">Aspetto dei beni</div><div class="value">@(_document.GoodsAppearance ?? "—")</div></div>
+                <div class="fact"><div class="label">Inizio trasporto</div><div class="value">@Labels.DateTime(_document.TransportStartAt)</div></div>
+                <div class="fact"><div class="label">Emesso</div><div class="value">@Labels.DateTime(_document.IssuedAt)@(_document.IssuedBy is null ? "" : $" · {_document.IssuedBy}")</div></div>
+                @if (_document.ExpectedReturnAt is not null)
+                {
+                    <div class="fact"><div class="label">Rientro previsto</div><div class="value">@Labels.Date(_document.ExpectedReturnAt)</div></div>
+                }
+                @if (_document.WorkOrderId is not null)
+                {
+                    <div class="fact"><div class="label">Commessa</div><div class="value"><a href="commesse/@_document.WorkOrderId" class="code">@_document.WorkOrderCode</a></div></div>
+                }
+            </div>
+            @if (!string.IsNullOrWhiteSpace(_document.Notes))
+            {
+                <p class="muted small">@_document.Notes</p>
+            }
+        </div>
+
+        <div class="card">
+            <div class="section-head"><h2>Merce</h2><span class="small muted">@_document.Lines.Count righe</span></div>
+            @if (_document.Lines.Count == 0)
+            {
+                <div class="state">Nessuna riga.</div>
+            }
+            else
+            {
+                var subcontracting = _document.Lines.Any(l => l.OutstandingQuantity is not null);
+                <div class="table-wrap">
+                    <table class="cards">
+                        <thead>
+                            <tr>
+                                <th>#</th><th>Codice</th><th>Descrizione</th><th>Lotto</th><th class="num">Quantità</th>
+                                @if (subcontracting) {<th class="num">Rientrato</th><th class="num">Scarto</th><th class="num">Da rientrare</th>}
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var line in _document.Lines.OrderBy(l => l.LineNumber))
+                            {
+                                <tr>
+                                    <td data-label="#" class="muted">@line.LineNumber</td>
+                                    <td data-label="Codice" class="code">@(line.Code ?? "—")</td>
+                                    <td data-label="Descrizione">@line.Description</td>
+                                    <td data-label="Lotto">@if (line.LotNumber is not null) {<CopyCode Value="@line.LotNumber" />} else {<span class="muted">—</span>}</td>
+                                    <td data-label="Quantità" class="num">@Labels.Number(line.Quantity) @line.Unit</td>
+                                    @if (subcontracting)
+                                    {
+                                        <td data-label="Rientrato" class="num">@Labels.Number(line.ReturnedQuantity ?? 0)</td>
+                                        <td data-label="Scarto" class="num">@Labels.Number(line.ScrapQuantity ?? 0)</td>
+                                        <td data-label="Da rientrare" class="num">
+                                            @if (line.OutstandingQuantity is > 0)
+                                            {
+                                                <span class="badge warn">@Labels.Number(line.OutstandingQuantity.Value)</span>
+                                            }
+                                            else
+                                            {
+                                                <span class="badge ok">Completo</span>
+                                            }
+                                        </td>
+                                    }
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            }
+        </div>
+    </div>
+}
+
+@code {
+    [Parameter] public Guid Id { get; set; }
+
+    private TransportDocument? _document;
+    private string? _error;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        _document = null;
+        _error = null;
+        try
+        {
+            _document = await Api.GetAsync<TransportDocument>($"api/transport-documents/{Id}");
+        }
+        catch (ApiException exception)
+        {
+            _error = exception.Message;
+        }
+    }
+}

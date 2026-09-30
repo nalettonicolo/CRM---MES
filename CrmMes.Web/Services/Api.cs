@@ -78,6 +78,18 @@ public sealed class Api
 
     public Task<T> PostAsync<T>(string path, object? body = null) => SendAsync<T>(HttpMethod.Post, path, body);
 
+    /// <summary>A file served behind login (the invoice XML): name taken from the server's header.</summary>
+    public async Task<DownloadedFile> GetFileAsync(string path, string fallbackName)
+    {
+        using var response = await SendAuthenticatedAsync(HttpMethod.Get, path, null);
+        await EnsureSuccessAsync(response);
+        var name = response.Content.Headers.ContentDisposition?.FileNameStar
+            ?? response.Content.Headers.ContentDisposition?.FileName?.Trim('"')
+            ?? fallbackName;
+        var type = response.Content.Headers.ContentType?.MediaType ?? "application/octet-stream";
+        return new DownloadedFile(name, type, await response.Content.ReadAsByteArrayAsync());
+    }
+
     private async Task<T> SendAsync<T>(HttpMethod method, string path, object? body)
     {
         using var response = await SendAuthenticatedAsync(method, path, body);

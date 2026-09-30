@@ -53,15 +53,18 @@ public class NavigationTests
     [Fact]
     public void Menu_ShowsOnlyAreasTheAdminKeepsOnTheWeb()
     {
-        var entries = Navigation.Visible(["production", "invoicing"], "Sales");
+        var entries = Navigation.Visible(["production", "haccp"], "Sales");
 
         Assert.Equal(["Commesse"], entries.Select(e => e.Title));
-        Assert.Equal(["invoicing"], Navigation.DesktopOnly(["production", "invoicing"]));
+        Assert.Equal(["haccp"], Navigation.DesktopOnly(["production", "haccp"]));
     }
 
     [Fact]
-    public void WithoutChannelSettings_EveryWebPageIsShown() =>
-        Assert.Equal(Navigation.WebPages.Count, Navigation.Visible(null, "Operator").Count);
+    public void WithoutChannelSettings_EveryWebPageTheRoleMayUseIsShown()
+    {
+        Assert.Equal(Navigation.WebPages.Count, Navigation.Visible(null, "Admin").Count);
+        Assert.Equal(Navigation.WebPages.Count(p => p.Roles is null), Navigation.Visible(null, "Operator").Count);
+    }
 
     [Fact]
     public void Restrictions_StoreOnlyWhatDiffersFromEverything()

@@ -72,6 +72,37 @@ public static class Labels
 
     public static string Money(decimal value) => value.ToString("C", Italian);
 
+    /// <summary>Transport documents and invoices share the same life: draft, issued (numbered), cancelled.</summary>
+    public static string DocumentStatus(string status) => status switch
+    {
+        "Draft" => "Bozza",
+        "Issued" => "Emesso",
+        "Cancelled" => "Annullato",
+        _ => status,
+    };
+
+    public static string DocumentStatusClass(string status) => status switch
+    {
+        "Issued" => "ok",
+        "Cancelled" => "danger",
+        _ => string.Empty,
+    };
+
+    public static string InvoiceType(string documentType) => documentType switch
+    {
+        "TD24" => "Differita (da DDT)",
+        "TD01" => "Immediata",
+        _ => documentType,
+    };
+
+    public static string TransportBy(string transportBy) => transportBy switch
+    {
+        "Sender" => "Mittente",
+        "Recipient" => "Destinatario",
+        "Carrier" => "Vettore",
+        _ => transportBy,
+    };
+
     public static string Channel(string channel) => channel switch
     {
         "desktop" => "Desktop",
