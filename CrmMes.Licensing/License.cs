@@ -117,3 +117,24 @@ public sealed record Heartbeat(
 /// <summary>The console's answer: the signed license and its public key (pinned by the installation at the
 /// first contact, then required to match).</summary>
 public sealed record HeartbeatReply(string License, string PublicKey);
+
+/// <summary>A request for help sent by an installation to the vendor console, with who asks, how to reach
+/// them, the remote-session ID if they already opened RustDesk, and the server's technical state.</summary>
+public sealed record SupportRequest(
+    string Subject,
+    string Message,
+    string RequestedBy,
+    string? Contact,
+    string? RemoteSessionId,
+    System.Text.Json.JsonElement? Diagnostics);
+
+/// <summary>A request as the console reports it back: number, state and the vendor's answer.</summary>
+public sealed record SupportTicketInfo(
+    Guid Id, int Number, string Subject, string Status, DateTime CreatedAt, string RequestedBy, string? Reply, DateTime? RepliedAt);
+
+public static class SupportTicketStatus
+{
+    public const string Open = "open";
+    public const string InProgress = "in-progress";
+    public const string Closed = "closed";
+}

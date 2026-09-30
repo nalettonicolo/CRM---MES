@@ -224,3 +224,76 @@ public class ConsoleSignInTests : IAsyncLifetime
         Assert.DoesNotContain("unsafe", csp);
     }
 }
+
+public class SupportTicketTests : IAsyncLifetime
+{
+    private readonly ConsoleFactory _factory = new();
+
+    public Task InitializeAsync() => Task.CompletedTask;
+
+    public async Task DisposeAsync() => await _factory.DisposeAsync();
+
+    private async Task<string> InstallationKeyAsync()
+    {
+        var key = LicenseKeys.New();
+        await using var db = _factory.Db();
+        var customer = new Customer { Name = "Officine Aurora srl" };
+        customer.Installations.Add(new Installation { Name = "Server sede", KeyHash = LicenseKeys.Hash(key), KeyPrefix = LicenseKeys.Prefix(key) });
+        db.Customers.Add(customer);
+        await db.SaveChangesAsync();
+        return key;
+    }
+
+    private HttpRequestMessage Request(HttpMethod method, string key, object? body = null)
+    {
+        var request = new HttpRequestMessage(method, "/api/installations/support");
+        request.Headers.Add(HeartbeatEndpoint.KeyHeader, key);
+        if (body is not null)
+        {
+            request.Content = JsonContent.Create(body);
+        }
+
+        return request;
+    }
+
+    [Fact]
+    public async Task Requests_ArriveNumbered_WithDiagnostics_AndTheReplyGoesBack()
+    {
+        var key = await InstallationKeyAsync();
+        var client = _factory.CreateClient();
+        var diagnostics = System.Text.Json.JsonSerializer.SerializeToElement(new { serverVersion = "1.7.0", database = new { canConnect = true } });
+
+        var first = await (await client.SendAsync(Request(HttpMethod.Post, key,
+            new SupportRequest("Stampa DDT", "Il PDF esce vuoto", "Anna <anna@example.test>", "333 1234567", "123 456 789", diagnostics))))
+            .Content.ReadFromJsonAsync<SupportTicketInfo>();
+        var second = await (await client.SendAsync(Request(HttpMethod.Post, key, new SupportRequest("Altro", "Seconda", "Anna", null, null, null))))
+            .Content.ReadFromJsonAsync<SupportTicketInfo>();
+
+        Assert.Equal(1, first!.Number);
+        Assert.Equal(2, second!.Number);
+        Assert.Equal(SupportTicketStatus.Open, first.Status);
+
+        await using (var db = _factory.Db())
+        {
+            var ticket = await db.Tickets.SingleAsync(t => t.Number == 1);
+            Assert.Contains("1.7.0", ticket.DiagnosticsJson);
+            Assert.Equal("123 456 789", ticket.RemoteSessionId);
+            ticket.Reply = "Aggiorna alla versione 1.7.1, poi riprova.";
+            ticket.Status = SupportTicketStatus.Closed;
+            await db.SaveChangesAsync();
+        }
+
+        var list = await (await client.SendAsync(Request(HttpMethod.Get, key))).Content.ReadFromJsonAsync<List<SupportTicketInfo>>();
+        var answered = list!.Single(t => t.Number == 1);
+        Assert.Equal(SupportTicketStatus.Closed, answered.Status);
+        Assert.Contains("1.7.1", answered.Reply);
+    }
+
+    [Fact]
+    public async Task Requests_NeedAValidKey()
+    {
+        var response = await _factory.CreateClient().SendAsync(Request(HttpMethod.Post, "nmes_inventata", new SupportRequest("A", "B", "C", null, null, null)));
+
+        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+    }
+}

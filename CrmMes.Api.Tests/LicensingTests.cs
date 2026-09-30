@@ -22,8 +22,28 @@ public sealed class FakeLicenseConsole : HttpMessageHandler
     public Heartbeat? LastHeartbeat { get; private set; }
     public string ExpectedKey { get; } = "chiave-licenza-di-prova";
 
+    public SupportRequest? LastSupportRequest { get; private set; }
+
     protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
     {
+        if (request.RequestUri!.AbsolutePath == "/api/installations/support"
+            && request.Headers.TryGetValues(LicenseHeartbeatService.KeyHeader, out var supportKeys) && supportKeys.Single() == ExpectedKey)
+        {
+            if (request.Method == HttpMethod.Post)
+            {
+                LastSupportRequest = await request.Content!.ReadFromJsonAsync<SupportRequest>(cancellationToken);
+                return new HttpResponseMessage(HttpStatusCode.OK)
+                {
+                    Content = JsonContent.Create(new SupportTicketInfo(Guid.NewGuid(), 42, LastSupportRequest!.Subject, SupportTicketStatus.Open, DateTime.UtcNow, LastSupportRequest.RequestedBy, null, null)),
+                };
+            }
+
+            return new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = JsonContent.Create(new[] { new SupportTicketInfo(Guid.NewGuid(), 41, "Precedente", SupportTicketStatus.Closed, DateTime.UtcNow.AddDays(-2), "Admin", "Risolto.", DateTime.UtcNow) }),
+            };
+        }
+
         if (request.RequestUri!.AbsolutePath != "/api/installations/heartbeat"
             || !request.Headers.TryGetValues(LicenseHeartbeatService.KeyHeader, out var keys) || keys.Single() != ExpectedKey)
         {
@@ -188,6 +208,28 @@ public class LicensingTests : IAsyncLifetime
         Assert.Equal(HttpStatusCode.BadGateway, response.StatusCode);
         var profile = await _admin.GetFromJsonAsync<CompanyProfileResponse>("/api/company-profile");
         Assert.DoesNotContain("invoicing", profile!.EnabledModules);
+    }
+
+    [Fact]
+    public async Task SupportRequest_GoesToTheConsole_WithTheServersState()
+    {
+        var response = await _admin.PostAsJsonAsync("/api/support/requests",
+            new NewSupportRequest("Stampa DDT", "Il PDF esce vuoto", "333 1234567", "123 456 789"));
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var ticket = await response.Content.ReadFromJsonAsync<SupportTicketInfo>();
+        Assert.Equal(42, ticket!.Number);
+        var sent = _console.LastSupportRequest!;
+        Assert.Contains("admin@licenza.test", sent.RequestedBy);
+        Assert.Equal("123 456 789", sent.RemoteSessionId);
+        Assert.True(sent.Diagnostics!.Value.GetProperty("database").GetProperty("canConnect").GetBoolean());
+        Assert.DoesNotContain("Password", sent.Diagnostics.Value.GetRawText());
+
+        var list = await _admin.GetFromJsonAsync<List<SupportTicketInfo>>("/api/support/requests");
+        Assert.Equal("Risolto.", list!.Single().Reply);
+
+        var empty = await _admin.PostAsJsonAsync("/api/support/requests", new NewSupportRequest(" ", "", null, null));
+        Assert.Equal(HttpStatusCode.BadRequest, empty.StatusCode);
     }
 
     [Fact]

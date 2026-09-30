@@ -1,0 +1,41 @@
+@page
+@model TicketsModel
+@{ ViewData["Title"] = "Assistenza"; }
+<div class="page-head">
+    <div>
+        <div class="eyebrow">Console fornitore</div>
+        <h1>Richieste di assistenza</h1>
+        <p class="sub">Inviate dal programma o dal web dei clienti, con lo stato del loro server allegato.</p>
+    </div>
+    <div class="actions">
+        <a class="button secondary" href="?show=open">Aperte</a>
+        <a class="button secondary" href="?show=all">Tutte</a>
+    </div>
+</div>
+<div class="card">
+    @if (Model.Rows.Count == 0)
+    {
+        <div class="state">Nessuna richiesta @(Model.Show == "all" ? "" : "aperta").</div>
+    }
+    else
+    {
+        <div class="table-wrap">
+            <table>
+                <thead><tr><th>N.</th><th>Data</th><th>Cliente</th><th>Oggetto</th><th>Da</th><th>Stato</th></tr></thead>
+                <tbody>
+                    @foreach (var t in Model.Rows)
+                    {
+                        <tr>
+                            <td class="code"><a asp-page="/Ticket" asp-route-id="@t.Id">@t.Number</a></td>
+                            <td>@Fmt.DateTime(t.CreatedAt)</td>
+                            <td>@t.Customer.Name <div class="small muted">@t.Installation.Name</div></td>
+                            <td><a asp-page="/Ticket" asp-route-id="@t.Id">@t.Subject</a></td>
+                            <td class="small muted">@t.RequestedBy</td>
+                            <td><span class="badge @TicketsModel.StatusClass(t.Status)">@TicketsModel.StatusName(t.Status)</span></td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    }
+</div>

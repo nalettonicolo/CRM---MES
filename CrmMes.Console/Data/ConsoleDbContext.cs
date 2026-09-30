@@ -17,6 +17,7 @@ public class ConsoleDbContext : DbContext, IDataProtectionKeyContext
     public DbSet<PriceItem> Prices => Set<PriceItem>();
     public DbSet<ConsoleSetting> Settings => Set<ConsoleSetting>();
     public DbSet<ConsoleAudit> Audit => Set<ConsoleAudit>();
+    public DbSet<SupportTicket> Tickets => Set<SupportTicket>();
 
     /// <summary>Login cookies survive a restart of the service (keys in the database, not in memory).</summary>
     public DbSet<DataProtectionKey> DataProtectionKeys => Set<DataProtectionKey>();
@@ -62,5 +63,14 @@ public class ConsoleDbContext : DbContext, IDataProtectionKeyContext
         });
 
         modelBuilder.Entity<ConsoleSetting>(entity => entity.HasKey(s => s.Key));
+
+        modelBuilder.Entity<SupportTicket>(entity =>
+        {
+            entity.HasIndex(t => t.Number).IsUnique();
+            entity.Property(t => t.Subject).HasMaxLength(200);
+            entity.Property(t => t.Status).HasMaxLength(20);
+            entity.HasOne(t => t.Installation).WithMany().HasForeignKey(t => t.InstallationId).OnDelete(DeleteBehavior.Cascade);
+            entity.HasOne(t => t.Customer).WithMany().HasForeignKey(t => t.CustomerId).OnDelete(DeleteBehavior.NoAction);
+        });
     }
 }

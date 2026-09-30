@@ -102,3 +102,4 @@ tbody tr:last-child td { border-bottom: 0; }
 .login-card .brand-line { font-size: 13px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--accent); }
 .qr { display: block; background: #fff; padding: 8px; border-radius: var(--radius-sm); }
 .key-once { font-family: var(--mono); font-size: 16px; padding: 12px; background: var(--bg); border-radius: var(--radius-sm); word-break: break-all; }
+pre { white-space: pre-wrap; word-break: break-word; margin: 0; }

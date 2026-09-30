@@ -119,6 +119,30 @@ public class PriceItem
     public int SortOrder { get; set; }
 }
 
+/// <summary>A request for help sent from an installation, with the server's state at that moment.</summary>
+public class SupportTicket
+{
+    public Guid Id { get; set; } = Guid.NewGuid();
+    public int Number { get; set; }
+    public Guid InstallationId { get; set; }
+    public Installation Installation { get; set; } = null!;
+    public Guid CustomerId { get; set; }
+    public Customer Customer { get; set; } = null!;
+    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+    public string Subject { get; set; } = string.Empty;
+    public string Message { get; set; } = string.Empty;
+    public string RequestedBy { get; set; } = string.Empty;
+    public string? Contact { get; set; }
+    public string? RemoteSessionId { get; set; }
+    public string? DiagnosticsJson { get; set; }
+
+    /// <summary>"open", "in-progress" or "closed" (see SupportTicketStatus).</summary>
+    public string Status { get; set; } = "open";
+    public string? Reply { get; set; }
+    public DateTime? RepliedAt { get; set; }
+    public string? RepliedBy { get; set; }
+}
+
 public class ConsoleSetting
 {
     public string Key { get; set; } = string.Empty;

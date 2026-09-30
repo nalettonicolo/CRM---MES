@@ -117,6 +117,8 @@ app.UseAuthentication();
 app.UseAuthorization();
 
 app.MapPost("/api/installations/heartbeat", HeartbeatEndpoint.HandleAsync).RequireRateLimiting("heartbeat").AllowAnonymous();
+app.MapPost("/api/installations/support", SupportEndpoint.CreateAsync).RequireRateLimiting("heartbeat").AllowAnonymous();
+app.MapGet("/api/installations/support", SupportEndpoint.ListAsync).RequireRateLimiting("heartbeat").AllowAnonymous();
 app.MapGet("/api/public-key", async (ConsoleKeyStore keys, CancellationToken ct) => Results.Ok(new { publicKey = (await keys.GetAsync(ct)).PublicKey }))
     .AllowAnonymous();
 app.MapGet("/health", async (ConsoleDbContext db) => await db.Database.CanConnectAsync() ? Results.Ok(new { status = "healthy" }) : Results.StatusCode(503))

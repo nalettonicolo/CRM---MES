@@ -181,6 +181,20 @@ public sealed class ApiClient
             ?? throw new InvalidOperationException("Risposta di assistenza non valida.");
     }
 
+    public Task<SupportTicketDto> SendSupportRequestAsync(string subject, string message, string? contact, string? remoteSessionId, CancellationToken cancellationToken = default)
+        => SendAsync<SupportTicketDto>(HttpMethod.Post, "api/support/requests", new { subject, message, contact, remoteSessionId }, cancellationToken);
+
+    public async Task<IReadOnlyList<SupportTicketDto>> GetSupportRequestsAsync(CancellationToken cancellationToken = default)
+    {
+        using var response = await _httpClient.GetAsync("api/support/requests", cancellationToken);
+        if (!response.IsSuccessStatusCode)
+        {
+            return [];
+        }
+
+        return await response.Content.ReadFromJsonAsync<List<SupportTicketDto>>(cancellationToken: cancellationToken) ?? [];
+    }
+
     /// <summary>Server state for the diagnostic package (Admin only), kept as raw JSON.</summary>
     public async Task<System.Text.Json.JsonElement> GetServerDiagnosticsAsync(CancellationToken cancellationToken = default)
     {
@@ -1907,6 +1921,13 @@ public sealed record TwoFactorStatusDto(bool Enabled, bool Required, int Recover
 public sealed record LicenseDto(
     bool Enabled, string Status, string? Message, string? Plan, List<string>? Modules, int? MaxUsers,
     DateTime? ValidUntil, DateTime? CheckedAt, string? Customer);
+
+public sealed record SupportTicketDto(Guid Id, int Number, string Subject, string Status, DateTime CreatedAt, string RequestedBy, string? Reply, DateTime? RepliedAt)
+{
+    public string StatusText => Status switch { "open" => "Aperta", "in-progress" => "In lavorazione", "closed" => "Chiusa", _ => Status };
+    public string CreatedText => CreatedAt.ToLocalTime().ToString("dd/MM/yyyy HH:mm");
+    public string ReplyText => string.IsNullOrWhiteSpace(Reply) ? "In attesa di risposta" : Reply;
+}
 
 public sealed record SupportInfoDto(
     string? Name, string? Email, string? Phone, string? Hours, string? RustDeskIdServer, string? RustDeskKey,

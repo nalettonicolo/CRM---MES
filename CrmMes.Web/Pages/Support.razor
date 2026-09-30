@@ -53,6 +53,45 @@ else if (_info is not null)
             <a class="button" href="https://rustdesk.com/download" target="_blank" rel="noopener noreferrer">Scarica RustDesk</a>
         </div>
 
+        @if (_licensed)
+        {
+            <div class="card card-pad stack">
+                <div>
+                    <h2>Scrivi all'assistenza</h2>
+                    <p class="muted small">La richiesta arriva con lo stato tecnico del server allegato (nessun dato aziendale). Qui sotto vedi stato e risposta.</p>
+                </div>
+                <label>Oggetto<input maxlength="200" @bind="_subject" /></label>
+                <label>Cosa succede<textarea class="textarea" maxlength="4000" @bind="_message"></textarea></label>
+                <div class="facts">
+                    <label>Recapito (telefono)<input maxlength="200" @bind="_contact" /></label>
+                    <label>ID RustDesk (se già aperto)<input maxlength="50" @bind="_remoteId" /></label>
+                </div>
+                @if (_requestResult is not null) { <div class="@(_requestOk ? "success" : "alert")" role="status">@_requestResult</div> }
+                <div class="actions"><button @onclick="SendRequestAsync" disabled="@_sending">@(_sending ? "Invio..." : "Invia la richiesta")</button></div>
+
+                @if (_tickets.Count > 0)
+                {
+                    <div class="table-wrap">
+                        <table class="cards">
+                            <thead><tr><th>N.</th><th>Data</th><th>Oggetto</th><th>Stato</th><th>Risposta</th></tr></thead>
+                            <tbody>
+                                @foreach (var ticket in _tickets)
+                                {
+                                    <tr>
+                                        <td data-label="N." class="code">@ticket.Number</td>
+                                        <td data-label="Data">@Labels.DateTime(ticket.CreatedAt)</td>
+                                        <td data-label="Oggetto">@ticket.Subject</td>
+                                        <td data-label="Stato"><span class="badge @(ticket.Status == "closed" ? "ok" : ticket.Status == "in-progress" ? "warn" : "info")">@TicketStatus(ticket.Status)</span></td>
+                                        <td data-label="Risposta" class="small">@(ticket.Reply ?? "In attesa di risposta")</td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                }
+            </div>
+        }
+
         <div class="card card-pad">
             <h2>Server</h2>
             <div class="facts">
@@ -78,6 +117,15 @@ else if (_info is not null)
 
 @code {
     private SupportInfo? _info;
+    private bool _licensed;
+    private List<SupportTicket> _tickets = [];
+    private string _subject = string.Empty;
+    private string _message = string.Empty;
+    private string _contact = string.Empty;
+    private string _remoteId = string.Empty;
+    private string? _requestResult;
+    private bool _requestOk;
+    private bool _sending;
     private ServerDiagnostics? _diagnostics;
     private string? _error;
 
@@ -86,6 +134,18 @@ else if (_info is not null)
         try
         {
             _info = await Api.GetAsync<SupportInfo>("api/support/info");
+            try
+            {
+                _licensed = (await Api.GetAsync<LicenseInfo>("api/license")).Enabled;
+                if (_licensed)
+                {
+                    _tickets = await Api.GetAsync<List<SupportTicket>>("api/support/requests");
+                }
+            }
+            catch (ApiException)
+            {
+                _licensed = false;
+            }
             if (Session.IsAdmin)
             {
                 _diagnostics = await Api.GetAsync<ServerDiagnostics>("api/support/diagnostics");
@@ -96,6 +156,48 @@ else if (_info is not null)
             _error = exception.Message;
         }
     }
+
+    private async Task SendRequestAsync()
+    {
+        if (string.IsNullOrWhiteSpace(_subject) || string.IsNullOrWhiteSpace(_message))
+        {
+            _requestOk = false;
+            _requestResult = "Scrivi l'oggetto e cosa succede.";
+            return;
+        }
+
+        _sending = true;
+        try
+        {
+            var ticket = await Api.PostAsync<SupportTicket>("api/support/requests", new
+            {
+                subject = _subject.Trim(), message = _message.Trim(),
+                contact = string.IsNullOrWhiteSpace(_contact) ? null : _contact.Trim(),
+                remoteSessionId = string.IsNullOrWhiteSpace(_remoteId) ? null : _remoteId.Trim(),
+            });
+            _requestOk = true;
+            _requestResult = $"Richiesta n. {ticket.Number} inviata.";
+            _subject = _message = string.Empty;
+            _tickets = await Api.GetAsync<List<SupportTicket>>("api/support/requests");
+        }
+        catch (ApiException exception)
+        {
+            _requestOk = false;
+            _requestResult = exception.Message;
+        }
+        finally
+        {
+            _sending = false;
+        }
+    }
+
+    private static string TicketStatus(string status) => status switch
+    {
+        "open" => "Aperta",
+        "in-progress" => "In lavorazione",
+        "closed" => "Chiusa",
+        _ => status,
+    };
 
     private static string HostingName(string hosting) => hosting switch
     {

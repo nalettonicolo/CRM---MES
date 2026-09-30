@@ -3,6 +3,7 @@ using System.Reflection;
 using System.Runtime.InteropServices;
 using CrmMes.Api.Services;
 using CrmMes.Core.Data;
+using CrmMes.Licensing;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -20,12 +21,17 @@ public class SupportController : ControllerBase
     private readonly ApplicationDbContext _dbContext;
     private readonly IConfiguration _configuration;
     private readonly IWebHostEnvironment _environment;
+    private readonly LicenseState _license;
+    private readonly IHttpClientFactory _http;
 
-    public SupportController(ApplicationDbContext dbContext, IConfiguration configuration, IWebHostEnvironment environment)
+    public SupportController(ApplicationDbContext dbContext, IConfiguration configuration, IWebHostEnvironment environment,
+        LicenseState license, IHttpClientFactory http)
     {
         _dbContext = dbContext;
         _configuration = configuration;
         _environment = environment;
+        _license = license;
+        _http = http;
     }
 
     public static string ServerVersion =>
@@ -52,13 +58,82 @@ public class SupportController : ControllerBase
 
     [Authorize(Policy = "AdminOnly")]
     [HttpGet("diagnostics")]
-    public async Task<ActionResult<SupportDiagnosticsResponse>> Diagnostics(CancellationToken cancellationToken = default)
+    public async Task<ActionResult<SupportDiagnosticsResponse>> Diagnostics(CancellationToken cancellationToken = default) =>
+        Ok(await BuildDiagnosticsAsync(cancellationToken));
+
+    /// <summary>Sends a request for help to the vendor console (the installation's licensed console), with
+    /// the server's technical state attached. Any logged-in user may ask for help.</summary>
+    [Authorize]
+    [HttpPost("requests")]
+    public async Task<ActionResult<SupportTicketInfo>> SendRequest(NewSupportRequest request, CancellationToken cancellationToken = default)
+    {
+        if (!_license.Enabled)
+        {
+            return Conflict(new { message = "Questa installazione non è collegata alla console di assistenza: contatta l'assistenza ai recapiti indicati." });
+        }
+
+        var subject = request.Subject?.Trim();
+        var message = request.Message?.Trim();
+        if (string.IsNullOrWhiteSpace(subject) || string.IsNullOrWhiteSpace(message))
+        {
+            return BadRequest(new { message = "Scrivi l'oggetto e cosa succede." });
+        }
+
+        var diagnostics = System.Text.Json.JsonSerializer.SerializeToElement(await BuildDiagnosticsAsync(cancellationToken),
+            new System.Text.Json.JsonSerializerOptions(System.Text.Json.JsonSerializerDefaults.Web));
+        var who = $"{User.FindFirst(System.Security.Claims.ClaimTypes.Name)?.Value} <{User.FindFirst(System.Security.Claims.ClaimTypes.Email)?.Value}>";
+        var body = new SupportRequest(subject[..Math.Min(subject.Length, 200)], message[..Math.Min(message.Length, 4000)], who,
+            request.Contact?.Trim(), request.RemoteSessionId?.Trim(), diagnostics);
+        try
+        {
+            using var outgoing = new HttpRequestMessage(HttpMethod.Post, $"{_license.ConsoleUrl}/api/installations/support") { Content = JsonContent.Create(body) };
+            outgoing.Headers.Add(LicenseHeartbeatService.KeyHeader, _license.Key);
+            using var response = await _http.CreateClient(LicenseHeartbeatService.HttpClientName).SendAsync(outgoing, cancellationToken);
+            if (!response.IsSuccessStatusCode)
+            {
+                return StatusCode(StatusCodes.Status502BadGateway, new { message = "La console di assistenza non ha accettato la richiesta: contatta l'assistenza per telefono o email." });
+            }
+
+            return Ok(await response.Content.ReadFromJsonAsync<SupportTicketInfo>(cancellationToken));
+        }
+        catch (HttpRequestException)
+        {
+            return StatusCode(StatusCodes.Status502BadGateway, new { message = "Console di assistenza non raggiungibile: contatta l'assistenza per telefono o email." });
+        }
+    }
+
+    /// <summary>The requests of this installation with their state and the vendor's answers.</summary>
+    [Authorize]
+    [HttpGet("requests")]
+    public async Task<ActionResult<List<SupportTicketInfo>>> Requests(CancellationToken cancellationToken = default)
+    {
+        if (!_license.Enabled)
+        {
+            return Ok(new List<SupportTicketInfo>());
+        }
+
+        try
+        {
+            using var outgoing = new HttpRequestMessage(HttpMethod.Get, $"{_license.ConsoleUrl}/api/installations/support");
+            outgoing.Headers.Add(LicenseHeartbeatService.KeyHeader, _license.Key);
+            using var response = await _http.CreateClient(LicenseHeartbeatService.HttpClientName).SendAsync(outgoing, cancellationToken);
+            return response.IsSuccessStatusCode
+                ? Ok(await response.Content.ReadFromJsonAsync<List<SupportTicketInfo>>(cancellationToken) ?? [])
+                : StatusCode(StatusCodes.Status502BadGateway, new { message = "Console di assistenza non disponibile." });
+        }
+        catch (HttpRequestException)
+        {
+            return StatusCode(StatusCodes.Status502BadGateway, new { message = "Console di assistenza non raggiungibile." });
+        }
+    }
+
+    private async Task<SupportDiagnosticsResponse> BuildDiagnosticsAsync(CancellationToken cancellationToken)
     {
         var database = await DatabaseDiagnosticsAsync(cancellationToken);
         var startedAt = Process.GetCurrentProcess().StartTime.ToUniversalTime();
         var logsPath = Clean(_configuration["Logs:Path"]);
 
-        return Ok(new SupportDiagnosticsResponse(
+        return new SupportDiagnosticsResponse(
             ServerVersion,
             ServerConfiguration.HostingMode(ConfigFileLoaded),
             _environment.EnvironmentName,
@@ -72,7 +147,7 @@ public class SupportController : ControllerBase
             logsPath,
             FreeDiskGigabytes(AppContext.BaseDirectory),
             logsPath is null ? null : FreeDiskGigabytes(logsPath),
-            database));
+            database);
     }
 
     private bool ConfigFileLoaded => _configuration.GetValue<bool>(ServerConfigLoadedKey);
@@ -183,3 +258,5 @@ public sealed record SupportDiagnosticsResponse(
     double? FreeDiskGigabytes,
     double? FreeLogDiskGigabytes,
     DatabaseDiagnostics Database);
+
+public sealed record NewSupportRequest(string? Subject, string? Message, string? Contact, string? RemoteSessionId);

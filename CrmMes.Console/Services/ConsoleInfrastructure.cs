@@ -97,6 +97,81 @@ public static class HeartbeatEndpoint
         string.IsNullOrWhiteSpace(text) ? null : text.Trim()[..Math.Min(text.Trim().Length, max)];
 }
 
+/// <summary>Requests for help from the installations (same license key as the heartbeat).</summary>
+public static class SupportEndpoint
+{
+    public static async Task<IResult> CreateAsync(HttpContext context, SupportRequest request, ConsoleDbContext db, CancellationToken cancellationToken)
+    {
+        var installation = await FindAsync(context, db, cancellationToken);
+        if (installation is null)
+        {
+            return Results.Unauthorized();
+        }
+
+        if (string.IsNullOrWhiteSpace(request.Subject) || string.IsNullOrWhiteSpace(request.Message))
+        {
+            return Results.BadRequest(new { message = "Oggetto e descrizione sono obbligatori." });
+        }
+
+        for (var attempt = 0; ; attempt++)
+        {
+            var ticket = new SupportTicket
+            {
+                Number = (await db.Tickets.MaxAsync(t => (int?)t.Number, cancellationToken) ?? 0) + 1,
+                InstallationId = installation.Id,
+                CustomerId = installation.CustomerId,
+                Subject = Cut(request.Subject, 200)!,
+                Message = Cut(request.Message, 4000)!,
+                RequestedBy = Cut(request.RequestedBy, 250) ?? "?",
+                Contact = Cut(request.Contact, 200),
+                RemoteSessionId = Cut(request.RemoteSessionId, 50),
+                DiagnosticsJson = request.Diagnostics is { } diagnostics ? Cut(diagnostics.GetRawText(), 20_000) : null,
+            };
+            db.Tickets.Add(ticket);
+            try
+            {
+                await db.SaveChangesAsync(cancellationToken);
+                return Results.Ok(ToInfo(ticket));
+            }
+            catch (DbUpdateException) when (attempt < 3)
+            {
+                db.Entry(ticket).State = EntityState.Detached; // two requests took the same number: next one
+            }
+        }
+    }
+
+    public static async Task<IResult> ListAsync(HttpContext context, ConsoleDbContext db, CancellationToken cancellationToken)
+    {
+        var installation = await FindAsync(context, db, cancellationToken);
+        if (installation is null)
+        {
+            return Results.Unauthorized();
+        }
+
+        var tickets = await db.Tickets.AsNoTracking().Where(t => t.InstallationId == installation.Id)
+            .OrderByDescending(t => t.CreatedAt).Take(50).ToListAsync(cancellationToken);
+        return Results.Ok(tickets.Select(ToInfo).ToList());
+    }
+
+    public static SupportTicketInfo ToInfo(SupportTicket t) =>
+        new(t.Id, t.Number, t.Subject, t.Status, t.CreatedAt, t.RequestedBy, t.Reply, t.RepliedAt);
+
+    private static async Task<Installation?> FindAsync(HttpContext context, ConsoleDbContext db, CancellationToken cancellationToken)
+    {
+        var key = context.Request.Headers[HeartbeatEndpoint.KeyHeader].ToString();
+        if (string.IsNullOrWhiteSpace(key))
+        {
+            return null;
+        }
+
+        var hash = LicenseKeys.Hash(key);
+        return await db.Installations.SingleOrDefaultAsync(i => i.KeyHash == hash && !i.Revoked, cancellationToken);
+    }
+
+    private static string? Cut(string? text, int max) =>
+        string.IsNullOrWhiteSpace(text) ? null : text.Trim()[..Math.Min(text.Trim().Length, max)];
+}
+
 /// <summary>Console sign-in in two steps: password, then the authenticator code. Until the code (or, for a
 /// new user, the authenticator setup) the session can only reach those pages.</summary>
 public static class ConsoleAuth

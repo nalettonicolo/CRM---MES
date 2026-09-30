@@ -58,6 +58,56 @@ public partial class SupportWindow : Window
 
         RemoteButton.Content = RustDesk.Find() is null ? "Scarica RustDesk" : "Avvia assistenza remota";
         InfoText.Text = InfoLines();
+        await LoadRequestsAsync();
+    }
+
+    /// <summary>Requests go through the server to the vendor console: only when logged in.</summary>
+    private async Task LoadRequestsAsync()
+    {
+        if (_apiClient.CurrentRole is null || !_reachable)
+        {
+            RequestPanel.Visibility = Visibility.Collapsed;
+            return;
+        }
+
+        RequestPanel.Visibility = Visibility.Visible;
+        try
+        {
+            RequestList.ItemsSource = await _apiClient.GetSupportRequestsAsync();
+        }
+        catch (Exception exception)
+        {
+            ClientLog.Error("Teleassistenza: elenco richieste", exception);
+        }
+    }
+
+    private async void SendRequest_Click(object sender, RoutedEventArgs e)
+    {
+        if (string.IsNullOrWhiteSpace(RequestSubjectBox.Text) || string.IsNullOrWhiteSpace(RequestMessageBox.Text))
+        {
+            SetResult("Scrivi l'oggetto e cosa succede.", ok: false);
+            return;
+        }
+
+        SendRequestButton.IsEnabled = false;
+        try
+        {
+            var ticket = await _apiClient.SendSupportRequestAsync(RequestSubjectBox.Text.Trim(), RequestMessageBox.Text.Trim(),
+                string.IsNullOrWhiteSpace(RequestContactBox.Text) ? null : RequestContactBox.Text.Trim(),
+                string.IsNullOrWhiteSpace(RequestRemoteBox.Text) ? null : RequestRemoteBox.Text.Trim());
+            SetResult($"Richiesta n. {ticket.Number} inviata: l'assistenza la vede con lo stato del server allegato.", ok: true);
+            RequestSubjectBox.Clear();
+            RequestMessageBox.Clear();
+            await LoadRequestsAsync();
+        }
+        catch (InvalidOperationException exception)
+        {
+            SetResult(exception.Message, ok: false);
+        }
+        finally
+        {
+            SendRequestButton.IsEnabled = true;
+        }
     }
 
     private string InfoLines() => string.Join(Environment.NewLine,

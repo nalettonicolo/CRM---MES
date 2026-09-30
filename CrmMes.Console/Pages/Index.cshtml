@@ -17,6 +17,7 @@
     <div class="card kpi"><div class="label">Sospesi</div><div class="value">@Model.Suspended</div></div>
     <div class="card kpi"><div class="label">Canoni mensili attivi</div><div class="value">@Fmt.Money(Model.MonthlyRevenue)</div></div>
     <div class="card kpi"><div class="label">Installazioni online</div><div class="value">@Model.Online / @(Model.Online + Model.Offline)</div></div>
+    <div class="card kpi"><div class="label">Richieste di assistenza aperte</div><div class="value"><a asp-page="/Tickets">@Model.OpenTickets</a></div></div>
 </div>
 
 <div class="card">

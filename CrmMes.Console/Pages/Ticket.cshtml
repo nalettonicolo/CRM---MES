@@ -1,0 +1,38 @@
+@page "{id:guid}"
+@model TicketModel
+@{ ViewData["Title"] = $"Richiesta {Model.Ticket.Number}"; var t = Model.Ticket; }
+<div class="page-head">
+    <div>
+        <div class="eyebrow"><a asp-page="/Tickets">Assistenza</a></div>
+        <h1>Richiesta @t.Number · @t.Subject</h1>
+        <p class="sub"><a asp-page="/Customers/Details" asp-route-id="@t.CustomerId">@t.Customer.Name</a> · @t.Installation.Name · @Fmt.DateTime(t.CreatedAt)</p>
+    </div>
+    <span class="badge @TicketsModel.StatusClass(t.Status)">@TicketsModel.StatusName(t.Status)</span>
+</div>
+<div class="stack">
+    @if (Model.Info is not null) { <div class="success" role="status">@Model.Info</div> }
+    <div class="card card-pad">
+        <h2>Cosa scrive il cliente</h2>
+        <p class="small muted">Da @t.RequestedBy@(t.Contact is null ? "" : $" · recapito: {t.Contact}")@(t.RemoteSessionId is null ? "" : $" · ID RustDesk: {t.RemoteSessionId}")</p>
+        <p>@t.Message</p>
+    </div>
+    <form method="post" class="card card-pad stack">
+        <h2>Risposta</h2>
+        <label>Testo visibile al cliente nel gestionale<textarea asp-for="Reply"></textarea></label>
+        <label>Stato
+            <select asp-for="Status">
+                <option value="open">Aperta</option>
+                <option value="in-progress">In lavorazione</option>
+                <option value="closed">Chiusa</option>
+            </select>
+        </label>
+        <div class="actions"><button type="submit">Salva</button></div>
+    </form>
+    @if (Model.DiagnosticsPretty is not null)
+    {
+        <div class="card card-pad">
+            <h2>Stato del server al momento della richiesta</h2>
+            <pre class="code small">@Model.DiagnosticsPretty</pre>
+        </div>
+    }
+</div>

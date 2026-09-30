@@ -27,6 +27,7 @@ public class IndexModel(ConsoleDbContext db) : PageModel
     public decimal MonthlyRevenue { get; private set; }
     public int Online { get; private set; }
     public int Offline { get; private set; }
+    public int OpenTickets { get; private set; }
     public List<(Customer Customer, string Status, string? Message)> Attention { get; } = [];
 
     public async Task OnGetAsync()
@@ -45,6 +46,7 @@ public class IndexModel(ConsoleDbContext db) : PageModel
             }
         }
 
+        OpenTickets = await db.Tickets.CountAsync(t => t.Status != SupportTicketStatus.Closed);
         var installations = customers.SelectMany(c => c.Installations).Where(i => !i.Revoked).ToList();
         Online = installations.Count(i => SubscriptionRules.IsOnline(i, now));
         Offline = installations.Count - Online;
@@ -319,6 +321,102 @@ public class CustomerDetailsModel(ConsoleDbContext db) : PageModel
     }
 
     private static string? Clean(string? value) => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
+}
+
+public class TicketsModel(ConsoleDbContext db) : PageModel
+{
+    [BindProperty(SupportsGet = true)] public string Show { get; set; } = "open";
+    public List<SupportTicket> Rows { get; private set; } = [];
+
+    public async Task OnGetAsync()
+    {
+        var query = db.Tickets.AsNoTracking().Include(t => t.Customer).Include(t => t.Installation).AsQueryable();
+        if (Show != "all")
+        {
+            query = query.Where(t => t.Status != SupportTicketStatus.Closed);
+        }
+
+        Rows = await query.OrderByDescending(t => t.CreatedAt).Take(300).ToListAsync();
+    }
+
+    public static string StatusName(string status) => status switch
+    {
+        SupportTicketStatus.Open => "Aperta",
+        SupportTicketStatus.InProgress => "In lavorazione",
+        SupportTicketStatus.Closed => "Chiusa",
+        _ => status,
+    };
+
+    public static string StatusClass(string status) => status switch
+    {
+        SupportTicketStatus.Open => "danger",
+        SupportTicketStatus.InProgress => "warn",
+        _ => "ok",
+    };
+}
+
+/// <summary>One request: what the customer wrote, the server's state attached, the answer (which the customer
+/// sees in the management software) and the state.</summary>
+public class TicketModel(ConsoleDbContext db) : PageModel
+{
+    public SupportTicket Ticket { get; private set; } = null!;
+    public string? DiagnosticsPretty { get; private set; }
+    public string? Info { get; private set; }
+
+    [BindProperty] public string? Reply { get; set; }
+    [BindProperty] public string Status { get; set; } = SupportTicketStatus.InProgress;
+
+    public async Task<IActionResult> OnGetAsync(Guid id) => await LoadAsync(id) ? Page() : NotFound();
+
+    public async Task<IActionResult> OnPostAsync(Guid id)
+    {
+        var ticket = await db.Tickets.SingleOrDefaultAsync(t => t.Id == id);
+        if (ticket is null)
+        {
+            return NotFound();
+        }
+
+        if (!string.IsNullOrWhiteSpace(Reply) && Reply.Trim() != ticket.Reply)
+        {
+            ticket.Reply = Reply.Trim()[..Math.Min(Reply.Trim().Length, 4000)];
+            ticket.RepliedAt = System.DateTime.UtcNow;
+            ticket.RepliedBy = User.Identity?.Name;
+        }
+
+        ticket.Status = Status is SupportTicketStatus.Open or SupportTicketStatus.InProgress or SupportTicketStatus.Closed ? Status : ticket.Status;
+        await db.SaveChangesAsync();
+        await ConsoleAuth.AuditAsync(db, User, "TicketUpdated", $"Richiesta {ticket.Number}: {ticket.Status}");
+        await LoadAsync(id);
+        Info = "Salvato: il cliente vede risposta e stato nel gestionale.";
+        return Page();
+    }
+
+    private async Task<bool> LoadAsync(Guid id)
+    {
+        var ticket = await db.Tickets.AsNoTracking().Include(t => t.Customer).Include(t => t.Installation).SingleOrDefaultAsync(t => t.Id == id);
+        if (ticket is null)
+        {
+            return false;
+        }
+
+        Ticket = ticket;
+        Reply = ticket.Reply;
+        Status = ticket.Status;
+        if (ticket.DiagnosticsJson is not null)
+        {
+            try
+            {
+                using var document = System.Text.Json.JsonDocument.Parse(ticket.DiagnosticsJson);
+                DiagnosticsPretty = System.Text.Json.JsonSerializer.Serialize(document.RootElement, new System.Text.Json.JsonSerializerOptions { WriteIndented = true });
+            }
+            catch (System.Text.Json.JsonException)
+            {
+                DiagnosticsPretty = ticket.DiagnosticsJson;
+            }
+        }
+
+        return true;
+    }
 }
 
 public class InstallationsModel(ConsoleDbContext db) : PageModel

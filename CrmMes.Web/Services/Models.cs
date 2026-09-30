@@ -18,6 +18,8 @@ public sealed record LicenseInfo(
     bool Enabled, string Status, string? Message, string? Plan, List<string>? Modules, int? MaxUsers,
     DateTime? ValidUntil, DateTime? CheckedAt, string? Customer);
 
+public sealed record SupportTicket(Guid Id, int Number, string Subject, string Status, DateTime CreatedAt, string RequestedBy, string? Reply, DateTime? RepliedAt);
+
 public sealed record SupportInfo(
     string? Name, string? Email, string? Phone, string? Hours, string? RustDeskIdServer, string? RustDeskKey,
     string? RemoteToolUrl, string ServerVersion, string Hosting);
