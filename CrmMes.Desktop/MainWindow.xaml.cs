@@ -201,6 +201,12 @@ public partial class MainWindow : Window
         try
         {
             var auth = await _apiClient.RefreshAsync(_refreshToken);
+            if (auth.TwoFactorSetupRequired)
+            {
+                // The Admin made two-factor compulsory for this role while the session was open.
+                auth = await RequireTwoFactorSetupAsync(auth) ?? throw new InvalidOperationException("Verifica in due passaggi non attivata.");
+            }
+
             CompleteLogin(auth, reloadMaterials: false);
         }
         catch (InvalidOperationException)
@@ -353,11 +359,79 @@ public partial class MainWindow : Window
         try
         {
             var auth = await _apiClient.LoginAsync(EmailBox.Text.Trim(), PasswordBox.Password);
+            if (!string.IsNullOrEmpty(auth.TwoFactorChallenge))
+            {
+                var codeWindow = new TwoFactorCodeWindow(_apiClient, auth.TwoFactorChallenge) { Owner = this };
+                if (codeWindow.ShowDialog() != true || codeWindow.Result is null)
+                {
+                    return;
+                }
+
+                auth = codeWindow.Result;
+            }
+
+            if (auth.TwoFactorSetupRequired)
+            {
+                auth = await RequireTwoFactorSetupAsync(auth);
+                if (auth is null)
+                {
+                    return;
+                }
+            }
+
+            PasswordBox.Password = string.Empty;
             CompleteLogin(auth);
         }
         catch (InvalidOperationException exception)
         {
             LoginError.Text = exception.Message;
+        }
+    }
+
+    /// <summary>The role requires two-factor and the account hasn't set it up: the setup window, then a
+    /// renewed session without the limit. Closing without activating ends the attempt.</summary>
+    private async Task<AuthDto?> RequireTwoFactorSetupAsync(AuthDto auth)
+    {
+        _apiClient.SetToken(auth.Token);
+        var window = new TwoFactorWindow(_apiClient) { Owner = this, Mandatory = true };
+        window.ShowDialog();
+        if (!window.Activated)
+        {
+            _apiClient.SetToken(string.Empty);
+            LoginError.Text = "Per il tuo ruolo serve la verifica in due passaggi: accedi di nuovo per attivarla.";
+            return null;
+        }
+
+        return await _apiClient.RefreshAsync(auth.RefreshToken);
+    }
+
+    private void SecurityButton_Click(object sender, RoutedEventArgs e)
+    {
+        var window = new TwoFactorWindow(_apiClient) { Owner = this };
+        window.ShowDialog();
+    }
+
+    private async void ResetTwoFactorButton_Click(object sender, RoutedEventArgs e)
+    {
+        if (UsersList.SelectedItem is not UserRowDto user)
+        {
+            return;
+        }
+
+        if (MessageBox.Show(this, $"Azzerare la verifica in due passaggi di {user.Name}? Le sue sessioni verranno chiuse e al prossimo accesso la configurerà di nuovo.",
+                "Verifica in due passaggi", MessageBoxButton.YesNo, MessageBoxImage.Question) != MessageBoxResult.Yes)
+        {
+            return;
+        }
+
+        try
+        {
+            await _apiClient.ResetUserTwoFactorAsync(user.Id);
+            MessageBox.Show(this, $"Verifica in due passaggi di {user.Name} azzerata.", "Verifica in due passaggi", MessageBoxButton.OK, MessageBoxImage.Information);
+        }
+        catch (InvalidOperationException exception)
+        {
+            MessageBox.Show(this, exception.Message, "Verifica in due passaggi", MessageBoxButton.OK, MessageBoxImage.Warning);
         }
     }
 
@@ -1892,6 +1966,7 @@ public partial class MainWindow : Window
     {
         SetPinButton.IsEnabled = UsersList.SelectedItem is UserRowDto;
         ResetPasswordButton.IsEnabled = UsersList.SelectedItem is UserRowDto;
+        ResetTwoFactorButton.IsEnabled = UsersList.SelectedItem is UserRowDto;
     }
 
     private void ResetPasswordButton_Click(object sender, RoutedEventArgs e)

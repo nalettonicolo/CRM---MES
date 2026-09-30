@@ -3,7 +3,16 @@ namespace CrmMes.Web.Services;
 // Shapes of the API responses the web platform reads (mirrors of the records in CrmMes.Api).
 
 public sealed record AuthResponse(
-    string Token, string RefreshToken, DateTime ExpiresAt, Guid UserId, string Name, string Email, string Role);
+    string Token, string RefreshToken, DateTime ExpiresAt, Guid UserId, string Name, string Email, string Role,
+    string? TwoFactorChallenge = null, bool TwoFactorSetupRequired = false);
+
+public sealed record TwoFactorStatus(bool Enabled, bool Required, int RecoveryCodesLeft);
+
+public sealed record TwoFactorSetupInfo(string Secret, string OtpAuthUri, string QrCodePng);
+
+public sealed record RecoveryCodeList(List<string> RecoveryCodes);
+
+public sealed record SecuritySettings(List<string> TwoFactorRoles, List<string> KnownRoles);
 
 public sealed record CompanyProfile(
     bool IsConfigured, string CompanyName, string? VatNumber, string? Address, string? Phone, string? Email,

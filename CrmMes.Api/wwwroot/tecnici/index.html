@@ -30,6 +30,7 @@
       <form id="login-form" class="stack" novalidate>
         <label>Email<input id="login-email" type="email" autocomplete="username" required></label>
         <label>Password<input id="login-password" type="password" autocomplete="current-password" required></label>
+        <label id="login-code-row" hidden>Codice dell'app di autenticazione<input id="login-code" inputmode="numeric" autocomplete="one-time-code" maxlength="12"></label>
         <p id="login-error" class="error" role="alert"></p>
         <button class="primary" type="submit">Accedi</button>
       </form>

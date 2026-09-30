@@ -1,0 +1,116 @@
+@inject Api Api
+
+@* Switching two-factor on: QR code (or key to type), first code, recovery codes shown once. Used by the
+   account page and, mandatory, right after login when the role requires it. *@
+@if (_error is not null)
+{
+    <div class="alert" role="alert">@_error</div>
+}
+
+@if (_codes is not null)
+{
+    <div class="stack">
+        <div class="success" role="status">Verifica in due passaggi attiva. Da ora a ogni accesso servirà anche il codice dell'app.</div>
+        <div class="card card-pad">
+            <h2>Codici di recupero</h2>
+            <p class="muted small">Salvali ora: non verranno più mostrati. Ognuno vale una sola volta, al posto del codice dell'app se perdi il telefono.</p>
+            <div class="recovery-codes">
+                @foreach (var recoveryCode in _codes)
+                {
+                    <span class="code">@recoveryCode</span>
+                }
+            </div>
+            <div class="actions">
+                <button class="secondary" @onclick="CopyCodesAsync">@_copyLabel</button>
+                <button @onclick="Done">Ho salvato i codici</button>
+            </div>
+        </div>
+    </div>
+}
+else if (_setup is null)
+{
+    <div class="actions">
+        <button @onclick="StartAsync" disabled="@_busy">@(_busy ? "Preparazione..." : "Attiva la verifica in due passaggi")</button>
+    </div>
+}
+else
+{
+    <div class="card card-pad stack">
+        <div>
+            <h2>1. Inquadra il codice con l'app</h2>
+            <p class="muted small">Google Authenticator, Microsoft Authenticator, Authy o simili: "Aggiungi account", poi inquadra il codice QR oppure digita la chiave.</p>
+            <img class="qr" src="@_setup.QrCodePng" alt="Codice QR per l'app di autenticazione" width="200" height="200" />
+            <div class="code">@_setup.Secret</div>
+        </div>
+        <div>
+            <h2>2. Inserisci il codice di 6 cifre</h2>
+            <form class="inline-form" @onsubmit="EnableAsync" @onsubmit:preventDefault>
+                <input inputmode="numeric" autocomplete="one-time-code" maxlength="6" aria-label="Codice di 6 cifre" @bind="_code" />
+                <button type="submit" disabled="@_busy">Conferma</button>
+            </form>
+        </div>
+    </div>
+}
+
+@code {
+    [Parameter] public EventCallback Activated { get; set; }
+    [Inject] private IJSRuntime Js { get; set; } = default!;
+
+    private TwoFactorSetupInfo? _setup;
+    private List<string>? _codes;
+    private string _code = string.Empty;
+    private string? _error;
+    private bool _busy;
+    private string _copyLabel = "Copia i codici";
+
+    private async Task StartAsync()
+    {
+        _busy = true;
+        _error = null;
+        try
+        {
+            _setup = await Api.PostAsync<TwoFactorSetupInfo>("api/account/2fa/setup");
+        }
+        catch (ApiException exception)
+        {
+            _error = exception.Message;
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+
+    private async Task EnableAsync()
+    {
+        _busy = true;
+        _error = null;
+        try
+        {
+            _codes = (await Api.PostAsync<RecoveryCodeList>("api/account/2fa/enable", new { code = _code.Trim() })).RecoveryCodes;
+        }
+        catch (ApiException exception)
+        {
+            _error = exception.Message;
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+
+    private async Task CopyCodesAsync()
+    {
+        try
+        {
+            await Js.InvokeVoidAsync("navigator.clipboard.writeText", string.Join("\n", _codes!));
+            _copyLabel = "Copiati";
+        }
+        catch (JSException)
+        {
+            _copyLabel = "Selezionali e copiali";
+        }
+    }
+
+    private Task Done() => Activated.InvokeAsync();
+}

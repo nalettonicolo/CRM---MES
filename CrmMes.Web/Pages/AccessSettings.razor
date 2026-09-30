@@ -94,6 +94,23 @@ else
             </div>
         </div>
 
+        @if (_security is not null)
+        {
+            <div class="card card-pad">
+                <h2>Verifica in due passaggi</h2>
+                <p class="muted small">Facoltativa per tutti; obbligatoria per i ruoli spuntati. Al terminale di reparto resta il PIN.</p>
+                <div class="checks">
+                    @foreach (var role in _security.KnownRoles)
+                    {
+                        <label class="check">
+                            <input type="checkbox" checked="@_twoFactorRoles.Contains(role)" @onchange="e => ToggleRole(role, e)" />
+                            @Labels.Role(role)
+                        </label>
+                    }
+                </div>
+            </div>
+        }
+
         @if (_saveError is not null)
         {
             <div class="alert" role="alert">@_saveError</div>
@@ -113,6 +130,8 @@ else
     private static readonly string[] AreaChannels = ["desktop", "web"];
 
     private AccessChannels? _settings;
+    private SecuritySettings? _security;
+    private HashSet<string> _twoFactorRoles = [];
     private HashSet<string> _channels = [];
     private Dictionary<string, HashSet<string>> _roles = [];
     private Dictionary<string, HashSet<string>> _areas = [];
@@ -135,6 +154,17 @@ else
         catch (ApiException exception)
         {
             _loadError = exception.Message;
+            return;
+        }
+
+        try
+        {
+            _security = await Api.GetAsync<SecuritySettings>("api/company-profile/security");
+            _twoFactorRoles = [.. _security.TwoFactorRoles];
+        }
+        catch (ApiException)
+        {
+            _security = null; // server older than two-factor: the section is simply not shown
         }
     }
 
@@ -158,6 +188,19 @@ else
         else
         {
             set.Remove(channel);
+        }
+    }
+
+    private void ToggleRole(string role, ChangeEventArgs e)
+    {
+        _saved = false;
+        if (e.Value is true)
+        {
+            _twoFactorRoles.Add(role);
+        }
+        else
+        {
+            _twoFactorRoles.Remove(role);
         }
     }
 
@@ -187,6 +230,11 @@ else
                 AccessRestrictions.From(_roles.Where(pair => pair.Key != "Admin").ToDictionary(p => p.Key, p => p.Value), AllChannels),
                 AccessRestrictions.From(_areas, AreaChannels));
             Apply(await Api.PutAsync<AccessChannels>("api/company-profile/access", request));
+            if (_security is not null && !_twoFactorRoles.SetEquals(_security.TwoFactorRoles))
+            {
+                _security = await Api.PutAsync<SecuritySettings>("api/company-profile/security", new { twoFactorRoles = _twoFactorRoles.ToList() });
+            }
+
             _saved = true;
             // The menu of this very page follows the new settings straight away.
             Session.WebAreas = await Api.GetAsync<List<string>>("api/company-profile/areas?channel=web");

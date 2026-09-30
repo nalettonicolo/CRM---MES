@@ -122,6 +122,8 @@ builder.Services.AddAuthorization(options =>
     options.AddPolicy("ViewMargins", policy => policy.RequireRole(CrmMes.Api.Services.MarginAccess.Roles));
 });
 builder.Services.AddSingleton<IPasswordHasher<CrmMes.Core.Models.User>, PasswordHasher<CrmMes.Core.Models.User>>();
+builder.Services.AddSingleton(new CrmMes.Api.Services.SecretProtector(jwtKey));
+builder.Services.AddSingleton(new CrmMes.Api.Services.TwoFactorChallenges(jwtKey));
 
 // Render terminates TLS on its proxy: without this every request would look like it came from the
 // proxy's address, and the per-IP rate limit below would become one shared global bucket. ForwardLimit=1
@@ -239,6 +241,20 @@ app.UseSerilogRequestLogging();
 app.UseResponseCompression();
 app.UseHttpsRedirection();
 app.UseAuthentication();
+// A role that must use two-factor, on an account that hasn't set it up yet: only login and the setup
+// itself answer until it is active (the client shows the setup screen).
+app.Use(async (context, next) =>
+{
+    if (context.User.HasClaim(CrmMes.Api.Services.TwoFactorRules.SetupClaim, "required")
+        && !CrmMes.Api.Services.TwoFactorRules.IsAllowedDuringSetup(context.Request.Path))
+    {
+        context.Response.StatusCode = StatusCodes.Status403Forbidden;
+        await context.Response.WriteAsJsonAsync(new { message = "Per il tuo ruolo serve la verifica in due passaggi: attivala per continuare.", twoFactorSetupRequired = true });
+        return;
+    }
+
+    await next();
+});
 app.UseRateLimiter();
 app.UseAuthorization();
 app.MapControllers();

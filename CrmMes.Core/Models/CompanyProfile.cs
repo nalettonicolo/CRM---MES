@@ -46,6 +46,9 @@ public class CompanyProfile
     /// everywhere.</summary>
     public string AccessChannels { get; set; } = string.Empty;
 
+    /// <summary>Roles that must use two-factor authentication, comma-separated. Empty: optional for all.</summary>
+    public string TwoFactorRoles { get; set; } = string.Empty;
+
     public DateTime ConfiguredAt { get; set; } = DateTime.UtcNow;
     public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
 }

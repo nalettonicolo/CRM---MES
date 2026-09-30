@@ -8,14 +8,25 @@
         <h1>Accedi</h1>
         <p>Usa le stesse credenziali del programma desktop.</p>
 
-        <label>
-            Email
-            <input type="email" autocomplete="username" required @bind="_email" disabled="@_busy" />
-        </label>
-        <label>
-            Password
-            <input type="password" autocomplete="current-password" required @bind="_password" disabled="@_busy" />
-        </label>
+        @if (_challenge is null)
+        {
+            <label>
+                Email
+                <input type="email" autocomplete="username" required @bind="_email" disabled="@_busy" />
+            </label>
+            <label>
+                Password
+                <input type="password" autocomplete="current-password" required @bind="_password" disabled="@_busy" />
+            </label>
+        }
+        else
+        {
+            <p>Inserisci il codice di 6 cifre dell'app di autenticazione. Senza telefono puoi usare un codice di recupero.</p>
+            <label>
+                Codice
+                <input inputmode="numeric" autocomplete="one-time-code" maxlength="12" required @bind="_code" disabled="@_busy" />
+            </label>
+        }
 
         @if (_error is not null)
         {
@@ -26,19 +37,38 @@
             <div class="notice" role="status">Il server si sta avviando, attendi qualche secondo...</div>
         }
 
-        <button type="submit" disabled="@_busy">@(_busy ? "Accesso in corso..." : "Accedi")</button>
+        <button type="submit" disabled="@_busy">@(_busy ? "Accesso in corso..." : _challenge is null ? "Accedi" : "Verifica")</button>
+        @if (_challenge is not null)
+        {
+            <button type="button" class="ghost" @onclick="BackToPassword">Torna a email e password</button>
+        }
     </form>
 </div>
 
 @code {
     private string _email = string.Empty;
     private string _password = string.Empty;
+    private string _code = string.Empty;
+    private string? _challenge;
     private string? _error;
     private bool _busy;
     private bool _waking;
 
+    private void BackToPassword()
+    {
+        _challenge = null;
+        _code = string.Empty;
+        _error = null;
+    }
+
     private async Task SubmitAsync()
     {
+        if (_challenge is not null)
+        {
+            await VerifyCodeAsync();
+            return;
+        }
+
         if (string.IsNullOrWhiteSpace(_email) || string.IsNullOrEmpty(_password))
         {
             _error = "Inserisci email e password.";
@@ -58,8 +88,9 @@
             }
 
             _waking = false;
-            await Api.LoginAsync(_email.Trim(), _password);
+            var auth = await Api.LoginAsync(_email.Trim(), _password);
             _password = string.Empty;
+            _challenge = auth.TwoFactorChallenge;
         }
         catch (ApiException exception)
         {
@@ -69,6 +100,28 @@
         {
             _busy = false;
             _waking = false;
+        }
+    }
+
+    private async Task VerifyCodeAsync()
+    {
+        _busy = true;
+        _error = null;
+        try
+        {
+            await Api.LoginTwoFactorAsync(_challenge!, _code.Trim());
+        }
+        catch (ApiException exception)
+        {
+            _error = exception.Message;
+            if (exception.Status == System.Net.HttpStatusCode.Unauthorized && exception.Message.Contains("scaduto"))
+            {
+                _challenge = null;
+            }
+        }
+        finally
+        {
+            _busy = false;
         }
     }
 }

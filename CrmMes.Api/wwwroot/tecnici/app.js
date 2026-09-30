@@ -142,22 +142,47 @@
     show("login", false);
   }
 
+  let loginChallenge = null;
   $("login-form").addEventListener("submit", async (event) => {
     event.preventDefault();
     const button = event.submitter;
     $("login-error").textContent = "";
     button.disabled = true;
     try {
-      const auth = await api("/api/auth/login", {
-        method: "POST",
-        body: { email: $("login-email").value.trim(), password: $("login-password").value, channel: "mobile" },
-      });
+      let auth;
+      if (loginChallenge) {
+        // Second step of a login with two-factor: the code from the phone app (or a recovery code).
+        auth = await api("/api/auth/login/2fa", { method: "POST", body: { challenge: loginChallenge, code: $("login-code").value.trim() } });
+      } else {
+        auth = await api("/api/auth/login", {
+          method: "POST",
+          body: { email: $("login-email").value.trim(), password: $("login-password").value, channel: "mobile" },
+        });
+      }
       $("login-password").value = "";
+      if (auth.twoFactorChallenge) {
+        loginChallenge = auth.twoFactorChallenge;
+        $("login-code-row").hidden = false;
+        $("login-code").focus();
+        $("login-error").textContent = "Inserisci il codice di 6 cifre dell'app di autenticazione.";
+        return;
+      }
+      if (auth.twoFactorSetupRequired) {
+        $("login-error").textContent = "Per il tuo ruolo serve la verifica in due passaggi: attivala dal programma o dalla piattaforma web, poi accedi di nuovo.";
+        return;
+      }
+      loginChallenge = null;
+      $("login-code-row").hidden = true;
+      $("login-code").value = "";
       setSession(auth.token, auth.refreshToken, auth.name, auth.userId);
       show("list", false);
       loadList();
     } catch (error) {
       $("login-error").textContent = error.message;
+      if (loginChallenge && /scaduto/i.test(error.message)) {
+        loginChallenge = null;
+        $("login-code-row").hidden = true;
+      }
     } finally {
       button.disabled = false;
     }

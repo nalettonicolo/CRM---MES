@@ -32,15 +32,21 @@ public class AuthController : ControllerBase
     private readonly ApplicationDbContext _dbContext;
     private readonly IConfiguration _configuration;
     private readonly IPasswordHasher<User> _passwordHasher;
+    private readonly TwoFactorChallenges _challenges;
+    private readonly SecretProtector _protector;
 
     public AuthController(
         ApplicationDbContext dbContext,
         IConfiguration configuration,
-        IPasswordHasher<User> passwordHasher)
+        IPasswordHasher<User> passwordHasher,
+        TwoFactorChallenges challenges,
+        SecretProtector protector)
     {
         _dbContext = dbContext;
         _configuration = configuration;
         _passwordHasher = passwordHasher;
+        _challenges = challenges;
+        _protector = protector;
     }
 
     [HttpPost("register")]
@@ -148,7 +154,58 @@ public class AuthController : ControllerBase
             return StatusCode(StatusCodes.Status403Forbidden, new { message = channelRefusal });
         }
 
+        if (user.TwoFactorEnabled)
+        {
+            // Password right, now the code: no tokens yet, only a 5-minute challenge.
+            await _dbContext.SaveChangesAsync(cancellationToken);
+            return Ok(new AuthResponse(string.Empty, string.Empty, DateTime.UtcNow.Add(TwoFactorChallenges.Lifetime),
+                user.Id, user.Name, user.Email, user.Role, TwoFactorChallenge: _challenges.Issue(user.Id, channel)));
+        }
+
         return Ok(await CreateResponseAsync(user, cancellationToken, channel: channel));
+    }
+
+    /// <summary>Second step of a login with two-factor: the challenge from the first step and a code from the
+    /// app, or one of the recovery codes. Wrong codes count as wrong passwords (same lockout).</summary>
+    [HttpPost("login/2fa")]
+    public async Task<ActionResult<AuthResponse>> LoginTwoFactor(TwoFactorLoginRequest request, CancellationToken cancellationToken = default)
+    {
+        var challenge = _challenges.Read(request.Challenge);
+        if (challenge is null)
+        {
+            return Unauthorized(new { message = "Accesso scaduto: inserisci di nuovo email e password." });
+        }
+
+        var user = await _dbContext.Users.SingleOrDefaultAsync(u => u.Id == challenge.Value.UserId && u.IsActive, cancellationToken);
+        if (user is null || !user.TwoFactorEnabled)
+        {
+            return Unauthorized(new { message = "Accesso scaduto: inserisci di nuovo email e password." });
+        }
+
+        var now = DateTime.UtcNow;
+        if (user.LockoutEndsAt is { } lockedUntil && lockedUntil > now)
+        {
+            var minutes = (int)Math.Ceiling((lockedUntil - now).TotalMinutes);
+            return StatusCode(StatusCodes.Status429TooManyRequests,
+                new { message = $"Troppi tentativi errati: account bloccato per {minutes} minuti." });
+        }
+
+        if (!AccountSecurityController.VerifyCodeOrRecovery(user, request.Code, _protector))
+        {
+            user.FailedLoginCount++;
+            if (user.FailedLoginCount >= MaxFailedLogins)
+            {
+                user.FailedLoginCount = 0;
+                user.LockoutEndsAt = now.Add(LockoutDuration);
+            }
+
+            await _dbContext.SaveChangesAsync(cancellationToken);
+            return Unauthorized(new { message = "Codice non valido." });
+        }
+
+        user.FailedLoginCount = 0;
+        user.LockoutEndsAt = null;
+        return Ok(await CreateResponseAsync(user, cancellationToken, channel: challenge.Value.Channel));
     }
 
     [HttpPost("refresh")]
@@ -305,7 +362,7 @@ public class AuthController : ControllerBase
         var key = _configuration["Jwt:Key"]
             ?? Environment.GetEnvironmentVariable("CRM_MES_JWT_KEY")
             ?? "development-only-key-change-before-deploy-32chars";
-        var claims = new[]
+        var claims = new List<Claim>
         {
             new Claim(JwtRegisteredClaimNames.Sub, user.Id.ToString()),
             new Claim(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString()),
@@ -314,6 +371,15 @@ public class AuthController : ControllerBase
             new Claim(ClaimTypes.Role, user.Role),
             new Claim("channel", channel)
         };
+
+        // Compulsory for this role and not set up yet: the session is limited to setting it up.
+        var requiredRoles = TwoFactorRules.ParseRoles(await _dbContext.CompanyProfiles.AsNoTracking()
+            .Select(p => p.TwoFactorRoles).FirstOrDefaultAsync(cancellationToken));
+        var setupRequired = !user.TwoFactorEnabled && requiredRoles.Contains(user.Role);
+        if (setupRequired)
+        {
+            claims.Add(new Claim(TwoFactorRules.SetupClaim, "required"));
+        }
         var credentials = new SigningCredentials(new SymmetricSecurityKey(Encoding.UTF8.GetBytes(key)), SecurityAlgorithms.HmacSha256);
         var expiresAt = DateTime.UtcNow.Add(AccessTokenLifetime);
         var token = new JwtSecurityToken(claims: claims, expires: expiresAt, signingCredentials: credentials);
@@ -342,7 +408,8 @@ public class AuthController : ControllerBase
             user.Id,
             user.Name,
             user.Email,
-            user.Role);
+            user.Role,
+            TwoFactorSetupRequired: setupRequired);
     }
 
     private static string GenerateRefreshToken() => Convert.ToBase64String(RandomNumberGenerator.GetBytes(32));
@@ -355,6 +422,9 @@ public sealed record RegisterRequest(string? Name, string? Email, string? Passwo
 public sealed record LoginRequest(string? Email, string? Password, string? Channel = null);
 public sealed record ChangePasswordRequest(string? CurrentPassword, string? NewPassword);
 public sealed record RefreshRequest(string? RefreshToken);
+/// <summary>With two-factor active the first login step returns no tokens but a TwoFactorChallenge to send
+/// to login/2fa with the code. TwoFactorSetupRequired: the role requires two-factor and the account hasn't
+/// set it up; the session only allows setting it up.</summary>
 public sealed record AuthResponse(
     string Token,
     string RefreshToken,
@@ -362,4 +432,8 @@ public sealed record AuthResponse(
     Guid UserId,
     string Name,
     string Email,
-    string Role);
+    string Role,
+    string? TwoFactorChallenge = null,
+    bool TwoFactorSetupRequired = false);
+
+public sealed record TwoFactorLoginRequest(string? Challenge, string? Code);

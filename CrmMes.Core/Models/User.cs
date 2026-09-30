@@ -17,6 +17,15 @@ public class User
     /// locked until <see cref="LockoutEndsAt"/>, so a public API can't be used to guess passwords at will.</summary>
     public int FailedLoginCount { get; set; }
     public DateTime? LockoutEndsAt { get; set; }
+
+    /// <summary>Two-factor authentication with an authenticator app (see Totp in CrmMes.Api). The secret is
+    /// stored encrypted; the pending one exists only between "start setup" and the first valid code. Recovery
+    /// codes are kept as hashes (';'-separated), each usable once. LastStep refuses a code used twice.</summary>
+    public bool TwoFactorEnabled { get; set; }
+    public string? TwoFactorSecret { get; set; }
+    public string? TwoFactorPendingSecret { get; set; }
+    public string TwoFactorRecoveryCodes { get; set; } = string.Empty;
+    public long TwoFactorLastStep { get; set; }
     public bool IsActive { get; set; } = true;
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     public ICollection<Area> Areas { get; set; } = new List<Area>();

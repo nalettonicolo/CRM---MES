@@ -12,6 +12,18 @@ else if (!Session.IsLoggedIn)
 {
     <Login />
 }
+else if (Session.Auth!.TwoFactorSetupRequired)
+{
+    <div class="login">
+        <div class="login-card wide">
+            <div class="brand">Nicolò MES</div>
+            <h1>Attiva la verifica in due passaggi</h1>
+            <p>Per il tuo ruolo l'amministratore l'ha resa obbligatoria: serve una volta sola, poi a ogni accesso basterà il codice dell'app.</p>
+            <TwoFactorSetup Activated="AfterMandatorySetupAsync" />
+            <button class="ghost" @onclick="LogoutAsync">Esci</button>
+        </div>
+    </div>
+}
 else
 {
     <div class="shell @(_menuOpen ? "menu-open" : "")">
@@ -63,6 +75,7 @@ else
                     <div class="name">@Session.Auth!.Name</div>
                     <div class="role">@Labels.Role(Session.Role)</div>
                 </div>
+                <NavLink class="nav-link" href="account/sicurezza" @onclick="CloseMenu">Verifica in due passaggi</NavLink>
                 <button class="secondary small" @onclick="LogoutAsync">Esci</button>
             </div>
         </nav>
@@ -129,6 +142,14 @@ else
     /// <summary>Recomputed at every render: the Admin's changes to the channels show up at once.</summary>
     private List<string> DesktopOnlyNames =>
         Navigation.DesktopOnly(Session.WebAreas).Select(key => _areaNames.GetValueOrDefault(key, key)).ToList();
+
+    private async Task AfterMandatorySetupAsync()
+    {
+        if (!await Api.RenewSessionAsync())
+        {
+            await Api.LogoutAsync();
+        }
+    }
 
     private void ToggleMenu() => _menuOpen = !_menuOpen;
 

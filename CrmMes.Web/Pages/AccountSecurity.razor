@@ -1,0 +1,133 @@
+@page "/account/sicurezza"
+@inject Api Api
+
+<PageTitle>Verifica in due passaggi · Nicolò MES</PageTitle>
+
+<div class="page-head">
+    <div>
+        <div class="eyebrow">Il tuo account</div>
+        <h1>Verifica in due passaggi</h1>
+        <p class="sub">Oltre alla password, a ogni accesso un codice di 6 cifre dal tuo telefono: chi ruba la password, senza il telefono non entra.</p>
+    </div>
+</div>
+
+@if (_error is not null)
+{
+    <div class="alert" role="alert">@_error</div>
+}
+
+@if (_status is null)
+{
+    <div class="card state">Caricamento...</div>
+}
+else if (!_status.Enabled)
+{
+    <div class="stack">
+        <div class="notice">
+            @(_status.Required
+                ? "Per il tuo ruolo l'amministratore l'ha resa obbligatoria."
+                : "Non attiva. È facoltativa, consigliata a chi vede costi, fatture o configurazione.")
+        </div>
+        <TwoFactorSetup Activated="LoadAsync" />
+    </div>
+}
+else
+{
+    <div class="stack">
+        <div class="success">Attiva. Codici di recupero rimasti: @_status.RecoveryCodesLeft.@(_status.Required ? " Per il tuo ruolo è obbligatoria." : "")</div>
+
+        @if (_newCodes is not null)
+        {
+            <div class="card card-pad">
+                <h2>Nuovi codici di recupero</h2>
+                <p class="muted small">I precedenti non valgono più. Salvali ora: non verranno più mostrati.</p>
+                <div class="recovery-codes">
+                    @foreach (var recoveryCode in _newCodes)
+                    {
+                        <span class="code">@recoveryCode</span>
+                    }
+                </div>
+            </div>
+        }
+
+        <div class="card card-pad stack">
+            <label>
+                Codice dell'app
+                <input inputmode="numeric" autocomplete="one-time-code" maxlength="12" @bind="_code" />
+            </label>
+            @if (!_status.Required)
+            {
+                <label>
+                    Password (solo per disattivare)
+                    <input type="password" autocomplete="current-password" @bind="_password" />
+                </label>
+            }
+            <div class="actions">
+                @if (!_status.Required)
+                {
+                    <button class="secondary" @onclick="DisableAsync" disabled="@_busy">Disattiva</button>
+                }
+                <button @onclick="NewCodesAsync" disabled="@_busy">Nuovi codici di recupero</button>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    private TwoFactorStatus? _status;
+    private List<string>? _newCodes;
+    private string _code = string.Empty;
+    private string _password = string.Empty;
+    private string? _error;
+    private bool _busy;
+
+    protected override Task OnInitializedAsync() => LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        _error = null;
+        try
+        {
+            _status = await Api.GetAsync<TwoFactorStatus>("api/account/2fa");
+        }
+        catch (ApiException exception)
+        {
+            _error = exception.Message;
+        }
+    }
+
+    private async Task NewCodesAsync()
+    {
+        await RunAsync(async () => _newCodes = (await Api.PostAsync<RecoveryCodeList>("api/account/2fa/recovery-codes", new { code = _code.Trim() })).RecoveryCodes);
+    }
+
+    private async Task DisableAsync()
+    {
+        await RunAsync(async () =>
+        {
+            await Api.PostNoContentAsync("api/account/2fa/disable", new { password = _password, code = _code.Trim() });
+            _newCodes = null;
+            await LoadAsync();
+        });
+    }
+
+    private async Task RunAsync(Func<Task> action)
+    {
+        _busy = true;
+        _error = null;
+        try
+        {
+            await action();
+            _code = string.Empty;
+            _password = string.Empty;
+        }
+        catch (ApiException exception)
+        {
+            _error = exception.Message;
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+}

@@ -151,6 +151,57 @@ public sealed class ApiClient
         }
     }
 
+    /// <summary>Second login step with two-factor: the challenge from LoginAsync and the code.</summary>
+    public async Task<AuthDto> LoginTwoFactorAsync(string challenge, string code, CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            using var response = await _httpClient.PostAsJsonAsync("api/auth/login/2fa", new { challenge, code }, cancellationToken);
+            if (!response.IsSuccessStatusCode)
+            {
+                var body = await response.Content.ReadAsStringAsync(cancellationToken);
+                throw new InvalidOperationException(TryExtractMessage(body) ?? "Codice non valido.");
+            }
+
+            return await response.Content.ReadFromJsonAsync<AuthDto>(cancellationToken: cancellationToken)
+                ?? throw new InvalidOperationException("Risposta di accesso non valida.");
+        }
+        catch (HttpRequestException exception)
+        {
+            throw new InvalidOperationException("Server non raggiungibile.", exception);
+        }
+    }
+
+    public Task<TwoFactorStatusDto> GetTwoFactorStatusAsync(CancellationToken cancellationToken = default)
+        => GetOneAsync<TwoFactorStatusDto>("api/account/2fa", cancellationToken);
+
+    public Task<TwoFactorSetupDto> StartTwoFactorSetupAsync(CancellationToken cancellationToken = default)
+        => SendAsync<TwoFactorSetupDto>(HttpMethod.Post, "api/account/2fa/setup", new { }, cancellationToken);
+
+    public async Task<List<string>> EnableTwoFactorAsync(string code, CancellationToken cancellationToken = default)
+        => (await SendAsync<RecoveryCodesDto>(HttpMethod.Post, "api/account/2fa/enable", new { code }, cancellationToken)).RecoveryCodes;
+
+    public async Task<List<string>> NewRecoveryCodesAsync(string code, CancellationToken cancellationToken = default)
+        => (await SendAsync<RecoveryCodesDto>(HttpMethod.Post, "api/account/2fa/recovery-codes", new { code }, cancellationToken)).RecoveryCodes;
+
+    public async Task DisableTwoFactorAsync(string password, string code, CancellationToken cancellationToken = default)
+    {
+        using var response = await _httpClient.PostAsJsonAsync("api/account/2fa/disable", new { password, code }, cancellationToken);
+        await EnsureSuccessAsync(response, cancellationToken);
+    }
+
+    public async Task ResetUserTwoFactorAsync(Guid userId, CancellationToken cancellationToken = default)
+    {
+        using var response = await _httpClient.PostAsync($"api/users/{userId}/2fa/reset", null, cancellationToken);
+        await EnsureSuccessAsync(response, cancellationToken);
+    }
+
+    public Task<SecuritySettingsDto> GetSecuritySettingsAsync(CancellationToken cancellationToken = default)
+        => GetOneAsync<SecuritySettingsDto>("api/company-profile/security", cancellationToken);
+
+    public Task<SecuritySettingsDto> SaveSecuritySettingsAsync(List<string> twoFactorRoles, CancellationToken cancellationToken = default)
+        => SendAsync<SecuritySettingsDto>(HttpMethod.Put, "api/company-profile/security", new { twoFactorRoles }, cancellationToken);
+
     public async Task<AuthDto> RefreshAsync(string refreshToken, CancellationToken cancellationToken = default)
     {
         try
@@ -1776,7 +1827,17 @@ public sealed record AuthDto(
     Guid UserId,
     string Name,
     string Email,
-    string Role);
+    string Role,
+    string? TwoFactorChallenge = null,
+    bool TwoFactorSetupRequired = false);
+
+public sealed record TwoFactorStatusDto(bool Enabled, bool Required, int RecoveryCodesLeft);
+
+public sealed record TwoFactorSetupDto(string Secret, string OtpAuthUri, string QrCodePng);
+
+public sealed record RecoveryCodesDto(List<string> RecoveryCodes);
+
+public sealed record SecuritySettingsDto(List<string> TwoFactorRoles, List<string> KnownRoles);
 
 public sealed record WithdrawalSlipSummaryDto(
     Guid Id,

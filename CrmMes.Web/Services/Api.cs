@@ -37,8 +37,32 @@ public sealed class Api
 
         await EnsureSuccessAsync(response);
         var auth = await response.Content.ReadFromJsonAsync<AuthResponse>() ?? throw new ApiException("Risposta di accesso non valida.");
+        if (string.IsNullOrEmpty(auth.TwoFactorChallenge))
+        {
+            await _session.SetAsync(auth);
+        }
+
+        // With two-factor active there are no tokens yet: the login page asks for the code.
+        return auth;
+    }
+
+    /// <summary>Second login step: the challenge from LoginAsync and the code from the app (or a recovery code).</summary>
+    public async Task<AuthResponse> LoginTwoFactorAsync(string challenge, string code)
+    {
+        using var response = await SendRawAsync(HttpMethod.Post, "api/auth/login/2fa", new { challenge, code }, authenticated: false);
+        await EnsureSuccessAsync(response);
+        var auth = await response.Content.ReadFromJsonAsync<AuthResponse>() ?? throw new ApiException("Risposta di accesso non valida.");
         await _session.SetAsync(auth);
         return auth;
+    }
+
+    /// <summary>A new pair of tokens now (after two-factor was switched on, to lift the setup limit).</summary>
+    public async Task<bool> RenewSessionAsync() => await RefreshAsync();
+
+    public async Task PostNoContentAsync(string path, object? body = null)
+    {
+        using var response = await SendAuthenticatedAsync(HttpMethod.Post, path, body);
+        await EnsureSuccessAsync(response);
     }
 
     public async Task LogoutAsync()

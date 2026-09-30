@@ -36,6 +36,15 @@
                     <Grid x:Name="RolesGrid" />
                 </Border>
 
+                <TextBlock Text="V E R I F I C A   I N   D U E   P A S S A G G I" Style="{StaticResource MicroLabel}" Margin="0,0,0,8" />
+                <Border Background="{StaticResource SurfaceBrush}" BorderBrush="{StaticResource BorderBrush0}" BorderThickness="1" CornerRadius="8" Padding="16,12" Margin="0,0,0,20">
+                    <StackPanel>
+                        <TextBlock Foreground="{StaticResource TextSecondaryBrush}" TextWrapping="Wrap" Margin="0,0,0,8"
+                                   Text="Facoltativa per tutti; obbligatoria per i ruoli spuntati (codice dell'app sul telefono a ogni accesso). Al terminale di reparto resta il PIN." />
+                        <WrapPanel x:Name="TwoFactorRolesPanel" />
+                    </StackPanel>
+                </Border>
+
                 <TextBlock Text="A R E E   M O S T R A T E" Style="{StaticResource MicroLabel}" Margin="0,0,0,8" />
                 <TextBlock Foreground="{StaticResource TextMutedBrush}" FontSize="11.5" TextWrapping="Wrap" Margin="0,0,0,8"
                            Text="Le aree dei moduli spenti in &quot;Azienda e settore&quot; non compaiono comunque. Nascondere un'area su un canale non cancella dati." />

@@ -31,6 +31,8 @@ public partial class AccessChannelsWindow : Window
     private readonly ApiClient _apiClient;
     private readonly Dictionary<(string Role, string Channel), CheckBox> _roleBoxes = [];
     private readonly Dictionary<(string Area, string Channel), CheckBox> _areaBoxes = [];
+    private readonly Dictionary<string, CheckBox> _twoFactorBoxes = [];
+    private List<string> _savedTwoFactorRoles = [];
 
     public bool Saved { get; private set; }
 
@@ -58,6 +60,7 @@ public partial class AccessChannelsWindow : Window
                 _areaBoxes, _ => false);
 
             ApplyChannelAvailability();
+            await LoadTwoFactorRolesAsync();
             StatusText.Text = string.Empty;
             SaveButton.IsEnabled = true;
         }
@@ -145,6 +148,31 @@ public partial class AccessChannelsWindow : Window
         grid.Children.Add(header);
     }
 
+    private async Task LoadTwoFactorRolesAsync()
+    {
+        try
+        {
+            var security = await _apiClient.GetSecuritySettingsAsync();
+            _savedTwoFactorRoles = security.TwoFactorRoles;
+            TwoFactorRolesPanel.Children.Clear();
+            foreach (var role in security.KnownRoles)
+            {
+                var box = new CheckBox
+                {
+                    Content = RoleLabels.GetValueOrDefault(role, role),
+                    IsChecked = security.TwoFactorRoles.Contains(role),
+                    Margin = new Thickness(0, 0, 18, 6),
+                };
+                _twoFactorBoxes[role] = box;
+                TwoFactorRolesPanel.Children.Add(box);
+            }
+        }
+        catch (InvalidOperationException)
+        {
+            TwoFactorRolesPanel.Children.Add(new TextBlock { Text = "Non disponibile su questo server." });
+        }
+    }
+
     private void ChannelBox_Click(object sender, RoutedEventArgs e) => ApplyChannelAvailability();
 
     /// <summary>A channel the company doesn't use can't be granted to a role or area: its column is locked.</summary>
@@ -216,6 +244,12 @@ public partial class AccessChannelsWindow : Window
         try
         {
             await _apiClient.SaveAccessChannelsAsync(new SaveAccessChannelsDto(channels, roles, areas));
+            var twoFactorRoles = _twoFactorBoxes.Where(pair => pair.Value.IsChecked == true).Select(pair => pair.Key).ToList();
+            if (_twoFactorBoxes.Count > 0 && !twoFactorRoles.ToHashSet().SetEquals(_savedTwoFactorRoles))
+            {
+                await _apiClient.SaveSecuritySettingsAsync(twoFactorRoles);
+            }
+
             Saved = true;
             Close();
         }
