@@ -14,10 +14,15 @@ public static class RateLimits
     public const string Auth = "auth";
     public const string Pin = "pin";
 
+    /// <summary>Machine data: per machine and address, generous enough for a reading every second in
+    /// bursts, tight enough that a stolen token can't flood the database.</summary>
+    public const string Machine = "machine";
+
     public static void Add(IServiceCollection services, IConfiguration configuration)
     {
         var authPerMinute = configuration.GetValue("RateLimits:AuthPerMinute", 20);
         var pinPerMinute = configuration.GetValue("RateLimits:PinPerMinute", 10);
+        var machinePerMinute = configuration.GetValue("RateLimits:MachinePerMinute", 120);
 
         services.AddRateLimiter(options =>
         {
@@ -39,6 +44,10 @@ public static class RateLimits
                     ?? context.Connection.RemoteIpAddress?.ToString()
                     ?? "unknown",
                 _ => new FixedWindowRateLimiterOptions { PermitLimit = pinPerMinute, Window = TimeSpan.FromMinutes(1), QueueLimit = 0 }));
+
+            options.AddPolicy(Machine, context => RateLimitPartition.GetFixedWindowLimiter(
+                $"{context.Request.RouteValues["equipmentId"]}|{context.Connection.RemoteIpAddress}",
+                _ => new FixedWindowRateLimiterOptions { PermitLimit = machinePerMinute, Window = TimeSpan.FromMinutes(1), QueueLimit = 0 }));
         });
     }
 }

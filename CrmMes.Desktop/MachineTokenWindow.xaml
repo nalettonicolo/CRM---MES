@@ -1,0 +1,31 @@
+<Window x:Class="CrmMes.Desktop.MachineTokenWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Collegamento macchina" Icon="Assets/logo.ico" Width="620" SizeToContent="Height"
+        WindowStartupLocation="CenterOwner" ResizeMode="NoResize"
+        Background="{StaticResource BackgroundBrush}">
+    <StackPanel Margin="24">
+        <TextBlock Text="I N D U S T R I A   4 . 0" Style="{StaticResource MicroLabel}" />
+        <TextBlock Text="Dati per il gateway della macchina" FontSize="18" FontWeight="SemiBold" Foreground="{StaticResource TextPrimaryBrush}" />
+        <TextBlock Foreground="{StaticResource DangerBrush}" FontWeight="SemiBold" TextWrapping="Wrap" Margin="0,6,0,14"
+                   Text="Il token si vede solo adesso: copialo nel config.json del gateway. Chiusa questa finestra non si può più rileggere (se ne genera uno nuovo)." />
+        <TextBlock Text="Id macchina" Foreground="{StaticResource TextSecondaryBrush}" FontSize="12.5" Margin="0,0,0,4" />
+        <DockPanel Margin="0,0,0,10">
+            <Button DockPanel.Dock="Right" Style="{StaticResource SecondaryButton}" Content="Copia" Width="80" Height="32" Margin="8,0,0,0" Click="CopyId_Click" />
+            <TextBox x:Name="IdBox" IsReadOnly="True" FontFamily="Consolas" />
+        </DockPanel>
+        <TextBlock Text="Indirizzo di invio" Foreground="{StaticResource TextSecondaryBrush}" FontSize="12.5" Margin="0,0,0,4" />
+        <DockPanel Margin="0,0,0,10">
+            <Button DockPanel.Dock="Right" Style="{StaticResource SecondaryButton}" Content="Copia" Width="80" Height="32" Margin="8,0,0,0" Click="CopyEndpoint_Click" />
+            <TextBox x:Name="EndpointBox" IsReadOnly="True" FontFamily="Consolas" />
+        </DockPanel>
+        <TextBlock x:Name="TokenLabel" Foreground="{StaticResource TextSecondaryBrush}" FontSize="12.5" Margin="0,0,0,4" />
+        <DockPanel Margin="0,0,0,14">
+            <Button DockPanel.Dock="Right" Style="{StaticResource SecondaryButton}" Content="Copia" Width="80" Height="32" Margin="8,0,0,0" Click="CopyToken_Click" />
+            <TextBox x:Name="TokenBox" IsReadOnly="True" FontFamily="Consolas" />
+        </DockPanel>
+        <TextBlock Foreground="{StaticResource TextSecondaryBrush}" FontSize="12" TextWrapping="Wrap"
+                   Text="Gateway pronto all'uso nella cartella scripts\machine-gateway del progetto (OPC UA o MQTT), con istruzioni in LEGGIMI.md." Margin="0,0,0,14" />
+        <Button Content="Ho copiato il token" Width="170" Height="36" HorizontalAlignment="Right" IsDefault="True" Click="Close_Click" />
+    </StackPanel>
+</Window>

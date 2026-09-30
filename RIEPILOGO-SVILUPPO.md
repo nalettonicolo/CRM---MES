@@ -6,6 +6,12 @@ Sintesi ad alto livello di cosa è stato costruito finora e cosa manca ancora. P
 
 ## Cosa è stato fatto
 
+### Interconnessione macchine, Industria 4.0 e 5.0 (2026-09-30, v1.5.0)
+- **Ingresso dati macchina**: ogni macchina ha un token proprio (salvato solo come hash, rigenerabile e revocabile, gestito dall'Admin), con cui invia stato (marcia, attesa, attrezzaggio, ferma, allarme, spenta), contapezzi, scarti e allarmi, anche a pacchetti. Letture duplicate ignorate, limite di richieste per macchina.
+- **Giornata della macchina** nel dettaglio: disponibilità, pezzi (anche con contatore che si azzera), ore di marcia e di fermo, allarmi. Un silenzio oltre 15 minuti conta come "nessun dato", mai come marcia.
+- **Gateway pronto** in `scripts/machine-gateway` (Python): legge via OPC UA o MQTT, invia a ogni cambio di stato più un segnale al minuto, tiene in coda su disco le letture se la rete cade. Istruzioni in `LEGGIMI.md`, anche per la documentazione della perizia Transizione 5.0.
+- **Difetto corretto nell'import catalogo da PDF**: i codici con "ff", "fi", "fl" venivano importati con un carattere tipografico combinato (legatura) e poi non si trovavano cercandoli. Emerso da un test che falliva a caso; ora il testo estratto è normalizzato, con test di regressione dedicato.
+
 ### Fattura elettronica, reparto più rapido, server sempre sveglio (2026-09-30, v1.4.0)
 - **Fattura elettronica (FatturaPA FPR12, schema 1.2.3)**: fattura differita (TD24) dai DDT emessi di un cliente, con i prezzi già venduti (prezzo della commessa o riga del preventivo), o fattura immediata (TD01). IVA per riga (22, 10, 5, 4, 0% con natura, compreso il reverse charge edile N6.3/N6.7), riepilogo per aliquota, riferimenti ai DDT, pagamento con IBAN. Emissione con numero progressivo annuale e blocco; un DDT si fattura una sola volta. Il file XML ha il nome atteso dallo SdI ed è validato nei test contro lo schema ufficiale scaricato da fatturapa.gov.it (con controllo negativo: un file manomesso viene respinto). Copia di cortesia in PDF. Dati fiscali dell'azienda (regime, indirizzo, REA, IBAN con controllo) e dei clienti (codice SDI o PEC, indirizzo strutturato). Invio: caricamento gratuito sul portale "Fatture e Corrispettivi" o tramite commercialista/intermediario.
 - **Terminale di reparto**: bastano le ultime cifre del codice commessa (o parte del lotto); con più risultati compare l'elenco da toccare. Per Admin, direzione e magazzino l'elenco delle commesse aperte e in lavorazione compare subito, con la fase da fare.

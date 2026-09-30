@@ -226,7 +226,10 @@ public class SupplierCatalogController : ControllerBase
                         builder.Append(gap > 8 ? "   " : " ");
                     }
 
-                    builder.Append(word.Text);
+                    // Compatibility normalisation turns typographic ligatures back into letters: a PDF may
+                    // draw "ff"/"fi"/"fl" as one glyph (U+FB00...), and a code like "PN-3ff1" would otherwise
+                    // be imported as a different string than the one people search for.
+                    builder.Append(word.Text.Normalize(System.Text.NormalizationForm.FormKC));
                     previousRight = word.BoundingBox.Right;
                 }
 

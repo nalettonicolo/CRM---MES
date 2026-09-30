@@ -97,6 +97,26 @@ public class SupplierCatalogPdfImportTests : IClassFixture<AdminSeededApiTestFix
         Assert.Single(searchResponse!);
     }
 
+    /// <summary>Regression: the PDF draws "ff"/"fi"/"fl" as ligature glyphs; a code containing them must be
+    /// imported with plain letters, or searching for it finds nothing (this made the test above fail
+    /// whenever its random suffix happened to contain "ff").</summary>
+    [Fact]
+    public async Task ImportPdf_CodesWithLigatureLetters_AreImportedAsTyped()
+    {
+        var suffix = Guid.NewGuid().ToString("N")[..6];
+        var partNumber = $"PN-ff{suffix}fi";
+        var pdfBytes = BuildCatalogPdf(
+            ["supplierCode", "supplierName", "code", "name", "partNumber"],
+            [[$"SUP-L{suffix}", "Fornitore legature", $"MAT-ffl{suffix}", "Staffa fissaggio", partNumber]]);
+
+        using var content = BuildFileContent(pdfBytes, "catalogo-legature.pdf");
+        var response = await _adminClient.PostAsync("/api/supplier-catalog/import-pdf", content);
+        Assert.True(response.StatusCode == HttpStatusCode.OK, await response.Content.ReadAsStringAsync());
+
+        var found = await _adminClient.GetFromJsonAsync<List<object>>($"/api/supplier-catalog/search?q={partNumber}");
+        Assert.Single(found!);
+    }
+
     [Fact]
     public async Task ImportPdf_NoRecognizableHeaderRow_ReturnsBadRequestWithClearMessage()
     {

@@ -823,6 +823,28 @@ public sealed class ApiClient
     public Task<CompanyFiscalDto> SaveCompanyFiscalAsync(CompanyFiscalDto data, CancellationToken cancellationToken = default)
         => SendAsync<CompanyFiscalDto>(HttpMethod.Put, "api/company-profile/fiscal", data, cancellationToken);
 
+    // ---------- Machine interconnection
+
+    public Task<MachineDayDto> GetMachineDayAsync(Guid equipmentId, CancellationToken cancellationToken = default)
+        => GetOneAsync<MachineDayDto>($"api/equipment/{equipmentId}/machine-day", cancellationToken);
+
+    public async Task<MachineTokenDto> CreateMachineTokenAsync(Guid equipmentId, CancellationToken cancellationToken = default)
+    {
+        using var response = await _httpClient.PostAsync($"api/equipment/{equipmentId}/machine-token", null, cancellationToken);
+        await EnsureSuccessAsync(response, cancellationToken);
+        return await response.Content.ReadFromJsonAsync<MachineTokenDto>(cancellationToken: cancellationToken)
+            ?? throw new InvalidOperationException("Risposta token non valida.");
+    }
+
+    public async Task RevokeMachineTokenAsync(Guid equipmentId, CancellationToken cancellationToken = default)
+    {
+        using var response = await _httpClient.DeleteAsync($"api/equipment/{equipmentId}/machine-token", cancellationToken);
+        await EnsureSuccessAsync(response, cancellationToken);
+    }
+
+    public Task<IReadOnlyList<MachineOverviewDto>> GetMachineOverviewAsync(CancellationToken cancellationToken = default)
+        => GetAsync<MachineOverviewDto>("api/machine-data/overview", cancellationToken);
+
     // ---------- Recall
 
     public Task<RecallDto> GetRecallFromMaterialLotAsync(Guid lotId, CancellationToken cancellationToken = default)
@@ -2421,3 +2443,14 @@ public sealed record CustomerFiscalDto(
 public sealed record CompanyFiscalDto(
     string? FiscalCode, string? TaxRegime, string? Street, string? PostalCode, string? City, string? Province, string? Country,
     string? ReaOffice, string? ReaNumber, string? Iban);
+
+public sealed record MachineTokenDto(string Token, string TokenPrefix, string Endpoint, string Header);
+
+public sealed record MachineAlarmDto(DateTime Timestamp, string? Code, string? Text);
+
+public sealed record MachineDayDto(
+    Guid EquipmentId, string EquipmentName, DateTime Day, bool Connected, string? TokenPrefix, DateTime? LastSeenAt, string? LastState,
+    Dictionary<string, decimal> MinutesByState, decimal NoDataMinutes, long Pieces, long Scrap, decimal? Availability, int AlarmCount,
+    List<MachineAlarmDto> Alarms);
+
+public sealed record MachineOverviewDto(Guid EquipmentId, string Name, string Code, DateTime? LastSeenAt, string LastState, long? LastPieceCounter);

@@ -5,9 +5,9 @@ Aggiornato: 30 settembre 2026. Questo file si aggiorna a ogni sessione di lavoro
 ## In sintesi
 
 - **Cos'è**: gestionale di produzione (MES) con parte commerciale e documentale, per piccole e medie aziende manifatturiere. Nato per un quadrista, oggi si configura per cinque settori.
-- **Versione pubblicata**: v1.4.0 (30/09/2026), con installer per Windows e aggiornamento automatico.
+- **Versione pubblicata**: v1.5.0 (30/09/2026), con installer per Windows e aggiornamento automatico.
 - **Architettura**: client Windows (WPF, .NET 8) + API web (ASP.NET Core 8) su Render + database Postgres su Neon. Una pagina web per i tecnici è servita dalla stessa API.
-- **Test automatici**: 258 sull'API e 111 sul client, tutti verdi all'ultima misura (30/09/2026). Le fatture elettroniche sono validate contro lo schema ufficiale FatturaPA.
+- **Test automatici**: 264 sull'API e 111 sul client, tutti verdi all'ultima misura (30/09/2026). Le fatture elettroniche sono validate contro lo schema ufficiale FatturaPA.
 - **Uso attuale**: interno, un'azienda con due sedi.
 
 ## Cosa c'è
@@ -33,6 +33,7 @@ Aggiornato: 30 settembre 2026. Questo file si aggiorna a ogni sessione di lavoro
 - Centri di lavoro con capacità e tariffa oraria; pianificazione a calendario; board settimanale delle scadenze; planning produzione dipinto a mano.
 - Qualità: piani di controllo, misure, certificato di conformità.
 - Manutenzione: macchine e interventi preventivi ricorrenti o correttivi.
+- **Interconnessione macchine (Industria 4.0/5.0)**: ogni macchina invia stato, pezzi e allarmi con un token proprio; nel dettaglio macchina disponibilità, pezzi, ore di marcia e fermo, allarmi della giornata; gateway OPC UA/MQTT pronto in `scripts/machine-gateway`.
 
 ### Documenti di legge e logistica
 - DDT con nove causali, numerazione progressiva annuale all'emissione, annullamento con motivo (il numero resta), PDF con firme; bozza precompilata dalla commessa.
@@ -72,7 +73,8 @@ Aggiornato: 30 settembre 2026. Questo file si aggiorna a ogni sessione di lavoro
 | Invio automatico delle fatture allo SdI | Da decidere | Intermediario accreditato a pagamento; oggi il file si carica a mano sul portale gratuito |
 | Hosting a pagamento (garanzia di nessuna sospensione) | Da acquistare | Tuo acquisto del piano su Render: istruzioni in RIEPILOGO-SVILUPPO.md, "Hosting e firma" |
 | Firma digitale dell'eseguibile (niente avviso di Windows) | Da acquistare | Certificato di firma del codice: istruzioni in RIEPILOGO-SVILUPPO.md |
-| Interconnessione macchine (Transizione 5.0) | Da fare (prossimo) | Ingresso dati macchina con token; per il collegamento OPC UA o MQTT serve l'elenco delle macchine |
+| Collegamento reale delle macchine | Da configurare | Ingresso dati e gateway pronti: servono indirizzi OPC UA o topic MQTT di ogni macchina e un PC gateway in reparto |
+| OEE del cruscotto dai dati macchina | Da fare | Oggi il cruscotto usa fasi e fermi dichiarati; i dati macchina sono nel dettaglio di ciascuna |
 | Listini Metel | In attesa | Un file Metel reale di un produttore |
 | Alimentare: GTIN sui prodotti, piano HACCP guidato per tipologia | Da fare | Un'azienda pilota del settore |
 | Scarico di magazzino da DDT e rapportini | Scelta aperta | Oggi DDT e rapportini registrano cosa esce ma non scaricano la giacenza |
@@ -89,12 +91,13 @@ Aggiornato: 30 settembre 2026. Questo file si aggiorna a ogni sessione di lavoro
 | 29/09/2026 | v1.2.0 | Clienti e preventivi; costi, ore e margini con area direzione; verifica di sicurezza e correzioni; installer e aggiornamento affidabile; tabelle a tutta larghezza |
 | 29-30/09/2026 | v1.3.0 | Configurazione multi-settore; DDT, conto lavoro, esportazione per la contabilità; verifica CEI EN 61439; alimentare completo (scadenze, richiamo, allergeni ed etichette, SSCC, HACCP); rapportini di cantiere con pagina web per i tecnici |
 | 30/09/2026 | v1.4.0 | Fattura elettronica FatturaPA; terminale con ricerca per ultime cifre ed elenco commesse aperte; filtro commesse; codici copiabili; server sempre sveglio e login più rapido; pagina web con Fasi e Ore; istruzioni per hosting e firma |
-| prossimo | - | Ingresso dati macchine (Transizione 5.0); importatore Metel configurabile |
+| 30/09/2026 | v1.5.0 | Interconnessione macchine (token per macchina, giornata con disponibilità e pezzi, gateway OPC UA/MQTT); corretto l'import catalogo PDF con codici contenenti ff/fi/fl |
+| prossimo | - | OEE dai dati macchina nel cruscotto; importatore Metel appena arriva un file reale |
 
 ## Pubblicazione e ambienti
 
 - **API**: https://crmmes-api.onrender.com (piano gratuito Render), deploy automatico a ogni push su `main`.
-- **Database**: Neon Postgres, progetto `cool-field-94626300`. Tutte le migrazioni fino a `AddElectronicInvoices` sono applicate in produzione il 30/09/2026, dopo prova su un branch dedicato.
+- **Database**: Neon Postgres, progetto `cool-field-94626300`. Tutte le migrazioni fino a `AddMachineInterconnection` sono applicate in produzione il 30/09/2026, dopo prova su un branch dedicato.
 - **Client**: release GitHub con `NicoloMES-Setup.exe` e checksum; il programma avvisa e si aggiorna da solo.
 - **Branch Neon di prova ancora esistente**: `test-multisettore`, da eliminare quando non serve più.
 

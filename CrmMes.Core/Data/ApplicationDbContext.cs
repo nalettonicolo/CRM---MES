@@ -64,6 +64,8 @@ public class ApplicationDbContext : DbContext
     public DbSet<InvoiceLine> InvoiceLines => Set<InvoiceLine>();
     public DbSet<InvoiceTransportDocument> InvoiceTransportDocuments => Set<InvoiceTransportDocument>();
     public DbSet<CustomerFiscalData> CustomerFiscalData => Set<CustomerFiscalData>();
+    public DbSet<MachineConnection> MachineConnections => Set<MachineConnection>();
+    public DbSet<MachineEvent> MachineEvents => Set<MachineEvent>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -496,6 +498,26 @@ public class ApplicationDbContext : DbContext
             entity.Property(f => f.City).HasMaxLength(60);
             entity.Property(f => f.Province).HasMaxLength(2);
             entity.Property(f => f.Country).HasMaxLength(2);
+        });
+
+        modelBuilder.Entity<MachineConnection>(entity =>
+        {
+            entity.HasKey(c => c.EquipmentId);
+            entity.HasOne(c => c.Equipment).WithOne().HasForeignKey<MachineConnection>(c => c.EquipmentId).OnDelete(DeleteBehavior.Cascade);
+            entity.Property(c => c.TokenHash).HasMaxLength(64);
+            entity.Property(c => c.TokenPrefix).HasMaxLength(8);
+            entity.Property(c => c.CreatedBy).HasMaxLength(200);
+            entity.Property(c => c.LastState).HasMaxLength(20);
+        });
+
+        modelBuilder.Entity<MachineEvent>(entity =>
+        {
+            entity.HasIndex(e => new { e.EquipmentId, e.Timestamp }).IsUnique();
+            entity.HasOne(e => e.Equipment).WithMany().HasForeignKey(e => e.EquipmentId).OnDelete(DeleteBehavior.Cascade);
+            entity.Property(e => e.State).HasMaxLength(20);
+            entity.Property(e => e.AlarmCode).HasMaxLength(50);
+            entity.Property(e => e.AlarmText).HasMaxLength(200);
+            entity.Property(e => e.WorkOrderCode).HasMaxLength(50);
         });
 
         modelBuilder.Entity<CompanyProfile>(entity =>

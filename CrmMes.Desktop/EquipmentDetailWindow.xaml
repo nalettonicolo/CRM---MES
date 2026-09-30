@@ -1,11 +1,12 @@
 <Window x:Class="CrmMes.Desktop.EquipmentDetailWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="Dettaglio macchina" Icon="Assets/logo.ico" Height="540" Width="640"
-        WindowStartupLocation="CenterOwner" ResizeMode="CanResize" MinHeight="400" MinWidth="540"
+        Title="Dettaglio macchina" Icon="Assets/logo.ico" Height="720" Width="760"
+        WindowStartupLocation="CenterOwner" ResizeMode="CanResize" MinHeight="520" MinWidth="600"
         Background="{StaticResource BackgroundBrush}">
     <Grid Margin="24">
         <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
@@ -16,10 +17,44 @@
             <TextBlock Text="M A C C H I N A" Style="{StaticResource MicroLabel}" Foreground="{StaticResource PrimaryBrush}" />
             <TextBlock x:Name="EquipmentTitleText" Style="{StaticResource EditorialTitle}" FontSize="26" Margin="0,0,0,4" />
         </StackPanel>
-        <TextBlock Grid.Row="1" x:Name="EquipmentInfoText" Foreground="{StaticResource TextSecondaryBrush}" FontSize="12.5" TextWrapping="Wrap" Margin="0,4,0,16" />
+        <TextBlock Grid.Row="1" x:Name="EquipmentInfoText" Foreground="{StaticResource TextSecondaryBrush}" FontSize="12.5" TextWrapping="Wrap" Margin="0,4,0,12" />
 
-        <TextBlock Grid.Row="2" Text="Storico interventi di manutenzione" FontWeight="SemiBold" Foreground="{StaticResource TextPrimaryBrush}" Margin="0,0,0,6" />
-        <Border Grid.Row="3" Style="{StaticResource CardBorder}" Padding="4">
+        <!-- Machine interconnection (Industry 4.0 / Transizione 5.0): today's figures from the machine's own data. -->
+        <Border Grid.Row="2" Style="{StaticResource CardBorder}" Padding="16,12" Margin="0,0,0,16">
+            <StackPanel>
+                <DockPanel>
+                    <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
+                        <Button x:Name="RefreshMachineButton" Style="{StaticResource SecondaryButton}" Content="Aggiorna" Height="30" Margin="0,0,8,0" Click="RefreshMachine_Click" />
+                        <Button x:Name="ConnectButton" Content="Collega macchina" Height="30" Margin="0,0,8,0" Click="Connect_Click" Visibility="Collapsed" />
+                        <Button x:Name="DisconnectButton" Style="{StaticResource DangerButton}" Content="Scollega" Height="30" Click="Disconnect_Click" Visibility="Collapsed" />
+                    </StackPanel>
+                    <TextBlock Text="Collegamento macchina" FontWeight="SemiBold" Foreground="{StaticResource TextPrimaryBrush}" VerticalAlignment="Center" />
+                </DockPanel>
+                <TextBlock x:Name="MachineStatusText" Foreground="{StaticResource TextSecondaryBrush}" TextWrapping="Wrap" Margin="0,8,0,0" />
+                <UniformGrid x:Name="MachineFigures" Columns="4" Margin="0,10,0,0" Visibility="Collapsed">
+                    <StackPanel>
+                        <TextBlock Text="Disponibilità oggi" FontSize="11.5" Foreground="{StaticResource TextSecondaryBrush}" />
+                        <TextBlock x:Name="AvailabilityText" FontSize="20" FontWeight="SemiBold" Foreground="{StaticResource TextPrimaryBrush}" />
+                    </StackPanel>
+                    <StackPanel>
+                        <TextBlock Text="Pezzi oggi" FontSize="11.5" Foreground="{StaticResource TextSecondaryBrush}" />
+                        <TextBlock x:Name="PiecesText" FontSize="20" FontWeight="SemiBold" Foreground="{StaticResource TextPrimaryBrush}" />
+                    </StackPanel>
+                    <StackPanel>
+                        <TextBlock Text="In marcia / ferma" FontSize="11.5" Foreground="{StaticResource TextSecondaryBrush}" />
+                        <TextBlock x:Name="RunStopText" FontSize="20" FontWeight="SemiBold" Foreground="{StaticResource TextPrimaryBrush}" />
+                    </StackPanel>
+                    <StackPanel>
+                        <TextBlock Text="Allarmi oggi" FontSize="11.5" Foreground="{StaticResource TextSecondaryBrush}" />
+                        <TextBlock x:Name="AlarmsText" FontSize="20" FontWeight="SemiBold" Foreground="{StaticResource TextPrimaryBrush}" />
+                    </StackPanel>
+                </UniformGrid>
+                <TextBlock x:Name="LastAlarmsText" Foreground="#A15C07" TextWrapping="Wrap" Margin="0,8,0,0" />
+            </StackPanel>
+        </Border>
+
+        <TextBlock Grid.Row="3" Text="Storico interventi di manutenzione" FontWeight="SemiBold" Foreground="{StaticResource TextPrimaryBrush}" Margin="0,0,0,6" />
+        <Border Grid.Row="4" Style="{StaticResource CardBorder}" Padding="4">
             <ListView x:Name="TasksList">
                 <ListView.View>
                     <GridView>

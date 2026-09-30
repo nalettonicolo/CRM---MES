@@ -1,0 +1,30 @@
+{
+  "api_url": "https://crmmes-api.onrender.com",
+  "equipment_id": "INCOLLA-QUI-L-ID-DELLA-MACCHINA",
+  "token": "INCOLLA-QUI-IL-TOKEN-GENERATO-NEL-GESTIONALE",
+  "heartbeat_seconds": 60,
+  "queue_file": "pending-readings.json",
+
+  "opcua": {
+    "endpoint": "opc.tcp://192.168.1.50:4840",
+    "poll_seconds": 5,
+    "nodes": {
+      "state": "ns=2;s=Machine.State",
+      "pieces": "ns=2;s=Machine.PartCounter",
+      "scrap": "ns=2;s=Machine.ScrapCounter",
+      "alarm": "ns=2;s=Machine.ActiveAlarm"
+    },
+    "state_map": { "0": "Off", "1": "Running", "2": "Idle", "3": "Setup", "4": "Stopped", "5": "Alarm" }
+  },
+
+  "_mqtt_example": {
+    "host": "192.168.1.60",
+    "port": 1883,
+    "topics": {
+      "fabbrica/pressa1/stato": "state",
+      "fabbrica/pressa1/pezzi": "pieces",
+      "fabbrica/pressa1/allarme": "alarm"
+    },
+    "state_map": { "RUN": "Running", "IDLE": "Idle", "STOP": "Stopped", "ALARM": "Alarm" }
+  }
+}
