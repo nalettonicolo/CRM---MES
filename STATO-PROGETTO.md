@@ -7,13 +7,15 @@ Aggiornato: 30 settembre 2026. Questo file si aggiorna a ogni sessione di lavoro
 - **Cos'è**: gestionale di produzione (MES) con parte commerciale e documentale, per piccole e medie aziende manifatturiere. Nato per un quadrista, oggi si configura per cinque settori.
 - **Versione pubblicata**: v1.6.0 (30/09/2026), con installer per Windows e aggiornamento automatico: i PC con una versione precedente si aggiornano da soli. Comprende tutto il lavoro della v1.5.0 (la cui release si era fermata sui test).
 - **Architettura**: client Windows (WPF, .NET 8) + API web (ASP.NET Core 8) su Render + database Postgres su Neon. La stessa API serve la piattaforma web (`/app/`, Blazor WebAssembly) e la pagina dei tecnici (`/tecnici/`).
-- **Test automatici**: 276 sull'API, 113 sul client desktop e 47 sulla piattaforma web, tutti verdi (30/09/2026). Le fatture elettroniche sono validate contro lo schema ufficiale FatturaPA.
+- **Test automatici**: 282 sull'API, 116 sul client desktop e 47 sulla piattaforma web, tutti verdi (30/09/2026). Le fatture elettroniche sono validate contro lo schema ufficiale FatturaPA.
 - **Backtest end-to-end** (30/09/2026): 68 passi su 68 superati su un database vuoto e isolato, percorrendo tutti i ruoli, dal preventivo alla fattura, più cantiere, alimentare, macchine e 14 controlli di sicurezza. Dettaglio nella sezione "Backtest".
 - **Uso attuale**: interno, un'azienda con due sedi.
 
 ## Cosa c'è
 
 ### Configurazione e settori
+- **Configurazione in tre passi** (30/09/2026): attività dell'azienda (anche più di una, compresa la nuova "Costruzione macchine e impianti"), reparti (ufficio tecnico, produzione meccanica, carpenteria, montaggio, quadristi, collaudo, service, cantiere, spedizioni...) che diventano aree con i loro centri di lavoro tipici, moduli proposti con il motivo. La ricerca commesse filtra per il reparto dell'operatore (anche per quello identificato con il PIN).
+- **Analisi di mercato** aggiornata in [ANALISI-MERCATO-MES.md](ANALISI-MERCATO-MES.md): confronto con i MES italiani e internazionali, settore per settore, con le priorità.
 - Configurazione azienda al primo accesso dell'Admin: dati azienda (anche per DDT, dichiarazioni, etichette), prefisso GS1, settore, moduli.
 - Cinque settori: Quadri elettrici e automazione, Meccanica e carpenteria, Alimentare, Impiantistica e installazioni, Manifattura generica. Il settore accende i moduli tipici; ogni modulo si attiva o si spegne a mano. Spegnere un modulo nasconde menu e pulsanti, non cancella dati.
 
@@ -106,6 +108,10 @@ Non ancora provato: la pagina web dei tecnici dal browser con accesso reale (il 
 | Scarico di magazzino da DDT e rapportini | Scelta aperta | Oggi DDT e rapportini registrano cosa esce ma non scaricano la giacenza |
 | Import catalogo PDF validato su cataloghi reali | Da verificare | Il primo catalogo reale disponibile |
 | Piattaforma web: altre aree (qualità, HACCP, cantiere, manutenzione, pianificazione) | In corso | Una alla volta; oggi cruscotto, commesse, materiali, vendite, acquisti, DDT, fatture, canali |
+| Selettore "mio reparto / tutto" nel terminale e nella pagina tecnici | Da fare (prossimo) | Il filtro lato server è pronto (`department=mine`) |
+| Ufficio tecnico, Collaudo macchine e CE, Service post-vendita | Deciso, da sviluppare | Moduli già in catalogo come "in arrivo", proposti dai reparti |
+| Monitoraggio energetico per l'iperammortamento 2026 | Da fare | Priorità alta dall'analisi di mercato: kWh per macchina e report ex ante/ex post |
+| Autenticazione a due fattori | Da fare | Priorità alta per la sicurezza |
 | Piattaforma web: creare e modificare anagrafiche e documenti | Da fare | Oggi si consulta tutto e si fanno i passaggi dei preventivi; la creazione di clienti, preventivi e commesse resta nel desktop |
 | Server presso il cliente | Basi pronte | L'API gira come servizio di Windows, legge `C:\ProgramData\NicoloMES\server.json`, aggiorna il database da sola (`--migrate` o `Database:AutoMigrate`), scrive log giornalieri. Mancano l'installer del server, il backup locale e la variante Docker con database incluso |
 | Teleassistenza | Basi pronte | Lato server: contatti di assistenza leggibili prima del login e diagnostica per l'amministratore (versione, database, migrazioni, disco), senza segreti. Mancano nel client: finestra Teleassistenza, avvio della sessione remota (RustDesk), pacchetto diagnostico |
