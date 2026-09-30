@@ -5,7 +5,7 @@ Aggiornato: 30 settembre 2026. Questo file si aggiorna a ogni sessione di lavoro
 ## In sintesi
 
 - **Cos'è**: gestionale di produzione (MES) con parte commerciale e documentale, per piccole e medie aziende manifatturiere. Nato per un quadrista, oggi si configura per cinque settori.
-- **Versione pubblicata**: v1.4.0 (30/09/2026), con installer per Windows e aggiornamento automatico. La release v1.5.0 si è fermata sui test automatici: il difetto è corretto e verificato, va pubblicata come v1.5.1.
+- **Versione pubblicata**: v1.6.0 (30/09/2026), con installer per Windows e aggiornamento automatico: i PC con una versione precedente si aggiornano da soli. Comprende tutto il lavoro della v1.5.0 (la cui release si era fermata sui test).
 - **Architettura**: client Windows (WPF, .NET 8) + API web (ASP.NET Core 8) su Render + database Postgres su Neon. La stessa API serve la piattaforma web (`/app/`, Blazor WebAssembly) e la pagina dei tecnici (`/tecnici/`).
 - **Test automatici**: 276 sull'API, 113 sul client desktop e 43 sulla piattaforma web, tutti verdi (30/09/2026). Le fatture elettroniche sono validate contro lo schema ufficiale FatturaPA.
 - **Backtest end-to-end** (30/09/2026): 68 passi su 68 superati su un database vuoto e isolato, percorrendo tutti i ruoli, dal preventivo alla fattura, più cantiere, alimentare, macchine e 14 controlli di sicurezza. Dettaglio nella sezione "Backtest".
@@ -109,7 +109,7 @@ Non ancora provato: la pagina web dei tecnici dal browser con accesso reale (il 
 | Piattaforma web: creare e modificare anagrafiche e documenti | Da fare | Oggi si consulta tutto e si fanno i passaggi dei preventivi; la creazione di clienti, preventivi e commesse resta nel desktop |
 | Server presso il cliente | Basi pronte | L'API gira come servizio di Windows, legge `C:\ProgramData\NicoloMES\server.json`, aggiorna il database da sola (`--migrate` o `Database:AutoMigrate`), scrive log giornalieri. Mancano l'installer del server, il backup locale e la variante Docker con database incluso |
 | Teleassistenza | Basi pronte | Lato server: contatti di assistenza leggibili prima del login e diagnostica per l'amministratore (versione, database, migrazioni, disco), senza segreti. Mancano nel client: finestra Teleassistenza, avvio della sessione remota (RustDesk), pacchetto diagnostico |
-| Installer del client "da collegare in seguito" | Fatto, da pubblicare con la v1.6.0 | L'installer chiede server aziendale, cloud o "collegherò il server in seguito"; nel terzo caso il programma chiede l'indirizzo al primo avvio |
+| Installer del client "da collegare in seguito" | Fatto, pubblicato con la v1.6.0 | L'installer chiede server aziendale, cloud o "collegherò il server in seguito"; nel terzo caso il programma chiede l'indirizzo al primo avvio |
 | Log centralizzati su Grafana | Pronto, non attivo | Account gratuito Grafana e variabili su Render |
 | Password dell'account di sviluppo esposto in passato | Da fare | Va cambiata dal titolare |
 
@@ -122,9 +122,9 @@ Non ancora provato: la pagina web dei tecnici dal browser con accesso reale (il 
 | 29/09/2026 | v1.2.0 | Clienti e preventivi; costi, ore e margini con area direzione; verifica di sicurezza e correzioni; installer e aggiornamento affidabile; tabelle a tutta larghezza |
 | 29-30/09/2026 | v1.3.0 | Configurazione multi-settore; DDT, conto lavoro, esportazione per la contabilità; verifica CEI EN 61439; alimentare completo (scadenze, richiamo, allergeni ed etichette, SSCC, HACCP); rapportini di cantiere con pagina web per i tecnici |
 | 30/09/2026 | v1.4.0 | Fattura elettronica FatturaPA; terminale con ricerca per ultime cifre ed elenco commesse aperte; filtro commesse; codici copiabili; server sempre sveglio e login più rapido; pagina web con Fasi e Ore; istruzioni per hosting e firma |
-| 30/09/2026 | v1.5.1 (da pubblicare) | Backtest end-to-end 68/68; legature disattivate nei PDF (codici copiabili senza lettere perse), test PDF resi stabili |
+| 30/09/2026 | (in v1.6.0) | Backtest end-to-end 68/68; legature disattivate nei PDF (codici copiabili senza lettere perse), test PDF resi stabili |
 | 30/09/2026 | v1.5.0 (release fermata dai test) | Interconnessione macchine (token per macchina, giornata con disponibilità e pezzi, gateway OPC UA/MQTT); corretto l'import catalogo PDF con codici contenenti ff/fi/fl |
-| 30/09/2026 | da pubblicare | Piattaforma web `/app/` (cruscotto, commesse, materiali); canali di accesso configurabili dall'amministratore; basi per server presso il cliente (servizio Windows, configurazione, migrazioni automatiche, log) e per la teleassistenza (contatti e diagnostica) |
+| 30/09/2026 | v1.6.0 | Installer da collegare in seguito; piattaforma web `/app/` con vendite, DDT e fatture; (cruscotto, commesse, materiali); canali di accesso configurabili dall'amministratore; basi per server presso il cliente (servizio Windows, configurazione, migrazioni automatiche, log) e per la teleassistenza (contatti e diagnostica) |
 | prossimo | - | Altre aree sulla piattaforma web; installer del server e teleassistenza nel client; OEE dai dati macchina |
 
 ## Pubblicazione e ambienti
