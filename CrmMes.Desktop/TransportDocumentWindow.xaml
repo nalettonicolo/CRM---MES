@@ -1,0 +1,176 @@
+<Window x:Class="CrmMes.Desktop.TransportDocumentWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Documento di trasporto" Icon="Assets/logo.ico" Height="800" Width="1080"
+        WindowStartupLocation="CenterOwner" ResizeMode="CanResize" MinHeight="620" MinWidth="900"
+        Background="{StaticResource BackgroundBrush}">
+    <Grid Margin="24,20,24,20">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
+        <DockPanel Grid.Row="0" Margin="0,0,0,14">
+            <Border DockPanel.Dock="Right" Style="{StaticResource Pill}" VerticalAlignment="Bottom" Margin="0,0,0,6">
+                <TextBlock x:Name="StatusText" Style="{StaticResource PillText}" FontSize="13" />
+            </Border>
+            <StackPanel>
+                <TextBlock Text="D O C U M E N T O   D I   T R A S P O R T O" Style="{StaticResource MicroLabel}" />
+                <TextBlock x:Name="HeaderText" Text="Nuovo DDT" Style="{StaticResource EditorialTitle}" FontSize="24" />
+                <TextBlock x:Name="SubHeaderText" Foreground="{StaticResource TextSecondaryBrush}" FontSize="12.5" TextWrapping="Wrap" />
+            </StackPanel>
+        </DockPanel>
+
+        <!-- Header fields: locked once issued (the printed document travelled with the goods). -->
+        <Grid Grid.Row="1" x:Name="HeaderPanel" Margin="0,0,0,14">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="20" />
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="20" />
+                <ColumnDefinition Width="*" />
+            </Grid.ColumnDefinitions>
+
+            <StackPanel Grid.Column="0">
+                <TextBlock Text="Causale" Foreground="{StaticResource TextSecondaryBrush}" FontSize="12.5" Margin="0,0,0,5" />
+                <ComboBox x:Name="ReasonCombo" Height="34" DisplayMemberPath="Label" SelectionChanged="ReasonCombo_SelectionChanged" />
+                <TextBox x:Name="ReasonDetailBox" Margin="0,8,0,0" Tag="Scrivi la causale" Visibility="Collapsed" />
+                <TextBlock x:Name="CustomerLabel" Text="Cliente" Foreground="{StaticResource TextSecondaryBrush}" FontSize="12.5" Margin="0,12,0,5" />
+                <ComboBox x:Name="CustomerCombo" Height="34" DisplayMemberPath="Name" SelectionChanged="CustomerCombo_SelectionChanged" />
+                <TextBlock x:Name="SupplierLabel" Text="Fornitore / terzista" Foreground="{StaticResource TextSecondaryBrush}" FontSize="12.5" Margin="0,12,0,5" />
+                <ComboBox x:Name="SupplierCombo" Height="34" DisplayMemberPath="Name" SelectionChanged="SupplierCombo_SelectionChanged" />
+            </StackPanel>
+
+            <StackPanel Grid.Column="2">
+                <TextBlock Text="Destinatario *" Foreground="{StaticResource TextSecondaryBrush}" FontSize="12.5" Margin="0,0,0,5" />
+                <TextBox x:Name="RecipientNameBox" />
+                <TextBlock Text="Indirizzo del destinatario" Foreground="{StaticResource TextSecondaryBrush}" FontSize="12.5" Margin="0,12,0,5" />
+                <TextBox x:Name="RecipientAddressBox" />
+                <TextBlock Text="Partita IVA destinatario" Foreground="{StaticResource TextSecondaryBrush}" FontSize="12.5" Margin="0,12,0,5" />
+                <TextBox x:Name="RecipientVatBox" />
+                <TextBlock Text="Luogo di destinazione (se diverso)" Foreground="{StaticResource TextSecondaryBrush}" FontSize="12.5" Margin="0,12,0,5" />
+                <TextBox x:Name="DestinationBox" />
+            </StackPanel>
+
+            <StackPanel Grid.Column="4">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="10" />
+                        <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
+                    <StackPanel Grid.Column="0">
+                        <TextBlock Text="Trasporto a cura" Foreground="{StaticResource TextSecondaryBrush}" FontSize="12.5" Margin="0,0,0,5" />
+                        <ComboBox x:Name="TransportByCombo" Height="34" SelectionChanged="TransportByCombo_SelectionChanged">
+                            <ComboBoxItem Content="Mittente" Tag="Sender" IsSelected="True" />
+                            <ComboBoxItem Content="Destinatario" Tag="Recipient" />
+                            <ComboBoxItem Content="Vettore" Tag="Carrier" />
+                        </ComboBox>
+                    </StackPanel>
+                    <StackPanel Grid.Column="2">
+                        <TextBlock Text="Porto" Foreground="{StaticResource TextSecondaryBrush}" FontSize="12.5" Margin="0,0,0,5" />
+                        <ComboBox x:Name="PortCombo" Height="34">
+                            <ComboBoxItem Content="Franco" Tag="Franco" IsSelected="True" />
+                            <ComboBoxItem Content="Assegnato" Tag="Assegnato" />
+                            <ComboBoxItem Content="(non indicato)" Tag="" />
+                        </ComboBox>
+                    </StackPanel>
+                </Grid>
+                <TextBlock Text="Vettore" Foreground="{StaticResource TextSecondaryBrush}" FontSize="12.5" Margin="0,12,0,5" />
+                <ComboBox x:Name="CarrierCombo" Height="34" DisplayMemberPath="Name" IsEnabled="False" />
+                <Grid Margin="0,12,0,0">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="2*" />
+                        <ColumnDefinition Width="10" />
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="10" />
+                        <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
+                    <StackPanel Grid.Column="0">
+                        <TextBlock Text="Aspetto dei beni" Foreground="{StaticResource TextSecondaryBrush}" FontSize="12.5" Margin="0,0,0,5" />
+                        <TextBox x:Name="AppearanceBox" Text="Scatole" Tag="Scatole, pallet, sfuso..." />
+                    </StackPanel>
+                    <StackPanel Grid.Column="2">
+                        <TextBlock Text="Colli" Foreground="{StaticResource TextSecondaryBrush}" FontSize="12.5" Margin="0,0,0,5" />
+                        <TextBox x:Name="PackagesBox" />
+                    </StackPanel>
+                    <StackPanel Grid.Column="4">
+                        <TextBlock Text="Peso kg" Foreground="{StaticResource TextSecondaryBrush}" FontSize="12.5" Margin="0,0,0,5" />
+                        <TextBox x:Name="WeightBox" />
+                    </StackPanel>
+                </Grid>
+                <StackPanel x:Name="ExpectedReturnPanel" Visibility="Collapsed">
+                    <TextBlock Text="Rientro previsto dal terzista" Foreground="{StaticResource TextSecondaryBrush}" FontSize="12.5" Margin="0,12,0,5" />
+                    <DatePicker x:Name="ExpectedReturnPicker" Height="34" />
+                </StackPanel>
+                <TextBlock Text="Note" Foreground="{StaticResource TextSecondaryBrush}" FontSize="12.5" Margin="0,12,0,5" />
+                <TextBox x:Name="NotesBox" />
+            </StackPanel>
+        </Grid>
+
+        <!-- New line strip: a code found in the materials fills description and unit. -->
+        <Grid Grid.Row="2" x:Name="LineEntryPanel" Margin="0,0,0,8">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="140" />
+                <ColumnDefinition Width="8" />
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="8" />
+                <ColumnDefinition Width="80" />
+                <ColumnDefinition Width="8" />
+                <ColumnDefinition Width="60" />
+                <ColumnDefinition Width="8" />
+                <ColumnDefinition Width="120" />
+                <ColumnDefinition Width="8" />
+                <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+            <TextBox Grid.Column="0" x:Name="LineCodeBox" Tag="Codice" LostFocus="LineCodeBox_LostFocus" />
+            <TextBox Grid.Column="2" x:Name="LineDescriptionBox" Tag="Descrizione dei beni" />
+            <TextBox Grid.Column="4" x:Name="LineQuantityBox" Tag="Q.tà" Text="1" />
+            <TextBox Grid.Column="6" x:Name="LineUnitBox" Tag="U.m." Text="pz" />
+            <TextBox Grid.Column="8" x:Name="LineLotBox" Tag="Lotto / matricola" />
+            <Button Grid.Column="10" Content="Aggiungi riga" Width="120" Height="34" Click="AddLine_Click" />
+        </Grid>
+
+        <Border Grid.Row="3" Style="{StaticResource CardBorder}" Padding="4">
+            <ListView x:Name="LinesList">
+                <ListView.View>
+                    <GridView x:Name="LinesGrid">
+                        <GridViewColumn Header="Codice" DisplayMemberBinding="{Binding Code}" Width="130" />
+                        <GridViewColumn Header="Descrizione" DisplayMemberBinding="{Binding Description}" Width="320" />
+                        <GridViewColumn Header="Q.tà" DisplayMemberBinding="{Binding Quantity, StringFormat=0.###}" Width="70" />
+                        <GridViewColumn Header="U.m." DisplayMemberBinding="{Binding Unit}" Width="55" />
+                        <GridViewColumn Header="Lotto" DisplayMemberBinding="{Binding LotNumber}" Width="120" />
+                        <GridViewColumn x:Name="ReturnedColumn" Header="Rientrato" DisplayMemberBinding="{Binding ReturnedText}" Width="90" />
+                        <GridViewColumn x:Name="OutstandingColumn" Header="Residuo" DisplayMemberBinding="{Binding OutstandingText}" Width="80" />
+                        <GridViewColumn Header="" Width="140">
+                            <GridViewColumn.CellTemplate>
+                                <DataTemplate>
+                                    <StackPanel Orientation="Horizontal">
+                                        <Button Content="Rimuovi" Style="{StaticResource SecondaryButton}" Height="28" Click="RemoveLine_Click" Tag="{Binding}"
+                                                Visibility="{Binding CanRemove, Converter={StaticResource BoolToVisibility}}" />
+                                        <Button Content="Rientri" Style="{StaticResource SecondaryButton}" Width="90" Height="28" Click="Returns_Click" Tag="{Binding}"
+                                                Visibility="{Binding CanReturn, Converter={StaticResource BoolToVisibility}}" />
+                                    </StackPanel>
+                                </DataTemplate>
+                            </GridViewColumn.CellTemplate>
+                        </GridViewColumn>
+                    </GridView>
+                </ListView.View>
+            </ListView>
+        </Border>
+
+        <DockPanel Grid.Row="4" Margin="0,14,0,0">
+            <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
+                <Button x:Name="DeleteButton" Style="{StaticResource DangerButton}" Content="Elimina bozza" Width="130" Height="36" Margin="0,0,10,0" Click="Delete_Click" />
+                <Button x:Name="CancelDocumentButton" Style="{StaticResource SecondaryButton}" Content="Annulla DDT" Width="120" Height="36" Margin="0,0,10,0" Click="CancelDocument_Click" />
+                <Button x:Name="PdfButton" Style="{StaticResource SecondaryButton}" Content="PDF" Width="80" Height="36" Margin="0,0,10,0" Click="Pdf_Click" />
+                <Button x:Name="SaveButton" Style="{StaticResource SecondaryButton}" Content="Salva bozza" Width="120" Height="36" Margin="0,0,10,0" Click="Save_Click" />
+                <Button x:Name="IssueButton" Content="Emetti DDT" Width="130" Height="36" Click="Issue_Click" />
+            </StackPanel>
+            <TextBlock x:Name="ErrorText" Foreground="{StaticResource DangerBrush}" TextWrapping="Wrap" VerticalAlignment="Center" Margin="0,0,16,0" />
+        </DockPanel>
+    </Grid>
+</Window>

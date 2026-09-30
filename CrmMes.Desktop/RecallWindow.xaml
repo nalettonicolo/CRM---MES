@@ -1,0 +1,70 @@
+<Window x:Class="CrmMes.Desktop.RecallWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Richiamo di lotto" Icon="Assets/logo.ico" Height="760" Width="1040" MinHeight="560" MinWidth="820"
+        WindowStartupLocation="CenterOwner"
+        Background="{StaticResource BackgroundBrush}">
+    <DockPanel Margin="24,20">
+        <StackPanel DockPanel.Dock="Top" Margin="0,0,0,12">
+            <TextBlock Text="R I C H I A M O" Style="{StaticResource MicroLabel}" />
+            <TextBlock x:Name="SubjectText" Text="Ricerca in corso..." Style="{StaticResource EditorialTitle}" FontSize="22" TextWrapping="Wrap" />
+            <ItemsControl x:Name="WarningsList" Margin="0,8,0,0">
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate>
+                        <TextBlock Text="{Binding}" Foreground="#A15C07" FontWeight="SemiBold" TextWrapping="Wrap" Margin="0,0,0,4" />
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
+            <TextBlock Text="Clienti da avvisare" FontWeight="SemiBold" Foreground="{StaticResource TextPrimaryBrush}" Margin="0,8,0,2" />
+            <TextBlock x:Name="CustomersText" Foreground="{StaticResource TextPrimaryBrush}" FontSize="15" TextWrapping="Wrap" />
+        </StackPanel>
+
+        <DockPanel DockPanel.Dock="Bottom" Margin="0,12,0,0">
+            <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
+                <Button x:Name="PdfButton" Content="Rapporto PDF" Width="140" Height="36" Margin="0,0,10,0" Click="Pdf_Click" IsEnabled="False" />
+                <Button Style="{StaticResource SecondaryButton}" Content="Chiudi" Width="100" Height="36" IsCancel="True" />
+            </StackPanel>
+            <TextBlock x:Name="ErrorText" Foreground="{StaticResource DangerBrush}" TextWrapping="Wrap" VerticalAlignment="Center" />
+        </DockPanel>
+
+        <Grid>
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="*" />
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="*" />
+            </Grid.RowDefinitions>
+            <TextBlock Grid.Row="0" Text="Commesse che hanno usato il lotto" FontWeight="SemiBold" Foreground="{StaticResource TextPrimaryBrush}" Margin="0,0,0,6" />
+            <Border Grid.Row="1" Style="{StaticResource CardBorder}" Padding="4">
+                <ListView x:Name="WorkOrdersList">
+                    <ListView.View>
+                        <GridView>
+                            <GridViewColumn Header="Commessa" DisplayMemberBinding="{Binding Code}" Width="130" />
+                            <GridViewColumn Header="Prodotto" DisplayMemberBinding="{Binding ProductName}" Width="220" />
+                            <GridViewColumn Header="Lotto prodotto" DisplayMemberBinding="{Binding ProductLotNumber}" Width="140" />
+                            <GridViewColumn Header="Consumato" DisplayMemberBinding="{Binding ConsumedQuantity, StringFormat=0.###}" Width="90" />
+                            <GridViewColumn Header="Stato" DisplayMemberBinding="{Binding StatusLabel}" Width="110" />
+                            <GridViewColumn Header="Cliente" DisplayMemberBinding="{Binding CustomerName}" Width="180" />
+                        </GridView>
+                    </ListView.View>
+                </ListView>
+            </Border>
+            <TextBlock Grid.Row="2" Text="Consegne (DDT emessi)" FontWeight="SemiBold" Foreground="{StaticResource TextPrimaryBrush}" Margin="0,12,0,6" />
+            <Border Grid.Row="3" Style="{StaticResource CardBorder}" Padding="4">
+                <ListView x:Name="ShipmentsList">
+                    <ListView.View>
+                        <GridView>
+                            <GridViewColumn Header="DDT" DisplayMemberBinding="{Binding DocumentCode}" Width="90" />
+                            <GridViewColumn Header="Data" DisplayMemberBinding="{Binding IssuedAt, StringFormat=dd/MM/yyyy}" Width="100" />
+                            <GridViewColumn Header="Destinatario" DisplayMemberBinding="{Binding RecipientName}" Width="220" />
+                            <GridViewColumn Header="Indirizzo" DisplayMemberBinding="{Binding RecipientAddress}" Width="200" />
+                            <GridViewColumn Header="Articolo" DisplayMemberBinding="{Binding Description}" Width="180" />
+                            <GridViewColumn Header="Q.tà" DisplayMemberBinding="{Binding Quantity, StringFormat=0.###}" Width="70" />
+                            <GridViewColumn Header="Lotto" DisplayMemberBinding="{Binding LotNumber}" Width="110" />
+                        </GridView>
+                    </ListView.View>
+                </ListView>
+            </Border>
+        </Grid>
+    </DockPanel>
+</Window>

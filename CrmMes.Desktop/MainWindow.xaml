@@ -81,7 +81,7 @@
                         </Border>
                         <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
                         <StackPanel Margin="0,10,0,0">
-                            <Expander Style="{StaticResource NavSectionExpander}" Header="V E N D I T E">
+                            <Expander x:Name="NavSalesSection" Style="{StaticResource NavSectionExpander}" Header="V E N D I T E">
                                 <StackPanel>
                                     <RadioButton x:Name="NavCustomers" Style="{StaticResource NavItem}" GroupName="Nav" Tag="20" Checked="NavItem_Checked">
                                         <StackPanel Orientation="Horizontal">
@@ -133,7 +133,7 @@
                                 </StackPanel>
                             </Expander>
 
-                            <Expander Style="{StaticResource NavSectionExpander}" Header="A C Q U I S T I">
+                            <Expander x:Name="NavPurchasingSection" Style="{StaticResource NavSectionExpander}" Header="A C Q U I S T I">
                                 <StackPanel>
                                     <RadioButton x:Name="NavOrders" Style="{StaticResource NavItem}" GroupName="Nav" Tag="4" Checked="NavItem_Checked">
                                         <StackPanel Orientation="Horizontal">
@@ -151,6 +151,12 @@
                                         <StackPanel Orientation="Horizontal">
                                             <TextBlock Text="&#xE721;" FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets" FontSize="16" Width="24" />
                                             <TextBlock Text="Ricerca catalogo" Margin="6,0,0,0" />
+                                        </StackPanel>
+                                    </RadioButton>
+                                    <RadioButton x:Name="NavSubcontracting" Style="{StaticResource NavItem}" GroupName="Nav" Tag="24" Checked="NavItem_Checked">
+                                        <StackPanel Orientation="Horizontal">
+                                            <TextBlock Text="&#xE8AB;" FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets" FontSize="16" Width="24" />
+                                            <TextBlock Text="Conto lavoro" Margin="6,0,0,0" />
                                         </StackPanel>
                                     </RadioButton>
                                 </StackPanel>
@@ -188,6 +194,18 @@
                                             <TextBlock Text="Pianificazione" Margin="6,0,0,0" />
                                         </StackPanel>
                                     </RadioButton>
+                                    <RadioButton x:Name="NavHaccp" Style="{StaticResource NavItem}" GroupName="Nav" Tag="25" Checked="NavItem_Checked">
+                                        <StackPanel Orientation="Horizontal">
+                                            <TextBlock Text="&#xE9CA;" FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets" FontSize="16" Width="24" />
+                                            <TextBlock Text="Registri HACCP" Margin="6,0,0,0" />
+                                        </StackPanel>
+                                    </RadioButton>
+                                    <RadioButton x:Name="NavSiteReports" Style="{StaticResource NavItem}" GroupName="Nav" Tag="26" Checked="NavItem_Checked">
+                                        <StackPanel Orientation="Horizontal">
+                                            <TextBlock Text="&#xE80F;" FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets" FontSize="16" Width="24" />
+                                            <TextBlock Text="Rapportini di cantiere" Margin="6,0,0,0" />
+                                        </StackPanel>
+                                    </RadioButton>
                                     <Button x:Name="ShopFloorTerminalButton" Style="{StaticResource SidebarLinkButton}" HorizontalAlignment="Stretch" HorizontalContentAlignment="Left" Margin="26,6,10,0" Click="ShopFloorTerminalButton_Click">
                                         <StackPanel Orientation="Horizontal">
                                             <TextBlock Text="&#xE8FD;" FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets" FontSize="16" Width="24" />
@@ -203,7 +221,7 @@
                                 </StackPanel>
                             </Expander>
 
-                            <Expander Style="{StaticResource NavSectionExpander}" Header="M A N U T E N Z I O N E">
+                            <Expander x:Name="NavMaintenanceSection" Style="{StaticResource NavSectionExpander}" Header="M A N U T E N Z I O N E">
                                 <StackPanel>
                                     <RadioButton x:Name="NavEquipment" Style="{StaticResource NavItem}" GroupName="Nav" Tag="17" Checked="NavItem_Checked">
                                         <StackPanel Orientation="Horizontal">
@@ -220,7 +238,7 @@
                                 </StackPanel>
                             </Expander>
 
-                            <Expander Style="{StaticResource NavSectionExpander}" Header="S P E D I Z I O N I">
+                            <Expander x:Name="NavShippingSection" Style="{StaticResource NavSectionExpander}" Header="S P E D I Z I O N I">
                                 <StackPanel>
                                     <RadioButton x:Name="NavCarriers" Style="{StaticResource NavItem}" GroupName="Nav" Tag="12" Checked="NavItem_Checked">
                                         <StackPanel Orientation="Horizontal">
@@ -232,6 +250,12 @@
                                         <StackPanel Orientation="Horizontal">
                                             <TextBlock Text="&#xE709;" FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets" FontSize="16" Width="24" />
                                             <TextBlock Text="Spedizioni" Margin="6,0,0,0" />
+                                        </StackPanel>
+                                    </RadioButton>
+                                    <RadioButton x:Name="NavTransportDocuments" Style="{StaticResource NavItem}" GroupName="Nav" Tag="23" Checked="NavItem_Checked">
+                                        <StackPanel Orientation="Horizontal">
+                                            <TextBlock Text="&#xE8A5;" FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets" FontSize="16" Width="24" />
+                                            <TextBlock Text="Documenti di trasporto" Margin="6,0,0,0" />
                                         </StackPanel>
                                     </RadioButton>
                                 </StackPanel>
@@ -270,6 +294,12 @@
                                             <TextBlock Text="Sedi" Margin="6,0,0,0" />
                                         </StackPanel>
                                     </RadioButton>
+                                    <Button x:Name="CompanySetupButton" Style="{StaticResource SidebarLinkButton}" HorizontalAlignment="Stretch" HorizontalContentAlignment="Left" Margin="26,6,10,0" Click="CompanySetupButton_Click" Visibility="Collapsed">
+                                        <StackPanel Orientation="Horizontal">
+                                            <TextBlock Text="&#xE713;" FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets" FontSize="16" Width="24" />
+                                            <TextBlock Text="Azienda e settore" Margin="6,0,0,0" />
+                                        </StackPanel>
+                                    </Button>
                                 </StackPanel>
                             </Expander>
                         </StackPanel>
@@ -302,6 +332,7 @@
                                 </Grid.RowDefinitions>
                                 <DockPanel Grid.Row="0" Margin="0,0,0,14">
                                     <Button DockPanel.Dock="Right" Content="Nuovo materiale" Width="140" Height="36" Click="NewMaterialButton_Click" />
+                                    <Button x:Name="MaterialFoodButton" DockPanel.Dock="Right" Style="{StaticResource SecondaryButton}" Content="Dati alimentari" Width="130" Height="36" Margin="0,0,10,0" Click="MaterialFoodButton_Click" Visibility="Collapsed" />
                                     <Button DockPanel.Dock="Right" Style="{StaticResource SecondaryButton}" Content="Importa catalogo Excel" Width="170" Height="36" Margin="0,0,10,0" Click="ImportCatalogButton_Click" />
                                     <Button DockPanel.Dock="Right" Style="{StaticResource SecondaryButton}" Content="Importa catalogo PDF" Width="160" Height="36" Margin="0,0,10,0" Click="ImportCatalogPdfButton_Click" />
                                     <Button DockPanel.Dock="Right" Style="{StaticResource SecondaryButton}" Content="Cerca" Width="90" Height="36" Margin="0,0,10,0" Click="SearchButton_Click" />
@@ -604,6 +635,7 @@
                                 <StackPanel Grid.Row="2" Orientation="Horizontal" Margin="0,14,0,0">
                                     <Button x:Name="OpenProductButton" Style="{StaticResource SecondaryButton}" Content="Apri" Width="110" Height="36" Margin="0,0,10,0" Click="OpenProductButton_Click" IsEnabled="False" />
                                     <Button x:Name="EditProductButton" Style="{StaticResource SecondaryButton}" Content="Modifica" Width="110" Height="36" Click="EditProductButton_Click" IsEnabled="False" />
+                                    <Button x:Name="ProductFoodButton" Style="{StaticResource SecondaryButton}" Content="Dati etichetta" Width="130" Height="36" Margin="10,0,0,0" Click="ProductFoodButton_Click" IsEnabled="False" Visibility="Collapsed" />
                                 </StackPanel>
                             </Grid>
                         </TabItem>
@@ -676,7 +708,7 @@
                                 <DockPanel Grid.Row="0" Margin="0,0,0,14">
                                     <Button DockPanel.Dock="Right" Content="Nuovo lotto" Width="130" Height="36" Click="NewMaterialLotButton_Click" />
                                     <Button DockPanel.Dock="Right" Style="{StaticResource SecondaryButton}" Content="Aggiorna" Width="100" Height="36" Margin="0,0,10,0" Click="RefreshMaterialLotsButton_Click" />
-                                    <TextBlock Text="Lotti materiali: tracciabilità delle giacenze in ingresso" VerticalAlignment="Center" Foreground="{StaticResource TextSecondaryBrush}" />
+                                    <TextBlock x:Name="MaterialLotsInfoText" Text="Lotti materiali: tracciabilità delle giacenze in ingresso" VerticalAlignment="Center" Foreground="{StaticResource TextSecondaryBrush}" TextWrapping="Wrap" />
                                 </DockPanel>
                                 <Border Grid.Row="1" Style="{StaticResource CardBorder}" Padding="4">
                                     <ListView x:Name="MaterialLotsList" SelectionChanged="MaterialLotsList_SelectionChanged" MouseDoubleClick="MaterialLotsList_MouseDoubleClick">
@@ -687,12 +719,32 @@
                                                 <GridViewColumn Header="Residuo" DisplayMemberBinding="{Binding Quantity}" Width="90" />
                                                 <GridViewColumn Header="Quantità iniziale" DisplayMemberBinding="{Binding InitialQuantity}" Width="120" />
                                                 <GridViewColumn Header="Ricevuto il" DisplayMemberBinding="{Binding ReceivedAt}" Width="150" />
+                                                <GridViewColumn x:Name="LotExpiryColumn" Header="Scadenza" Width="0">
+                                                    <GridViewColumn.CellTemplate>
+                                                        <DataTemplate>
+                                                            <TextBlock x:Name="Expiry" Text="{Binding ExpiryDate, StringFormat=dd/MM/yyyy}" />
+                                                            <DataTemplate.Triggers>
+                                                                <DataTrigger Binding="{Binding ExpiresSoon}" Value="True">
+                                                                    <Setter TargetName="Expiry" Property="Foreground" Value="#A15C07" />
+                                                                    <Setter TargetName="Expiry" Property="FontWeight" Value="SemiBold" />
+                                                                </DataTrigger>
+                                                                <DataTrigger Binding="{Binding IsExpired}" Value="True">
+                                                                    <Setter TargetName="Expiry" Property="Foreground" Value="{StaticResource DangerBrush}" />
+                                                                    <Setter TargetName="Expiry" Property="FontWeight" Value="Bold" />
+                                                                </DataTrigger>
+                                                            </DataTemplate.Triggers>
+                                                        </DataTemplate>
+                                                    </GridViewColumn.CellTemplate>
+                                                </GridViewColumn>
                                             </GridView>
                                         </ListView.View>
                                     </ListView>
                                 </Border>
                                 <StackPanel Grid.Row="2" Orientation="Horizontal" Margin="0,14,0,0">
                                     <Button x:Name="OpenMaterialLotButton" Style="{StaticResource SecondaryButton}" Content="Apri (tracciabilità)" Width="160" Height="36" Click="OpenMaterialLotButton_Click" IsEnabled="False" />
+                                    <Button x:Name="RecallLotButton" Style="{StaticResource SecondaryButton}" Content="Richiamo del lotto" Width="150" Height="36" Margin="10,0,0,0" Click="RecallLotButton_Click" IsEnabled="False" />
+                                    <Button Style="{StaticResource SecondaryButton}" Content="Richiamo lotto prodotto" Width="180" Height="36" Margin="10,0,0,0" Click="RecallProductLotButton_Click" />
+                                    <Button x:Name="SetLotExpiryButton" Style="{StaticResource SecondaryButton}" Content="Imposta scadenza" Width="150" Height="36" Margin="10,0,0,0" Click="SetLotExpiryButton_Click" IsEnabled="False" Visibility="Collapsed" />
                                 </StackPanel>
                             </Grid>
                         </TabItem>
@@ -1399,6 +1451,193 @@
                             </Grid>
                         </TabItem>
 
+
+                        <TabItem Header="Documenti di trasporto">
+                            <Grid>
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto" />
+                                    <RowDefinition Height="*" />
+                                </Grid.RowDefinitions>
+                                <DockPanel Grid.Row="0" Margin="0,0,0,14">
+                                    <Button DockPanel.Dock="Right" Content="Nuovo DDT" Width="120" Height="36" Click="NewTransportDocument_Click" />
+                                    <Button DockPanel.Dock="Right" Style="{StaticResource SecondaryButton}" Content="Esporta per contabilità" Width="180" Height="36" Margin="0,0,10,0" Click="ExportTransportDocuments_Click" />
+                                    <Button DockPanel.Dock="Right" Style="{StaticResource SecondaryButton}" Content="Aggiorna" Width="100" Height="36" Margin="0,0,10,0" Click="RefreshTransportDocuments_Click" />
+                                    <ComboBox x:Name="TransportStatusFilter" DockPanel.Dock="Right" Width="150" Height="36" Margin="0,0,10,0" SelectionChanged="TransportFilter_SelectionChanged">
+                                        <ComboBoxItem Content="Tutti gli stati" Tag="" IsSelected="True" />
+                                        <ComboBoxItem Content="Bozze" Tag="Draft" />
+                                        <ComboBoxItem Content="Emessi" Tag="Issued" />
+                                        <ComboBoxItem Content="Annullati" Tag="Cancelled" />
+                                    </ComboBox>
+                                    <ComboBox x:Name="TransportReasonFilter" DockPanel.Dock="Right" Width="190" Height="36" Margin="0,0,10,0" DisplayMemberPath="Label" SelectionChanged="TransportFilter_SelectionChanged" />
+                                    <TextBox x:Name="TransportSearchBox" Height="36" Margin="0,0,10,0" Tag="Cerca per destinatario o note" KeyDown="TransportSearchBox_KeyDown" />
+                                </DockPanel>
+                                <Border Grid.Row="1" Style="{StaticResource CardBorder}" Padding="4">
+                                    <ListView x:Name="TransportDocumentsList" SelectionMode="Single" MouseDoubleClick="TransportDocumentsList_MouseDoubleClick">
+                                        <ListView.View>
+                                            <GridView>
+                                                <GridViewColumn Header="Numero" DisplayMemberBinding="{Binding DocumentCode}" Width="100" />
+                                                <GridViewColumn Header="Data" DisplayMemberBinding="{Binding IssuedAtLocal, StringFormat=dd/MM/yyyy}" Width="100" />
+                                                <GridViewColumn Header="Stato" Width="110">
+                                                    <GridViewColumn.CellTemplate>
+                                                        <DataTemplate>
+                                                            <Border Style="{StaticResource Pill}">
+                                                                <TextBlock Style="{StaticResource PillText}" Text="{Binding StatusLabel}" Foreground="{Binding Status, Converter={StaticResource StatusToBrush}, ConverterParameter=Foreground}" />
+                                                            </Border>
+                                                        </DataTemplate>
+                                                    </GridViewColumn.CellTemplate>
+                                                </GridViewColumn>
+                                                <GridViewColumn Header="Causale" DisplayMemberBinding="{Binding ReasonLabel}" Width="160" />
+                                                <GridViewColumn Header="Destinatario" DisplayMemberBinding="{Binding RecipientName}" Width="260" />
+                                                <GridViewColumn Header="Righe" DisplayMemberBinding="{Binding LineCount}" Width="60" />
+                                            </GridView>
+                                        </ListView.View>
+                                    </ListView>
+                                </Border>
+                            </Grid>
+                        </TabItem>
+
+                        <TabItem Header="Conto lavoro">
+                            <Grid>
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto" />
+                                    <RowDefinition Height="*" />
+                                </Grid.RowDefinitions>
+                                <DockPanel Grid.Row="0" Margin="0,0,0,14">
+                                    <Button DockPanel.Dock="Right" Content="Invia in conto lavoro" Width="170" Height="36" Click="NewSubcontractingDocument_Click" />
+                                    <Button DockPanel.Dock="Right" Style="{StaticResource SecondaryButton}" Content="Aggiorna" Width="100" Height="36" Margin="0,0,10,0" Click="RefreshSubcontracting_Click" />
+                                    <TextBlock x:Name="SubcontractingInfoText" VerticalAlignment="Center" Foreground="{StaticResource TextSecondaryBrush}" TextWrapping="Wrap" />
+                                </DockPanel>
+                                <Border Grid.Row="1" Style="{StaticResource CardBorder}" Padding="4">
+                                    <ListView x:Name="SubcontractingList" SelectionMode="Single" MouseDoubleClick="SubcontractingList_MouseDoubleClick">
+                                        <ListView.View>
+                                            <GridView>
+                                                <GridViewColumn Header="Terzista" DisplayMemberBinding="{Binding SupplierName}" Width="200" />
+                                                <GridViewColumn Header="DDT" DisplayMemberBinding="{Binding DocumentCode}" Width="90" />
+                                                <GridViewColumn Header="Inviato il" DisplayMemberBinding="{Binding SentAt, StringFormat=dd/MM/yyyy}" Width="100" />
+                                                <GridViewColumn Header="Rientro previsto" Width="120">
+                                                    <GridViewColumn.CellTemplate>
+                                                        <DataTemplate>
+                                                            <TextBlock x:Name="Expected" Text="{Binding ExpectedReturnAt, StringFormat=dd/MM/yyyy}" />
+                                                            <DataTemplate.Triggers>
+                                                                <DataTrigger Binding="{Binding IsOverdue}" Value="True">
+                                                                    <Setter TargetName="Expected" Property="Foreground" Value="{StaticResource DangerBrush}" />
+                                                                    <Setter TargetName="Expected" Property="FontWeight" Value="Bold" />
+                                                                </DataTrigger>
+                                                            </DataTemplate.Triggers>
+                                                        </DataTemplate>
+                                                    </GridViewColumn.CellTemplate>
+                                                </GridViewColumn>
+                                                <GridViewColumn Header="Codice" DisplayMemberBinding="{Binding Code}" Width="110" />
+                                                <GridViewColumn Header="Descrizione" DisplayMemberBinding="{Binding Description}" Width="240" />
+                                                <GridViewColumn Header="Inviati" DisplayMemberBinding="{Binding SentQuantity, StringFormat=0.###}" Width="70" />
+                                                <GridViewColumn Header="Rientrati" DisplayMemberBinding="{Binding ReturnedQuantity, StringFormat=0.###}" Width="80" />
+                                                <GridViewColumn Header="Scarti" DisplayMemberBinding="{Binding ScrapQuantity, StringFormat=0.###}" Width="60" />
+                                                <GridViewColumn Header="Residuo" DisplayMemberBinding="{Binding OutstandingQuantity, StringFormat=0.###}" Width="80" />
+                                                <GridViewColumn Header="U.m." DisplayMemberBinding="{Binding Unit}" Width="55" />
+                                            </GridView>
+                                        </ListView.View>
+                                    </ListView>
+                                </Border>
+                            </Grid>
+                        </TabItem>
+
+                        <TabItem Header="Registri HACCP">
+                            <Grid>
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto" />
+                                    <RowDefinition Height="*" />
+                                    <RowDefinition Height="Auto" />
+                                </Grid.RowDefinitions>
+                                <DockPanel Grid.Row="0" Margin="0,0,0,14">
+                                    <Button DockPanel.Dock="Right" Content="Registra lettura" Width="150" Height="36" Click="HaccpReading_Click" />
+                                    <Button DockPanel.Dock="Right" Style="{StaticResource SecondaryButton}" Content="Registro ▾" Width="110" Height="36" Margin="0,0,10,0" Click="ExportMenuButton_Click">
+                                        <Button.ContextMenu>
+                                            <ContextMenu>
+                                                <MenuItem Header="Registro del periodo (Excel)" Click="HaccpRegisterExcel_Click" />
+                                                <MenuItem Header="Registro del periodo (PDF)" Click="HaccpRegisterPdf_Click" />
+                                                <MenuItem Header="Solo non conformità (PDF)" Click="HaccpNonCompliantPdf_Click" />
+                                            </ContextMenu>
+                                        </Button.ContextMenu>
+                                    </Button>
+                                    <Button DockPanel.Dock="Right" Style="{StaticResource SecondaryButton}" Content="Aggiorna" Width="100" Height="36" Margin="0,0,10,0" Click="RefreshHaccp_Click" />
+                                    <TextBlock x:Name="HaccpInfoText" VerticalAlignment="Center" Foreground="{StaticResource TextSecondaryBrush}" TextWrapping="Wrap" />
+                                </DockPanel>
+                                <Border Grid.Row="1" Style="{StaticResource CardBorder}" Padding="4">
+                                    <ListView x:Name="HaccpPointsList" SelectionMode="Single" MouseDoubleClick="HaccpPointsList_MouseDoubleClick">
+                                        <ListView.View>
+                                            <GridView>
+                                                <GridViewColumn Header="Punto di controllo" DisplayMemberBinding="{Binding Name}" Width="240" />
+                                                <GridViewColumn Header="Luogo" DisplayMemberBinding="{Binding Location}" Width="140" />
+                                                <GridViewColumn Header="Limiti" DisplayMemberBinding="{Binding LimitsText}" Width="120" />
+                                                <GridViewColumn Header="Frequenza" DisplayMemberBinding="{Binding Frequency}" Width="150" />
+                                                <GridViewColumn Header="Ultima lettura" Width="200">
+                                                    <GridViewColumn.CellTemplate>
+                                                        <DataTemplate>
+                                                            <TextBlock x:Name="Last" Text="{Binding LastText}" />
+                                                            <DataTemplate.Triggers>
+                                                                <DataTrigger Binding="{Binding LastNonCompliant}" Value="True">
+                                                                    <Setter TargetName="Last" Property="Foreground" Value="{StaticResource DangerBrush}" />
+                                                                    <Setter TargetName="Last" Property="FontWeight" Value="Bold" />
+                                                                </DataTrigger>
+                                                            </DataTemplate.Triggers>
+                                                        </DataTemplate>
+                                                    </GridViewColumn.CellTemplate>
+                                                </GridViewColumn>
+                                            </GridView>
+                                        </ListView.View>
+                                    </ListView>
+                                </Border>
+                                <StackPanel Grid.Row="2" Orientation="Horizontal" Margin="0,14,0,0">
+                                    <Button Style="{StaticResource SecondaryButton}" Content="Nuovo punto" Width="130" Height="36" Margin="0,0,10,0" Click="NewHaccpPoint_Click" />
+                                    <Button Style="{StaticResource SecondaryButton}" Content="Modifica punto" Width="140" Height="36" Click="EditHaccpPoint_Click" />
+                                </StackPanel>
+                            </Grid>
+                        </TabItem>
+
+                        <TabItem Header="Rapportini di cantiere">
+                            <Grid>
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto" />
+                                    <RowDefinition Height="*" />
+                                </Grid.RowDefinitions>
+                                <DockPanel Grid.Row="0" Margin="0,0,0,14">
+                                    <Button DockPanel.Dock="Right" Content="Nuovo rapportino" Width="150" Height="36" Click="NewSiteReport_Click" />
+                                    <Button DockPanel.Dock="Right" Style="{StaticResource SecondaryButton}" Content="Pagina tecnici" Width="130" Height="36" Margin="0,0,10,0" Click="OpenTechnicianPage_Click" />
+                                    <Button DockPanel.Dock="Right" Style="{StaticResource SecondaryButton}" Content="Aggiorna" Width="100" Height="36" Margin="0,0,10,0" Click="RefreshSiteReports_Click" />
+                                    <ComboBox x:Name="SiteReportStatusFilter" DockPanel.Dock="Right" Width="150" Height="36" Margin="0,0,10,0" SelectionChanged="SiteReportStatusFilter_SelectionChanged">
+                                        <ComboBoxItem Content="Tutti" Tag="" IsSelected="True" />
+                                        <ComboBoxItem Content="Da firmare" Tag="Draft" />
+                                        <ComboBoxItem Content="Firmati" Tag="Signed" />
+                                    </ComboBox>
+                                    <TextBlock VerticalAlignment="Center" Foreground="{StaticResource TextSecondaryBrush}" TextWrapping="Wrap"
+                                               Text="I tecnici compilano e fanno firmare dal telefono: apri la Pagina tecnici sul loro dispositivo." />
+                                </DockPanel>
+                                <Border Grid.Row="1" Style="{StaticResource CardBorder}" Padding="4">
+                                    <ListView x:Name="SiteReportsList" SelectionMode="Single" MouseDoubleClick="SiteReportsList_MouseDoubleClick">
+                                        <ListView.View>
+                                            <GridView>
+                                                <GridViewColumn Header="Rapportino" DisplayMemberBinding="{Binding Code}" Width="120" />
+                                                <GridViewColumn Header="Data" DisplayMemberBinding="{Binding WorkDate, StringFormat=dd/MM/yyyy}" Width="100" />
+                                                <GridViewColumn Header="Commessa" DisplayMemberBinding="{Binding WorkOrderCode}" Width="130" />
+                                                <GridViewColumn Header="Cliente" DisplayMemberBinding="{Binding CustomerName}" Width="220" />
+                                                <GridViewColumn Header="Ore" DisplayMemberBinding="{Binding HoursText}" Width="70" />
+                                                <GridViewColumn Header="Stato" Width="110">
+                                                    <GridViewColumn.CellTemplate>
+                                                        <DataTemplate>
+                                                            <Border Style="{StaticResource Pill}">
+                                                                <TextBlock Style="{StaticResource PillText}" Text="{Binding StatusLabel}" Foreground="{Binding BrushStatus, Converter={StaticResource StatusToBrush}, ConverterParameter=Foreground}" />
+                                                            </Border>
+                                                        </DataTemplate>
+                                                    </GridViewColumn.CellTemplate>
+                                                </GridViewColumn>
+                                                <GridViewColumn Header="Firmato da" DisplayMemberBinding="{Binding SignedByName}" Width="160" />
+                                                <GridViewColumn Header="Tecnico" DisplayMemberBinding="{Binding CreatedBy}" Width="140" />
+                                            </GridView>
+                                        </ListView.View>
+                                    </ListView>
+                                </Border>
+                            </Grid>
+                        </TabItem>
                     </TabControl>
                 </Grid>
             </Grid>

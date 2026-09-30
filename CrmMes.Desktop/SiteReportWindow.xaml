@@ -1,0 +1,142 @@
+<Window x:Class="CrmMes.Desktop.SiteReportWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Rapportino di cantiere" Icon="Assets/logo.ico" Height="820" Width="1000" MinHeight="620" MinWidth="820"
+        WindowStartupLocation="CenterOwner"
+        Background="{StaticResource BackgroundBrush}">
+    <DockPanel Margin="24,20">
+        <DockPanel DockPanel.Dock="Top" Margin="0,0,0,12">
+            <Border DockPanel.Dock="Right" Style="{StaticResource Pill}" VerticalAlignment="Bottom" Margin="0,0,0,6">
+                <TextBlock x:Name="StatusText" Style="{StaticResource PillText}" FontSize="13" />
+            </Border>
+            <StackPanel>
+                <TextBlock Text="C A N T I E R E" Style="{StaticResource MicroLabel}" />
+                <TextBlock x:Name="HeaderText" Text="Nuovo rapportino" Style="{StaticResource EditorialTitle}" FontSize="24" />
+                <TextBlock x:Name="SubHeaderText" Foreground="{StaticResource TextSecondaryBrush}" FontSize="12.5" TextWrapping="Wrap" />
+            </StackPanel>
+        </DockPanel>
+
+        <DockPanel DockPanel.Dock="Bottom" Margin="0,12,0,0">
+            <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
+                <Button x:Name="WebButton" Style="{StaticResource SecondaryButton}" Content="Firma da tablet" Width="140" Height="36" Margin="0,0,10,0" Click="Web_Click"
+                        ToolTip="Apre la pagina web dei tecnici: il cliente firma col dito su tablet o telefono" />
+                <Button x:Name="DeleteButton" Style="{StaticResource DangerButton}" Content="Elimina bozza" Width="130" Height="36" Margin="0,0,10,0" Click="Delete_Click" />
+                <Button x:Name="PdfButton" Style="{StaticResource SecondaryButton}" Content="PDF" Width="80" Height="36" Margin="0,0,10,0" Click="Pdf_Click" />
+                <Button x:Name="SaveButton" Content="Salva bozza" Width="130" Height="36" Click="Save_Click" />
+            </StackPanel>
+            <TextBlock x:Name="ErrorText" Foreground="{StaticResource DangerBrush}" TextWrapping="Wrap" VerticalAlignment="Center" Margin="0,0,16,0" />
+        </DockPanel>
+
+        <ScrollViewer VerticalScrollBarVisibility="Auto">
+            <StackPanel x:Name="EditPanel">
+                <Grid Margin="0,0,0,12">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="2*" />
+                        <ColumnDefinition Width="12" />
+                        <ColumnDefinition Width="160" />
+                        <ColumnDefinition Width="12" />
+                        <ColumnDefinition Width="3*" />
+                    </Grid.ColumnDefinitions>
+                    <StackPanel Grid.Column="0">
+                        <TextBlock Text="Commessa *" Foreground="{StaticResource TextSecondaryBrush}" FontSize="12.5" Margin="0,0,0,5" />
+                        <ComboBox x:Name="WorkOrderCombo" Height="34" DisplayMemberPath="Label" SelectionChanged="WorkOrderCombo_SelectionChanged" />
+                    </StackPanel>
+                    <StackPanel Grid.Column="2">
+                        <TextBlock Text="Data intervento" Foreground="{StaticResource TextSecondaryBrush}" FontSize="12.5" Margin="0,0,0,5" />
+                        <DatePicker x:Name="DatePicker" Height="34" />
+                    </StackPanel>
+                    <StackPanel Grid.Column="4">
+                        <TextBlock Text="Indirizzo del cantiere" Foreground="{StaticResource TextSecondaryBrush}" FontSize="12.5" Margin="0,0,0,5" />
+                        <TextBox x:Name="AddressBox" />
+                    </StackPanel>
+                </Grid>
+                <TextBlock Text="Lavori eseguiti" Foreground="{StaticResource TextSecondaryBrush}" FontSize="12.5" Margin="0,0,0,5" />
+                <TextBox x:Name="DescriptionBox" Height="90" TextWrapping="Wrap" AcceptsReturn="True" VerticalContentAlignment="Top" VerticalScrollBarVisibility="Auto" Margin="0,0,0,12" />
+
+                <TextBlock Text="Ore" FontWeight="SemiBold" Foreground="{StaticResource TextPrimaryBrush}" Margin="0,0,0,6" />
+                <Grid x:Name="HoursEntry" Margin="0,0,0,6">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="8" />
+                        <ColumnDefinition Width="200" />
+                        <ColumnDefinition Width="8" />
+                        <ColumnDefinition Width="90" />
+                        <ColumnDefinition Width="8" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <TextBox Grid.Column="0" x:Name="TechnicianBox" Tag="Tecnico" />
+                    <ComboBox Grid.Column="2" x:Name="WorkCenterCombo" Height="34" DisplayMemberPath="Name" />
+                    <TextBox Grid.Column="4" x:Name="HoursBox" Tag="1:30" />
+                    <Button Grid.Column="6" Content="Aggiungi ore" Width="120" Height="34" Click="AddHours_Click" />
+                </Grid>
+                <Border Style="{StaticResource CardBorder}" Padding="4" Margin="0,0,0,12">
+                    <ListView x:Name="HoursList" MinHeight="70" MaxHeight="180">
+                        <ListView.View>
+                            <GridView>
+                                <GridViewColumn Header="Tecnico" DisplayMemberBinding="{Binding TechnicianName}" Width="260" />
+                                <GridViewColumn Header="Reparto" DisplayMemberBinding="{Binding WorkCenterName}" Width="200" />
+                                <GridViewColumn Header="Ore" DisplayMemberBinding="{Binding HoursText}" Width="80" />
+                                <GridViewColumn Header="" Width="110">
+                                    <GridViewColumn.CellTemplate>
+                                        <DataTemplate>
+                                            <Button Content="Rimuovi" Style="{StaticResource SecondaryButton}" Height="28" Click="RemoveHours_Click" Tag="{Binding}" />
+                                        </DataTemplate>
+                                    </GridViewColumn.CellTemplate>
+                                </GridViewColumn>
+                            </GridView>
+                        </ListView.View>
+                    </ListView>
+                </Border>
+
+                <TextBlock Text="Materiali installati" FontWeight="SemiBold" Foreground="{StaticResource TextPrimaryBrush}" Margin="0,0,0,6" />
+                <Grid x:Name="MaterialEntry" Margin="0,0,0,6">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="140" />
+                        <ColumnDefinition Width="8" />
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="8" />
+                        <ColumnDefinition Width="80" />
+                        <ColumnDefinition Width="8" />
+                        <ColumnDefinition Width="60" />
+                        <ColumnDefinition Width="8" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <TextBox Grid.Column="0" x:Name="MaterialCodeBox" Tag="Codice" LostFocus="MaterialCodeBox_LostFocus" />
+                    <TextBox Grid.Column="2" x:Name="MaterialDescriptionBox" Tag="Descrizione" />
+                    <TextBox Grid.Column="4" x:Name="MaterialQuantityBox" Tag="Q.tà" />
+                    <TextBox Grid.Column="6" x:Name="MaterialUnitBox" Text="pz" />
+                    <Button Grid.Column="8" Content="Aggiungi" Width="120" Height="34" Click="AddMaterial_Click" />
+                </Grid>
+                <Border Style="{StaticResource CardBorder}" Padding="4" Margin="0,0,0,12">
+                    <ListView x:Name="MaterialsList" MinHeight="70" MaxHeight="200">
+                        <ListView.View>
+                            <GridView>
+                                <GridViewColumn Header="Codice" DisplayMemberBinding="{Binding MaterialCode}" Width="140" />
+                                <GridViewColumn Header="Descrizione" DisplayMemberBinding="{Binding Description}" Width="360" />
+                                <GridViewColumn Header="Q.tà" DisplayMemberBinding="{Binding Quantity, StringFormat=0.###}" Width="80" />
+                                <GridViewColumn Header="U.m." DisplayMemberBinding="{Binding Unit}" Width="60" />
+                                <GridViewColumn Header="" Width="110">
+                                    <GridViewColumn.CellTemplate>
+                                        <DataTemplate>
+                                            <Button Content="Rimuovi" Style="{StaticResource SecondaryButton}" Height="28" Click="RemoveMaterial_Click" Tag="{Binding}" />
+                                        </DataTemplate>
+                                    </GridViewColumn.CellTemplate>
+                                </GridViewColumn>
+                            </GridView>
+                        </ListView.View>
+                    </ListView>
+                </Border>
+
+                <TextBlock Text="Note" Foreground="{StaticResource TextSecondaryBrush}" FontSize="12.5" Margin="0,0,0,5" />
+                <TextBox x:Name="NotesBox" Margin="0,0,0,12" />
+
+                <StackPanel x:Name="SignaturePanel" Visibility="Collapsed">
+                    <TextBlock x:Name="SignedByText" FontWeight="SemiBold" Foreground="{StaticResource TextPrimaryBrush}" Margin="0,0,0,6" />
+                    <Border Style="{StaticResource CardBorder}" Background="White" HorizontalAlignment="Left" Padding="6">
+                        <Image x:Name="SignatureImage" Height="120" MaxWidth="420" Stretch="Uniform" />
+                    </Border>
+                </StackPanel>
+            </StackPanel>
+        </ScrollViewer>
+    </DockPanel>
+</Window>

@@ -311,6 +311,748 @@ public static class ListExporter
         }).GeneratePdf(filePath);
     }
 
+    /// <summary>Documento di trasporto (DPR 472/1996): mittente from the company profile, destinatario and
+    /// destination, causale, goods with quantities, who transports, appearance/packages/weight, start of
+    /// transport and signature boxes. Drafts print as "BOZZA" and cancelled documents as "ANNULLATO", so
+    /// neither can pass for a valid document.</summary>
+    public static void ExportTransportDocument(TransportDocumentDto document, CompanyProfileDto? company, string filePath)
+    {
+        var italian = System.Globalization.CultureInfo.GetCultureInfo("it-IT");
+        var stamp = document.Status switch
+        {
+            "Draft" => "BOZZA - NON VALIDO COME DDT",
+            "Cancelled" => "ANNULLATO",
+            _ => null
+        };
+
+        static void Box(IContainer container, string label, string? value) =>
+            container.Border(0.75f).BorderColor(Colors.Grey.Lighten1).Padding(6).Column(column =>
+            {
+                column.Item().Text(label).FontSize(7.5f).FontColor(Colors.Grey.Darken1);
+                column.Item().Text(string.IsNullOrWhiteSpace(value) ? " " : value).FontSize(10);
+            });
+
+        Document.Create(container =>
+        {
+            container.Page(page =>
+            {
+                page.Size(PageSizes.A4);
+                page.Margin(36);
+                page.DefaultTextStyle(style => style.FontSize(9.5f));
+
+                page.Header().Column(column =>
+                {
+                    column.Item().Row(row =>
+                    {
+                        row.RelativeItem().Column(left =>
+                        {
+                            left.Item().Text("Mittente").FontSize(7.5f).FontColor(Colors.Grey.Darken1);
+                            left.Item().Text(company?.CompanyName is { Length: > 0 } name ? name : "(configura i dati azienda)").FontSize(13).Bold();
+                            if (!string.IsNullOrWhiteSpace(company?.Address))
+                            {
+                                left.Item().Text(company.Address);
+                            }
+
+                            if (!string.IsNullOrWhiteSpace(company?.VatNumber))
+                            {
+                                left.Item().Text($"P.IVA {company.VatNumber}");
+                            }
+
+                            var contacts = string.Join("  ·  ", new[] { company?.Phone, company?.Email }.Where(v => !string.IsNullOrWhiteSpace(v)));
+                            if (contacts.Length > 0)
+                            {
+                                left.Item().Text(contacts).FontSize(8.5f).FontColor(Colors.Grey.Darken1);
+                            }
+                        });
+                        row.ConstantItem(230).AlignRight().Column(right =>
+                        {
+                            right.Item().AlignRight().Text("DOCUMENTO DI TRASPORTO").FontSize(13).Bold();
+                            right.Item().AlignRight().Text("D.P.R. 472/1996").FontSize(7.5f).FontColor(Colors.Grey.Darken1);
+                            right.Item().PaddingTop(6).AlignRight().Text(document.Number is { } number
+                                ? $"N. {number}/{document.Year} del {(document.IssuedAt ?? document.CreatedAt).ToLocalTime():dd/MM/yyyy}"
+                                : "Numero assegnato all'emissione").FontSize(11).Bold();
+                            if (document.WorkOrderCode is not null)
+                            {
+                                right.Item().AlignRight().Text($"Rif. commessa {document.WorkOrderCode}").FontSize(8.5f);
+                            }
+                        });
+                    });
+                    if (stamp is not null)
+                    {
+                        column.Item().PaddingTop(8).Border(1.5f).BorderColor(Colors.Red.Darken2).Padding(4).AlignCenter()
+                            .Text(stamp).FontSize(14).Bold().FontColor(Colors.Red.Darken2);
+                    }
+                });
+
+                page.Content().PaddingTop(12).Column(content =>
+                {
+                    content.Item().Row(row =>
+                    {
+                        row.RelativeItem().Border(0.75f).BorderColor(Colors.Grey.Lighten1).Padding(8).Column(recipient =>
+                        {
+                            recipient.Item().Text("Destinatario").FontSize(7.5f).FontColor(Colors.Grey.Darken1);
+                            recipient.Item().Text(document.RecipientName).FontSize(11).Bold();
+                            if (!string.IsNullOrWhiteSpace(document.RecipientAddress))
+                            {
+                                recipient.Item().Text(document.RecipientAddress);
+                            }
+
+                            if (!string.IsNullOrWhiteSpace(document.RecipientVatNumber))
+                            {
+                                recipient.Item().Text($"P.IVA {document.RecipientVatNumber}");
+                            }
+                        });
+                        row.ConstantItem(10);
+                        row.RelativeItem().Border(0.75f).BorderColor(Colors.Grey.Lighten1).Padding(8).Column(destination =>
+                        {
+                            destination.Item().Text("Luogo di destinazione").FontSize(7.5f).FontColor(Colors.Grey.Darken1);
+                            destination.Item().Text(document.DestinationAddress ?? document.RecipientAddress ?? "Sede del destinatario");
+                        });
+                    });
+
+                    content.Item().PaddingTop(8).Row(row =>
+                    {
+                        row.RelativeItem(2).Element(c => Box(c, "Causale del trasporto", document.ReasonLabel));
+                        row.RelativeItem().Element(c => Box(c, "Trasporto a cura del", TransportDocumentDto.TransportByText(document.TransportBy)));
+                        row.RelativeItem(2).Element(c => Box(c, "Vettore", document.CarrierName));
+                        row.RelativeItem().Element(c => Box(c, "Porto", document.Port));
+                    });
+
+                    content.Item().PaddingTop(12).Table(table =>
+                    {
+                        table.ColumnsDefinition(columns =>
+                        {
+                            columns.ConstantColumn(28);
+                            columns.RelativeColumn(1.4f);
+                            columns.RelativeColumn(4.6f);
+                            columns.ConstantColumn(40);
+                            columns.ConstantColumn(60);
+                        });
+
+                        table.Header(header =>
+                        {
+                            foreach (var (text, right) in new[] { ("#", false), ("Codice", false), ("Descrizione dei beni (natura e qualità)", false), ("U.m.", false), ("Quantità", true) })
+                            {
+                                var cell = header.Cell().BorderBottom(1).BorderColor(Colors.Grey.Darken1).PaddingBottom(4);
+                                (right ? cell.AlignRight() : cell).Text(text).Bold().FontSize(8.5f);
+                            }
+                        });
+
+                        foreach (var line in document.Lines)
+                        {
+                            IContainer Cell() => table.Cell().BorderBottom(0.5f).BorderColor(Colors.Grey.Lighten2).PaddingVertical(4);
+                            Cell().Text(line.LineNumber.ToString(italian)).FontColor(Colors.Grey.Darken1);
+                            Cell().Text(line.Code ?? string.Empty);
+                            Cell().Column(cell =>
+                            {
+                                cell.Item().Text(line.Description);
+                                var extra = string.Join("  ·  ", new[]
+                                {
+                                    line.LotNumber is null ? null : $"Lotto {line.LotNumber}",
+                                    line.Notes
+                                }.Where(v => !string.IsNullOrWhiteSpace(v)));
+                                if (extra.Length > 0)
+                                {
+                                    cell.Item().Text(extra).FontSize(8).FontColor(Colors.Grey.Darken1);
+                                }
+                            });
+                            Cell().Text(line.Unit);
+                            Cell().AlignRight().Text(line.Quantity.ToString("0.###", italian));
+                        }
+                    });
+
+                    content.Item().PaddingTop(12).Row(row =>
+                    {
+                        row.RelativeItem(2).Element(c => Box(c, "Aspetto esteriore dei beni", document.GoodsAppearance));
+                        row.RelativeItem().Element(c => Box(c, "N. colli", document.Packages?.ToString(italian)));
+                        row.RelativeItem().Element(c => Box(c, "Peso lordo kg", document.GrossWeightKg?.ToString("0.###", italian)));
+                        row.RelativeItem(2).Element(c => Box(c, "Data e ora inizio trasporto",
+                            document.TransportStartAt?.ToLocalTime().ToString("dd/MM/yyyy HH:mm", italian)));
+                    });
+
+                    if (document.IsSubcontracting)
+                    {
+                        content.Item().PaddingTop(8).Text(text =>
+                        {
+                            text.Span("Merce inviata in conto lavorazione, da restituire lavorata.").Bold();
+                            if (document.ExpectedReturnAt is { } expected)
+                            {
+                                text.Span($" Rientro previsto entro il {expected.ToLocalTime():dd/MM/yyyy}.");
+                            }
+                        });
+                    }
+
+                    if (!string.IsNullOrWhiteSpace(document.Notes))
+                    {
+                        content.Item().PaddingTop(8).Text("Annotazioni").FontSize(7.5f).FontColor(Colors.Grey.Darken1);
+                        content.Item().Text(document.Notes);
+                    }
+
+                    if (document.Status == "Cancelled" && document.CancellationReason is not null)
+                    {
+                        content.Item().PaddingTop(8).Text($"Annullato il {document.CancelledAt?.ToLocalTime():dd/MM/yyyy}: {document.CancellationReason}")
+                            .FontColor(Colors.Red.Darken2);
+                    }
+
+                    content.Item().PaddingTop(28).Row(row =>
+                    {
+                        foreach (var label in new[] { "Firma del conducente", "Firma del vettore", "Firma del destinatario" })
+                        {
+                            row.RelativeItem().PaddingHorizontal(6).Column(signature =>
+                            {
+                                signature.Item().Height(28);
+                                signature.Item().LineHorizontal(0.75f).LineColor(Colors.Grey.Darken1);
+                                signature.Item().PaddingTop(2).AlignCenter().Text(label).FontSize(8).FontColor(Colors.Grey.Darken1);
+                            });
+                        }
+                    });
+                });
+
+                page.Footer().AlignCenter().Text(text =>
+                {
+                    text.CurrentPageNumber();
+                    text.Span(" / ");
+                    text.TotalPages();
+                });
+            });
+        }).GeneratePdf(filePath);
+    }
+
+    /// <summary>Declaration of conformity of a low-voltage assembly (CEI EN 61439, Low Voltage Directive
+    /// 2014/35/UE and EMC Directive 2014/30/UE) with its rated data, followed by the routine verification
+    /// report of clause 11. Only printed for a completed verification.</summary>
+    public static void ExportPanelDeclaration(PanelVerificationDto verification, CompanyProfileDto? company, string filePath)
+    {
+        var italian = System.Globalization.CultureInfo.GetCultureInfo("it-IT");
+        string Value(decimal? value, string unit) => value is { } number ? $"{number.ToString("0.###", italian)} {unit}" : "-";
+        var companyName = company?.CompanyName is { Length: > 0 } name ? name : "(configura i dati azienda)";
+
+        void Header(IContainer container, string title) => container.Column(column =>
+        {
+            column.Item().Row(row =>
+            {
+                row.RelativeItem().Column(left =>
+                {
+                    left.Item().Text(companyName).FontSize(12).Bold();
+                    if (!string.IsNullOrWhiteSpace(company?.Address))
+                    {
+                        left.Item().Text(company.Address).FontSize(9);
+                    }
+
+                    if (!string.IsNullOrWhiteSpace(company?.VatNumber))
+                    {
+                        left.Item().Text($"P.IVA {company.VatNumber}").FontSize(9);
+                    }
+                });
+                row.ConstantItem(240).AlignRight().Column(right =>
+                {
+                    right.Item().AlignRight().Text(title).FontSize(13).Bold();
+                    right.Item().AlignRight().Text($"Commessa {verification.WorkOrderCode}").FontSize(9);
+                });
+            });
+            column.Item().PaddingTop(10).LineHorizontal(0.75f).LineColor(Colors.Grey.Lighten1);
+        });
+
+        static void DataRow(TableDescriptor table, string label, string value)
+        {
+            table.Cell().BorderBottom(0.5f).BorderColor(Colors.Grey.Lighten2).PaddingVertical(4).Text(label).FontColor(Colors.Grey.Darken2);
+            table.Cell().BorderBottom(0.5f).BorderColor(Colors.Grey.Lighten2).PaddingVertical(4).Text(value).Bold();
+        }
+
+        Document.Create(container =>
+        {
+            container.Page(page =>
+            {
+                page.Size(PageSizes.A4);
+                page.Margin(40);
+                page.DefaultTextStyle(style => style.FontSize(10));
+                page.Header().Element(c => Header(c, "DICHIARAZIONE DI CONFORMITÀ"));
+                page.Content().PaddingTop(14).Column(content =>
+                {
+                    content.Item().Text(text =>
+                    {
+                        text.Span("Il costruttore del quadro ");
+                        text.Span(companyName).Bold();
+                        text.Span(" dichiara sotto la propria responsabilità che l'apparecchiatura assiemata di protezione e manovra per bassa tensione descritta di seguito è conforme alla norma ");
+                        text.Span(verification.Standard).Bold();
+                        text.Span(" (in combinazione con la CEI EN 61439-1) e alle direttive 2014/35/UE (Bassa Tensione) e 2014/30/UE (Compatibilità Elettromagnetica), ed è stata sottoposta con esito positivo alla verifica individuale prevista dalla norma.");
+                    });
+
+                    content.Item().PaddingTop(14).Table(table =>
+                    {
+                        table.ColumnsDefinition(columns =>
+                        {
+                            columns.RelativeColumn(2);
+                            columns.RelativeColumn(3);
+                        });
+                        DataRow(table, "Quadro", $"{verification.ProductCode} {verification.ProductName}");
+                        DataRow(table, "Matricola", verification.SerialNumber ?? verification.ProductLotNumber ?? "-");
+                        DataRow(table, "Cliente", verification.CustomerName ?? "-");
+                        DataRow(table, "Sistema / costruttore originale", string.Join(" · ", new[] { verification.SystemReference, verification.OriginalManufacturer }.Where(v => !string.IsNullOrWhiteSpace(v))) is { Length: > 0 } system ? system : "-");
+                        DataRow(table, "Tensione nominale Un", Value(verification.RatedVoltage, "V"));
+                        DataRow(table, "Corrente nominale del quadro InA", Value(verification.RatedCurrent, "A"));
+                        DataRow(table, "Frequenza nominale", Value(verification.RatedFrequency, "Hz"));
+                        DataRow(table, "Corrente di breve durata Icw (1 s)", Value(verification.ShortTimeWithstandCurrent, "kA"));
+                        DataRow(table, "Corrente di cortocircuito condizionata Icc", Value(verification.ConditionalShortCircuitCurrent, "kA"));
+                        DataRow(table, "Grado di protezione", verification.IpRating ?? "-");
+                        DataRow(table, "Forma di segregazione", verification.InternalSeparation ?? "-");
+                        DataRow(table, "Sistema di distribuzione", verification.EarthingSystem ?? "-");
+                    });
+
+                    content.Item().PaddingTop(18).Text($"Data {verification.CompletedAt?.ToLocalTime():dd/MM/yyyy}");
+                    content.Item().PaddingTop(30).Row(row =>
+                    {
+                        row.RelativeItem();
+                        row.ConstantItem(220).Column(signature =>
+                        {
+                            signature.Item().LineHorizontal(0.75f).LineColor(Colors.Grey.Darken1);
+                            signature.Item().PaddingTop(2).AlignCenter().Text("Il legale rappresentante / responsabile tecnico").FontSize(8).FontColor(Colors.Grey.Darken1);
+                        });
+                    });
+                });
+                page.Footer().AlignCenter().Text("Allegato: rapporto di verifica individuale").FontSize(8).FontColor(Colors.Grey.Darken1);
+            });
+
+            container.Page(page =>
+            {
+                page.Size(PageSizes.A4);
+                page.Margin(40);
+                page.DefaultTextStyle(style => style.FontSize(10));
+                page.Header().Element(c => Header(c, "RAPPORTO DI VERIFICA INDIVIDUALE"));
+                page.Content().PaddingTop(14).Column(content =>
+                {
+                    content.Item().Text($"CEI EN 61439-1, articolo 11 · {verification.Standard}").FontColor(Colors.Grey.Darken2);
+                    content.Item().PaddingTop(10).Table(table =>
+                    {
+                        table.ColumnsDefinition(columns =>
+                        {
+                            columns.ConstantColumn(45);
+                            columns.RelativeColumn(4);
+                            columns.RelativeColumn(1.4f);
+                            columns.RelativeColumn(2);
+                        });
+                        table.Header(header =>
+                        {
+                            foreach (var text in new[] { "Punto", "Verifica", "Esito", "Note" })
+                            {
+                                header.Cell().BorderBottom(1).BorderColor(Colors.Grey.Darken1).PaddingBottom(4).Text(text).Bold();
+                            }
+                        });
+                        foreach (var check in verification.Checks)
+                        {
+                            IContainer Cell() => table.Cell().BorderBottom(0.5f).BorderColor(Colors.Grey.Lighten2).PaddingVertical(5);
+                            Cell().Text(check.Clause);
+                            Cell().Text(check.Description);
+                            Cell().Text(PanelVerificationDto.ResultText(check.Result));
+                            Cell().Text(check.Notes ?? string.Empty).FontSize(9);
+                        }
+                    });
+
+                    content.Item().PaddingTop(12).Text(text =>
+                    {
+                        text.Span("Resistenza d'isolamento misurata: ");
+                        text.Span(Value(verification.InsulationResistanceMOhm, "MΩ")).Bold();
+                        text.Span("   ·   Tensione di prova: ");
+                        text.Span(Value(verification.DielectricTestVoltage, "V")).Bold();
+                    });
+                    if (!string.IsNullOrWhiteSpace(verification.Notes))
+                    {
+                        content.Item().PaddingTop(8).Text($"Note: {verification.Notes}");
+                    }
+
+                    content.Item().PaddingTop(14).Text($"Verifica eseguita da {verification.VerifiedBy} il {verification.CompletedAt?.ToLocalTime():dd/MM/yyyy HH:mm}.");
+                    content.Item().PaddingTop(30).Row(row =>
+                    {
+                        row.RelativeItem();
+                        row.ConstantItem(220).Column(signature =>
+                        {
+                            signature.Item().LineHorizontal(0.75f).LineColor(Colors.Grey.Darken1);
+                            signature.Item().PaddingTop(2).AlignCenter().Text("Firma dell'addetto al collaudo").FontSize(8).FontColor(Colors.Grey.Darken1);
+                        });
+                    });
+                });
+            });
+        }).GeneratePdf(filePath);
+    }
+
+    /// <summary>Food label of a produced lot (Reg. UE 1169/2011): legal name, ingredients in descending
+    /// order of weight with allergens in bold, net quantity, date mark ("da consumarsi entro" for
+    /// perishables, "da consumarsi preferibilmente entro" otherwise), lot, storage and producer. A6 page,
+    /// the size of a common label printer roll.</summary>
+    public static void ExportFoodLabel(FoodLabelDto label, string filePath)
+    {
+        var italian = System.Globalization.CultureInfo.GetCultureInfo("it-IT");
+        Document.Create(container =>
+        {
+            container.Page(page =>
+            {
+                page.Size(PageSizes.A6);
+                page.Margin(16);
+                page.DefaultTextStyle(style => style.FontSize(8.5f));
+                page.Content().Column(column =>
+                {
+                    column.Spacing(5);
+                    column.Item().Text(label.SalesName).FontSize(14).Bold();
+                    column.Item().Text(text =>
+                    {
+                        text.Span("Ingredienti: ").Bold();
+                        for (var i = 0; i < label.Ingredients.Count; i++)
+                        {
+                            var ingredient = label.Ingredients[i];
+                            var span = text.Span(ingredient.Name);
+                            if (ingredient.Allergens.Count > 0)
+                            {
+                                span.Bold().Underline();
+                            }
+
+                            text.Span(i < label.Ingredients.Count - 1 ? ", " : ".");
+                        }
+                    });
+                    column.Item().Text(label.Allergens.Count == 0
+                        ? "Allergeni: nessuno degli allergeni del Reg. UE 1169/2011."
+                        : $"Contiene: {string.Join(", ", label.Allergens).ToLower(italian)}.").Bold();
+                    if (!string.IsNullOrWhiteSpace(label.NetQuantity))
+                    {
+                        column.Item().Text($"Quantità netta: {label.NetQuantity}").FontSize(11).Bold();
+                    }
+
+                    if (label.ExpiryDate is { } expiry)
+                    {
+                        column.Item().Text($"{(label.UseByDate ? "Da consumarsi entro il" : "Da consumarsi preferibilmente entro il")} {expiry:dd/MM/yyyy}").FontSize(10).Bold();
+                    }
+
+                    column.Item().Text($"Lotto: {label.LotNumber ?? label.WorkOrderCode}").FontSize(10).Bold();
+                    if (!string.IsNullOrWhiteSpace(label.StorageConditions))
+                    {
+                        column.Item().Text(label.StorageConditions);
+                    }
+
+                    column.Item().PaddingTop(4).Text(text =>
+                    {
+                        text.Span("Prodotto da ").FontColor(Colors.Grey.Darken2);
+                        text.Span(label.ProducerName ?? "(configura i dati azienda)").Bold();
+                        if (!string.IsNullOrWhiteSpace(label.ProducerAddress))
+                        {
+                            text.Span($", {label.ProducerAddress}");
+                        }
+                    });
+                });
+            });
+        }).GeneratePdf(filePath);
+    }
+
+    /// <summary>GS1 logistic label of a pallet: SSCC in large type and as GS1-128 barcode (AI 00), plus a
+    /// second barcode with best-before (15), count (37) and lot (10) when known. 100 x 150 mm.</summary>
+    public static void ExportPalletLabel(LogisticUnitDto unit, CompanyProfileDto? company, string filePath)
+    {
+        var sscc = new[] { Gs1Barcode.SsccElement(unit.Sscc) };
+        var content = new List<Gs1Barcode.Element>();
+        if (unit.BestBefore is { } bestBefore)
+        {
+            content.Add(Gs1Barcode.BestBeforeElement(bestBefore));
+        }
+
+        if (unit.Quantity is { } quantity && quantity > 0 && quantity == Math.Round(quantity))
+        {
+            content.Add(Gs1Barcode.CountElement(quantity));
+        }
+
+        if (!string.IsNullOrWhiteSpace(unit.LotNumber) && unit.LotNumber.Trim().Length <= 20 && unit.LotNumber.All(c => c is >= ' ' and <= '~'))
+        {
+            content.Add(Gs1Barcode.LotElement(unit.LotNumber));
+        }
+
+        Document.Create(container =>
+        {
+            container.Page(page =>
+            {
+                page.Size(new PageSize(100, 150, Unit.Millimetre));
+                page.Margin(6, Unit.Millimetre);
+                page.DefaultTextStyle(style => style.FontSize(9));
+                page.Content().Column(column =>
+                {
+                    column.Spacing(4);
+                    column.Item().Text(company?.CompanyName ?? string.Empty).FontSize(10).Bold();
+                    column.Item().LineHorizontal(1);
+                    column.Item().Text("SSCC").FontSize(7).FontColor(Colors.Grey.Darken2);
+                    column.Item().Text(unit.Sscc).FontSize(15).Bold();
+                    if (unit.ProductName is not null)
+                    {
+                        column.Item().Text("CONTENUTO").FontSize(7).FontColor(Colors.Grey.Darken2);
+                        column.Item().Text($"{unit.ProductCode} {unit.ProductName}").FontSize(10).Bold();
+                    }
+
+                    column.Item().Row(row =>
+                    {
+                        row.RelativeItem().Column(c =>
+                        {
+                            c.Item().Text("QUANTITÀ").FontSize(7).FontColor(Colors.Grey.Darken2);
+                            c.Item().Text(unit.Quantity?.ToString("0.###") ?? "-").FontSize(11).Bold();
+                        });
+                        row.RelativeItem().Column(c =>
+                        {
+                            c.Item().Text("LOTTO").FontSize(7).FontColor(Colors.Grey.Darken2);
+                            c.Item().Text(unit.LotNumber ?? "-").FontSize(11).Bold();
+                        });
+                        row.RelativeItem().Column(c =>
+                        {
+                            c.Item().Text("TMC / SCADENZA").FontSize(7).FontColor(Colors.Grey.Darken2);
+                            c.Item().Text(unit.BestBefore?.ToString("dd/MM/yyyy") ?? "-").FontSize(11).Bold();
+                        });
+                    });
+                    column.Item().LineHorizontal(1);
+                    if (content.Count > 0)
+                    {
+                        column.Item().Height(18, Unit.Millimetre).AlignCenter().Svg(Gs1Barcode.Svg(content)).FitArea();
+                        column.Item().AlignCenter().Text(Gs1Barcode.HumanReadable(content)).FontSize(8);
+                    }
+
+                    column.Item().PaddingTop(4).Height(24, Unit.Millimetre).AlignCenter().Svg(Gs1Barcode.Svg(sscc)).FitArea();
+                    column.Item().AlignCenter().Text(Gs1Barcode.HumanReadable(sscc)).FontSize(9).Bold();
+                });
+            });
+        }).GeneratePdf(filePath);
+    }
+
+    /// <summary>Recall report: what the suspect lot went into and who received it.</summary>
+    public static void ExportRecall(RecallDto recall, CompanyProfileDto? company, string filePath)
+    {
+        var italian = System.Globalization.CultureInfo.GetCultureInfo("it-IT");
+        Document.Create(container =>
+        {
+            container.Page(page =>
+            {
+                page.Size(PageSizes.A4);
+                page.Margin(36);
+                page.DefaultTextStyle(style => style.FontSize(9.5f));
+                page.Header().Column(column =>
+                {
+                    column.Item().Row(row =>
+                    {
+                        row.RelativeItem().Text(company?.CompanyName ?? string.Empty).Bold();
+                        row.RelativeItem().AlignRight().Text($"Rapporto di richiamo · {DateTime.Now:dd/MM/yyyy HH:mm}").FontColor(Colors.Grey.Darken1);
+                    });
+                    column.Item().PaddingTop(6).Text(recall.Subject).FontSize(15).Bold();
+                    column.Item().PaddingTop(6).LineHorizontal(0.75f).LineColor(Colors.Grey.Lighten1);
+                });
+                page.Content().PaddingTop(10).Column(content =>
+                {
+                    content.Spacing(12);
+                    if (recall.Warnings.Count > 0)
+                    {
+                        content.Item().Background(Colors.Orange.Lighten4).Padding(8).Column(w =>
+                        {
+                            foreach (var warning in recall.Warnings)
+                            {
+                                w.Item().Text($"• {warning}");
+                            }
+                        });
+                    }
+
+                    content.Item().Text($"Clienti da avvisare ({recall.Customers.Count})").FontSize(12).Bold();
+                    content.Item().Text(recall.Customers.Count == 0 ? "Nessuna consegna registrata." : string.Join(", ", recall.Customers));
+
+                    content.Item().Text("Commesse coinvolte").FontSize(12).Bold();
+                    content.Item().Table(table =>
+                    {
+                        table.ColumnsDefinition(c => { c.RelativeColumn(1.3f); c.RelativeColumn(2.5f); c.RelativeColumn(1.3f); c.RelativeColumn(1); c.RelativeColumn(1.2f); c.RelativeColumn(2); });
+                        foreach (var header in new[] { "Commessa", "Prodotto", "Lotto prodotto", "Consumato", "Stato", "Matricole" })
+                        {
+                            table.Cell().BorderBottom(1).PaddingBottom(3).Text(header).Bold();
+                        }
+
+                        foreach (var order in recall.WorkOrders)
+                        {
+                            IContainer Cell() => table.Cell().BorderBottom(0.5f).BorderColor(Colors.Grey.Lighten2).PaddingVertical(3);
+                            Cell().Text(order.Code);
+                            Cell().Text($"{order.ProductCode} {order.ProductName}");
+                            Cell().Text(order.ProductLotNumber ?? "-");
+                            Cell().Text(order.ConsumedQuantity.ToString("0.###", italian));
+                            Cell().Text(order.StatusLabel);
+                            Cell().Text(order.AffectedSerials.Count == 0 ? "-" : string.Join(", ", order.AffectedSerials));
+                        }
+                    });
+
+                    content.Item().Text("Consegne (DDT)").FontSize(12).Bold();
+                    content.Item().Table(table =>
+                    {
+                        table.ColumnsDefinition(c => { c.RelativeColumn(1); c.RelativeColumn(1); c.RelativeColumn(2.5f); c.RelativeColumn(2.5f); c.RelativeColumn(1); c.RelativeColumn(1.2f); });
+                        foreach (var header in new[] { "DDT", "Data", "Destinatario", "Articolo", "Quantità", "Lotto" })
+                        {
+                            table.Cell().BorderBottom(1).PaddingBottom(3).Text(header).Bold();
+                        }
+
+                        foreach (var shipment in recall.Shipments)
+                        {
+                            IContainer Cell() => table.Cell().BorderBottom(0.5f).BorderColor(Colors.Grey.Lighten2).PaddingVertical(3);
+                            Cell().Text(shipment.DocumentCode);
+                            Cell().Text(shipment.IssuedAt?.ToLocalTime().ToString("dd/MM/yyyy") ?? "-");
+                            Cell().Text($"{shipment.RecipientName}{(shipment.RecipientAddress is null ? string.Empty : $"\n{shipment.RecipientAddress}")}");
+                            Cell().Text(shipment.Description);
+                            Cell().Text($"{shipment.Quantity.ToString("0.###", italian)} {shipment.Unit}");
+                            Cell().Text(shipment.LotNumber ?? "-");
+                        }
+                    });
+
+                    if (recall.Pallets.Count > 0)
+                    {
+                        content.Item().Text("Pallet (SSCC)").FontSize(12).Bold();
+                        content.Item().Text(string.Join("   ", recall.Pallets.Select(p => $"{p.Sscc} ({p.LotNumber})")));
+                    }
+                });
+                page.Footer().AlignCenter().Text(text =>
+                {
+                    text.CurrentPageNumber();
+                    text.Span(" / ");
+                    text.TotalPages();
+                });
+            });
+        }).GeneratePdf(filePath);
+    }
+
+    /// <summary>Rapportino di intervento with the customer's signature, as left at the site.</summary>
+    public static void ExportSiteReport(SiteReportDto report, CompanyProfileDto? company, string filePath)
+    {
+        var italian = System.Globalization.CultureInfo.GetCultureInfo("it-IT");
+        byte[]? signature = null;
+        const string pngHeader = "data:image/png;base64,";
+        if (report.SignatureImage is { } image && image.StartsWith(pngHeader, StringComparison.Ordinal))
+        {
+            try
+            {
+                signature = Convert.FromBase64String(image[pngHeader.Length..]);
+            }
+            catch (FormatException)
+            {
+                signature = null;
+            }
+        }
+
+        Document.Create(container =>
+        {
+            container.Page(page =>
+            {
+                page.Size(PageSizes.A4);
+                page.Margin(36);
+                page.DefaultTextStyle(style => style.FontSize(10));
+                page.Header().Column(column =>
+                {
+                    column.Item().Row(row =>
+                    {
+                        row.RelativeItem().Column(left =>
+                        {
+                            left.Item().Text(company?.CompanyName ?? string.Empty).FontSize(12).Bold();
+                            if (!string.IsNullOrWhiteSpace(company?.Address))
+                            {
+                                left.Item().Text(company.Address).FontSize(9);
+                            }
+                        });
+                        row.ConstantItem(230).AlignRight().Column(right =>
+                        {
+                            right.Item().AlignRight().Text("RAPPORTINO DI INTERVENTO").FontSize(13).Bold();
+                            right.Item().AlignRight().Text($"{report.Code} del {report.WorkDate:dd/MM/yyyy}").FontSize(10);
+                        });
+                    });
+                    if (!report.IsSigned)
+                    {
+                        column.Item().PaddingTop(6).Border(1.5f).BorderColor(Colors.Red.Darken2).Padding(3).AlignCenter()
+                            .Text("BOZZA - NON FIRMATO").Bold().FontColor(Colors.Red.Darken2);
+                    }
+
+                    column.Item().PaddingTop(8).LineHorizontal(0.75f).LineColor(Colors.Grey.Lighten1);
+                });
+                page.Content().PaddingTop(10).Column(content =>
+                {
+                    content.Spacing(10);
+                    content.Item().Row(row =>
+                    {
+                        row.RelativeItem().Column(c =>
+                        {
+                            c.Item().Text("Cliente").FontSize(8).FontColor(Colors.Grey.Darken1);
+                            c.Item().Text(report.CustomerName ?? "-").Bold();
+                            c.Item().Text(report.SiteAddress ?? string.Empty);
+                        });
+                        row.RelativeItem().Column(c =>
+                        {
+                            c.Item().Text("Commessa").FontSize(8).FontColor(Colors.Grey.Darken1);
+                            c.Item().Text($"{report.WorkOrderCode} · {report.ProductName}").Bold();
+                        });
+                    });
+                    content.Item().Text("Lavori eseguiti").FontSize(8).FontColor(Colors.Grey.Darken1);
+                    content.Item().Border(0.75f).BorderColor(Colors.Grey.Lighten1).Padding(8).MinHeight(80).Text(report.Description);
+
+                    content.Item().Text("Ore").FontSize(8).FontColor(Colors.Grey.Darken1);
+                    content.Item().Table(table =>
+                    {
+                        table.ColumnsDefinition(c => { c.RelativeColumn(3); c.RelativeColumn(2); c.RelativeColumn(1); });
+                        foreach (var header in new[] { "Tecnico", "Reparto", "Ore" })
+                        {
+                            table.Cell().BorderBottom(1).PaddingBottom(3).Text(header).Bold();
+                        }
+
+                        foreach (var hours in report.Hours)
+                        {
+                            table.Cell().PaddingVertical(3).Text(hours.TechnicianName);
+                            table.Cell().PaddingVertical(3).Text(hours.WorkCenterName ?? "-");
+                            table.Cell().PaddingVertical(3).Text(hours.HoursText);
+                        }
+
+                        var total = report.Hours.Sum(h => h.Minutes);
+                        table.Cell().BorderTop(0.75f).PaddingVertical(3).Text("Totale").Bold();
+                        table.Cell().BorderTop(0.75f);
+                        table.Cell().BorderTop(0.75f).PaddingVertical(3).Text($"{(int)(total / 60)}:{(int)(total % 60):00}").Bold();
+                    });
+
+                    content.Item().Text("Materiali installati").FontSize(8).FontColor(Colors.Grey.Darken1);
+                    if (report.Materials.Count == 0)
+                    {
+                        content.Item().Text("Nessuno.");
+                    }
+                    else
+                    {
+                        content.Item().Table(table =>
+                        {
+                            table.ColumnsDefinition(c => { c.RelativeColumn(1.3f); c.RelativeColumn(4); c.RelativeColumn(1); });
+                            foreach (var header in new[] { "Codice", "Descrizione", "Quantità" })
+                            {
+                                table.Cell().BorderBottom(1).PaddingBottom(3).Text(header).Bold();
+                            }
+
+                            foreach (var material in report.Materials)
+                            {
+                                table.Cell().PaddingVertical(3).Text(material.MaterialCode ?? "-");
+                                table.Cell().PaddingVertical(3).Text(material.Description);
+                                table.Cell().PaddingVertical(3).Text($"{material.Quantity.ToString("0.###", italian)} {material.Unit}");
+                            }
+                        });
+                    }
+
+                    if (!string.IsNullOrWhiteSpace(report.Notes))
+                    {
+                        content.Item().Text($"Note: {report.Notes}");
+                    }
+
+                    content.Item().PaddingTop(10).Row(row =>
+                    {
+                        row.RelativeItem().Column(c =>
+                        {
+                            c.Item().Text("Per il cliente").FontSize(8).FontColor(Colors.Grey.Darken1);
+                            c.Item().Text(report.SignedByName ?? string.Empty).Bold();
+                            c.Item().Text(report.SignedAt is { } signedAt ? $"Firmato il {signedAt.ToLocalTime():dd/MM/yyyy HH:mm}" : string.Empty).FontSize(8);
+                        });
+                        row.ConstantItem(220).Height(80).Border(0.75f).BorderColor(Colors.Grey.Lighten1).Padding(4).Element(box =>
+                        {
+                            if (signature is not null)
+                            {
+                                box.Image(signature).FitArea();
+                            }
+                        });
+                    });
+                });
+            });
+        }).GeneratePdf(filePath);
+    }
+
     private static string Sanitize(string sheetName)
     {
         var invalid = new[] { '\\', '/', '?', '*', '[', ']', ':' };

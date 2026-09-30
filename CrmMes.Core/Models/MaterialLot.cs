@@ -16,6 +16,10 @@ public class MaterialLot
     public Guid? PurchaseOrderId { get; set; }
     public PurchaseOrder? PurchaseOrder { get; set; }
     public DateTime ReceivedAt { get; set; } = DateTime.UtcNow;
+
+    /// <summary>Use-by date, for perishable materials (food, chemicals, adhesives). Lots with a date are
+    /// consumed first-expiring-first-out; lots without one keep the plain first-in-first-out order.</summary>
+    public DateTime? ExpiryDate { get; set; }
     public string? Notes { get; set; }
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     public ICollection<MaterialLotConsumption> Consumptions { get; set; } = new List<MaterialLotConsumption>();

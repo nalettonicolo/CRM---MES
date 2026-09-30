@@ -1,0 +1,121 @@
+<!doctype html>
+<html lang="it">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="color-scheme" content="light dark">
+  <meta name="theme-color" content="#18181B">
+  <title>Rapportini di cantiere</title>
+  <link rel="icon" href="/favicon.ico">
+  <link rel="stylesheet" href="app.css">
+</head>
+<body>
+  <header class="bar">
+    <span class="brand">Rapportini</span>
+    <span id="who" class="who"></span>
+    <button id="logout" class="link" type="button" hidden>Esci</button>
+  </header>
+
+  <main id="app" class="wrap" data-app="tecnici">
+    <!-- Login -->
+    <section id="view-login" class="view" hidden>
+      <h1>Accedi</h1>
+      <p class="muted">Usa le stesse credenziali del gestionale.</p>
+      <form id="login-form" class="stack" novalidate>
+        <label>Email<input id="login-email" type="email" autocomplete="username" required></label>
+        <label>Password<input id="login-password" type="password" autocomplete="current-password" required></label>
+        <p id="login-error" class="error" role="alert"></p>
+        <button class="primary" type="submit">Accedi</button>
+      </form>
+    </section>
+
+    <!-- Report list -->
+    <section id="view-list" class="view" hidden>
+      <div class="row between">
+        <h1>I rapportini</h1>
+        <button id="new-report" class="primary" type="button">Nuovo</button>
+      </div>
+      <div class="tabs" role="tablist">
+        <button class="tab active" type="button" data-status="Draft" role="tab" aria-selected="true">Da firmare</button>
+        <button class="tab" type="button" data-status="Signed" role="tab" aria-selected="false">Firmati</button>
+      </div>
+      <p id="list-state" class="state"></p>
+      <ul id="report-list" class="cards"></ul>
+    </section>
+
+    <!-- Work order picker -->
+    <section id="view-pick" class="view" hidden>
+      <div class="row between">
+        <h1>Scegli la commessa</h1>
+        <button class="link" type="button" data-back>Indietro</button>
+      </div>
+      <input id="pick-search" type="search" placeholder="Codice, cliente o prodotto" aria-label="Cerca commessa">
+      <p id="pick-state" class="state"></p>
+      <ul id="pick-list" class="cards"></ul>
+    </section>
+
+    <!-- Editor -->
+    <section id="view-edit" class="view" hidden>
+      <div class="row between">
+        <h1 id="edit-title">Rapportino</h1>
+        <button class="link" type="button" data-back>Indietro</button>
+      </div>
+      <p id="edit-sub" class="muted"></p>
+      <form id="edit-form" class="stack" novalidate>
+        <label>Data intervento<input id="edit-date" type="date" required></label>
+        <label>Indirizzo del cantiere<input id="edit-address" type="text" autocomplete="street-address"></label>
+        <label>Lavori eseguiti<textarea id="edit-description" rows="5" required></textarea></label>
+
+        <fieldset>
+          <legend>Ore</legend>
+          <div id="hours-rows" class="rows"></div>
+          <button id="add-hours" class="secondary" type="button">Aggiungi tecnico</button>
+          <p class="hint">Ore come 1:30 oppure 1,5.</p>
+        </fieldset>
+
+        <fieldset>
+          <legend>Materiali installati</legend>
+          <div id="material-rows" class="rows"></div>
+          <button id="add-material" class="secondary" type="button">Aggiungi materiale</button>
+        </fieldset>
+
+        <label>Note<textarea id="edit-notes" rows="2"></textarea></label>
+        <p id="edit-error" class="error" role="alert"></p>
+        <div class="actions">
+          <button id="delete-draft" class="danger" type="button" hidden>Elimina</button>
+          <button class="secondary" type="submit">Salva bozza</button>
+          <button id="go-sign" class="primary" type="button">Firma cliente</button>
+        </div>
+      </form>
+    </section>
+
+    <!-- Signature -->
+    <section id="view-sign" class="view" hidden>
+      <div class="row between">
+        <h1>Firma del cliente</h1>
+        <button class="link" type="button" data-back>Indietro</button>
+      </div>
+      <p id="sign-summary" class="muted"></p>
+      <label>Nome di chi firma<input id="sign-name" type="text" autocomplete="name" required></label>
+      <div class="pad-wrap">
+        <canvas id="sign-pad" aria-label="Riquadro firma"></canvas>
+        <button id="sign-clear" class="link pad-clear" type="button">Cancella</button>
+      </div>
+      <p class="hint">Firmando il cliente conferma i lavori, le ore e i materiali indicati. Dopo la firma il rapportino non si modifica.</p>
+      <p id="sign-error" class="error" role="alert"></p>
+      <button id="sign-confirm" class="primary wide" type="button">Conferma firma</button>
+    </section>
+
+    <!-- Signed report (read only) -->
+    <section id="view-show" class="view" hidden>
+      <div class="row between">
+        <h1 id="show-title">Rapportino</h1>
+        <button class="link" type="button" data-back>Indietro</button>
+      </div>
+      <div id="show-body" class="stack"></div>
+    </section>
+  </main>
+
+  <script src="app.js"></script>
+</body>
+</html>

@@ -323,13 +323,18 @@ public class WithdrawalSlipsController : ControllerBase
         }
 
         // Ordering before GroupBy isn't reliably preserved through SQL translation + materialization,
-        // so the lots are fetched first and grouped/ordered client-side to guarantee FIFO order.
+        // so the lots are fetched first and grouped/ordered client-side. Order: lots with a use-by date
+        // first, earliest expiry first (FEFO); then the others oldest first (FIFO) — without expiry dates
+        // this is exactly the plain FIFO it always was.
         var openLots = await _dbContext.MaterialLots
             .Where(lot => codes.Contains(lot.MaterialCode) && lot.Quantity > 0)
             .ToListAsync(cancellationToken);
         var lotsByMaterial = openLots
             .GroupBy(lot => lot.MaterialCode)
-            .ToDictionary(group => group.Key, group => group.OrderBy(lot => lot.ReceivedAt).ToList());
+            .ToDictionary(group => group.Key, group => group
+                .OrderBy(lot => lot.ExpiryDate ?? DateTime.MaxValue)
+                .ThenBy(lot => lot.ReceivedAt)
+                .ToList());
 
         // Per-unit lot traceability only applies when this slip is tied to a work order with tracked
         // units (integer quantity) — otherwise there's nothing discrete to attribute lots to.

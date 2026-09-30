@@ -35,6 +35,7 @@ public sealed class StatusToBrushConverter : IValueConverter
         ["Sent"] = "#2E6F9E",
         ["Accepted"] = "#3D7A4C",
         ["Rejected"] = "#C0392B",
+        ["Issued"] = "#3D7A4C",
     };
 
     public object Convert(object? value, Type targetType, object? parameter, CultureInfo culture)

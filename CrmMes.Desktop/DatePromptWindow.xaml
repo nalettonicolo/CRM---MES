@@ -1,0 +1,30 @@
+<Window x:Class="CrmMes.Desktop.DatePromptWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Icon="Assets/logo.ico" Width="420" SizeToContent="Height"
+        WindowStartupLocation="CenterOwner" ResizeMode="NoResize"
+        Background="{StaticResource BackgroundBrush}">
+    <StackPanel Margin="24">
+        <TextBlock x:Name="MessageText" Foreground="{StaticResource TextSecondaryBrush}" FontSize="12.5" TextWrapping="Wrap" Margin="0,0,0,12" />
+        <Grid Margin="0,0,0,10">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="12" />
+                <ColumnDefinition Width="*" />
+            </Grid.ColumnDefinitions>
+            <StackPanel Grid.Column="0">
+                <TextBlock x:Name="FromLabel" Text="Data" Foreground="{StaticResource TextSecondaryBrush}" FontSize="12.5" Margin="0,0,0,5" />
+                <DatePicker x:Name="FromPicker" Height="34" />
+            </StackPanel>
+            <StackPanel Grid.Column="2" x:Name="ToPanel" Visibility="Collapsed">
+                <TextBlock Text="Al" Foreground="{StaticResource TextSecondaryBrush}" FontSize="12.5" Margin="0,0,0,5" />
+                <DatePicker x:Name="ToPicker" Height="34" />
+            </StackPanel>
+        </Grid>
+        <TextBlock x:Name="ErrorText" Foreground="{StaticResource DangerBrush}" TextWrapping="Wrap" Margin="0,0,0,8" />
+        <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+            <Button Style="{StaticResource SecondaryButton}" Content="Indietro" Width="100" Height="36" Margin="0,0,10,0" IsCancel="True" />
+            <Button Content="Conferma" Width="110" Height="36" IsDefault="True" Click="Confirm_Click" />
+        </StackPanel>
+    </StackPanel>
+</Window>

@@ -47,7 +47,7 @@ public class MaterialLotsController : ControllerBase
             .Take(200)
             .Select(lot => new MaterialLotSummaryResponse(
                 lot.Id, lot.MaterialCode, lot.LotNumber, lot.Quantity, lot.InitialQuantity,
-                lot.SupplierId, lot.PurchaseOrderId, lot.ReceivedAt))
+                lot.SupplierId, lot.PurchaseOrderId, lot.ReceivedAt, lot.ExpiryDate))
             .ToListAsync(cancellationToken);
 
         return Ok(lots);
@@ -114,7 +114,8 @@ public class MaterialLotsController : ControllerBase
             LotNumber = lotNumber,
             Quantity = request.Quantity,
             InitialQuantity = request.Quantity,
-            Notes = string.IsNullOrWhiteSpace(request.Notes) ? null : request.Notes.Trim()
+            Notes = string.IsNullOrWhiteSpace(request.Notes) ? null : request.Notes.Trim(),
+            ExpiryDate = request.ExpiryDate?.Date
         };
         material.Stock += request.Quantity;
 
@@ -133,11 +134,55 @@ public class MaterialLotsController : ControllerBase
         return CreatedAtAction(
             nameof(GetMaterialLot),
             new { id = lot.Id },
-            new MaterialLotSummaryResponse(lot.Id, lot.MaterialCode, lot.LotNumber, lot.Quantity, lot.InitialQuantity, lot.SupplierId, lot.PurchaseOrderId, lot.ReceivedAt));
+            new MaterialLotSummaryResponse(lot.Id, lot.MaterialCode, lot.LotNumber, lot.Quantity, lot.InitialQuantity, lot.SupplierId, lot.PurchaseOrderId, lot.ReceivedAt, lot.ExpiryDate));
+    }
+
+    /// <summary>Sets or clears a lot's use-by date (e.g. read off the label after receiving it).</summary>
+    [Authorize(Policy = "Warehouse")]
+    [HttpPut("{id:guid}/expiry")]
+    public async Task<ActionResult<MaterialLotSummaryResponse>> SetExpiry(
+        Guid id, SetLotExpiryRequest request, CancellationToken cancellationToken = default)
+    {
+        var lot = await _dbContext.MaterialLots.SingleOrDefaultAsync(l => l.Id == id, cancellationToken);
+        if (lot is null)
+        {
+            return NotFound();
+        }
+
+        lot.ExpiryDate = request.ExpiryDate?.Date;
+        _dbContext.AuditLogs.Add(new AuditLog
+        {
+            Action = "MaterialLotExpirySet",
+            EntityType = "MaterialLot",
+            EntityId = lot.Id,
+            UserName = User.FindFirstValue(ClaimTypes.Name),
+            Details = $"Scadenza del lotto {lot.LotNumber} ({lot.MaterialCode}): {(lot.ExpiryDate is { } date ? date.ToString("dd/MM/yyyy") : "rimossa")}."
+        });
+        await _dbContext.SaveChangesAsync(cancellationToken);
+        return Ok(new MaterialLotSummaryResponse(lot.Id, lot.MaterialCode, lot.LotNumber, lot.Quantity, lot.InitialQuantity, lot.SupplierId, lot.PurchaseOrderId, lot.ReceivedAt, lot.ExpiryDate));
+    }
+
+    /// <summary>Lots still in stock that expire within the given days (or already expired), soonest first.</summary>
+    [HttpGet("expiring")]
+    public async Task<ActionResult<IEnumerable<MaterialLotSummaryResponse>>> GetExpiring(
+        [FromQuery] int days = 30, CancellationToken cancellationToken = default)
+    {
+        var limit = DateTime.UtcNow.Date.AddDays(Math.Clamp(days, 0, 3650));
+        var lots = await _dbContext.MaterialLots.AsNoTracking()
+            .Where(lot => lot.Quantity > 0 && lot.ExpiryDate != null && lot.ExpiryDate <= limit)
+            .OrderBy(lot => lot.ExpiryDate)
+            .Take(500)
+            .Select(lot => new MaterialLotSummaryResponse(
+                lot.Id, lot.MaterialCode, lot.LotNumber, lot.Quantity, lot.InitialQuantity,
+                lot.SupplierId, lot.PurchaseOrderId, lot.ReceivedAt, lot.ExpiryDate))
+            .ToListAsync(cancellationToken);
+        return Ok(lots);
     }
 }
 
-public sealed record CreateMaterialLotRequest(string? MaterialCode, string? LotNumber, decimal Quantity, string? Notes);
+public sealed record SetLotExpiryRequest(DateTime? ExpiryDate);
+
+public sealed record CreateMaterialLotRequest(string? MaterialCode, string? LotNumber, decimal Quantity, string? Notes, DateTime? ExpiryDate = null);
 
 public sealed record MaterialLotSummaryResponse(
     Guid Id,
@@ -147,7 +192,8 @@ public sealed record MaterialLotSummaryResponse(
     decimal InitialQuantity,
     Guid? SupplierId,
     Guid? PurchaseOrderId,
-    DateTime ReceivedAt);
+    DateTime ReceivedAt,
+    DateTime? ExpiryDate = null);
 
 public sealed record MaterialLotDetailResponse(
     Guid Id,

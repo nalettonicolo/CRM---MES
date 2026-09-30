@@ -4,6 +4,7 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Data;
 using System.Windows.Input;
+using System.Windows.Media;
 using System.Windows.Threading;
 
 namespace CrmMes.Desktop;
@@ -53,6 +54,10 @@ public partial class MainWindow : Window
     private bool _customersLoaded;
     private bool _quotesLoaded;
     private bool _marginsLoaded;
+    private bool _transportDocumentsLoaded;
+    private bool _subcontractingLoaded;
+    private bool _haccpLoaded;
+    private bool _siteReportsLoaded;
 
     private static readonly Dictionary<int, string> PageTitles = new()
     {
@@ -79,6 +84,10 @@ public partial class MainWindow : Window
         [20] = "Clienti",
         [21] = "Preventivi",
         [22] = "Controllo margini",
+        [23] = "Documenti di trasporto",
+        [24] = "Conto lavoro",
+        [25] = "Registri HACCP",
+        [26] = "Rapportini di cantiere",
     };
 
     private static readonly Dictionary<int, string> PageEyebrows = new()
@@ -106,10 +115,18 @@ public partial class MainWindow : Window
         [20] = "V E N D I T E",
         [21] = "V E N D I T E",
         [22] = "D I R E Z I O N E",
+        [23] = "S P E D I Z I O N I",
+        [24] = "A C Q U I S T I",
+        [25] = "P R O D U Z I O N E",
+        [26] = "P R O D U Z I O N E",
     };
 
     private static readonly Dictionary<int, string> PageHelpTexts = new()
     {
+        [25] = "Piano HACCP: i punti di controllo critici con i loro limiti e le letture registrate. Una lettura fuori limite richiede l'azione correttiva; le letture non si modificano né si cancellano, perché il registro vale come prova per i controlli. \"Registro\" esporta il periodo per l'ispezione.",
+        [26] = "Rapportini di intervento presso il cliente: lavori eseguiti, ore per tecnico, materiali installati e firma del cliente. La firma si raccoglie sul posto dalla pagina web dei tecnici (telefono o tablet). Firmato, il rapportino si blocca, le ore entrano nella commessa e i materiali nel suo costo reale.",
+        [23] = "Documenti di trasporto (DDT) per qualsiasi causale: vendita, conto lavorazione, riparazione, reso, conto visione. Una bozza si modifica liberamente e non ha numero; \"Emetti\" assegna il numero progressivo dell'anno e la blocca. Un DDT emesso non si modifica né si cancella: si annulla (resta in archivio con il suo numero). Da una commessa, \"Crea DDT\" prepara la bozza con cliente, prodotto, lotto e quantità.",
+        [24] = "Materiale presso i terzisti: ogni riga dei DDT con causale \"Conto lavorazione\" ancora da rientrare, con quanto è già tornato o è stato scartato. In rosso i rientri oltre la data prevista. Doppio click per aprire il DDT e registrare un rientro, anche parziale, con il riferimento al DDT del terzista.",
         [0] = "Elenco dei materiali a magazzino: codice, descrizione, unità di misura, giacenza. Da qui si crea un nuovo materiale, si cerca per codice/descrizione e si importa un catalogo Excel di un fornitore.",
         [1] = "Materiali la cui giacenza è scesa sotto la scorta minima impostata. \"Scansiona\" crea automaticamente una richiesta di materiale mancante per ciascuno di quelli non ancora richiesti.",
         [2] = "Materiali richiesti ma non ancora disponibili: generati automaticamente chiudendo una distinta di prelievo che porta un materiale sotto scorta, oppure dallo scan sottoscorte. Restano aperti finché non arrivano da un ordine fornitore.",
@@ -318,9 +335,8 @@ public partial class MainWindow : Window
         _currentRole = auth.Role;
         _apiClient.CurrentRole = auth.Role;
         _ = FlagAvailableUpdateAsync();
-        var canViewMargins = _apiClient.CanViewMargins;
-        NavManagementSection.Visibility = canViewMargins ? Visibility.Visible : Visibility.Collapsed;
-        WorkCenterRateButton.Visibility = canViewMargins ? Visibility.Visible : Visibility.Collapsed;
+        ApplyEnabledModules();
+        CompanySetupButton.Visibility = auth.Role == "Admin" ? Visibility.Visible : Visibility.Collapsed;
         _refreshToken = auth.RefreshToken;
         ScheduleTokenRefresh(auth.ExpiresAt);
         LoginPanel.Visibility = Visibility.Collapsed;
@@ -330,6 +346,449 @@ public partial class MainWindow : Window
         if (reloadMaterials)
         {
             _ = SearchMaterialsAsync();
+            _ = LoadCompanyProfileAsync(offerSetup: auth.Role == "Admin");
+        }
+    }
+
+    /// <summary>Loads the company's industry and modules and adapts the sidebar. An Admin on a server
+    /// nobody has configured yet gets the configuration window straight away (it can be postponed).</summary>
+    private async Task LoadCompanyProfileAsync(bool offerSetup)
+    {
+        try
+        {
+            _apiClient.CompanyProfile = await _apiClient.GetCompanyProfileAsync();
+        }
+        catch (InvalidOperationException)
+        {
+            _apiClient.CompanyProfile = null; // every module stays visible, as before the configuration existed
+        }
+
+        ApplyEnabledModules();
+        if (offerSetup && _apiClient.CompanyProfile is { IsConfigured: false })
+        {
+            OpenCompanySetup();
+        }
+    }
+
+    /// <summary>Shows only what the configured sector uses. Hiding never deletes data, and the API
+    /// still enforces roles on its own.</summary>
+    private void ApplyEnabledModules()
+    {
+        static Visibility Show(bool visible) => visible ? Visibility.Visible : Visibility.Collapsed;
+
+        NavSalesSection.Visibility = Show(_apiClient.IsModuleEnabled("sales"));
+        NavPurchasingSection.Visibility = Show(_apiClient.IsModuleEnabled("purchasing"));
+        NavPlanning.Visibility = Show(_apiClient.IsModuleEnabled("planning"));
+        PlanningBoardButton.Visibility = Show(_apiClient.IsModuleEnabled("planning"));
+        ShopFloorTerminalButton.Visibility = Show(_apiClient.IsModuleEnabled("shopfloor"));
+        NavMaintenanceSection.Visibility = Show(_apiClient.IsModuleEnabled("maintenance"));
+        NavShippingSection.Visibility = Show(_apiClient.IsModuleEnabled("shipping"));
+        NavSubcontracting.Visibility = Show(_apiClient.IsModuleEnabled("subcontracting"));
+        NavHaccp.Visibility = Show(_apiClient.IsModuleEnabled("haccp"));
+        NavSiteReports.Visibility = Show(_apiClient.IsModuleEnabled("site-work"));
+        MaterialFoodButton.Visibility = Show(_apiClient.IsModuleEnabled("food-labels"));
+        ProductFoodButton.Visibility = Show(_apiClient.IsModuleEnabled("food-labels"));
+        var lotExpiry = _apiClient.IsModuleEnabled("lot-expiry");
+        SetLotExpiryButton.Visibility = Show(lotExpiry);
+        LotExpiryColumn.Width = lotExpiry ? 110 : 0;
+        NavManagementSection.Visibility = Show(_apiClient.CanViewMargins);
+        WorkCenterRateButton.Visibility = Show(_apiClient.CanViewMargins);
+
+        // A section just switched off may be the page on screen: fall back to Materiali (always on).
+        if (MainTabs.SelectedIndex > 0 && FindCheckedNavItem() is { IsVisible: false } hidden)
+        {
+            hidden.IsChecked = false;
+            NavMaterials.IsChecked = true;
+        }
+    }
+
+    private RadioButton? FindCheckedNavItem() =>
+        new[] { NavCustomers, NavQuotes, NavOrders, NavSuppliers, NavCatalogSearch, NavPlanning, NavEquipment,
+                NavMaintenance, NavCarriers, NavShipments, NavMargins, NavTransportDocuments, NavSubcontracting, NavHaccp, NavSiteReports }
+            .FirstOrDefault(item => item.IsChecked == true);
+
+    // ---------- Documenti di trasporto
+
+    private async Task LoadTransportDocumentsAsync()
+    {
+        try
+        {
+            if (TransportReasonFilter.ItemsSource is null)
+            {
+                var reasons = await _apiClient.GetTransportReasonsAsync();
+                TransportReasonFilter.ItemsSource = new[] { new TransportReasonDto(string.Empty, "Tutte le causali") }.Concat(reasons).ToList();
+                TransportReasonFilter.SelectedIndex = 0; // triggers a reload through the filter handler
+                return;
+            }
+
+            BusyIndicator.Text = "Caricamento DDT...";
+            TransportDocumentsList.ItemsSource = await _apiClient.GetTransportDocumentsAsync(
+                (TransportStatusFilter.SelectedItem as ComboBoxItem)?.Tag as string,
+                (TransportReasonFilter.SelectedItem as TransportReasonDto)?.Key,
+                TransportSearchBox.Text);
+            _transportDocumentsLoaded = true;
+        }
+        catch (Exception exception)
+        {
+            MessageBox.Show(exception.Message, "DDT", MessageBoxButton.OK, MessageBoxImage.Warning);
+        }
+        finally
+        {
+            BusyIndicator.Text = string.Empty;
+        }
+    }
+
+    private async void TransportFilter_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (_isAuthenticated && IsLoaded)
+        {
+            await LoadTransportDocumentsAsync();
+        }
+    }
+
+    private async void TransportSearchBox_KeyDown(object sender, KeyEventArgs e)
+    {
+        if (e.Key == Key.Enter)
+        {
+            await LoadTransportDocumentsAsync();
+        }
+    }
+
+    private async void RefreshTransportDocuments_Click(object sender, RoutedEventArgs e) => await LoadTransportDocumentsAsync();
+
+    private async void NewTransportDocument_Click(object sender, RoutedEventArgs e) => await OpenTransportDocumentAsync(null);
+
+    private async void TransportDocumentsList_MouseDoubleClick(object sender, MouseButtonEventArgs e)
+    {
+        if (TransportDocumentsList.SelectedItem is TransportDocumentSummaryDto summary)
+        {
+            await OpenTransportDocumentAsync(summary.Id);
+        }
+    }
+
+    private async Task OpenTransportDocumentAsync(Guid? id)
+    {
+        var window = new TransportDocumentWindow(_apiClient, id) { Owner = this };
+        window.ShowDialog();
+        if (window.Changed)
+        {
+            await LoadTransportDocumentsAsync();
+            _subcontractingLoaded = false; // conto lavoro reads the same documents
+        }
+    }
+
+    private static readonly ExportColumn[] TransportExportColumns =
+    [
+        new("Numero DDT", row => ((TransportDocumentExportRowDto)row).DocumentNumber),
+        new("Data", row => ((TransportDocumentExportRowDto)row).IssuedDate.ToString("dd/MM/yyyy")),
+        new("Causale", row => ((TransportDocumentExportRowDto)row).Reason),
+        new("Codice cliente", row => ((TransportDocumentExportRowDto)row).CustomerCode ?? string.Empty),
+        new("Destinatario", row => ((TransportDocumentExportRowDto)row).RecipientName),
+        new("Partita IVA", row => ((TransportDocumentExportRowDto)row).RecipientVatNumber ?? string.Empty),
+        new("Commessa", row => ((TransportDocumentExportRowDto)row).WorkOrderCode ?? string.Empty),
+        new("Riga", row => ((TransportDocumentExportRowDto)row).LineNumber.ToString()),
+        new("Codice articolo", row => ((TransportDocumentExportRowDto)row).Code ?? string.Empty),
+        new("Descrizione", row => ((TransportDocumentExportRowDto)row).Description),
+        new("U.m.", row => ((TransportDocumentExportRowDto)row).Unit),
+        new("Quantità", row => ((TransportDocumentExportRowDto)row).Quantity.ToString("0.###")),
+        new("Lotto", row => ((TransportDocumentExportRowDto)row).LotNumber ?? string.Empty),
+    ];
+
+    /// <summary>Issued DDT lines of a period as a spreadsheet for the accounting system (deferred
+    /// invoicing): the previous month by default, the usual monthly invoicing run.</summary>
+    private async void ExportTransportDocuments_Click(object sender, RoutedEventArgs e)
+    {
+        var firstOfMonth = new DateTime(DateTime.Today.Year, DateTime.Today.Month, 1);
+        var prompt = new DatePromptWindow("Esporta DDT per la contabilità",
+            "Righe dei DDT emessi nel periodo (esclusi bozze e annullati), una riga per articolo, da importare nel gestionale contabile per la fatturazione differita.",
+            firstOfMonth.AddMonths(-1), to: firstOfMonth.AddDays(-1), isRange: true) { Owner = this };
+        if (prompt.ShowDialog() != true)
+        {
+            return;
+        }
+
+        IReadOnlyList<TransportDocumentExportRowDto> rows;
+        try
+        {
+            rows = await _apiClient.GetTransportDocumentExportAsync(prompt.From!.Value, prompt.To!.Value);
+        }
+        catch (Exception exception)
+        {
+            MessageBox.Show(exception.Message, "Esportazione DDT", MessageBoxButton.OK, MessageBoxImage.Warning);
+            return;
+        }
+
+        if (rows.Count == 0)
+        {
+            MessageBox.Show("Nessun DDT emesso nel periodo scelto.", "Esportazione DDT", MessageBoxButton.OK, MessageBoxImage.Information);
+            return;
+        }
+
+        ExportList($"DDT {prompt.From:dd-MM-yyyy} {prompt.To:dd-MM-yyyy}", $"DDT_{prompt.From:yyyyMMdd}_{prompt.To:yyyyMMdd}.xlsx",
+            TransportExportColumns, rows, asPdf: false);
+    }
+
+    // ---------- Food data, recall
+
+    private void MaterialFoodButton_Click(object sender, RoutedEventArgs e)
+    {
+        if (MaterialsList.SelectedItem is not MaterialDto material)
+        {
+            MessageBox.Show("Seleziona un materiale.", "Dati alimentari", MessageBoxButton.OK, MessageBoxImage.Information);
+            return;
+        }
+
+        new MaterialFoodInfoWindow(_apiClient, material.Id) { Owner = this }.ShowDialog();
+    }
+
+    private void ProductFoodButton_Click(object sender, RoutedEventArgs e)
+    {
+        if (_selectedProduct is not null)
+        {
+            new ProductFoodInfoWindow(_apiClient, _selectedProduct.Id) { Owner = this }.ShowDialog();
+        }
+    }
+
+    private void RecallLotButton_Click(object sender, RoutedEventArgs e)
+    {
+        if (_selectedMaterialLot is not null)
+        {
+            var recall = RecallWindow.ForMaterialLot(_apiClient, _selectedMaterialLot.Id);
+            recall.Owner = this;
+            recall.ShowDialog();
+        }
+    }
+
+    private void RecallProductLotButton_Click(object sender, RoutedEventArgs e)
+    {
+        var prompt = new TextPromptWindow("Richiamo lotto prodotto", "Lotto del prodotto finito da richiamare (lo trovi sull'etichetta o sulla commessa):") { Owner = this };
+        if (prompt.ShowDialog() == true)
+        {
+            var recall = RecallWindow.ForProductLot(_apiClient, prompt.Value);
+            recall.Owner = this;
+            recall.ShowDialog();
+        }
+    }
+
+    // ---------- HACCP
+
+    private Task LoadHaccpAsync() => RunBusyAsync(string.Empty, async () =>
+    {
+        var points = await _apiClient.GetHaccpControlPointsAsync(activeOnly: false);
+        HaccpPointsList.ItemsSource = points.OrderBy(p => !p.IsActive).ThenBy(p => p.Location).ThenBy(p => p.Name).ToList();
+        var open = points.Count(p => p.IsActive && p.LastNonCompliant);
+        var neverRead = points.Count(p => p.IsActive && p.LastReadAt is null);
+        HaccpInfoText.Text = points.Count == 0
+            ? "Nessun punto di controllo: aggiungi quelli del piano HACCP con \"Nuovo punto\"."
+            : $"{points.Count(p => p.IsActive)} punti attivi" + (open > 0 ? $", {open} con l'ultima lettura non conforme" : string.Empty)
+              + (neverRead > 0 ? $", {neverRead} mai rilevati" : string.Empty) + ".";
+        _haccpLoaded = true;
+    });
+
+    private async void RefreshHaccp_Click(object sender, RoutedEventArgs e) => await LoadHaccpAsync();
+
+    private async void HaccpReading_Click(object sender, RoutedEventArgs e)
+    {
+        if (HaccpPointsList.SelectedItem is not HaccpControlPointDto point)
+        {
+            MessageBox.Show("Seleziona il punto di controllo.", "HACCP", MessageBoxButton.OK, MessageBoxImage.Information);
+            return;
+        }
+
+        if (!point.IsActive)
+        {
+            MessageBox.Show("Punto di controllo disattivato.", "HACCP", MessageBoxButton.OK, MessageBoxImage.Information);
+            return;
+        }
+
+        if (new HaccpReadingWindow(_apiClient, point) { Owner = this }.ShowDialog() == true)
+        {
+            await LoadHaccpAsync();
+        }
+    }
+
+    private void HaccpPointsList_MouseDoubleClick(object sender, MouseButtonEventArgs e) => HaccpReading_Click(sender, e);
+
+    private async void NewHaccpPoint_Click(object sender, RoutedEventArgs e)
+    {
+        if (new HaccpControlPointWindow(_apiClient) { Owner = this }.ShowDialog() == true)
+        {
+            await LoadHaccpAsync();
+        }
+    }
+
+    private async void EditHaccpPoint_Click(object sender, RoutedEventArgs e)
+    {
+        if (HaccpPointsList.SelectedItem is HaccpControlPointDto point &&
+            new HaccpControlPointWindow(_apiClient, point) { Owner = this }.ShowDialog() == true)
+        {
+            await LoadHaccpAsync();
+        }
+    }
+
+    private static readonly ExportColumn[] HaccpExportColumns =
+    [
+        new("Data e ora", row => ((HaccpReadingDto)row).ReadAtLocal.ToString("dd/MM/yyyy HH:mm")),
+        new("Punto di controllo", row => ((HaccpReadingDto)row).ControlPointName),
+        new("Luogo", row => ((HaccpReadingDto)row).Location ?? string.Empty),
+        new("Valore", row => ((HaccpReadingDto)row).ValueText),
+        new("Esito", row => ((HaccpReadingDto)row).OutcomeText),
+        new("Azione correttiva", row => ((HaccpReadingDto)row).CorrectiveAction ?? string.Empty),
+        new("Operatore", row => ((HaccpReadingDto)row).OperatorName ?? string.Empty),
+        new("Note", row => ((HaccpReadingDto)row).Notes ?? string.Empty),
+    ];
+
+    private void HaccpRegisterExcel_Click(object sender, RoutedEventArgs e) => _ = ExportHaccpRegisterAsync(asPdf: false, nonCompliantOnly: false);
+
+    private void HaccpRegisterPdf_Click(object sender, RoutedEventArgs e) => _ = ExportHaccpRegisterAsync(asPdf: true, nonCompliantOnly: false);
+
+    private void HaccpNonCompliantPdf_Click(object sender, RoutedEventArgs e) => _ = ExportHaccpRegisterAsync(asPdf: true, nonCompliantOnly: true);
+
+    /// <summary>The HACCP register of a period, for inspections (the current month by default).</summary>
+    private async Task ExportHaccpRegisterAsync(bool asPdf, bool nonCompliantOnly)
+    {
+        var firstOfMonth = new DateTime(DateTime.Today.Year, DateTime.Today.Month, 1);
+        var prompt = new DatePromptWindow("Registro HACCP", "Periodo del registro da esportare.", firstOfMonth, to: DateTime.Today, isRange: true) { Owner = this };
+        if (prompt.ShowDialog() != true)
+        {
+            return;
+        }
+
+        try
+        {
+            var readings = await _apiClient.GetHaccpReadingsAsync(prompt.From!.Value, prompt.To!.Value, nonCompliantOnly);
+            if (readings.Count == 0)
+            {
+                MessageBox.Show("Nessuna lettura nel periodo.", "Registro HACCP", MessageBoxButton.OK, MessageBoxImage.Information);
+                return;
+            }
+
+            var title = $"Registro HACCP{(nonCompliantOnly ? " - non conformità" : string.Empty)} {prompt.From:dd-MM-yyyy} {prompt.To:dd-MM-yyyy}";
+            ExportList(title, $"HACCP_{prompt.From:yyyyMMdd}_{prompt.To:yyyyMMdd}.{(asPdf ? "pdf" : "xlsx")}",
+                HaccpExportColumns, readings.OrderBy(r => r.ReadAt), asPdf);
+        }
+        catch (Exception exception)
+        {
+            MessageBox.Show(exception.Message, "Registro HACCP", MessageBoxButton.OK, MessageBoxImage.Warning);
+        }
+    }
+
+    // ---------- Site reports
+
+    private Task LoadSiteReportsAsync() => RunBusyAsync(string.Empty, async () =>
+    {
+        var status = (SiteReportStatusFilter.SelectedItem as ComboBoxItem)?.Tag as string;
+        SiteReportsList.ItemsSource = await _apiClient.GetSiteReportsAsync(status: status);
+        _siteReportsLoaded = true;
+    });
+
+    private async void RefreshSiteReports_Click(object sender, RoutedEventArgs e) => await LoadSiteReportsAsync();
+
+    private async void SiteReportStatusFilter_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (_isAuthenticated && IsLoaded)
+        {
+            await LoadSiteReportsAsync();
+        }
+    }
+
+    private async void NewSiteReport_Click(object sender, RoutedEventArgs e) => await OpenSiteReportAsync(null);
+
+    private async void SiteReportsList_MouseDoubleClick(object sender, MouseButtonEventArgs e)
+    {
+        if (SiteReportsList.SelectedItem is SiteReportSummaryDto report)
+        {
+            await OpenSiteReportAsync(report.Id);
+        }
+    }
+
+    private async Task OpenSiteReportAsync(Guid? id)
+    {
+        var window = new SiteReportWindow(_apiClient, id) { Owner = this };
+        window.ShowDialog();
+        if (window.Changed)
+        {
+            await LoadSiteReportsAsync();
+        }
+    }
+
+    private void OpenTechnicianPage_Click(object sender, RoutedEventArgs e)
+    {
+        var url = new Uri(_apiClient.BaseAddress, "tecnici/").ToString();
+        try
+        {
+            Process.Start(new ProcessStartInfo(url) { UseShellExecute = true });
+        }
+        catch (Exception exception)
+        {
+            MessageBox.Show($"Apri questo indirizzo sul telefono del tecnico:\n{url}\n\n{exception.Message}", "Pagina tecnici", MessageBoxButton.OK, MessageBoxImage.Information);
+        }
+    }
+
+    // ---------- Conto lavoro
+
+    private async Task LoadSubcontractingAsync()
+    {
+        try
+        {
+            BusyIndicator.Text = "Caricamento conto lavoro...";
+            var rows = await _apiClient.GetOpenSubcontractingAsync();
+            SubcontractingList.ItemsSource = rows;
+            var overdue = rows.Count(row => row.IsOverdue);
+            SubcontractingInfoText.Text = rows.Count == 0
+                ? "Nessun materiale presso i terzisti."
+                : $"{rows.Count} righe presso {rows.Select(row => row.SupplierName).Distinct().Count()} terzisti"
+                  + (overdue > 0 ? $", {overdue} oltre la data di rientro prevista." : ".");
+            _subcontractingLoaded = true;
+        }
+        catch (Exception exception)
+        {
+            MessageBox.Show(exception.Message, "Conto lavoro", MessageBoxButton.OK, MessageBoxImage.Warning);
+        }
+        finally
+        {
+            BusyIndicator.Text = string.Empty;
+        }
+    }
+
+    private async void RefreshSubcontracting_Click(object sender, RoutedEventArgs e) => await LoadSubcontractingAsync();
+
+    private async void SubcontractingList_MouseDoubleClick(object sender, MouseButtonEventArgs e)
+    {
+        if (SubcontractingList.SelectedItem is SubcontractingOpenLineDto row)
+        {
+            var window = new TransportDocumentWindow(_apiClient, row.DocumentId) { Owner = this };
+            window.ShowDialog();
+            if (window.Changed)
+            {
+                await LoadSubcontractingAsync();
+                _transportDocumentsLoaded = false;
+            }
+        }
+    }
+
+    /// <summary>A new DDT already set to "Conto lavorazione": the subcontractor is picked in the window.</summary>
+    private async void NewSubcontractingDocument_Click(object sender, RoutedEventArgs e)
+    {
+        var window = new TransportDocumentWindow(_apiClient, null, initialReason: "Subcontracting") { Owner = this };
+        window.ShowDialog();
+        if (window.Changed)
+        {
+            await LoadSubcontractingAsync();
+            _transportDocumentsLoaded = false;
+        }
+    }
+
+    private void CompanySetupButton_Click(object sender, RoutedEventArgs e) => OpenCompanySetup();
+
+    private void OpenCompanySetup()
+    {
+        var window = new CompanySetupWindow(_apiClient) { Owner = this };
+        window.ShowDialog();
+        if (window.SavedProfile is { } profile)
+        {
+            _apiClient.CompanyProfile = profile;
+            ApplyEnabledModules();
         }
     }
 
@@ -421,6 +880,18 @@ public partial class MainWindow : Window
                 break;
             case "Controllo margini" when !_marginsLoaded:
                 await LoadMarginsAsync();
+                break;
+            case "Documenti di trasporto" when !_transportDocumentsLoaded:
+                await LoadTransportDocumentsAsync();
+                break;
+            case "Conto lavoro" when !_subcontractingLoaded:
+                await LoadSubcontractingAsync();
+                break;
+            case "Registri HACCP" when !_haccpLoaded:
+                await LoadHaccpAsync();
+                break;
+            case "Rapportini di cantiere" when !_siteReportsLoaded:
+                await LoadSiteReportsAsync();
                 break;
         }
     }
@@ -1317,6 +1788,7 @@ public partial class MainWindow : Window
         var hasSelection = _selectedProduct is not null;
         OpenProductButton.IsEnabled = hasSelection;
         EditProductButton.IsEnabled = hasSelection;
+        ProductFoodButton.IsEnabled = hasSelection;
     }
 
     private void ProductsList_MouseDoubleClick(object sender, MouseButtonEventArgs e)
@@ -1514,6 +1986,8 @@ public partial class MainWindow : Window
     {
         _selectedMaterialLot = MaterialLotsList.SelectedItem as MaterialLotSummaryDto;
         OpenMaterialLotButton.IsEnabled = _selectedMaterialLot is not null;
+        SetLotExpiryButton.IsEnabled = _selectedMaterialLot is not null;
+        RecallLotButton.IsEnabled = _selectedMaterialLot is not null;
     }
 
     private void MaterialLotsList_MouseDoubleClick(object sender, MouseButtonEventArgs e)
@@ -1533,6 +2007,55 @@ public partial class MainWindow : Window
     }
 
     private async void RefreshMaterialLotsButton_Click(object sender, RoutedEventArgs e) => await LoadMaterialLotsAsync();
+
+    private async void SetLotExpiryButton_Click(object sender, RoutedEventArgs e)
+    {
+        if (_selectedMaterialLot is not { } lot)
+        {
+            return;
+        }
+
+        var prompt = new DatePromptWindow("Scadenza lotto",
+            $"Data di scadenza del lotto {lot.LotNumber} ({lot.MaterialCode}). Lascia vuoto per toglierla.",
+            lot.ExpiryDate?.Date, allowEmpty: true) { Owner = this };
+        if (prompt.ShowDialog() != true)
+        {
+            return;
+        }
+
+        try
+        {
+            await _apiClient.SetMaterialLotExpiryAsync(lot.Id, prompt.From);
+            await LoadMaterialLotsAsync();
+        }
+        catch (Exception exception)
+        {
+            MessageBox.Show(exception.Message, "Scadenza lotto", MessageBoxButton.OK, MessageBoxImage.Warning);
+        }
+    }
+
+    /// <summary>Warns about lots in stock that are expired or expire within 30 days (food module only).</summary>
+    private async Task ShowExpiringLotsInfoAsync()
+    {
+        if (!_apiClient.IsModuleEnabled("lot-expiry"))
+        {
+            return;
+        }
+
+        try
+        {
+            var expiring = await _apiClient.GetExpiringMaterialLotsAsync(30);
+            var expired = expiring.Count(lot => lot.IsExpired);
+            MaterialLotsInfoText.Text = expiring.Count == 0
+                ? "Nessun lotto in giacenza scade nei prossimi 30 giorni."
+                : $"{expired} lotti scaduti e {expiring.Count - expired} in scadenza entro 30 giorni ancora in giacenza. Il prelievo usa per primi i lotti che scadono prima.";
+            MaterialLotsInfoText.Foreground = expired > 0 ? (Brush)FindResource("DangerBrush") : (Brush)FindResource("TextSecondaryBrush");
+        }
+        catch
+        {
+            // Only an informational line: the list itself still loads.
+        }
+    }
 
     private async void RefreshDashboardButton_Click(object sender, RoutedEventArgs e) => await LoadDashboardAsync();
 
@@ -2150,6 +2673,9 @@ public partial class MainWindow : Window
         _materialLotsLoaded = true;
         _selectedMaterialLot = null;
         OpenMaterialLotButton.IsEnabled = false;
+        SetLotExpiryButton.IsEnabled = false;
+        RecallLotButton.IsEnabled = false;
+        await ShowExpiringLotsInfoAsync();
     });
 
     private Task LoadDashboardAsync() => RunBusyAsync(string.Empty, async () =>

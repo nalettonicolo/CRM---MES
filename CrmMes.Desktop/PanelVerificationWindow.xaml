@@ -1,0 +1,174 @@
+<Window x:Class="CrmMes.Desktop.PanelVerificationWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Verifica individuale del quadro" Icon="Assets/logo.ico" Height="820" Width="1060"
+        WindowStartupLocation="CenterOwner" ResizeMode="CanResize" MinHeight="620" MinWidth="880"
+        Background="{StaticResource BackgroundBrush}">
+    <Grid Margin="24,20,24,20">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
+        <DockPanel Grid.Row="0" Margin="0,0,0,14">
+            <Border DockPanel.Dock="Right" Style="{StaticResource Pill}" VerticalAlignment="Bottom" Margin="0,0,0,6">
+                <TextBlock x:Name="StatusText" Style="{StaticResource PillText}" FontSize="13" />
+            </Border>
+            <StackPanel>
+                <TextBlock Text="C E I   E N   6 1 4 3 9" Style="{StaticResource MicroLabel}" />
+                <TextBlock x:Name="HeaderText" Text="Verifica individuale" Style="{StaticResource EditorialTitle}" FontSize="24" />
+                <TextBlock x:Name="SubHeaderText" Foreground="{StaticResource TextSecondaryBrush}" FontSize="12.5" TextWrapping="Wrap" />
+            </StackPanel>
+        </DockPanel>
+
+        <!-- Rated data: they go on the declaration and on the nameplate. -->
+        <Grid Grid.Row="1" x:Name="DataPanel" Margin="0,0,0,14">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="12" />
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="12" />
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="12" />
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="12" />
+                <ColumnDefinition Width="*" />
+            </Grid.ColumnDefinitions>
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+            </Grid.RowDefinitions>
+
+            <StackPanel Grid.Row="0" Grid.Column="0">
+                <TextBlock Text="Norma di prodotto" Foreground="{StaticResource TextSecondaryBrush}" FontSize="12.5" Margin="0,0,0,5" />
+                <ComboBox x:Name="StandardCombo" Height="34" SelectedIndex="0">
+                    <ComboBoxItem Content="CEI EN 61439-2" />
+                    <ComboBoxItem Content="CEI EN 61439-3" />
+                    <ComboBoxItem Content="CEI EN 61439-4" />
+                    <ComboBoxItem Content="CEI EN 61439-5" />
+                    <ComboBoxItem Content="CEI EN 61439-6" />
+                    <ComboBoxItem Content="CEI EN 61439-7" />
+                </ComboBox>
+            </StackPanel>
+            <StackPanel Grid.Row="0" Grid.Column="2">
+                <TextBlock Text="Costruttore del sistema" Foreground="{StaticResource TextSecondaryBrush}" FontSize="12.5" Margin="0,0,0,5" />
+                <TextBox x:Name="OriginalManufacturerBox" />
+            </StackPanel>
+            <StackPanel Grid.Row="0" Grid.Column="4">
+                <TextBlock Text="Sistema / tipo armadio" Foreground="{StaticResource TextSecondaryBrush}" FontSize="12.5" Margin="0,0,0,5" />
+                <TextBox x:Name="SystemReferenceBox" />
+            </StackPanel>
+            <StackPanel Grid.Row="0" Grid.Column="6">
+                <TextBlock Text="Matricola" Foreground="{StaticResource TextSecondaryBrush}" FontSize="12.5" Margin="0,0,0,5" />
+                <TextBox x:Name="SerialNumberBox" />
+            </StackPanel>
+            <StackPanel Grid.Row="0" Grid.Column="8">
+                <TextBlock Text="Sistema di distribuzione" Foreground="{StaticResource TextSecondaryBrush}" FontSize="12.5" Margin="0,0,0,5" />
+                <ComboBox x:Name="EarthingCombo" Height="34" SelectedIndex="0">
+                    <ComboBoxItem Content="(non indicato)" Tag="" />
+                    <ComboBoxItem Content="TN-S" />
+                    <ComboBoxItem Content="TN-C" />
+                    <ComboBoxItem Content="TN-C-S" />
+                    <ComboBoxItem Content="TT" />
+                    <ComboBoxItem Content="IT" />
+                </ComboBox>
+            </StackPanel>
+
+            <StackPanel Grid.Row="1" Grid.Column="0" Margin="0,12,0,0">
+                <TextBlock Text="Tensione nominale Un (V) *" Foreground="{StaticResource TextSecondaryBrush}" FontSize="12.5" Margin="0,0,0,5" />
+                <TextBox x:Name="VoltageBox" />
+            </StackPanel>
+            <StackPanel Grid.Row="1" Grid.Column="2" Margin="0,12,0,0">
+                <TextBlock Text="Corrente nominale InA (A) *" Foreground="{StaticResource TextSecondaryBrush}" FontSize="12.5" Margin="0,0,0,5" />
+                <TextBox x:Name="CurrentBox" />
+            </StackPanel>
+            <StackPanel Grid.Row="1" Grid.Column="4" Margin="0,12,0,0">
+                <TextBlock Text="Frequenza (Hz)" Foreground="{StaticResource TextSecondaryBrush}" FontSize="12.5" Margin="0,0,0,5" />
+                <TextBox x:Name="FrequencyBox" />
+            </StackPanel>
+            <StackPanel Grid.Row="1" Grid.Column="6" Margin="0,12,0,0">
+                <TextBlock Text="Icw (kA, 1 s)" Foreground="{StaticResource TextSecondaryBrush}" FontSize="12.5" Margin="0,0,0,5" />
+                <TextBox x:Name="IcwBox" />
+            </StackPanel>
+            <StackPanel Grid.Row="1" Grid.Column="8" Margin="0,12,0,0">
+                <TextBlock Text="Icc condizionata (kA)" Foreground="{StaticResource TextSecondaryBrush}" FontSize="12.5" Margin="0,0,0,5" />
+                <TextBox x:Name="IccBox" />
+            </StackPanel>
+
+            <StackPanel Grid.Row="2" Grid.Column="0" Margin="0,12,0,0">
+                <TextBlock Text="Grado di protezione" Foreground="{StaticResource TextSecondaryBrush}" FontSize="12.5" Margin="0,0,0,5" />
+                <TextBox x:Name="IpBox" Tag="Es. IP55" />
+            </StackPanel>
+            <StackPanel Grid.Row="2" Grid.Column="2" Margin="0,12,0,0">
+                <TextBlock Text="Forma di segregazione" Foreground="{StaticResource TextSecondaryBrush}" FontSize="12.5" Margin="0,0,0,5" />
+                <ComboBox x:Name="SeparationCombo" Height="34" SelectedIndex="0">
+                    <ComboBoxItem Content="(non indicata)" Tag="" />
+                    <ComboBoxItem Content="Forma 1" />
+                    <ComboBoxItem Content="Forma 2a" />
+                    <ComboBoxItem Content="Forma 2b" />
+                    <ComboBoxItem Content="Forma 3a" />
+                    <ComboBoxItem Content="Forma 3b" />
+                    <ComboBoxItem Content="Forma 4a" />
+                    <ComboBoxItem Content="Forma 4b" />
+                </ComboBox>
+            </StackPanel>
+            <StackPanel Grid.Row="2" Grid.Column="4" Margin="0,12,0,0">
+                <TextBlock Text="Resistenza isolamento (MΩ)" Foreground="{StaticResource TextSecondaryBrush}" FontSize="12.5" Margin="0,0,0,5" />
+                <TextBox x:Name="InsulationBox" />
+            </StackPanel>
+            <StackPanel Grid.Row="2" Grid.Column="6" Margin="0,12,0,0">
+                <TextBlock Text="Tensione di prova (V)" Foreground="{StaticResource TextSecondaryBrush}" FontSize="12.5" Margin="0,0,0,5" />
+                <TextBox x:Name="TestVoltageBox" />
+            </StackPanel>
+            <StackPanel Grid.Row="2" Grid.Column="8" Margin="0,12,0,0">
+                <TextBlock Text="Note" Foreground="{StaticResource TextSecondaryBrush}" FontSize="12.5" Margin="0,0,0,5" />
+                <TextBox x:Name="NotesBox" />
+            </StackPanel>
+        </Grid>
+
+        <!-- Routine verifications, clause 11 of CEI EN 61439-1. -->
+        <Border Grid.Row="2" Style="{StaticResource CardBorder}" Padding="4">
+            <ListView x:Name="ChecksList">
+                <ListView.View>
+                    <GridView>
+                        <GridViewColumn Header="Punto" DisplayMemberBinding="{Binding Clause}" Width="60" />
+                        <GridViewColumn Header="Verifica" DisplayMemberBinding="{Binding Description}" Width="420" />
+                        <GridViewColumn Header="Esito" Width="170">
+                            <GridViewColumn.CellTemplate>
+                                <DataTemplate>
+                                    <ComboBox Width="150" Height="30" SelectedValuePath="Tag" SelectedValue="{Binding Result, Mode=TwoWay}"
+                                              IsEnabled="{Binding IsEditable}">
+                                        <ComboBoxItem Content="Da eseguire" Tag="" />
+                                        <ComboBoxItem Content="Superata" Tag="Pass" />
+                                        <ComboBoxItem Content="Non superata" Tag="Fail" />
+                                        <ComboBoxItem Content="Non applicabile" Tag="NotApplicable" />
+                                    </ComboBox>
+                                </DataTemplate>
+                            </GridViewColumn.CellTemplate>
+                        </GridViewColumn>
+                        <GridViewColumn Header="Note" Width="260">
+                            <GridViewColumn.CellTemplate>
+                                <DataTemplate>
+                                    <TextBox Width="240" Height="30" Text="{Binding Notes, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" IsEnabled="{Binding IsEditable}" />
+                                </DataTemplate>
+                            </GridViewColumn.CellTemplate>
+                        </GridViewColumn>
+                    </GridView>
+                </ListView.View>
+            </ListView>
+        </Border>
+
+        <DockPanel Grid.Row="3" Margin="0,14,0,0">
+            <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
+                <Button x:Name="ReopenButton" Style="{StaticResource SecondaryButton}" Content="Riapri" Width="100" Height="36" Margin="0,0,10,0" Click="Reopen_Click" />
+                <Button x:Name="PdfButton" Style="{StaticResource SecondaryButton}" Content="Dichiarazione PDF" Width="160" Height="36" Margin="0,0,10,0" Click="Pdf_Click" />
+                <Button x:Name="SaveButton" Style="{StaticResource SecondaryButton}" Content="Salva" Width="100" Height="36" Margin="0,0,10,0" Click="Save_Click" />
+                <Button x:Name="CompleteButton" Content="Completa verifica" Width="160" Height="36" Click="Complete_Click" />
+            </StackPanel>
+            <TextBlock x:Name="ErrorText" Foreground="{StaticResource DangerBrush}" TextWrapping="Wrap" VerticalAlignment="Center" Margin="0,0,16,0" />
+        </DockPanel>
+    </Grid>
+</Window>

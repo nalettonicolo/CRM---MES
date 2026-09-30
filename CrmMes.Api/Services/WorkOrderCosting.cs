@@ -70,8 +70,15 @@ public sealed class WorkOrderCosting
                 string.Equals(line.MaterialCode, lot.MaterialCode, StringComparison.OrdinalIgnoreCase))?.UnitPrice
             : null;
 
+        // Materials installed at the customer's site, from signed site reports (rapportini).
+        var siteMaterials = await _dbContext.SiteReportMaterials.AsNoTracking()
+            .Where(m => m.SiteReport.Status == "Signed" && ids.Contains(m.SiteReport.WorkOrderId))
+            .Select(m => new SiteMaterial(m.SiteReport.WorkOrderId, m.MaterialCode, m.Description, m.Quantity))
+            .ToListAsync(cancellationToken);
+
         var catalogPrices = await _materialPricing.CheapestCatalogPricesAsync(
             slipItems.Select(entry => entry.Item.MaterialCode)
+                .Concat(siteMaterials.Where(m => m.MaterialCode != null).Select(m => m.MaterialCode!))
                 .Concat(orders.SelectMany(o => o.Product.BillOfMaterial).Select(b => b.MaterialCode)),
             cancellationToken);
 
@@ -85,12 +92,13 @@ public sealed class WorkOrderCosting
         var consumptionsByItem = consumptions.ToLookup(c => c.WithdrawalItemId);
         var itemsByOrder = slipItems.ToLookup(entry => entry.WorkOrderId, entry => entry.Item);
         var entriesByOrder = entries.ToLookup(e => e.WorkOrderId);
+        var siteByOrder = siteMaterials.ToLookup(m => m.WorkOrderId);
         var ordersById = orders.ToDictionary(o => o.Id);
 
         return ids
             .Where(ordersById.ContainsKey)
             .Select(id => Compute(
-                ordersById[id], itemsByOrder[id].ToList(), entriesByOrder[id].ToList(),
+                ordersById[id], itemsByOrder[id].ToList(), entriesByOrder[id].ToList(), siteByOrder[id].ToList(),
                 workCenters, consumptionsByItem, LotUnitCost, catalogPrices, now))
             .ToList();
     }
@@ -99,6 +107,7 @@ public sealed class WorkOrderCosting
         WorkOrder order,
         List<WithdrawalItem> slipItems,
         List<LaborEntry> entries,
+        List<SiteMaterial> siteMaterials,
         List<WorkCenter> workCenters,
         ILookup<Guid, MaterialLotConsumption> consumptionsByItem,
         Func<MaterialLot, decimal?> lotUnitCost,
@@ -159,13 +168,23 @@ public sealed class WorkOrderCosting
             materialLines.Add(new MaterialCostLine(group.Key, quantity, Round(cost), source, unpricedQuantity));
         }
 
+        // Site materials have no lot: valued at the cheapest catalog price; free-text ones stay unpriced.
+        foreach (var group in siteMaterials.GroupBy(m => m.MaterialCode ?? m.Description, StringComparer.OrdinalIgnoreCase))
+        {
+            var quantity = group.Sum(m => m.Quantity);
+            var price = group.First().MaterialCode is { } code ? CatalogPrice(code) : null;
+            materialLines.Add(new MaterialCostLine(
+                group.Key, quantity, Round(quantity * (price ?? 0)), price is null ? "Cantiere, senza prezzo" : "Cantiere, listino",
+                price is null ? quantity : 0));
+        }
+
         var unpricedMaterials = materialLines.Count(line => line.UnpricedQuantity > 0);
         if (unpricedMaterials > 0)
         {
             warnings.Add($"{unpricedMaterials} materiali prelevati senza prezzo d'acquisto né a listino: il costo materiali reale è sottostimato.");
         }
 
-        if (slipItems.Count == 0)
+        if (slipItems.Count == 0 && siteMaterials.Count == 0)
         {
             warnings.Add("Nessuna distinta di prelievo chiusa per questa commessa: il costo materiali reale è ancora zero.");
         }
@@ -283,6 +302,8 @@ public sealed class WorkOrderCosting
     /// <summary>One 8-hour shift: a phase lasting longer than this is flagged in Warnings.</summary>
     public const decimal LongPhaseMinutes = 480;
 }
+
+internal sealed record SiteMaterial(Guid WorkOrderId, string? MaterialCode, string Description, decimal Quantity);
 
 public sealed record CostBreakdown(decimal Material, decimal Labor)
 {

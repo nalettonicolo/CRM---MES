@@ -172,6 +172,61 @@ namespace CrmMes.Api.Migrations
                     b.ToTable("Carriers");
                 });
 
+            modelBuilder.Entity("CrmMes.Core.Models.CompanyProfile", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Address")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<string>("CompanyName")
+                        .IsRequired()
+                        .HasMaxLength(250)
+                        .HasColumnType("character varying(250)");
+
+                    b.Property<DateTime>("ConfiguredAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Email")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<string>("EnabledModules")
+                        .IsRequired()
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)");
+
+                    b.Property<string>("Gs1CompanyPrefix")
+                        .HasMaxLength(12)
+                        .HasColumnType("character varying(12)");
+
+                    b.Property<long>("LastSsccSerial")
+                        .HasColumnType("bigint");
+
+                    b.Property<string>("Phone")
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
+
+                    b.Property<string>("Sector")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("VatNumber")
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("CompanyProfiles");
+                });
+
             modelBuilder.Entity("CrmMes.Core.Models.Customer", b =>
                 {
                     b.Property<Guid>("Id")
@@ -257,6 +312,97 @@ namespace CrmMes.Api.Migrations
                     b.ToTable("Equipment");
                 });
 
+            modelBuilder.Entity("CrmMes.Core.Models.HaccpControlPoint", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("CorrectiveActionHint")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Frequency")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<string>("Hazard")
+                        .HasMaxLength(300)
+                        .HasColumnType("character varying(300)");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("boolean");
+
+                    b.Property<string>("Location")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<decimal?>("MaxValue")
+                        .HasPrecision(12, 3)
+                        .HasColumnType("numeric(12,3)");
+
+                    b.Property<decimal?>("MinValue")
+                        .HasPrecision(12, 3)
+                        .HasColumnType("numeric(12,3)");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<string>("Unit")
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("HaccpControlPoints");
+                });
+
+            modelBuilder.Entity("CrmMes.Core.Models.HaccpReading", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<bool>("Compliant")
+                        .HasColumnType("boolean");
+
+                    b.Property<Guid>("ControlPointId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("CorrectiveAction")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Notes")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<string>("OperatorName")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<DateTime>("ReadAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<decimal?>("Value")
+                        .HasPrecision(12, 3)
+                        .HasColumnType("numeric(12,3)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ControlPointId", "ReadAt");
+
+                    b.ToTable("HaccpReadings");
+                });
+
             modelBuilder.Entity("CrmMes.Core.Models.LaborEntry", b =>
                 {
                     b.Property<Guid>("Id")
@@ -307,6 +453,61 @@ namespace CrmMes.Api.Migrations
                     b.HasIndex("WorkOrderOperationId");
 
                     b.ToTable("LaborEntries");
+                });
+
+            modelBuilder.Entity("CrmMes.Core.Models.LogisticUnit", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime?>("BestBefore")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("CreatedBy")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<string>("LotNumber")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<string>("ProductCode")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<string>("ProductName")
+                        .HasMaxLength(250)
+                        .HasColumnType("character varying(250)");
+
+                    b.Property<decimal?>("Quantity")
+                        .HasPrecision(18, 3)
+                        .HasColumnType("numeric(18,3)");
+
+                    b.Property<string>("Sscc")
+                        .IsRequired()
+                        .HasMaxLength(18)
+                        .HasColumnType("character varying(18)");
+
+                    b.Property<Guid?>("TransportDocumentId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("WorkOrderId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Sscc")
+                        .IsUnique();
+
+                    b.HasIndex("TransportDocumentId");
+
+                    b.HasIndex("WorkOrderId");
+
+                    b.ToTable("LogisticUnits");
                 });
 
             modelBuilder.Entity("CrmMes.Core.Models.MaintenanceTask", b =>
@@ -376,6 +577,9 @@ namespace CrmMes.Api.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid");
 
+                    b.Property<string>("Allergens")
+                        .HasColumnType("text");
+
                     b.Property<string>("Code")
                         .IsRequired()
                         .HasMaxLength(100)
@@ -383,6 +587,9 @@ namespace CrmMes.Api.Migrations
 
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("IngredientName")
+                        .HasColumnType("text");
 
                     b.Property<bool>("IsActive")
                         .HasColumnType("boolean");
@@ -418,6 +625,9 @@ namespace CrmMes.Api.Migrations
                         .HasColumnType("uuid");
 
                     b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime?>("ExpiryDate")
                         .HasColumnType("timestamp with time zone");
 
                     b.Property<decimal>("InitialQuantity")
@@ -649,6 +859,136 @@ namespace CrmMes.Api.Migrations
                     b.ToTable("OperationDowntimes");
                 });
 
+            modelBuilder.Entity("CrmMes.Core.Models.PanelVerification", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime?>("CompletedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<decimal?>("ConditionalShortCircuitCurrent")
+                        .HasPrecision(10, 2)
+                        .HasColumnType("numeric(10,2)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<decimal?>("DielectricTestVoltage")
+                        .HasPrecision(10, 2)
+                        .HasColumnType("numeric(10,2)");
+
+                    b.Property<string>("EarthingSystem")
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<decimal?>("InsulationResistanceMOhm")
+                        .HasPrecision(12, 2)
+                        .HasColumnType("numeric(12,2)");
+
+                    b.Property<string>("InternalSeparation")
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
+
+                    b.Property<string>("IpRating")
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<string>("Notes")
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)");
+
+                    b.Property<string>("OriginalManufacturer")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<decimal?>("RatedCurrent")
+                        .HasPrecision(10, 2)
+                        .HasColumnType("numeric(10,2)");
+
+                    b.Property<decimal?>("RatedFrequency")
+                        .HasPrecision(8, 2)
+                        .HasColumnType("numeric(8,2)");
+
+                    b.Property<decimal?>("RatedVoltage")
+                        .HasPrecision(10, 2)
+                        .HasColumnType("numeric(10,2)");
+
+                    b.Property<string>("SerialNumber")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<decimal?>("ShortTimeWithstandCurrent")
+                        .HasPrecision(10, 2)
+                        .HasColumnType("numeric(10,2)");
+
+                    b.Property<string>("Standard")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<string>("SystemReference")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("VerifiedBy")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<Guid>("WorkOrderId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("WorkOrderId")
+                        .IsUnique();
+
+                    b.ToTable("PanelVerifications");
+                });
+
+            modelBuilder.Entity("CrmMes.Core.Models.PanelVerificationCheck", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Clause")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<string>("Description")
+                        .IsRequired()
+                        .HasMaxLength(300)
+                        .HasColumnType("character varying(300)");
+
+                    b.Property<string>("Notes")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<Guid>("PanelVerificationId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Result")
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("PanelVerificationId");
+
+                    b.ToTable("PanelVerificationChecks");
+                });
+
             modelBuilder.Entity("CrmMes.Core.Models.PlanningCategory", b =>
                 {
                     b.Property<Guid>("Id")
@@ -779,6 +1119,21 @@ namespace CrmMes.Api.Migrations
                         .IsRequired()
                         .HasMaxLength(250)
                         .HasColumnType("character varying(250)");
+
+                    b.Property<string>("NetQuantity")
+                        .HasColumnType("text");
+
+                    b.Property<string>("SalesName")
+                        .HasColumnType("text");
+
+                    b.Property<int?>("ShelfLifeDays")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("StorageConditions")
+                        .HasColumnType("text");
+
+                    b.Property<bool>("UseByDate")
+                        .HasColumnType("boolean");
 
                     b.HasKey("Id");
 
@@ -1222,6 +1577,178 @@ namespace CrmMes.Api.Migrations
                     b.ToTable("Sites");
                 });
 
+            modelBuilder.Entity("CrmMes.Core.Models.SiteReport", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Code")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("CreatedBy")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<string>("Description")
+                        .IsRequired()
+                        .HasMaxLength(4000)
+                        .HasColumnType("character varying(4000)");
+
+                    b.Property<string>("Notes")
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)");
+
+                    b.Property<string>("SignatureImage")
+                        .HasMaxLength(400000)
+                        .HasColumnType("character varying(400000)");
+
+                    b.Property<DateTime?>("SignedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("SignedByName")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<string>("SiteAddress")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime>("WorkDate")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("WorkOrderId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Code")
+                        .IsUnique();
+
+                    b.HasIndex("WorkOrderId");
+
+                    b.ToTable("SiteReports");
+                });
+
+            modelBuilder.Entity("CrmMes.Core.Models.SiteReportHours", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<decimal>("Minutes")
+                        .HasPrecision(10, 2)
+                        .HasColumnType("numeric(10,2)");
+
+                    b.Property<Guid>("SiteReportId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("TechnicianName")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<Guid?>("WorkCenterId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("SiteReportId");
+
+                    b.HasIndex("WorkCenterId");
+
+                    b.ToTable("SiteReportHours");
+                });
+
+            modelBuilder.Entity("CrmMes.Core.Models.SiteReportMaterial", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Description")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<string>("MaterialCode")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<decimal>("Quantity")
+                        .HasPrecision(18, 3)
+                        .HasColumnType("numeric(18,3)");
+
+                    b.Property<Guid>("SiteReportId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Unit")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("SiteReportId");
+
+                    b.ToTable("SiteReportMaterials");
+                });
+
+            modelBuilder.Entity("CrmMes.Core.Models.SubcontractingReturn", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Notes")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<decimal>("Quantity")
+                        .HasPrecision(18, 3)
+                        .HasColumnType("numeric(18,3)");
+
+                    b.Property<string>("RecordedBy")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<DateTime>("ReturnedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<decimal>("ScrapQuantity")
+                        .HasPrecision(18, 3)
+                        .HasColumnType("numeric(18,3)");
+
+                    b.Property<string>("SupplierDocumentReference")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<Guid>("TransportDocumentLineId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TransportDocumentLineId");
+
+                    b.ToTable("SubcontractingReturns");
+                });
+
             modelBuilder.Entity("CrmMes.Core.Models.Supplier", b =>
                 {
                     b.Property<Guid>("Id")
@@ -1260,6 +1787,185 @@ namespace CrmMes.Api.Migrations
                         .IsUnique();
 
                     b.ToTable("Suppliers");
+                });
+
+            modelBuilder.Entity("CrmMes.Core.Models.TransportDocument", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("CancellationReason")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<DateTime?>("CancelledAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("CarrierId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("CreatedBy")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<Guid?>("CustomerId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("DestinationAddress")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<DateTime?>("ExpectedReturnAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("GoodsAppearance")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<decimal?>("GrossWeightKg")
+                        .HasPrecision(12, 3)
+                        .HasColumnType("numeric(12,3)");
+
+                    b.Property<DateTime?>("IssuedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("IssuedBy")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<string>("Notes")
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)");
+
+                    b.Property<int?>("Number")
+                        .HasColumnType("integer");
+
+                    b.Property<int?>("Packages")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Port")
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<string>("Reason")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)");
+
+                    b.Property<string>("ReasonDetail")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<string>("RecipientAddress")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<string>("RecipientName")
+                        .IsRequired()
+                        .HasMaxLength(250)
+                        .HasColumnType("character varying(250)");
+
+                    b.Property<string>("RecipientVatNumber")
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<Guid?>("SupplierId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("TransportBy")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<DateTime?>("TransportStartAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("WorkOrderId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int?>("Year")
+                        .HasColumnType("integer");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CarrierId");
+
+                    b.HasIndex("CustomerId");
+
+                    b.HasIndex("SupplierId");
+
+                    b.HasIndex("WorkOrderId");
+
+                    b.HasIndex("Status", "Reason");
+
+                    b.HasIndex("Year", "Number")
+                        .IsUnique();
+
+                    b.ToTable("TransportDocuments");
+                });
+
+            modelBuilder.Entity("CrmMes.Core.Models.TransportDocumentLine", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Code")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<string>("Description")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<int>("LineNumber")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("LotNumber")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<Guid?>("MaterialId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Notes")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<Guid?>("ProductId")
+                        .HasColumnType("uuid");
+
+                    b.Property<decimal>("Quantity")
+                        .HasPrecision(18, 3)
+                        .HasColumnType("numeric(18,3)");
+
+                    b.Property<Guid>("TransportDocumentId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Unit")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("MaterialId");
+
+                    b.HasIndex("ProductId");
+
+                    b.HasIndex("TransportDocumentId");
+
+                    b.ToTable("TransportDocumentLines");
                 });
 
             modelBuilder.Entity("CrmMes.Core.Models.User", b =>
@@ -1738,6 +2444,17 @@ namespace CrmMes.Api.Migrations
                     b.Navigation("WorkCenter");
                 });
 
+            modelBuilder.Entity("CrmMes.Core.Models.HaccpReading", b =>
+                {
+                    b.HasOne("CrmMes.Core.Models.HaccpControlPoint", "ControlPoint")
+                        .WithMany("Readings")
+                        .HasForeignKey("ControlPointId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("ControlPoint");
+                });
+
             modelBuilder.Entity("CrmMes.Core.Models.LaborEntry", b =>
                 {
                     b.HasOne("CrmMes.Core.Models.User", "User")
@@ -1766,6 +2483,23 @@ namespace CrmMes.Api.Migrations
                     b.Navigation("User");
 
                     b.Navigation("WorkCenter");
+
+                    b.Navigation("WorkOrder");
+                });
+
+            modelBuilder.Entity("CrmMes.Core.Models.LogisticUnit", b =>
+                {
+                    b.HasOne("CrmMes.Core.Models.TransportDocument", "TransportDocument")
+                        .WithMany()
+                        .HasForeignKey("TransportDocumentId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.HasOne("CrmMes.Core.Models.WorkOrder", "WorkOrder")
+                        .WithMany()
+                        .HasForeignKey("WorkOrderId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.Navigation("TransportDocument");
 
                     b.Navigation("WorkOrder");
                 });
@@ -1908,6 +2642,28 @@ namespace CrmMes.Api.Migrations
                     b.Navigation("Operation");
 
                     b.Navigation("ReportedByUser");
+                });
+
+            modelBuilder.Entity("CrmMes.Core.Models.PanelVerification", b =>
+                {
+                    b.HasOne("CrmMes.Core.Models.WorkOrder", "WorkOrder")
+                        .WithMany()
+                        .HasForeignKey("WorkOrderId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("WorkOrder");
+                });
+
+            modelBuilder.Entity("CrmMes.Core.Models.PanelVerificationCheck", b =>
+                {
+                    b.HasOne("CrmMes.Core.Models.PanelVerification", "PanelVerification")
+                        .WithMany("Checks")
+                        .HasForeignKey("PanelVerificationId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("PanelVerification");
                 });
 
             modelBuilder.Entity("CrmMes.Core.Models.PlanningCell", b =>
@@ -2088,6 +2844,113 @@ namespace CrmMes.Api.Migrations
                     b.Navigation("WorkOrder");
                 });
 
+            modelBuilder.Entity("CrmMes.Core.Models.SiteReport", b =>
+                {
+                    b.HasOne("CrmMes.Core.Models.WorkOrder", "WorkOrder")
+                        .WithMany()
+                        .HasForeignKey("WorkOrderId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("WorkOrder");
+                });
+
+            modelBuilder.Entity("CrmMes.Core.Models.SiteReportHours", b =>
+                {
+                    b.HasOne("CrmMes.Core.Models.SiteReport", "SiteReport")
+                        .WithMany("Hours")
+                        .HasForeignKey("SiteReportId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("CrmMes.Core.Models.WorkCenter", "WorkCenter")
+                        .WithMany()
+                        .HasForeignKey("WorkCenterId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.Navigation("SiteReport");
+
+                    b.Navigation("WorkCenter");
+                });
+
+            modelBuilder.Entity("CrmMes.Core.Models.SiteReportMaterial", b =>
+                {
+                    b.HasOne("CrmMes.Core.Models.SiteReport", "SiteReport")
+                        .WithMany("Materials")
+                        .HasForeignKey("SiteReportId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("SiteReport");
+                });
+
+            modelBuilder.Entity("CrmMes.Core.Models.SubcontractingReturn", b =>
+                {
+                    b.HasOne("CrmMes.Core.Models.TransportDocumentLine", "Line")
+                        .WithMany("Returns")
+                        .HasForeignKey("TransportDocumentLineId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Line");
+                });
+
+            modelBuilder.Entity("CrmMes.Core.Models.TransportDocument", b =>
+                {
+                    b.HasOne("CrmMes.Core.Models.Carrier", "Carrier")
+                        .WithMany()
+                        .HasForeignKey("CarrierId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("CrmMes.Core.Models.Customer", "Customer")
+                        .WithMany()
+                        .HasForeignKey("CustomerId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("CrmMes.Core.Models.Supplier", "Supplier")
+                        .WithMany()
+                        .HasForeignKey("SupplierId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("CrmMes.Core.Models.WorkOrder", "WorkOrder")
+                        .WithMany()
+                        .HasForeignKey("WorkOrderId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.Navigation("Carrier");
+
+                    b.Navigation("Customer");
+
+                    b.Navigation("Supplier");
+
+                    b.Navigation("WorkOrder");
+                });
+
+            modelBuilder.Entity("CrmMes.Core.Models.TransportDocumentLine", b =>
+                {
+                    b.HasOne("CrmMes.Core.Models.Material", "Material")
+                        .WithMany()
+                        .HasForeignKey("MaterialId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("CrmMes.Core.Models.Product", "Product")
+                        .WithMany()
+                        .HasForeignKey("ProductId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("CrmMes.Core.Models.TransportDocument", "TransportDocument")
+                        .WithMany("Lines")
+                        .HasForeignKey("TransportDocumentId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Material");
+
+                    b.Navigation("Product");
+
+                    b.Navigation("TransportDocument");
+                });
+
             modelBuilder.Entity("CrmMes.Core.Models.WithdrawalItem", b =>
                 {
                     b.HasOne("CrmMes.Core.Models.WithdrawalSlip", "WithdrawalSlip")
@@ -2241,6 +3104,11 @@ namespace CrmMes.Api.Migrations
                     b.Navigation("Unit");
                 });
 
+            modelBuilder.Entity("CrmMes.Core.Models.HaccpControlPoint", b =>
+                {
+                    b.Navigation("Readings");
+                });
+
             modelBuilder.Entity("CrmMes.Core.Models.Material", b =>
                 {
                     b.Navigation("Suppliers");
@@ -2249,6 +3117,11 @@ namespace CrmMes.Api.Migrations
             modelBuilder.Entity("CrmMes.Core.Models.MaterialLot", b =>
                 {
                     b.Navigation("Consumptions");
+                });
+
+            modelBuilder.Entity("CrmMes.Core.Models.PanelVerification", b =>
+                {
+                    b.Navigation("Checks");
                 });
 
             modelBuilder.Entity("CrmMes.Core.Models.PlanningProject", b =>
@@ -2273,9 +3146,26 @@ namespace CrmMes.Api.Migrations
                     b.Navigation("Items");
                 });
 
+            modelBuilder.Entity("CrmMes.Core.Models.SiteReport", b =>
+                {
+                    b.Navigation("Hours");
+
+                    b.Navigation("Materials");
+                });
+
             modelBuilder.Entity("CrmMes.Core.Models.Supplier", b =>
                 {
                     b.Navigation("Materials");
+                });
+
+            modelBuilder.Entity("CrmMes.Core.Models.TransportDocument", b =>
+                {
+                    b.Navigation("Lines");
+                });
+
+            modelBuilder.Entity("CrmMes.Core.Models.TransportDocumentLine", b =>
+                {
+                    b.Navigation("Returns");
                 });
 
             modelBuilder.Entity("CrmMes.Core.Models.WithdrawalSlip", b =>

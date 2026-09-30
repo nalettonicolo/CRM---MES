@@ -1,0 +1,61 @@
+<Window x:Class="CrmMes.Desktop.HaccpControlPointWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Punto di controllo HACCP" Icon="Assets/logo.ico" Width="520" SizeToContent="Height"
+        WindowStartupLocation="CenterOwner" ResizeMode="NoResize"
+        Background="{StaticResource BackgroundBrush}">
+    <StackPanel Margin="24">
+        <TextBlock Text="H A C C P" Style="{StaticResource MicroLabel}" />
+        <TextBlock x:Name="HeaderText" Text="Nuovo punto di controllo" FontSize="18" FontWeight="SemiBold" Foreground="{StaticResource TextPrimaryBrush}" Margin="0,0,0,12" />
+        <TextBlock Text="Nome *" Foreground="{StaticResource TextSecondaryBrush}" FontSize="12.5" Margin="0,0,0,5" />
+        <TextBox x:Name="NameBox" Tag="Es. Temperatura cella frigo 1" Margin="0,0,0,10" />
+        <Grid Margin="0,0,0,10">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="12" />
+                <ColumnDefinition Width="*" />
+            </Grid.ColumnDefinitions>
+            <StackPanel Grid.Column="0">
+                <TextBlock Text="Luogo" Foreground="{StaticResource TextSecondaryBrush}" FontSize="12.5" Margin="0,0,0,5" />
+                <TextBox x:Name="LocationBox" Tag="Es. Laboratorio" />
+            </StackPanel>
+            <StackPanel Grid.Column="2">
+                <TextBlock Text="Frequenza" Foreground="{StaticResource TextSecondaryBrush}" FontSize="12.5" Margin="0,0,0,5" />
+                <TextBox x:Name="FrequencyBox" Tag="Es. due volte al giorno" />
+            </StackPanel>
+        </Grid>
+        <TextBlock Text="Pericolo controllato" Foreground="{StaticResource TextSecondaryBrush}" FontSize="12.5" Margin="0,0,0,5" />
+        <TextBox x:Name="HazardBox" Tag="Es. proliferazione batterica" Margin="0,0,0,10" />
+        <TextBlock Foreground="{StaticResource TextMutedBrush}" FontSize="11.5" TextWrapping="Wrap" Margin="0,0,0,6"
+                   Text="Con almeno un limite la lettura è un valore misurato; senza limiti è un controllo sì/no (es. pulizia eseguita)." />
+        <Grid Margin="0,0,0,10">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="12" />
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="12" />
+                <ColumnDefinition Width="*" />
+            </Grid.ColumnDefinitions>
+            <StackPanel Grid.Column="0">
+                <TextBlock Text="Minimo" Foreground="{StaticResource TextSecondaryBrush}" FontSize="12.5" Margin="0,0,0,5" />
+                <TextBox x:Name="MinBox" />
+            </StackPanel>
+            <StackPanel Grid.Column="2">
+                <TextBlock Text="Massimo" Foreground="{StaticResource TextSecondaryBrush}" FontSize="12.5" Margin="0,0,0,5" />
+                <TextBox x:Name="MaxBox" />
+            </StackPanel>
+            <StackPanel Grid.Column="4">
+                <TextBlock Text="Unità" Foreground="{StaticResource TextSecondaryBrush}" FontSize="12.5" Margin="0,0,0,5" />
+                <TextBox x:Name="UnitBox" Tag="°C" />
+            </StackPanel>
+        </Grid>
+        <TextBlock Text="Azione correttiva prevista" Foreground="{StaticResource TextSecondaryBrush}" FontSize="12.5" Margin="0,0,0,5" />
+        <TextBox x:Name="ActionBox" Tag="Proposta all'operatore quando la lettura è fuori limite" Margin="0,0,0,10" />
+        <CheckBox x:Name="ActiveCheck" Content="Attivo" IsChecked="True" Margin="0,0,0,10" />
+        <TextBlock x:Name="ErrorText" Foreground="{StaticResource DangerBrush}" TextWrapping="Wrap" Margin="0,0,0,8" />
+        <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+            <Button Style="{StaticResource SecondaryButton}" Content="Annulla" Width="100" Height="36" Margin="0,0,10,0" IsCancel="True" />
+            <Button x:Name="SaveButton" Content="Salva" Width="110" Height="36" Click="Save_Click" />
+        </StackPanel>
+    </StackPanel>
+</Window>

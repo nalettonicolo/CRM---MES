@@ -6,6 +6,31 @@ Sintesi ad alto livello di cosa è stato costruito finora e cosa manca ancora. P
 
 ## Cosa è stato fatto
 
+### Alimentare e impiantistica completati (2026-09-30)
+- **Richiamo di lotto guidato** (tutti i settori): da un lotto di materia prima, o da un lotto di prodotto finito, alle commesse che l'hanno usato, alle matricole, ai pallet, ai DDT emessi e ai clienti da avvisare, con rapporto PDF. Segnala il lotto ancora in magazzino e le commesse completate senza DDT.
+- **Etichette e allergeni**: i 14 allergeni del Reg. UE 1169/2011 e il nome ingrediente sui materiali; sui prodotti denominazione, durata, conservazione e quantità netta. L'etichetta del lotto elenca gli ingredienti in ordine di quantità dalla distinta, con gli allergeni in grassetto e la data "da consumarsi (preferibilmente) entro"; segnala i materiali senza dati alimentari.
+- **Pallet SSCC**: prefisso aziendale GS1 in configurazione, numerazione progressiva senza doppioni, etichetta logistica 100x150 mm con codici a barre GS1-128 (SSCC; scadenza, quantità e lotto). Il generatore di codici a barre è scritto nel programma, senza librerie esterne.
+- **Registri HACCP**: punti di controllo con limiti o controllo sì/no; una lettura fuori limite richiede l'azione correttiva; le letture non si modificano né si cancellano; registro del periodo in Excel o PDF, anche solo le non conformità.
+- **Rapportini di cantiere**: lavori eseguiti, ore per tecnico, materiali installati, firma del cliente. Firmato, si blocca; le ore diventano ore di commessa e i materiali entrano nel costo reale (a prezzo di listino). PDF con la firma.
+- **Pagina web per i tecnici** (`/tecnici/` sullo stesso server): accesso con le credenziali del gestionale, scelta della commessa, compilazione e firma col dito da telefono o tablet. Rinnova la sessione da sola durante il lavoro e conserva sul dispositivo il rapportino non ancora salvato. Intestazioni di sicurezza (niente script esterni o incorporati, niente inserimento in altre pagine).
+- Test: 247 API e 110 client, tutti verdi. Migrazioni applicate prima su un branch Neon di prova, poi in produzione.
+
+### Multi-settore: configurazione iniziale e moduli (2026-09-29)
+- **Configurazione azienda al primo accesso dell'Admin** (rimandabile, poi da Amministrazione > "Azienda e settore"): ragione sociale, partita IVA, indirizzo e contatti (stampati su DDT e dichiarazioni), **settore** e **moduli attivi**. I settori sono cinque: Quadri elettrici e automazione, Meccanica e carpenteria, Alimentare, Impiantistica e installazioni, Manifattura generica. Il settore è un punto di partenza: attiva i moduli tipici, poi ogni modulo si accende o spegne singolarmente. Spegnere un modulo nasconde menu e pulsanti, non cancella dati; i ruoli restano verificati dall'API.
+- **Moduli comuni**: Vendite, Acquisti, Pianificazione, Terminale di reparto, Qualità, Manutenzione, Spedizioni e DDT, Conto lavoro, Costi e margini. **Moduli di settore**: Verifica quadri CEI EN 61439 (quadristi), Scadenze lotti (alimentare), Listini Metel e Lavori in cantiere (annunciati come "in arrivo", non ancora selezionabili).
+- Un'installazione già esistente e non ancora configurata continua a mostrare tutto come prima.
+
+### Documenti di trasporto (DDT) e conto lavoro (2026-09-29, per tutti i settori)
+- **DDT** con causale (vendita, conto lavorazione, riparazione, conto visione, reso a fornitore, sostituzione in garanzia, trasferimento tra sedi, omaggio, altro), destinatario da cliente o fornitore o libero, luogo di destinazione, trasporto a cura di mittente/destinatario/vettore, porto, aspetto dei beni, colli, peso, righe con codice, descrizione, quantità, unità e lotto.
+- **Numerazione a norma**: la bozza non ha numero e si modifica liberamente; "Emetti" assegna il progressivo dell'anno (anno italiano, gestione di due emissioni contemporanee) e la blocca. Un DDT emesso non si modifica né si cancella: si annulla con motivo, e il numero resta in archivio. Stampa PDF con mittente, destinatario, causale, beni, trasporto e firme; bozze e annullati stampano la scritta "BOZZA" o "ANNULLATO". Da una commessa, "Crea DDT" prepara la bozza con cliente, prodotto, lotto e quantità.
+- **Conto lavoro**: un DDT con causale "Conto lavorazione" richiede il terzista (tra i fornitori) e la data di rientro prevista; poi si registrano i rientri, anche parziali e con scarti, con il riferimento al DDT del terzista. La schermata Acquisti > "Conto lavoro" mostra tutto ciò che è ancora presso i terzisti, con i ritardi in rosso.
+- **Esportazione per la contabilità**: le righe dei DDT emessi in un periodo (esclusi bozze e annullati) in Excel, con numero, data, causale, cliente, partita IVA e articoli, per la fatturazione differita nel gestionale contabile.
+
+### Moduli di settore (2026-09-29)
+- **Quadristi, verifica individuale CEI EN 61439**: dalla commessa, "Verifica 61439" apre le nove verifiche dell'articolo 11 della CEI EN 61439-1 (esito e note per ciascuna) e i dati di targa (Un, InA, frequenza, Icw, Icc, IP, forma di segregazione, sistema di distribuzione, isolamento, tensione di prova). Si completa solo con tutte le verifiche eseguite, nessuna non superata e tensione e corrente indicate; da completata si stampa la **dichiarazione di conformità** con il rapporto di verifica allegato. Solo l'Admin può riaprirla.
+- **Alimentare, scadenze lotti**: data di scadenza sui lotti (alla creazione o dopo), prelievo "prima scade, prima esce" (i lotti senza scadenza mantengono l'ordine di arrivo), colonna scadenza colorata e avviso dei lotti scaduti o in scadenza entro 30 giorni.
+- Test: 236 API e 105 client, tutti verdi.
+
 ### Costi, ore e controllo margini (2026-09-29, passo 3 del piano)
 - **Tariffa oraria** per centro di lavoro (endpoint dedicato, solo Admin) e **prezzo di vendita** per commessa, impostato in automatico dalla riga del preventivo alla conversione.
 - **Ore lavorate** registrate a mano sulla commessa (cablaggio fuori ciclo, installazione, rilavorazioni), da qualunque ruolo; eliminabili da Magazzino/Admin. La finestra preseleziona il centro di lavoro delle fasi.
@@ -110,6 +135,9 @@ Sintesi ad alto livello di cosa è stato costruito finora e cosa manca ancora. P
 
 ## Cosa manca
 
+- **Listini Metel**: serve un file Metel reale di un produttore per costruire e verificare l'importazione; fino ad allora il modulo è "in arrivo".
+- **Materiali del rapportino e magazzino**: i materiali installati entrano nel costo della commessa ma non scaricano la giacenza; il carico del furgone si fa con una distinta di prelievo.
+- **Il DDT non muove la giacenza**: registra cosa esce, ma il carico e lo scarico restano quelli di prelievi e ricevimenti.
 - **Password dell'account di sviluppo da cambiare**: le credenziali erano nel codice pubblico fino al 2026-09-29 e restano nella storia di Git (vedi "Verifica di sicurezza").
 - **Import PDF cataloghi non validato nel mondo reale**: euristica generica (raggruppamento parole per riga/colonna), testata solo su PDF generati sinteticamente in fase di test — va riverificata al primo catalogo fornitore reale disponibile.
 - **Firma digitale non ancora attiva**: la pipeline di release è pronta a firmare (vedi sopra), ma senza un certificato di firma del codice — a pagamento, da acquistare presso un'autorità come DigiCert o Sectigo (circa 70-400€/anno) — le release restano non firmate.

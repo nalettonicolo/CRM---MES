@@ -91,6 +91,8 @@ builder.Services.AddAuthorization(options =>
     // warehouse/production staff may also do, hence the combined policy for that one action.
     options.AddPolicy("Sales", policy => policy.RequireRole("Admin", "Sales"));
     options.AddPolicy("SalesOrWarehouse", policy => policy.RequireRole("Admin", "Sales", "Warehouse"));
+    // Transport documents leave with sales (Sales/Warehouse) and with goods sent to subcontractors (Purchasing).
+    options.AddPolicy("TransportDocuments", policy => policy.RequireRole("Admin", "Sales", "Warehouse", "Purchasing"));
     // Costs, hourly rates and margins: company-confidential, visible only to management.
     options.AddPolicy("ViewMargins", policy => policy.RequireRole(CrmMes.Api.Services.MarginAccess.Roles));
 });
@@ -132,6 +134,32 @@ var app = builder.Build();
 
 app.UseForwardedHeaders();
 app.UseExceptionHandler();
+// The technicians' web page (/tecnici, wwwroot/tecnici): same-origin only, no inline scripts, no
+// framing — it handles a bearer token and a customer's signature.
+app.Use(async (context, next) =>
+{
+    if (context.Request.Path.Value == "/tecnici")
+    {
+        context.Response.Redirect("/tecnici/");
+        return;
+    }
+
+    if (context.Request.Path.StartsWithSegments("/tecnici"))
+    {
+        var headers = context.Response.Headers;
+        headers["Content-Security-Policy"] =
+            "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self'; " +
+            "base-uri 'none'; form-action 'self'; frame-ancestors 'none'";
+        headers["X-Content-Type-Options"] = "nosniff";
+        headers["Referrer-Policy"] = "no-referrer";
+        headers["X-Frame-Options"] = "DENY";
+        headers["Permissions-Policy"] = "camera=(), microphone=(), geolocation=()";
+        headers["Cache-Control"] = "no-cache";
+    }
+
+    await next();
+});
+app.UseDefaultFiles(); // /tecnici/ -> /tecnici/index.html
 app.UseStaticFiles(); // serves wwwroot/favicon.ico, picked up automatically by the browser and by Swagger UI
 
 if (app.Environment.IsDevelopment())

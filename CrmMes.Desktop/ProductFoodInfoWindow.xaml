@@ -1,0 +1,38 @@
+<Window x:Class="CrmMes.Desktop.ProductFoodInfoWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Dati etichetta del prodotto" Icon="Assets/logo.ico" Width="480" SizeToContent="Height"
+        WindowStartupLocation="CenterOwner" ResizeMode="NoResize"
+        Background="{StaticResource BackgroundBrush}">
+    <StackPanel Margin="24">
+        <TextBlock Text="E T I C H E T T A" Style="{StaticResource MicroLabel}" />
+        <TextBlock x:Name="HeaderText" FontSize="18" FontWeight="SemiBold" Foreground="{StaticResource TextPrimaryBrush}" Margin="0,0,0,12" TextWrapping="Wrap" />
+        <TextBlock Text="Denominazione di vendita" Foreground="{StaticResource TextSecondaryBrush}" FontSize="12.5" Margin="0,0,0,5" />
+        <TextBox x:Name="SalesNameBox" Tag="Es. Brioche al latte" Margin="0,0,0,12" />
+        <Grid Margin="0,0,0,12">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="12" />
+                <ColumnDefinition Width="*" />
+            </Grid.ColumnDefinitions>
+            <StackPanel Grid.Column="0">
+                <TextBlock Text="Durata (giorni)" Foreground="{StaticResource TextSecondaryBrush}" FontSize="12.5" Margin="0,0,0,5" />
+                <TextBox x:Name="ShelfLifeBox" />
+            </StackPanel>
+            <StackPanel Grid.Column="2">
+                <TextBlock Text="Quantità netta" Foreground="{StaticResource TextSecondaryBrush}" FontSize="12.5" Margin="0,0,0,5" />
+                <TextBox x:Name="NetQuantityBox" Tag="Es. 400 g" />
+            </StackPanel>
+        </Grid>
+        <CheckBox x:Name="UseByCheck" Margin="0,0,0,12">
+            <TextBlock TextWrapping="Wrap" Text="Deperibile: stampa &quot;da consumarsi entro&quot; (altrimenti &quot;preferibilmente entro&quot;)" />
+        </CheckBox>
+        <TextBlock Text="Modalità di conservazione" Foreground="{StaticResource TextSecondaryBrush}" FontSize="12.5" Margin="0,0,0,5" />
+        <TextBox x:Name="StorageBox" Tag="Es. Conservare in frigorifero tra 0 e 4 °C" Margin="0,0,0,8" />
+        <TextBlock x:Name="ErrorText" Foreground="{StaticResource DangerBrush}" TextWrapping="Wrap" Margin="0,0,0,8" />
+        <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+            <Button Style="{StaticResource SecondaryButton}" Content="Annulla" Width="100" Height="36" Margin="0,0,10,0" IsCancel="True" />
+            <Button x:Name="SaveButton" Content="Salva" Width="110" Height="36" Click="Save_Click" IsEnabled="False" />
+        </StackPanel>
+    </StackPanel>
+</Window>

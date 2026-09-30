@@ -48,6 +48,18 @@ public class ApplicationDbContext : DbContext
     public DbSet<Quote> Quotes => Set<Quote>();
     public DbSet<QuoteItem> QuoteItems => Set<QuoteItem>();
     public DbSet<LaborEntry> LaborEntries => Set<LaborEntry>();
+    public DbSet<CompanyProfile> CompanyProfiles => Set<CompanyProfile>();
+    public DbSet<TransportDocument> TransportDocuments => Set<TransportDocument>();
+    public DbSet<TransportDocumentLine> TransportDocumentLines => Set<TransportDocumentLine>();
+    public DbSet<SubcontractingReturn> SubcontractingReturns => Set<SubcontractingReturn>();
+    public DbSet<PanelVerification> PanelVerifications => Set<PanelVerification>();
+    public DbSet<PanelVerificationCheck> PanelVerificationChecks => Set<PanelVerificationCheck>();
+    public DbSet<LogisticUnit> LogisticUnits => Set<LogisticUnit>();
+    public DbSet<HaccpControlPoint> HaccpControlPoints => Set<HaccpControlPoint>();
+    public DbSet<HaccpReading> HaccpReadings => Set<HaccpReading>();
+    public DbSet<SiteReport> SiteReports => Set<SiteReport>();
+    public DbSet<SiteReportHours> SiteReportHours => Set<SiteReportHours>();
+    public DbSet<SiteReportMaterial> SiteReportMaterials => Set<SiteReportMaterial>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -284,6 +296,166 @@ public class ApplicationDbContext : DbContext
                 .WithMany()
                 .HasForeignKey(w => w.QuoteId)
                 .OnDelete(DeleteBehavior.SetNull);
+        });
+
+        modelBuilder.Entity<TransportDocument>(entity =>
+        {
+            // One number per year; drafts (null number) don't take part in the uniqueness.
+            entity.HasIndex(d => new { d.Year, d.Number }).IsUnique();
+            entity.HasIndex(d => new { d.Status, d.Reason });
+            entity.Property(d => d.Status).HasMaxLength(20);
+            entity.Property(d => d.Reason).HasMaxLength(40);
+            entity.Property(d => d.ReasonDetail).HasMaxLength(200);
+            entity.Property(d => d.RecipientName).HasMaxLength(250);
+            entity.Property(d => d.RecipientAddress).HasMaxLength(500);
+            entity.Property(d => d.RecipientVatNumber).HasMaxLength(40);
+            entity.Property(d => d.DestinationAddress).HasMaxLength(500);
+            entity.Property(d => d.TransportBy).HasMaxLength(20);
+            entity.Property(d => d.Port).HasMaxLength(20);
+            entity.Property(d => d.GoodsAppearance).HasMaxLength(100);
+            entity.Property(d => d.GrossWeightKg).HasPrecision(12, 3);
+            entity.Property(d => d.Notes).HasMaxLength(2000);
+            entity.Property(d => d.CancellationReason).HasMaxLength(500);
+            entity.Property(d => d.CreatedBy).HasMaxLength(200);
+            entity.Property(d => d.IssuedBy).HasMaxLength(200);
+            entity.HasOne(d => d.Customer).WithMany().HasForeignKey(d => d.CustomerId).OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne(d => d.Supplier).WithMany().HasForeignKey(d => d.SupplierId).OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne(d => d.Carrier).WithMany().HasForeignKey(d => d.CarrierId).OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne(d => d.WorkOrder).WithMany().HasForeignKey(d => d.WorkOrderId).OnDelete(DeleteBehavior.SetNull);
+            entity.HasMany(d => d.Lines).WithOne(l => l.TransportDocument).HasForeignKey(l => l.TransportDocumentId).OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<TransportDocumentLine>(entity =>
+        {
+            entity.Property(l => l.Code).HasMaxLength(100);
+            entity.Property(l => l.Description).HasMaxLength(500);
+            entity.Property(l => l.Quantity).HasPrecision(18, 3);
+            entity.Property(l => l.Unit).HasMaxLength(20);
+            entity.Property(l => l.LotNumber).HasMaxLength(100);
+            entity.Property(l => l.Notes).HasMaxLength(500);
+            entity.HasOne(l => l.Material).WithMany().HasForeignKey(l => l.MaterialId).OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne(l => l.Product).WithMany().HasForeignKey(l => l.ProductId).OnDelete(DeleteBehavior.Restrict);
+            entity.HasMany(l => l.Returns).WithOne(r => r.Line).HasForeignKey(r => r.TransportDocumentLineId).OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<SubcontractingReturn>(entity =>
+        {
+            entity.Property(r => r.Quantity).HasPrecision(18, 3);
+            entity.Property(r => r.ScrapQuantity).HasPrecision(18, 3);
+            entity.Property(r => r.SupplierDocumentReference).HasMaxLength(100);
+            entity.Property(r => r.Notes).HasMaxLength(500);
+            entity.Property(r => r.RecordedBy).HasMaxLength(200);
+        });
+
+        modelBuilder.Entity<PanelVerification>(entity =>
+        {
+            entity.HasIndex(v => v.WorkOrderId).IsUnique();
+            entity.HasOne(v => v.WorkOrder).WithMany().HasForeignKey(v => v.WorkOrderId).OnDelete(DeleteBehavior.Cascade);
+            entity.HasMany(v => v.Checks).WithOne(c => c.PanelVerification).HasForeignKey(c => c.PanelVerificationId).OnDelete(DeleteBehavior.Cascade);
+            entity.Property(v => v.Status).HasMaxLength(20);
+            entity.Property(v => v.Standard).HasMaxLength(100);
+            entity.Property(v => v.OriginalManufacturer).HasMaxLength(200);
+            entity.Property(v => v.SystemReference).HasMaxLength(200);
+            entity.Property(v => v.SerialNumber).HasMaxLength(100);
+            entity.Property(v => v.RatedVoltage).HasPrecision(10, 2);
+            entity.Property(v => v.RatedCurrent).HasPrecision(10, 2);
+            entity.Property(v => v.RatedFrequency).HasPrecision(8, 2);
+            entity.Property(v => v.ShortTimeWithstandCurrent).HasPrecision(10, 2);
+            entity.Property(v => v.ConditionalShortCircuitCurrent).HasPrecision(10, 2);
+            entity.Property(v => v.IpRating).HasMaxLength(20);
+            entity.Property(v => v.InternalSeparation).HasMaxLength(50);
+            entity.Property(v => v.EarthingSystem).HasMaxLength(20);
+            entity.Property(v => v.InsulationResistanceMOhm).HasPrecision(12, 2);
+            entity.Property(v => v.DielectricTestVoltage).HasPrecision(10, 2);
+            entity.Property(v => v.Notes).HasMaxLength(2000);
+            entity.Property(v => v.VerifiedBy).HasMaxLength(200);
+        });
+
+        modelBuilder.Entity<PanelVerificationCheck>(entity =>
+        {
+            entity.Property(c => c.Clause).HasMaxLength(20);
+            entity.Property(c => c.Description).HasMaxLength(300);
+            entity.Property(c => c.Result).HasMaxLength(20);
+            entity.Property(c => c.Notes).HasMaxLength(500);
+        });
+
+        modelBuilder.Entity<LogisticUnit>(entity =>
+        {
+            entity.HasIndex(u => u.Sscc).IsUnique();
+            entity.Property(u => u.Sscc).HasMaxLength(18);
+            entity.Property(u => u.ProductCode).HasMaxLength(100);
+            entity.Property(u => u.ProductName).HasMaxLength(250);
+            entity.Property(u => u.LotNumber).HasMaxLength(100);
+            entity.Property(u => u.Quantity).HasPrecision(18, 3);
+            entity.Property(u => u.CreatedBy).HasMaxLength(200);
+            entity.HasOne(u => u.WorkOrder).WithMany().HasForeignKey(u => u.WorkOrderId).OnDelete(DeleteBehavior.SetNull);
+            entity.HasOne(u => u.TransportDocument).WithMany().HasForeignKey(u => u.TransportDocumentId).OnDelete(DeleteBehavior.SetNull);
+        });
+
+        modelBuilder.Entity<HaccpControlPoint>(entity =>
+        {
+            entity.Property(c => c.Name).HasMaxLength(200);
+            entity.Property(c => c.Location).HasMaxLength(200);
+            entity.Property(c => c.Hazard).HasMaxLength(300);
+            entity.Property(c => c.Unit).HasMaxLength(20);
+            entity.Property(c => c.MinValue).HasPrecision(12, 3);
+            entity.Property(c => c.MaxValue).HasPrecision(12, 3);
+            entity.Property(c => c.Frequency).HasMaxLength(100);
+            entity.Property(c => c.CorrectiveActionHint).HasMaxLength(500);
+            entity.HasMany(c => c.Readings).WithOne(r => r.ControlPoint).HasForeignKey(r => r.ControlPointId).OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<HaccpReading>(entity =>
+        {
+            entity.HasIndex(r => new { r.ControlPointId, r.ReadAt });
+            entity.Property(r => r.Value).HasPrecision(12, 3);
+            entity.Property(r => r.CorrectiveAction).HasMaxLength(1000);
+            entity.Property(r => r.Notes).HasMaxLength(500);
+            entity.Property(r => r.OperatorName).HasMaxLength(200);
+        });
+
+        modelBuilder.Entity<SiteReport>(entity =>
+        {
+            entity.HasIndex(r => r.Code).IsUnique();
+            entity.HasIndex(r => r.WorkOrderId);
+            entity.Property(r => r.Code).HasMaxLength(40);
+            entity.Property(r => r.Status).HasMaxLength(20);
+            entity.Property(r => r.SiteAddress).HasMaxLength(500);
+            entity.Property(r => r.Description).HasMaxLength(4000);
+            entity.Property(r => r.Notes).HasMaxLength(2000);
+            entity.Property(r => r.SignedByName).HasMaxLength(200);
+            entity.Property(r => r.SignatureImage).HasMaxLength(400000);
+            entity.Property(r => r.CreatedBy).HasMaxLength(200);
+            entity.HasOne(r => r.WorkOrder).WithMany().HasForeignKey(r => r.WorkOrderId).OnDelete(DeleteBehavior.Cascade);
+            entity.HasMany(r => r.Hours).WithOne(h => h.SiteReport).HasForeignKey(h => h.SiteReportId).OnDelete(DeleteBehavior.Cascade);
+            entity.HasMany(r => r.Materials).WithOne(m => m.SiteReport).HasForeignKey(m => m.SiteReportId).OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<SiteReportHours>(entity =>
+        {
+            entity.Property(h => h.TechnicianName).HasMaxLength(200);
+            entity.Property(h => h.Minutes).HasPrecision(10, 2);
+            entity.HasOne(h => h.WorkCenter).WithMany().HasForeignKey(h => h.WorkCenterId).OnDelete(DeleteBehavior.SetNull);
+        });
+
+        modelBuilder.Entity<SiteReportMaterial>(entity =>
+        {
+            entity.Property(m => m.MaterialCode).HasMaxLength(100);
+            entity.Property(m => m.Description).HasMaxLength(500);
+            entity.Property(m => m.Quantity).HasPrecision(18, 3);
+            entity.Property(m => m.Unit).HasMaxLength(20);
+        });
+
+        modelBuilder.Entity<CompanyProfile>(entity =>
+        {
+            entity.Property(c => c.CompanyName).HasMaxLength(250);
+            entity.Property(c => c.VatNumber).HasMaxLength(40);
+            entity.Property(c => c.Address).HasMaxLength(500);
+            entity.Property(c => c.Phone).HasMaxLength(50);
+            entity.Property(c => c.Email).HasMaxLength(200);
+            entity.Property(c => c.Sector).HasMaxLength(50);
+            entity.Property(c => c.EnabledModules).HasMaxLength(1000);
+            entity.Property(c => c.Gs1CompanyPrefix).HasMaxLength(12);
         });
 
         modelBuilder.Entity<LaborEntry>(entity =>

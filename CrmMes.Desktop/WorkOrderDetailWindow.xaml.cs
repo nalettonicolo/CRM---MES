@@ -19,6 +19,97 @@ public partial class WorkOrderDetailWindow : Window
         Loaded += WorkOrderDetailWindow_Loaded;
         // Costs and margins are management-only; the API refuses them to other roles anyway.
         CostButton.Visibility = apiClient.CanViewMargins ? Visibility.Visible : Visibility.Collapsed;
+        TransportDocumentButton.Visibility = apiClient.IsModuleEnabled("shipping") ? Visibility.Visible : Visibility.Collapsed;
+        // Panel builders only: the CEI EN 61439 routine verification and declaration.
+        PanelVerificationButton.Visibility = apiClient.IsModuleEnabled("panel-verification") ? Visibility.Visible : Visibility.Collapsed;
+        FoodLabelButton.Visibility = PalletButton.Visibility = apiClient.IsModuleEnabled("food-labels") ? Visibility.Visible : Visibility.Collapsed;
+        SiteReportButton.Visibility = apiClient.IsModuleEnabled("site-work") ? Visibility.Visible : Visibility.Collapsed;
+    }
+
+    /// <summary>Food label of this lot: warnings (missing food data) are shown before printing.</summary>
+    private async void FoodLabel_Click(object sender, RoutedEventArgs e)
+    {
+        try
+        {
+            var label = await _apiClient.GetFoodLabelAsync(_workOrderId);
+            if (label.Warnings.Count > 0 && MessageBox.Show(
+                    "Attenzione:\n\n" + string.Join("\n", label.Warnings.Select(w => "• " + w)) + "\n\nStampare comunque l'etichetta?",
+                    "Etichetta", MessageBoxButton.YesNo, MessageBoxImage.Warning) != MessageBoxResult.Yes)
+            {
+                return;
+            }
+
+            SavePdf($"Etichetta-{label.LotNumber ?? label.WorkOrderCode}.pdf", path => ListExporter.ExportFoodLabel(label, path));
+        }
+        catch (Exception exception)
+        {
+            MessageBox.Show(exception.Message, "Etichetta", MessageBoxButton.OK, MessageBoxImage.Warning);
+        }
+    }
+
+    /// <summary>Allocates the next SSCC for a pallet of this lot and prints its GS1 logistic label.</summary>
+    private async void Pallet_Click(object sender, RoutedEventArgs e)
+    {
+        var prompt = new TextPromptWindow("Pallet SSCC", "Quantità sul pallet (vuoto = intera commessa). Verrà assegnato un nuovo codice SSCC.") { Owner = this };
+        prompt.AllowEmpty = true;
+        if (prompt.ShowDialog() != true)
+        {
+            return;
+        }
+
+        decimal? quantity = null;
+        if (!string.IsNullOrWhiteSpace(prompt.Value))
+        {
+            if (!NumberInput.TryParseDecimal(prompt.Value, out var parsed) || parsed <= 0)
+            {
+                MessageBox.Show("Quantità non valida.", "Pallet SSCC", MessageBoxButton.OK, MessageBoxImage.Warning);
+                return;
+            }
+
+            quantity = parsed;
+        }
+
+        try
+        {
+            var unit = await _apiClient.CreateLogisticUnitAsync(_workOrderId, null, quantity);
+            SavePdf($"SSCC-{unit.Sscc}.pdf", path => ListExporter.ExportPalletLabel(unit, _apiClient.CompanyProfile, path));
+        }
+        catch (Exception exception)
+        {
+            MessageBox.Show(exception.Message, "Pallet SSCC", MessageBoxButton.OK, MessageBoxImage.Warning);
+        }
+    }
+
+    private void SiteReport_Click(object sender, RoutedEventArgs e) =>
+        new SiteReportWindow(_apiClient, workOrderId: _workOrderId) { Owner = this }.ShowDialog();
+
+    private void SavePdf(string fileName, Action<string> export)
+    {
+        var dialog = new Microsoft.Win32.SaveFileDialog { FileName = fileName, Filter = "File PDF (*.pdf)|*.pdf" };
+        if (dialog.ShowDialog(this) != true)
+        {
+            return;
+        }
+
+        export(dialog.FileName);
+        System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(dialog.FileName) { UseShellExecute = true });
+    }
+
+    private void PanelVerification_Click(object sender, RoutedEventArgs e) =>
+        new PanelVerificationWindow(_apiClient, _workOrderId) { Owner = this }.ShowDialog();
+
+    /// <summary>A DDT draft prefilled with this job's customer, product, lot and quantity.</summary>
+    private async void TransportDocument_Click(object sender, RoutedEventArgs e)
+    {
+        try
+        {
+            var draft = await _apiClient.CreateTransportDocumentFromWorkOrderAsync(_workOrderId);
+            new TransportDocumentWindow(_apiClient, draft.Id) { Owner = this }.ShowDialog();
+        }
+        catch (Exception exception)
+        {
+            MessageBox.Show(exception.Message, "DDT", MessageBoxButton.OK, MessageBoxImage.Warning);
+        }
     }
 
     private void Cost_Click(object sender, RoutedEventArgs e) =>

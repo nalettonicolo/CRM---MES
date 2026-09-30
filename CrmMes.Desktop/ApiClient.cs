@@ -17,9 +17,18 @@ public sealed class ApiClient
     /// restriction is enforced again by the API.</summary>
     public string? CurrentRole { get; set; }
 
+    /// <summary>Company profile loaded at login: industry and enabled modules. Null before login and on
+    /// servers without the endpoint, in which case every module counts as enabled.</summary>
+    public CompanyProfileDto? CompanyProfile { get; set; }
+
+    /// <summary>Whether a module (see Sectors in CrmMes.Api) is switched on for this company. Only
+    /// decides what the UI offers: switching a module off hides it, it never deletes data.</summary>
+    public bool IsModuleEnabled(string module) =>
+        CompanyProfile is null || CompanyProfile.EnabledModules.Contains(module, StringComparer.OrdinalIgnoreCase);
+
     /// <summary>Costs, margins and hourly rates: Admin and Management only (mirrors the API's
-    /// "ViewMargins" policy).</summary>
-    public bool CanViewMargins => CurrentRole is "Admin" or "Management";
+    /// "ViewMargins" policy), and only with the costing module enabled.</summary>
+    public bool CanViewMargins => CurrentRole is "Admin" or "Management" && IsModuleEnabled("costing");
 
     public ApiClient()
     {
@@ -574,6 +583,276 @@ public sealed class ApiClient
             ?? throw new InvalidOperationException("Risposta controllo margini non valida.");
     }
 
+    public async Task<CompanyProfileDto?> GetCompanyProfileAsync(CancellationToken cancellationToken = default)
+    {
+        using var response = await _httpClient.GetAsync("api/company-profile", cancellationToken);
+        if (response.StatusCode == HttpStatusCode.NotFound)
+        {
+            return null; // server older than the sector configuration
+        }
+
+        await EnsureSuccessAsync(response, cancellationToken);
+        return await response.Content.ReadFromJsonAsync<CompanyProfileDto>(cancellationToken: cancellationToken);
+    }
+
+    public async Task<CompanyCatalogDto> GetCompanyCatalogAsync(CancellationToken cancellationToken = default)
+    {
+        using var response = await _httpClient.GetAsync("api/company-profile/catalog", cancellationToken);
+        await EnsureSuccessAsync(response, cancellationToken);
+        return await response.Content.ReadFromJsonAsync<CompanyCatalogDto>(cancellationToken: cancellationToken)
+            ?? throw new InvalidOperationException("Risposta settori non valida.");
+    }
+
+    public async Task<CompanyProfileDto> SaveCompanyProfileAsync(SaveCompanyProfileDto profile, CancellationToken cancellationToken = default)
+    {
+        using var response = await _httpClient.PutAsJsonAsync("api/company-profile", profile, cancellationToken);
+        await EnsureSuccessAsync(response, cancellationToken);
+        return await response.Content.ReadFromJsonAsync<CompanyProfileDto>(cancellationToken: cancellationToken)
+            ?? throw new InvalidOperationException("Risposta profilo azienda non valida.");
+    }
+
+    public Task<IReadOnlyList<TransportReasonDto>> GetTransportReasonsAsync(CancellationToken cancellationToken = default)
+        => GetAsync<TransportReasonDto>("api/transport-documents/reasons", cancellationToken);
+
+    public Task<IReadOnlyList<TransportDocumentSummaryDto>> GetTransportDocumentsAsync(
+        string? status = null, string? reason = null, string? search = null, CancellationToken cancellationToken = default)
+    {
+        var query = new List<string>();
+        if (!string.IsNullOrWhiteSpace(status))
+        {
+            query.Add($"status={Uri.EscapeDataString(status)}");
+        }
+
+        if (!string.IsNullOrWhiteSpace(reason))
+        {
+            query.Add($"reason={Uri.EscapeDataString(reason)}");
+        }
+
+        if (!string.IsNullOrWhiteSpace(search))
+        {
+            query.Add($"search={Uri.EscapeDataString(search)}");
+        }
+
+        var path = "api/transport-documents" + (query.Count > 0 ? "?" + string.Join('&', query) : string.Empty);
+        return GetAsync<TransportDocumentSummaryDto>(path, cancellationToken);
+    }
+
+    public async Task<TransportDocumentDto> GetTransportDocumentAsync(Guid id, CancellationToken cancellationToken = default)
+    {
+        using var response = await _httpClient.GetAsync($"api/transport-documents/{id}", cancellationToken);
+        return await ReadTransportDocumentAsync(response, cancellationToken);
+    }
+
+    public async Task<TransportDocumentDto> CreateTransportDocumentAsync(SaveTransportDocumentDto document, CancellationToken cancellationToken = default)
+    {
+        using var response = await _httpClient.PostAsJsonAsync("api/transport-documents", document, cancellationToken);
+        return await ReadTransportDocumentAsync(response, cancellationToken);
+    }
+
+    public async Task<TransportDocumentDto> CreateTransportDocumentFromWorkOrderAsync(Guid workOrderId, CancellationToken cancellationToken = default)
+    {
+        using var response = await _httpClient.PostAsync($"api/transport-documents/from-work-order/{workOrderId}", null, cancellationToken);
+        return await ReadTransportDocumentAsync(response, cancellationToken);
+    }
+
+    public async Task<TransportDocumentDto> UpdateTransportDocumentAsync(Guid id, SaveTransportDocumentDto document, CancellationToken cancellationToken = default)
+    {
+        using var response = await _httpClient.PutAsJsonAsync($"api/transport-documents/{id}", document, cancellationToken);
+        return await ReadTransportDocumentAsync(response, cancellationToken);
+    }
+
+    public async Task DeleteTransportDocumentAsync(Guid id, CancellationToken cancellationToken = default)
+    {
+        using var response = await _httpClient.DeleteAsync($"api/transport-documents/{id}", cancellationToken);
+        await EnsureSuccessAsync(response, cancellationToken);
+    }
+
+    public async Task<TransportDocumentDto> IssueTransportDocumentAsync(Guid id, CancellationToken cancellationToken = default)
+    {
+        using var response = await _httpClient.PostAsJsonAsync($"api/transport-documents/{id}/issue", new { transportStartAt = (DateTime?)null }, cancellationToken);
+        return await ReadTransportDocumentAsync(response, cancellationToken);
+    }
+
+    public async Task<TransportDocumentDto> CancelTransportDocumentAsync(Guid id, string reason, CancellationToken cancellationToken = default)
+    {
+        using var response = await _httpClient.PostAsJsonAsync($"api/transport-documents/{id}/cancel", new { reason }, cancellationToken);
+        return await ReadTransportDocumentAsync(response, cancellationToken);
+    }
+
+    public async Task<TransportDocumentDto> AddSubcontractingReturnAsync(
+        Guid documentId, Guid lineId, decimal quantity, decimal scrapQuantity, DateTime? returnedAt,
+        string? supplierDocumentReference, string? notes, CancellationToken cancellationToken = default)
+    {
+        using var response = await _httpClient.PostAsJsonAsync(
+            $"api/transport-documents/{documentId}/lines/{lineId}/returns",
+            new { quantity, scrapQuantity, returnedAt, supplierDocumentReference, notes },
+            cancellationToken);
+        return await ReadTransportDocumentAsync(response, cancellationToken);
+    }
+
+    public async Task<TransportDocumentDto> DeleteSubcontractingReturnAsync(Guid documentId, Guid returnId, CancellationToken cancellationToken = default)
+    {
+        using var response = await _httpClient.DeleteAsync($"api/transport-documents/{documentId}/returns/{returnId}", cancellationToken);
+        return await ReadTransportDocumentAsync(response, cancellationToken);
+    }
+
+    public Task<IReadOnlyList<SubcontractingOpenLineDto>> GetOpenSubcontractingAsync(Guid? supplierId = null, CancellationToken cancellationToken = default)
+        => GetAsync<SubcontractingOpenLineDto>(
+            "api/subcontracting/open" + (supplierId.HasValue ? $"?supplierId={supplierId}" : string.Empty), cancellationToken);
+
+    private static async Task<TransportDocumentDto> ReadTransportDocumentAsync(HttpResponseMessage response, CancellationToken cancellationToken)
+    {
+        await EnsureSuccessAsync(response, cancellationToken);
+        return await response.Content.ReadFromJsonAsync<TransportDocumentDto>(cancellationToken: cancellationToken)
+            ?? throw new InvalidOperationException("Risposta DDT non valida.");
+    }
+
+    public async Task<PanelVerificationDto> GetPanelVerificationAsync(Guid workOrderId, CancellationToken cancellationToken = default)
+    {
+        using var response = await _httpClient.GetAsync($"api/work-orders/{workOrderId}/panel-verification", cancellationToken);
+        return await ReadPanelVerificationAsync(response, cancellationToken);
+    }
+
+    public async Task<PanelVerificationDto> SavePanelVerificationAsync(Guid workOrderId, SavePanelVerificationDto verification, CancellationToken cancellationToken = default)
+    {
+        using var response = await _httpClient.PutAsJsonAsync($"api/work-orders/{workOrderId}/panel-verification", verification, cancellationToken);
+        return await ReadPanelVerificationAsync(response, cancellationToken);
+    }
+
+    public async Task<PanelVerificationDto> CompletePanelVerificationAsync(Guid workOrderId, CancellationToken cancellationToken = default)
+    {
+        using var response = await _httpClient.PostAsync($"api/work-orders/{workOrderId}/panel-verification/complete", null, cancellationToken);
+        return await ReadPanelVerificationAsync(response, cancellationToken);
+    }
+
+    public async Task<PanelVerificationDto> ReopenPanelVerificationAsync(Guid workOrderId, CancellationToken cancellationToken = default)
+    {
+        using var response = await _httpClient.PostAsync($"api/work-orders/{workOrderId}/panel-verification/reopen", null, cancellationToken);
+        return await ReadPanelVerificationAsync(response, cancellationToken);
+    }
+
+    private static async Task<PanelVerificationDto> ReadPanelVerificationAsync(HttpResponseMessage response, CancellationToken cancellationToken)
+    {
+        await EnsureSuccessAsync(response, cancellationToken);
+        return await response.Content.ReadFromJsonAsync<PanelVerificationDto>(cancellationToken: cancellationToken)
+            ?? throw new InvalidOperationException("Risposta verifica quadro non valida.");
+    }
+
+    public Task<IReadOnlyList<TransportDocumentExportRowDto>> GetTransportDocumentExportAsync(DateTime from, DateTime to, CancellationToken cancellationToken = default)
+        => GetAsync<TransportDocumentExportRowDto>($"api/transport-documents/export?from={from:yyyy-MM-dd}&to={to:yyyy-MM-dd}", cancellationToken);
+
+    // ---------- Food: allergens, label, SSCC
+
+    public Task<IReadOnlyList<AllergenDto>> GetAllergensAsync(CancellationToken cancellationToken = default)
+        => GetAsync<AllergenDto>("api/food/allergens", cancellationToken);
+
+    public Task<MaterialFoodInfoDto> GetMaterialFoodInfoAsync(Guid materialId, CancellationToken cancellationToken = default)
+        => GetOneAsync<MaterialFoodInfoDto>($"api/food/materials/{materialId}", cancellationToken);
+
+    public Task<MaterialFoodInfoDto> SaveMaterialFoodInfoAsync(Guid materialId, string? ingredientName, IReadOnlyList<string> allergens, CancellationToken cancellationToken = default)
+        => SendAsync<MaterialFoodInfoDto>(HttpMethod.Put, $"api/food/materials/{materialId}", new { ingredientName, allergens }, cancellationToken);
+
+    public Task<ProductFoodInfoDto> GetProductFoodInfoAsync(Guid productId, CancellationToken cancellationToken = default)
+        => GetOneAsync<ProductFoodInfoDto>($"api/food/products/{productId}", cancellationToken);
+
+    public Task<ProductFoodInfoDto> SaveProductFoodInfoAsync(Guid productId, SaveProductFoodInfoDto info, CancellationToken cancellationToken = default)
+        => SendAsync<ProductFoodInfoDto>(HttpMethod.Put, $"api/food/products/{productId}", info, cancellationToken);
+
+    public Task<FoodLabelDto> GetFoodLabelAsync(Guid workOrderId, CancellationToken cancellationToken = default)
+        => GetOneAsync<FoodLabelDto>($"api/food/work-orders/{workOrderId}/label", cancellationToken);
+
+    public Task<LogisticUnitDto> CreateLogisticUnitAsync(Guid? workOrderId, Guid? transportDocumentId, decimal? quantity, CancellationToken cancellationToken = default)
+        => SendAsync<LogisticUnitDto>(HttpMethod.Post, "api/food/logistic-units", new { workOrderId, transportDocumentId, quantity }, cancellationToken);
+
+    public Task<IReadOnlyList<LogisticUnitDto>> GetLogisticUnitsAsync(Guid workOrderId, CancellationToken cancellationToken = default)
+        => GetAsync<LogisticUnitDto>($"api/food/logistic-units?workOrderId={workOrderId}", cancellationToken);
+
+    public async Task SetGs1PrefixAsync(string companyPrefix, CancellationToken cancellationToken = default)
+    {
+        using var response = await _httpClient.PutAsJsonAsync("api/food/gs1-prefix", new { companyPrefix }, cancellationToken);
+        await EnsureSuccessAsync(response, cancellationToken);
+    }
+
+    // ---------- Recall
+
+    public Task<RecallDto> GetRecallFromMaterialLotAsync(Guid lotId, CancellationToken cancellationToken = default)
+        => GetOneAsync<RecallDto>($"api/recall/material-lot/{lotId}", cancellationToken);
+
+    public Task<RecallDto> GetRecallFromProductLotAsync(string lotNumber, CancellationToken cancellationToken = default)
+        => GetOneAsync<RecallDto>($"api/recall/product-lot?lotNumber={Uri.EscapeDataString(lotNumber)}", cancellationToken);
+
+    // ---------- HACCP
+
+    public Task<IReadOnlyList<HaccpControlPointDto>> GetHaccpControlPointsAsync(bool activeOnly = true, CancellationToken cancellationToken = default)
+        => GetAsync<HaccpControlPointDto>($"api/haccp/control-points?activeOnly={activeOnly}", cancellationToken);
+
+    public Task<HaccpControlPointDto> SaveHaccpControlPointAsync(Guid? id, SaveHaccpControlPointDto point, CancellationToken cancellationToken = default)
+        => id is { } existing
+            ? SendAsync<HaccpControlPointDto>(HttpMethod.Put, $"api/haccp/control-points/{existing}", point, cancellationToken)
+            : SendAsync<HaccpControlPointDto>(HttpMethod.Post, "api/haccp/control-points", point, cancellationToken);
+
+    public Task<HaccpReadingDto> AddHaccpReadingAsync(Guid controlPointId, decimal? value, bool? compliant, string? correctiveAction, string? notes, CancellationToken cancellationToken = default)
+        => SendAsync<HaccpReadingDto>(HttpMethod.Post, $"api/haccp/control-points/{controlPointId}/readings",
+            new { value, compliant, correctiveAction, notes, readAt = (DateTime?)null }, cancellationToken);
+
+    public Task<IReadOnlyList<HaccpReadingDto>> GetHaccpReadingsAsync(DateTime from, DateTime to, bool nonCompliantOnly = false, CancellationToken cancellationToken = default)
+        => GetAsync<HaccpReadingDto>($"api/haccp/readings?from={from:yyyy-MM-dd}&to={to:yyyy-MM-dd}&nonCompliantOnly={nonCompliantOnly}", cancellationToken);
+
+    // ---------- Site reports
+
+    public Task<IReadOnlyList<SiteReportSummaryDto>> GetSiteReportsAsync(Guid? workOrderId = null, string? status = null, CancellationToken cancellationToken = default)
+    {
+        var query = new List<string>();
+        if (workOrderId.HasValue)
+        {
+            query.Add($"workOrderId={workOrderId}");
+        }
+
+        if (!string.IsNullOrWhiteSpace(status))
+        {
+            query.Add($"status={Uri.EscapeDataString(status)}");
+        }
+
+        return GetAsync<SiteReportSummaryDto>("api/site-reports" + (query.Count > 0 ? "?" + string.Join('&', query) : string.Empty), cancellationToken);
+    }
+
+    public Task<IReadOnlyList<SiteWorkOrderDto>> GetOpenSiteWorkOrdersAsync(CancellationToken cancellationToken = default)
+        => GetAsync<SiteWorkOrderDto>("api/site-reports/open-work-orders", cancellationToken);
+
+    public Task<SiteReportDto> GetSiteReportAsync(Guid id, CancellationToken cancellationToken = default)
+        => GetOneAsync<SiteReportDto>($"api/site-reports/{id}", cancellationToken);
+
+    public Task<SiteReportDto> SaveSiteReportAsync(Guid? id, SaveSiteReportDto report, CancellationToken cancellationToken = default)
+        => id is { } existing
+            ? SendAsync<SiteReportDto>(HttpMethod.Put, $"api/site-reports/{existing}", report, cancellationToken)
+            : SendAsync<SiteReportDto>(HttpMethod.Post, "api/site-reports", report, cancellationToken);
+
+    public async Task DeleteSiteReportAsync(Guid id, CancellationToken cancellationToken = default)
+    {
+        using var response = await _httpClient.DeleteAsync($"api/site-reports/{id}", cancellationToken);
+        await EnsureSuccessAsync(response, cancellationToken);
+    }
+
+    public Task<SiteReportDto> SignSiteReportAsync(Guid id, string signedByName, string signatureImage, CancellationToken cancellationToken = default)
+        => SendAsync<SiteReportDto>(HttpMethod.Post, $"api/site-reports/{id}/sign", new { signedByName, signatureImage }, cancellationToken);
+
+    private async Task<T> GetOneAsync<T>(string path, CancellationToken cancellationToken)
+    {
+        using var response = await _httpClient.GetAsync(path, cancellationToken);
+        await EnsureSuccessAsync(response, cancellationToken);
+        return await response.Content.ReadFromJsonAsync<T>(cancellationToken: cancellationToken)
+            ?? throw new InvalidOperationException("Risposta del server non valida.");
+    }
+
+    private async Task<T> SendAsync<T>(HttpMethod method, string path, object body, CancellationToken cancellationToken)
+    {
+        using var request = new HttpRequestMessage(method, path) { Content = JsonContent.Create(body) };
+        using var response = await _httpClient.SendAsync(request, cancellationToken);
+        await EnsureSuccessAsync(response, cancellationToken);
+        return await response.Content.ReadFromJsonAsync<T>(cancellationToken: cancellationToken)
+            ?? throw new InvalidOperationException("Risposta del server non valida.");
+    }
+
     public async Task ChangePasswordAsync(string currentPassword, string newPassword, CancellationToken cancellationToken = default)
     {
         using var response = await _httpClient.PostAsJsonAsync("api/auth/change-password", new { currentPassword, newPassword }, cancellationToken);
@@ -1047,12 +1326,26 @@ public sealed class ApiClient
             ?? throw new InvalidOperationException("Risposta lotto non valida.");
     }
 
-    public async Task CreateMaterialLotAsync(string materialCode, string lotNumber, decimal quantity, string? notes, CancellationToken cancellationToken = default)
+    public async Task CreateMaterialLotAsync(
+        string materialCode, string lotNumber, decimal quantity, string? notes, DateTime? expiryDate = null, CancellationToken cancellationToken = default)
     {
         using var response = await _httpClient.PostAsJsonAsync(
-            "api/material-lots", new { materialCode, lotNumber, quantity, notes }, cancellationToken);
+            "api/material-lots", new { materialCode, lotNumber, quantity, notes, expiryDate = AsUtcDate(expiryDate) }, cancellationToken);
         await EnsureSuccessAsync(response, cancellationToken);
     }
+
+    public async Task SetMaterialLotExpiryAsync(Guid lotId, DateTime? expiryDate, CancellationToken cancellationToken = default)
+    {
+        using var response = await _httpClient.PutAsJsonAsync($"api/material-lots/{lotId}/expiry", new { expiryDate = AsUtcDate(expiryDate) }, cancellationToken);
+        await EnsureSuccessAsync(response, cancellationToken);
+    }
+
+    public Task<IReadOnlyList<MaterialLotSummaryDto>> GetExpiringMaterialLotsAsync(int days = 30, CancellationToken cancellationToken = default)
+        => GetAsync<MaterialLotSummaryDto>($"api/material-lots/expiring?days={days}", cancellationToken);
+
+    /// <summary>A calendar day picked in a DatePicker, sent as that same day at UTC midnight: a use-by
+    /// date is a day, not an instant, and must not shift to the day before when converted.</summary>
+    private static DateTime? AsUtcDate(DateTime? day) => day.HasValue ? DateTime.SpecifyKind(day.Value.Date, DateTimeKind.Utc) : null;
 
     private static MaterialAvailabilityDto? TryExtractAvailability(string body)
     {
@@ -1770,7 +2063,12 @@ public sealed record MaterialLotSummaryDto(
     decimal InitialQuantity,
     Guid? SupplierId,
     Guid? PurchaseOrderId,
-    DateTime ReceivedAt);
+    DateTime ReceivedAt,
+    DateTime? ExpiryDate = null)
+{
+    public bool IsExpired => ExpiryDate is { } date && date.Date < DateTime.Today && Quantity > 0;
+    public bool ExpiresSoon => ExpiryDate is { } date && !IsExpired && date.Date <= DateTime.Today.AddDays(30) && Quantity > 0;
+}
 
 public sealed record MaterialLotDetailDto(
     Guid Id,
@@ -1791,3 +2089,233 @@ public sealed record MaterialLotUsageDto(
     Guid WithdrawalSlipId,
     string WithdrawalSlipCode,
     Guid? WorkOrderId);
+
+public sealed record CompanyProfileDto(
+    bool IsConfigured, string CompanyName, string? VatNumber, string? Address, string? Phone, string? Email,
+    string Sector, List<string> EnabledModules, string? Gs1CompanyPrefix = null);
+
+public sealed record SaveCompanyProfileDto(
+    string CompanyName, string? VatNumber, string? Address, string? Phone, string? Email,
+    string Sector, List<string> EnabledModules);
+
+public sealed record SectorDto(string Key, string Name, string Description, List<string> Modules);
+
+public sealed record ModuleDto(string Key, string Name, string Description, bool SectorSpecific, bool Available = true);
+
+public sealed record CompanyCatalogDto(List<SectorDto> Sectors, List<ModuleDto> Modules);
+
+public sealed record TransportReasonDto(string Key, string Label);
+
+public sealed record TransportDocumentSummaryDto(
+    Guid Id, string DocumentCode, int? Number, int? Year, string Status, string Reason, string ReasonLabel,
+    string RecipientName, DateTime? IssuedAt, DateTime CreatedAt, int LineCount, Guid? WorkOrderId)
+{
+    public string StatusLabel => TransportDocumentDto.StatusText(Status);
+    public DateTime? IssuedAtLocal => IssuedAt?.ToLocalTime();
+}
+
+public sealed record SubcontractingReturnDto(
+    Guid Id, decimal Quantity, decimal ScrapQuantity, DateTime ReturnedAt, string? SupplierDocumentReference,
+    string? Notes, string? RecordedBy);
+
+public sealed record TransportDocumentLineDto(
+    Guid Id, int LineNumber, Guid? MaterialId, Guid? ProductId, string? Code, string Description, decimal Quantity,
+    string Unit, string? LotNumber, string? Notes, decimal? ReturnedQuantity, decimal? ScrapQuantity,
+    decimal? OutstandingQuantity, List<SubcontractingReturnDto> Returns);
+
+public sealed record TransportDocumentDto(
+    Guid Id, string DocumentCode, int? Number, int? Year, string Status, string Reason, string? ReasonDetail,
+    string ReasonLabel, Guid? CustomerId, Guid? SupplierId, string RecipientName, string? RecipientAddress,
+    string? RecipientVatNumber, string? DestinationAddress, string TransportBy, Guid? CarrierId, string? CarrierName,
+    string? Port, string? GoodsAppearance, int? Packages, decimal? GrossWeightKg, DateTime? TransportStartAt,
+    DateTime? ExpectedReturnAt, Guid? WorkOrderId, string? WorkOrderCode, string? Notes, string? CancellationReason,
+    DateTime CreatedAt, string? CreatedBy, DateTime? IssuedAt, string? IssuedBy, DateTime? CancelledAt,
+    List<TransportDocumentLineDto> Lines)
+{
+    public bool IsDraft => Status == "Draft";
+    public bool IsSubcontracting => Reason == "Subcontracting";
+
+    public static string StatusText(string status) => status switch
+    {
+        "Draft" => "Bozza",
+        "Issued" => "Emesso",
+        "Cancelled" => "Annullato",
+        _ => status
+    };
+
+    public static string TransportByText(string transportBy) => transportBy switch
+    {
+        "Sender" => "Mittente",
+        "Recipient" => "Destinatario",
+        "Carrier" => "Vettore",
+        _ => transportBy
+    };
+}
+
+public sealed record SaveTransportDocumentLineDto(
+    Guid? MaterialId, Guid? ProductId, string? Code, string? Description, decimal Quantity, string? Unit,
+    string? LotNumber, string? Notes);
+
+public sealed record SaveTransportDocumentDto(
+    string Reason, string? ReasonDetail, Guid? CustomerId, Guid? SupplierId,
+    string? RecipientName, string? RecipientAddress, string? RecipientVatNumber, string? DestinationAddress,
+    string TransportBy, Guid? CarrierId, string? Port, string? GoodsAppearance, int? Packages, decimal? GrossWeightKg,
+    DateTime? TransportStartAt, DateTime? ExpectedReturnAt, Guid? WorkOrderId, string? Notes,
+    List<SaveTransportDocumentLineDto> Lines);
+
+public sealed record SubcontractingOpenLineDto(
+    Guid DocumentId, string DocumentCode, Guid LineId, Guid? SupplierId, string SupplierName, DateTime? SentAt,
+    DateTime? ExpectedReturnAt, bool IsOverdue, string? Code, string Description, string Unit, decimal SentQuantity,
+    decimal ReturnedQuantity, decimal ScrapQuantity, decimal OutstandingQuantity)
+{
+    public string StatusLabel => IsOverdue ? "In ritardo" : "Presso terzista";
+}
+
+public sealed record PanelVerificationCheckDto(string Clause, string Description, string? Result, string? Notes);
+
+public sealed record PanelVerificationDto(
+    bool IsSaved, string Status, Guid WorkOrderId, string WorkOrderCode, string ProductCode, string ProductName,
+    string? ProductLotNumber, string? CustomerName,
+    string Standard, string? OriginalManufacturer, string? SystemReference, string? SerialNumber,
+    decimal? RatedVoltage, decimal? RatedCurrent, decimal? RatedFrequency, decimal? ShortTimeWithstandCurrent,
+    decimal? ConditionalShortCircuitCurrent, string? IpRating, string? InternalSeparation, string? EarthingSystem,
+    decimal? InsulationResistanceMOhm, decimal? DielectricTestVoltage, string? Notes,
+    DateTime? CompletedAt, string? VerifiedBy, List<PanelVerificationCheckDto> Checks)
+{
+    public bool IsCompleted => Status == "Completed";
+
+    public static string ResultText(string? result) => result switch
+    {
+        "Pass" => "Superata",
+        "Fail" => "Non superata",
+        "NotApplicable" => "Non applicabile",
+        _ => "Da eseguire"
+    };
+}
+
+public sealed record SavePanelVerificationDto(
+    string Standard, string? OriginalManufacturer, string? SystemReference, string? SerialNumber,
+    decimal? RatedVoltage, decimal? RatedCurrent, decimal? RatedFrequency, decimal? ShortTimeWithstandCurrent,
+    decimal? ConditionalShortCircuitCurrent, string? IpRating, string? InternalSeparation, string? EarthingSystem,
+    decimal? InsulationResistanceMOhm, decimal? DielectricTestVoltage, string? Notes,
+    List<PanelVerificationCheckDto> Checks);
+
+public sealed record TransportDocumentExportRowDto(
+    int Number, int Year, DateTime IssuedAt, string Reason, string? CustomerCode, string RecipientName,
+    string? RecipientVatNumber, string? WorkOrderCode, int LineNumber, string? Code, string Description,
+    string Unit, decimal Quantity, string? LotNumber)
+{
+    public string DocumentNumber => $"{Number}/{Year}";
+    public DateTime IssuedDate => IssuedAt.ToLocalTime().Date;
+}
+
+public sealed record AllergenDto(string Key, string Name);
+
+public sealed record MaterialFoodInfoDto(Guid Id, string Code, string Name, string? IngredientName, List<string> Allergens);
+
+public sealed record ProductFoodInfoDto(
+    Guid Id, string Code, string Name, string? SalesName, int? ShelfLifeDays, bool UseByDate,
+    string? StorageConditions, string? NetQuantity);
+
+public sealed record SaveProductFoodInfoDto(
+    string? SalesName, int? ShelfLifeDays, bool UseByDate, string? StorageConditions, string? NetQuantity);
+
+public sealed record FoodLabelIngredientDto(string MaterialCode, string Name, decimal QuantityPerUnit, List<string> Allergens, List<string> AllergenNames);
+
+public sealed record FoodLabelDto(
+    Guid WorkOrderId, string WorkOrderCode, string ProductCode, string SalesName, string? LotNumber, decimal Quantity,
+    DateTime ProductionDate, DateTime? ExpiryDate, bool UseByDate, string? StorageConditions, string? NetQuantity,
+    string? ProducerName, string? ProducerAddress,
+    List<FoodLabelIngredientDto> Ingredients, List<string> Allergens, List<string> Warnings);
+
+public sealed record LogisticUnitDto(
+    Guid Id, string Sscc, Guid? WorkOrderId, Guid? TransportDocumentId, string? ProductCode, string? ProductName,
+    string? LotNumber, decimal? Quantity, DateTime? BestBefore, DateTime CreatedAt);
+
+public sealed record RecallWorkOrderDto(
+    Guid Id, string Code, string ProductCode, string ProductName, string? ProductLotNumber, decimal Quantity,
+    string Status, decimal ConsumedQuantity, string? CustomerName, List<string> AffectedSerials)
+{
+    public string StatusLabel => StatusToItalianTextConverter.Translate(Status);
+}
+
+public sealed record RecallShipmentDto(
+    Guid DocumentId, string DocumentCode, DateTime? IssuedAt, string RecipientName, string? CustomerCode,
+    string? RecipientAddress, string? Code, string Description, decimal Quantity, string Unit, string? LotNumber);
+
+public sealed record RecallPalletDto(string Sscc, string? LotNumber, decimal? Quantity, DateTime CreatedAt);
+
+public sealed record RecallDto(
+    string Subject, List<RecallWorkOrderDto> WorkOrders, List<RecallPalletDto> Pallets, List<RecallShipmentDto> Shipments,
+    List<string> Customers, List<string> Warnings);
+
+public sealed record HaccpControlPointDto(
+    Guid Id, string Name, string? Location, string? Hazard, string? Unit, decimal? MinValue, decimal? MaxValue,
+    string? Frequency, string? CorrectiveActionHint, bool IsActive, bool IsNumeric,
+    DateTime? LastReadAt, decimal? LastValue, bool? LastCompliant)
+{
+    public string LimitsText => (MinValue, MaxValue) switch
+    {
+        (null, null) => "Sì / No",
+        ({ } min, null) => $"≥ {min:0.##} {Unit}",
+        (null, { } max) => $"≤ {max:0.##} {Unit}",
+        ({ } min, { } max) => $"{min:0.##} – {max:0.##} {Unit}"
+    };
+
+    public string LastText => LastReadAt is null ? "Mai rilevato"
+        : $"{LastReadAt.Value.ToLocalTime():dd/MM HH:mm} · {(IsNumeric ? $"{LastValue:0.##} {Unit}" : LastCompliant == true ? "Conforme" : "Non conforme")}";
+
+    public bool LastNonCompliant => LastCompliant == false;
+}
+
+public sealed record SaveHaccpControlPointDto(
+    string Name, string? Location, string? Hazard, string? Unit, decimal? MinValue, decimal? MaxValue,
+    string? Frequency, string? CorrectiveActionHint, bool? IsActive = null);
+
+public sealed record HaccpReadingDto(
+    Guid Id, Guid ControlPointId, string ControlPointName, string? Location, string? Unit, decimal? MinValue,
+    decimal? MaxValue, decimal? Value, bool Compliant, string? CorrectiveAction, string? Notes, DateTime ReadAt,
+    string? OperatorName)
+{
+    public DateTime ReadAtLocal => ReadAt.ToLocalTime();
+    public string ValueText => Value is { } v ? $"{v:0.##} {Unit}" : Compliant ? "Conforme" : "Non conforme";
+    public string OutcomeText => Compliant ? "Conforme" : "NON CONFORME";
+}
+
+public sealed record SiteReportHoursDto(string TechnicianName, Guid? WorkCenterId, string? WorkCenterName, decimal Minutes)
+{
+    public string HoursText => $"{(int)(Minutes / 60)}:{(int)(Minutes % 60):00}";
+}
+
+public sealed record SiteReportMaterialDto(string? MaterialCode, string Description, decimal Quantity, string Unit);
+
+public sealed record SiteReportSummaryDto(
+    Guid Id, string Code, Guid WorkOrderId, string WorkOrderCode, string? CustomerName, string Status, DateTime WorkDate,
+    decimal TotalMinutes, string? SignedByName, DateTime? SignedAt, string? CreatedBy)
+{
+    public string StatusLabel => Status == "Signed" ? "Firmato" : "Bozza";
+    public string BrushStatus => Status == "Signed" ? "Completed" : "Draft";
+    public string HoursText => $"{(int)(TotalMinutes / 60)}:{(int)(TotalMinutes % 60):00}";
+}
+
+public sealed record SiteReportDto(
+    Guid Id, string Code, Guid WorkOrderId, string WorkOrderCode, string ProductName, string? CustomerName, string Status,
+    DateTime WorkDate, string? SiteAddress, string Description, string? Notes, string? SignedByName, string? SignatureImage,
+    DateTime? SignedAt, string? CreatedBy, DateTime CreatedAt, List<SiteReportHoursDto> Hours,
+    List<SiteReportMaterialDto> Materials)
+{
+    public bool IsSigned => Status == "Signed";
+}
+
+public sealed record SiteReportHoursRequestDto(string TechnicianName, Guid? WorkCenterId, decimal Minutes);
+
+public sealed record SiteReportMaterialRequestDto(string? MaterialCode, string? Description, decimal Quantity, string? Unit);
+
+public sealed record SaveSiteReportDto(
+    Guid WorkOrderId, DateTime WorkDate, string? SiteAddress, string Description, string? Notes,
+    List<SiteReportHoursRequestDto> Hours, List<SiteReportMaterialRequestDto> Materials);
+
+public sealed record SiteWorkOrderDto(Guid Id, string Code, string ProductName, string? CustomerName, string? CustomerAddress, string Status, DateTime? DueDate)
+{
+    public string Label => $"{Code} · {CustomerName ?? ProductName}";
+}

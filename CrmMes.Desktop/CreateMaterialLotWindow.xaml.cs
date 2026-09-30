@@ -12,6 +12,7 @@ public partial class CreateMaterialLotWindow : Window
     {
         InitializeComponent();
         _apiClient = apiClient;
+        ExpiryPanel.Visibility = apiClient.IsModuleEnabled("lot-expiry") ? Visibility.Visible : Visibility.Collapsed;
     }
 
     private async void Create_Click(object sender, RoutedEventArgs e)
@@ -28,7 +29,7 @@ public partial class CreateMaterialLotWindow : Window
         CreateButton.IsEnabled = false;
         try
         {
-            await _apiClient.CreateMaterialLotAsync(materialCode, lotNumber, quantity, string.IsNullOrWhiteSpace(NotesBox.Text) ? null : NotesBox.Text.Trim());
+            await _apiClient.CreateMaterialLotAsync(materialCode, lotNumber, quantity, string.IsNullOrWhiteSpace(NotesBox.Text) ? null : NotesBox.Text.Trim(), ExpiryPicker.SelectedDate);
             Created = true;
             Close();
         }

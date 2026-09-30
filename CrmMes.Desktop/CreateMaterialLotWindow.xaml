@@ -17,6 +17,11 @@
         <TextBlock Text="Quantità" Foreground="{StaticResource TextSecondaryBrush}" FontSize="12.5" Margin="0,0,0,5" />
         <TextBox x:Name="QuantityBox" Text="1" Margin="0,0,0,14" />
 
+        <StackPanel x:Name="ExpiryPanel" Visibility="Collapsed">
+            <TextBlock Text="Scadenza (opzionale)" Foreground="{StaticResource TextSecondaryBrush}" FontSize="12.5" Margin="0,0,0,5" />
+            <DatePicker x:Name="ExpiryPicker" Height="34" Margin="0,0,0,14" />
+        </StackPanel>
+
         <TextBlock Text="Note (opzionale)" Foreground="{StaticResource TextSecondaryBrush}" FontSize="12.5" Margin="0,0,0,5" />
         <TextBox x:Name="NotesBox" Margin="0,0,0,14" />
 

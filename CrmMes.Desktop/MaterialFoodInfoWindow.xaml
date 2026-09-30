@@ -1,0 +1,31 @@
+<Window x:Class="CrmMes.Desktop.MaterialFoodInfoWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Dati alimentari del materiale" Icon="Assets/logo.ico" Width="560" SizeToContent="Height"
+        WindowStartupLocation="CenterOwner" ResizeMode="NoResize"
+        Background="{StaticResource BackgroundBrush}">
+    <StackPanel Margin="24">
+        <TextBlock Text="E T I C H E T T A" Style="{StaticResource MicroLabel}" />
+        <TextBlock x:Name="HeaderText" FontSize="18" FontWeight="SemiBold" Foreground="{StaticResource TextPrimaryBrush}" Margin="0,0,0,12" TextWrapping="Wrap" />
+        <TextBlock Text="Nome dell'ingrediente in etichetta (se diverso dal nome di magazzino)" Foreground="{StaticResource TextSecondaryBrush}" FontSize="12.5" Margin="0,0,0,5" TextWrapping="Wrap" />
+        <TextBox x:Name="IngredientBox" Tag="Es. farina di grano tenero tipo 00" Margin="0,0,0,14" />
+        <TextBlock Text="Allergeni contenuti (Reg. UE 1169/2011, allegato II)" Foreground="{StaticResource TextSecondaryBrush}" FontSize="12.5" Margin="0,0,0,8" />
+        <ItemsControl x:Name="AllergenList">
+            <ItemsControl.ItemsPanel>
+                <ItemsPanelTemplate>
+                    <UniformGrid Columns="2" />
+                </ItemsPanelTemplate>
+            </ItemsControl.ItemsPanel>
+            <ItemsControl.ItemTemplate>
+                <DataTemplate>
+                    <CheckBox Content="{Binding Name}" IsChecked="{Binding IsChecked, Mode=TwoWay}" Margin="0,0,0,8" />
+                </DataTemplate>
+            </ItemsControl.ItemTemplate>
+        </ItemsControl>
+        <TextBlock x:Name="ErrorText" Foreground="{StaticResource DangerBrush}" TextWrapping="Wrap" Margin="0,8,0,8" />
+        <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+            <Button Style="{StaticResource SecondaryButton}" Content="Annulla" Width="100" Height="36" Margin="0,0,10,0" IsCancel="True" />
+            <Button x:Name="SaveButton" Content="Salva" Width="110" Height="36" Click="Save_Click" IsEnabled="False" />
+        </StackPanel>
+    </StackPanel>
+</Window>
