@@ -8,8 +8,11 @@
 ; - Gli aggiornamenti usano questo stesso installer (UpdateService.cs lo avvia con /UPDATE=1):
 ;   CloseApplications chiude il programma e attende che sia davvero chiuso, poi lo riapre a fine
 ;   installazione. Sostituisce il vecchio script con attesa fissa di 2 secondi.
-; - Pagina "Server" solo alla prima installazione: scrive %LOCALAPPDATA%\CrmMes\settings.json (lo stesso
-;   file di ClientSettings.cs) se non esiste già; gli aggiornamenti non lo toccano mai.
+;
+; - Pagina "Server" solo alla prima installazione, tre scelte: server dell'azienda (indirizzo in rete),
+;   servizio in cloud, oppure "collegherò il server in seguito" (nessun file scritto: al primo avvio il
+;   programma chiede l'indirizzo). Scrive %LOCALAPPDATA%\CrmMes\settings.json (lo stesso file di
+;   ClientSettings.cs) solo se non esiste già; gli aggiornamenti non lo toccano mai.
 ; - Il client è framework-dependent: se manca .NET 8 Desktop Runtime lo dice e apre la pagina ufficiale.
 
 #ifndef MyAppVersion
@@ -65,6 +68,7 @@ Filename: "{app}\{#MyAppExe}"; Flags: nowait; Check: IsUpdate
 
 [Code]
 var
+  ServerChoicePage: TInputOptionWizardPage;
   ServerPage: TInputQueryWizardPage;
 
 function IsUpdate: Boolean;
@@ -103,18 +107,31 @@ end;
 
 procedure InitializeWizard;
 begin
-  ServerPage := CreateInputQueryPage(wpSelectTasks,
-    'Server', 'Indirizzo del server di Nicolò MES',
-    'Il programma si collega a questo indirizzo. Lascia quello proposto se non ti è stato indicato diversamente: ' +
-    'l''amministratore può cambiarlo in seguito da "Impostazioni server".');
+  ServerChoicePage := CreateInputOptionPage(wpSelectTasks,
+    'Server', 'A quale server si collega Nicolò MES?',
+    'Scegli dove si trova il gestionale. Se non lo sai ancora, collegalo in seguito: al primo avvio il programma ' +
+    'chiederà l''indirizzo, e l''amministratore può sempre cambiarlo da "Impostazioni server".',
+    True, False);
+  ServerChoicePage.Add('Server dell''azienda (installato nella vostra rete)');
+  ServerChoicePage.Add('Servizio in cloud');
+  ServerChoicePage.Add('Collegherò il server in seguito');
+  ServerChoicePage.SelectedValueIndex := 2;
+
+  ServerPage := CreateInputQueryPage(ServerChoicePage.ID,
+    'Server', 'Indirizzo del server dell''azienda',
+    'Te lo indica chi ha installato il server, ad esempio http://SERVER-MES:5092/ oppure https://mes.azienda.it/.');
   ServerPage.Add('Indirizzo:', False);
-  ServerPage.Values[0] := '{#DefaultServer}';
+  ServerPage.Values[0] := 'http://';
 end;
 
 function ShouldSkipPage(PageID: Integer): Boolean;
 begin
   // Already configured on this PC (a previous install, or an update): never ask again.
-  Result := (PageID = ServerPage.ID) and FileExists(SettingsPath);
+  if FileExists(SettingsPath) then
+    Result := (PageID = ServerChoicePage.ID) or (PageID = ServerPage.ID)
+  else
+    // The address page only for the company's own server.
+    Result := (PageID = ServerPage.ID) and (ServerChoicePage.SelectedValueIndex <> 0);
 end;
 
 function NextButtonClick(CurPageID: Integer): Boolean;
@@ -125,9 +142,9 @@ begin
   if CurPageID = ServerPage.ID then
   begin
     Url := Lowercase(Trim(ServerPage.Values[0]));
-    if (Pos('https://', Url) <> 1) and (Pos('http://', Url) <> 1) then
+    if ((Pos('https://', Url) <> 1) and (Pos('http://', Url) <> 1)) or (Url = 'http://') or (Url = 'https://') then
     begin
-      MsgBox('Inserisci un indirizzo che inizi con https:// (oppure http:// per un server locale).', mbError, MB_OK);
+      MsgBox('Inserisci l''indirizzo completo del server, che inizia con http:// o https://.', mbError, MB_OK);
       Result := False;
     end;
   end;
@@ -137,9 +154,13 @@ procedure CurStepChanged(CurStep: TSetupStep);
 var
   Url: String;
 begin
-  if (CurStep = ssPostInstall) and not FileExists(SettingsPath) then
+  // "Collegherò il server in seguito": no file, the program asks at its first start.
+  if (CurStep = ssPostInstall) and not FileExists(SettingsPath) and (ServerChoicePage.SelectedValueIndex <> 2) then
   begin
-    Url := Trim(ServerPage.Values[0]);
+    if ServerChoicePage.SelectedValueIndex = 1 then
+      Url := '{#DefaultServer}'
+    else
+      Url := Trim(ServerPage.Values[0]);
     StringChangeEx(Url, '\', '\\', True);
     StringChangeEx(Url, '"', '\"', True);
     ForceDirectories(ExtractFileDir(SettingsPath));

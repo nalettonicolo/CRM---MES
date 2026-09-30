@@ -251,6 +251,22 @@ public partial class MainWindow : Window
     private async void MainWindow_Loaded(object sender, RoutedEventArgs e)
     {
         _apiClient.SetBaseUrl(ClientSettings.Load().ApiBaseUrl);
+#if !DEBUG
+        // Installed with "collegherò il server in seguito": ask for the address first. No admin check is
+        // possible (there is no server yet), exactly as when the configured server is unreachable.
+        if (!ClientSettings.IsConfigured())
+        {
+            ConnectionStatus.Text = "Programma non ancora collegato a un server";
+            var window = new SettingsWindow(_apiClient) { Owner = this };
+            window.ShowDialog();
+            if (!window.SettingsChanged)
+            {
+                LoginButton.IsEnabled = false;
+                LoginError.Text = "Collega il programma al server da \"Impostazioni server\" qui sotto.";
+                return;
+            }
+        }
+#endif
         await ConnectAsync();
     }
 
@@ -306,7 +322,7 @@ public partial class MainWindow : Window
                 healthy = await _apiClient.EnsureLocalApiAsync();
             }
 
-            ConnectionStatus.Text = healthy ? "API e Neon online" : "API non disponibile";
+            ConnectionStatus.Text = healthy ? "Server online" : "Server non raggiungibile";
             LoginButton.IsEnabled = healthy;
 
 #if DEBUG

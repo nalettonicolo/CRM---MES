@@ -1,4 +1,4 @@
-using System.IO;
+﻿using System.IO;
 using System.Text.Json;
 
 namespace CrmMes.Desktop;
@@ -19,6 +19,10 @@ public sealed class ClientSettings
     public string ApiBaseUrl { get; set; } = DefaultApiBaseUrl;
 
     public static ClientSettings Load() => Load(SettingsPath);
+
+    /// <summary>False on a PC installed with "collegherò il server in seguito": the program then asks for
+    /// the address at its first start instead of trying a server that isn't there.</summary>
+    public static bool IsConfigured() => File.Exists(SettingsPath);
 
     /// <summary>Test seam: lets CrmMes.Desktop.Tests exercise the load/parse/fallback logic against a
     /// temp file instead of the real user profile, so a test run can never clobber someone's actual
