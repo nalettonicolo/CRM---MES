@@ -13,4 +13,8 @@ public class Area
     /// error — most installations have a single site and never need to set this.</summary>
     public Guid? SiteId { get; set; }
     public Site? Site { get; set; }
+
+    /// <summary>What the department does (see Departments in CrmMes.Api: "panels", "testing", "service"...).
+    /// Null for areas created before the company structure existed, or just to group people.</summary>
+    public string? DepartmentType { get; set; }
 }

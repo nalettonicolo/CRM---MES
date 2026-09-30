@@ -15,6 +15,10 @@ public class CompanyProfile
     /// <summary>Industry key (see Sectors in CrmMes.Api): drives the default modules.</summary>
     public string Sector { get; set; } = "generic";
 
+    /// <summary>Everything the company does, comma-separated sector keys (a machine builder is mechanics,
+    /// panels and service at once). <see cref="Sector"/> is the first of them, kept for older clients.</summary>
+    public string Activities { get; set; } = string.Empty;
+
     /// <summary>Enabled module keys, comma-separated (see Sectors in CrmMes.Api). Stored as text on
     /// purpose: the set of modules changes with the product, the schema shouldn't.</summary>
     public string EnabledModules { get; set; } = string.Empty;

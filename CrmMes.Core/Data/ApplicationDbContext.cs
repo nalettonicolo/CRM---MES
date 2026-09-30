@@ -85,6 +85,7 @@ public class ApplicationDbContext : DbContext
         {
             entity.Property(a => a.Name).HasMaxLength(200);
             entity.Property(a => a.Code).HasMaxLength(50);
+            entity.Property(a => a.DepartmentType).HasMaxLength(50);
             entity.HasOne(a => a.Site)
                 .WithMany()
                 .HasForeignKey(a => a.SiteId)
@@ -711,6 +712,10 @@ public class ApplicationDbContext : DbContext
             entity.HasOne(w => w.Site)
                 .WithMany()
                 .HasForeignKey(w => w.SiteId)
+                .OnDelete(DeleteBehavior.SetNull);
+            entity.HasOne(w => w.Area)
+                .WithMany()
+                .HasForeignKey(w => w.AreaId)
                 .OnDelete(DeleteBehavior.SetNull);
         });
 

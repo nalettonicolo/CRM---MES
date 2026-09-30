@@ -32,12 +32,18 @@ public static class Sectors
         new("food-labels", "Etichette, allergeni e SSCC", "Ingredienti e allergeni dalla distinta, etichetta del lotto, etichetta pallet SSCC.", true),
         new("haccp", "Registri HACCP", "Punti di controllo, letture con limiti e azioni correttive.", true),
         new("site-work", "Lavori in cantiere", "Rapportini con ore, materiali e firma del cliente, anche da telefono.", true),
+        new("engineering", "Ufficio tecnico", "Revisioni di distinte e cicli, disegni e schemi allegati, modifiche tecniche approvate.", true, Available: false),
+        new("machine-testing", "Collaudo macchine e CE", "Collaudi in fabbrica e presso il cliente, fascicolo tecnico, dichiarazione CE.", true, Available: false),
+        new("service", "Service post-vendita", "Macchine installate presso i clienti con matricola e garanzia, richieste di assistenza, interventi.", true, Available: false),
     ];
 
     private static readonly string[] Common = ["sales", "purchasing", "planning", "shopfloor", "quality", "maintenance", "shipping", "costing", "invoicing"];
 
     public static readonly IReadOnlyList<SectorInfo> All =
     [
+        new("machine-building", "Costruzione macchine e impianti",
+            "Macchine e impianti su progetto: lavorazioni, montaggio, quadri a bordo macchina, collaudo e assistenza.",
+            [.. Common, "subcontracting", "panel-verification", "engineering", "machine-testing", "service"]),
         new("electrical-panels", "Quadri elettrici e automazione",
             "Quadristi, costruttori di quadri e bordo macchina.",
             [.. Common, "subcontracting", "panel-verification", "metel"]),

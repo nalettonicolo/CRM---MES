@@ -97,13 +97,32 @@ public class WorkOrdersController : ControllerBase
 
     /// <summary>Quick search for the shop floor terminal: the last digits of the code are enough. Exact
     /// code first, then codes ending with the text, then codes or lots containing it; open jobs (in
-    /// progress, then released) before the others. Without text: the open jobs, for picking from a list.</summary>
+    /// progress, then released) before the others. Without text: the open jobs, for picking from a list.
+    ///
+    /// department: "mine" narrows to the departments of the logged-in user, or of forUser (the operator
+    /// identified by PIN at a shared terminal). A job is a department's when it is assigned to it or has
+    /// a phase still to do on one of its work centers. A user in no department sees everything.</summary>
     [HttpGet("lookup")]
     public async Task<ActionResult<IEnumerable<WorkOrderLookupResponse>>> Lookup(
-        [FromQuery] string? q = null, CancellationToken cancellationToken = default)
+        [FromQuery] string? q = null, [FromQuery] string? department = null, [FromQuery] Guid? forUser = null,
+        CancellationToken cancellationToken = default)
     {
         var term = q?.Trim() ?? string.Empty;
         var query = _dbContext.WorkOrders.AsNoTracking();
+        if (string.Equals(department, "mine", StringComparison.OrdinalIgnoreCase))
+        {
+            var userId = forUser ?? (Guid.TryParse(User.FindFirstValue(System.IdentityModel.Tokens.Jwt.JwtRegisteredClaimNames.Sub)
+                ?? User.FindFirstValue(ClaimTypes.NameIdentifier), out var id) ? id : Guid.Empty);
+            var areaIds = await _dbContext.Users.Where(u => u.Id == userId).SelectMany(u => u.Areas.Select(a => a.Id)).ToListAsync(cancellationToken);
+            if (areaIds.Count > 0)
+            {
+                var workCenterNames = await _dbContext.WorkCenters.Where(w => w.AreaId != null && areaIds.Contains(w.AreaId.Value))
+                    .Select(w => w.Name).ToListAsync(cancellationToken);
+                query = query.Where(order => (order.AreaId != null && areaIds.Contains(order.AreaId.Value))
+                    || order.Operations.Any(op => op.Status != "Completed" && op.WorkCenter != null && workCenterNames.Contains(op.WorkCenter)));
+            }
+        }
+
         if (term.Length == 0)
         {
             query = query.Where(order => order.Status == "Released" || order.Status == "InProgress");

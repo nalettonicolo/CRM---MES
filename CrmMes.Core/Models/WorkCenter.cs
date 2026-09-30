@@ -26,4 +26,9 @@ public class WorkCenter
     /// <summary>Which physical site (seconda sede) this work center is at. Null = not yet assigned.</summary>
     public Guid? SiteId { get; set; }
     public Site? Site { get; set; }
+
+    /// <summary>The department this work center belongs to: its operations are that department's work, so
+    /// the terminal can show each operator the phases of their own department first.</summary>
+    public Guid? AreaId { get; set; }
+    public Area? Area { get; set; }
 }

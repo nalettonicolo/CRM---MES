@@ -1,20 +1,27 @@
 <Window x:Class="CrmMes.Desktop.CompanySetupWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="Configurazione azienda" Icon="Assets/logo.ico" Width="980" Height="700" MinWidth="820" MinHeight="560"
+        Title="Configurazione azienda" Icon="Assets/logo.ico" Width="1040" Height="740" MinWidth="880" MinHeight="600"
         WindowStartupLocation="CenterOwner"
         Background="{StaticResource BackgroundBrush}">
     <Window.Resources>
-        <!-- One card per sector: the checked card is the chosen industry. -->
-        <Style x:Key="SectorCard" TargetType="RadioButton">
+        <!-- One card per activity: several can be ticked (a machine builder is mechanics and panels at once). -->
+        <Style x:Key="ActivityCard" TargetType="CheckBox">
             <Setter Property="Cursor" Value="Hand" />
             <Setter Property="Margin" Value="0,0,0,8" />
             <Setter Property="Template">
                 <Setter.Value>
-                    <ControlTemplate TargetType="RadioButton">
+                    <ControlTemplate TargetType="CheckBox">
                         <Border x:Name="Card" Background="{StaticResource SurfaceBrush}" BorderBrush="{StaticResource BorderBrush0}"
                                 BorderThickness="1" CornerRadius="8" Padding="14,10">
-                            <ContentPresenter />
+                            <DockPanel>
+                                <Border x:Name="Tick" DockPanel.Dock="Right" Width="20" Height="20" CornerRadius="4" Margin="12,0,0,0"
+                                        BorderThickness="1" BorderBrush="{StaticResource BorderBrush0}" VerticalAlignment="Top">
+                                    <TextBlock x:Name="TickMark" Text="&#xE73E;" FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets" FontSize="12"
+                                               HorizontalAlignment="Center" VerticalAlignment="Center" Foreground="White" Visibility="Collapsed" />
+                                </Border>
+                                <ContentPresenter />
+                            </DockPanel>
                         </Border>
                         <ControlTemplate.Triggers>
                             <Trigger Property="IsMouseOver" Value="True">
@@ -23,6 +30,9 @@
                             <Trigger Property="IsChecked" Value="True">
                                 <Setter TargetName="Card" Property="Background" Value="{StaticResource PrimarySoftBrush}" />
                                 <Setter TargetName="Card" Property="BorderBrush" Value="{StaticResource PrimaryBrush}" />
+                                <Setter TargetName="Tick" Property="Background" Value="{StaticResource PrimaryBrush}" />
+                                <Setter TargetName="Tick" Property="BorderBrush" Value="{StaticResource PrimaryBrush}" />
+                                <Setter TargetName="TickMark" Property="Visibility" Value="Visible" />
                             </Trigger>
                             <Trigger Property="IsKeyboardFocused" Value="True">
                                 <Setter TargetName="Card" Property="BorderBrush" Value="{StaticResource PrimaryBrush}" />
@@ -32,82 +42,147 @@
                 </Setter.Value>
             </Setter>
         </Style>
+        <Style x:Key="StepLabel" TargetType="TextBlock">
+            <Setter Property="FontSize" Value="13" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="Foreground" Value="{StaticResource TextMutedBrush}" />
+            <Setter Property="Margin" Value="0,0,22,0" />
+        </Style>
     </Window.Resources>
 
     <DockPanel Margin="28,24">
-        <StackPanel DockPanel.Dock="Top" Margin="0,0,0,18">
+        <StackPanel DockPanel.Dock="Top" Margin="0,0,0,14">
             <TextBlock Text="C O N F I G U R A Z I O N E" Style="{StaticResource MicroLabel}" />
             <TextBlock Text="La tua azienda" FontSize="24" FontWeight="SemiBold" Foreground="{StaticResource TextPrimaryBrush}" />
-            <TextBlock Foreground="{StaticResource TextSecondaryBrush}" FontSize="12.5" TextWrapping="Wrap" Margin="0,4,0,0"
-                       Text="Il settore decide quali moduli si aprono. Puoi cambiarlo in seguito da Amministrazione: spegnere un modulo lo nasconde, non cancella i dati." />
+            <StackPanel Orientation="Horizontal" Margin="0,10,0,0">
+                <TextBlock x:Name="Step1Label" Text="1  Attività" Style="{StaticResource StepLabel}" />
+                <TextBlock x:Name="Step2Label" Text="2  Reparti" Style="{StaticResource StepLabel}" />
+                <TextBlock x:Name="Step3Label" Text="3  Moduli e servizi" Style="{StaticResource StepLabel}" />
+            </StackPanel>
         </StackPanel>
 
         <DockPanel DockPanel.Dock="Bottom" Margin="0,16,0,0">
             <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
                 <Button x:Name="CancelButton" Style="{StaticResource SecondaryButton}" Content="Più tardi" Width="110" Height="36" Margin="0,0,10,0" Click="Cancel_Click" />
-                <Button x:Name="SaveButton" Content="Salva configurazione" Width="170" Height="36" Click="Save_Click" />
+                <Button x:Name="BackButton" Style="{StaticResource SecondaryButton}" Content="Indietro" Width="110" Height="36" Margin="0,0,10,0" Click="Back_Click" />
+                <Button x:Name="NextButton" Content="Avanti" Width="170" Height="36" Click="Next_Click" />
             </StackPanel>
             <TextBlock x:Name="ErrorText" Foreground="{StaticResource DangerBrush}" TextWrapping="Wrap" VerticalAlignment="Center" Margin="0,0,16,0" />
         </DockPanel>
 
         <Grid>
-            <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="280" />
-                <ColumnDefinition Width="24" />
-                <ColumnDefinition Width="*" />
-                <ColumnDefinition Width="24" />
-                <ColumnDefinition Width="*" />
-            </Grid.ColumnDefinitions>
+            <!-- Step 1: company data and activities -->
+            <Grid x:Name="Step1Panel">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="300" />
+                    <ColumnDefinition Width="28" />
+                    <ColumnDefinition Width="*" />
+                </Grid.ColumnDefinitions>
+                <ScrollViewer Grid.Column="0" VerticalScrollBarVisibility="Auto">
+                    <StackPanel>
+                        <TextBlock Text="D A T I   A Z I E N D A" Style="{StaticResource MicroLabel}" Margin="0,0,0,8" />
+                        <TextBlock Text="Ragione sociale *" Foreground="{StaticResource TextSecondaryBrush}" FontSize="12.5" Margin="0,0,0,5" />
+                        <TextBox x:Name="CompanyNameBox" Margin="0,0,0,12" />
+                        <TextBlock Text="Partita IVA" Foreground="{StaticResource TextSecondaryBrush}" FontSize="12.5" Margin="0,0,0,5" />
+                        <TextBox x:Name="VatNumberBox" Margin="0,0,0,12" />
+                        <TextBlock Text="Indirizzo" Foreground="{StaticResource TextSecondaryBrush}" FontSize="12.5" Margin="0,0,0,5" />
+                        <TextBox x:Name="AddressBox" Margin="0,0,0,12" Tag="Via, CAP, città" />
+                        <TextBlock Text="Telefono" Foreground="{StaticResource TextSecondaryBrush}" FontSize="12.5" Margin="0,0,0,5" />
+                        <TextBox x:Name="PhoneBox" Margin="0,0,0,12" />
+                        <TextBlock Text="Email" Foreground="{StaticResource TextSecondaryBrush}" FontSize="12.5" Margin="0,0,0,5" />
+                        <TextBox x:Name="EmailBox" Margin="0,0,0,12" />
+                        <TextBlock Text="Prefisso aziendale GS1 (per SSCC)" Foreground="{StaticResource TextSecondaryBrush}" FontSize="12.5" Margin="0,0,0,5" />
+                        <TextBox x:Name="Gs1PrefixBox" Margin="0,0,0,12" Tag="7-10 cifre, da GS1 Italy" />
+                        <TextBlock Foreground="{StaticResource TextMutedBrush}" FontSize="11.5" TextWrapping="Wrap"
+                                   Text="Questi dati compaiono sui documenti di trasporto e sulle dichiarazioni di conformità." />
+                    </StackPanel>
+                </ScrollViewer>
+                <DockPanel Grid.Column="2">
+                    <StackPanel DockPanel.Dock="Top" Margin="0,0,0,8">
+                        <TextBlock Text="A T T I V I T À" Style="{StaticResource MicroLabel}" />
+                        <TextBlock Foreground="{StaticResource TextSecondaryBrush}" FontSize="12.5" TextWrapping="Wrap" Margin="0,2,0,0"
+                                   Text="Scegli tutto ciò che fa l'azienda, anche più di una voce: un costruttore di macchine fa meccanica, quadri e assistenza. Da qui partono le proposte di reparti e moduli." />
+                    </StackPanel>
+                    <ScrollViewer VerticalScrollBarVisibility="Auto">
+                        <ItemsControl x:Name="ActivityList">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <CheckBox Style="{StaticResource ActivityCard}" IsChecked="{Binding IsSelected, Mode=TwoWay}" Click="Activity_Click">
+                                        <StackPanel>
+                                            <TextBlock Text="{Binding Name}" FontWeight="SemiBold" FontSize="14" Foreground="{StaticResource TextPrimaryBrush}" />
+                                            <TextBlock Text="{Binding Description}" FontSize="12" TextWrapping="Wrap" Foreground="{StaticResource TextSecondaryBrush}" Margin="0,2,0,0" />
+                                        </StackPanel>
+                                    </CheckBox>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </ScrollViewer>
+                </DockPanel>
+            </Grid>
 
-            <!-- Company data: printed on transport documents and declarations. -->
-            <ScrollViewer Grid.Column="0" VerticalScrollBarVisibility="Auto">
-                <StackPanel>
-                    <TextBlock Text="D A T I   A Z I E N D A" Style="{StaticResource MicroLabel}" Margin="0,0,0,8" />
-                    <TextBlock Text="Ragione sociale *" Foreground="{StaticResource TextSecondaryBrush}" FontSize="12.5" Margin="0,0,0,5" />
-                    <TextBox x:Name="CompanyNameBox" Margin="0,0,0,12" />
-                    <TextBlock Text="Partita IVA" Foreground="{StaticResource TextSecondaryBrush}" FontSize="12.5" Margin="0,0,0,5" />
-                    <TextBox x:Name="VatNumberBox" Margin="0,0,0,12" />
-                    <TextBlock Text="Indirizzo" Foreground="{StaticResource TextSecondaryBrush}" FontSize="12.5" Margin="0,0,0,5" />
-                    <TextBox x:Name="AddressBox" Margin="0,0,0,12" Tag="Via, CAP, città" />
-                    <TextBlock Text="Telefono" Foreground="{StaticResource TextSecondaryBrush}" FontSize="12.5" Margin="0,0,0,5" />
-                    <TextBox x:Name="PhoneBox" Margin="0,0,0,12" />
-                    <TextBlock Text="Email" Foreground="{StaticResource TextSecondaryBrush}" FontSize="12.5" Margin="0,0,0,5" />
-                    <TextBox x:Name="EmailBox" Margin="0,0,0,12" />
-                    <TextBlock Text="Prefisso aziendale GS1 (per SSCC)" Foreground="{StaticResource TextSecondaryBrush}" FontSize="12.5" Margin="0,0,0,5" />
-                    <TextBox x:Name="Gs1PrefixBox" Margin="0,0,0,12" Tag="7-10 cifre, da GS1 Italy" />
-                    <TextBlock Foreground="{StaticResource TextMutedBrush}" FontSize="11.5" TextWrapping="Wrap"
-                               Text="Questi dati compaiono sui documenti di trasporto e sulle dichiarazioni di conformità." />
+            <!-- Step 2: departments -->
+            <DockPanel x:Name="Step2Panel" Visibility="Collapsed">
+                <StackPanel DockPanel.Dock="Top" Margin="0,0,0,10">
+                    <TextBlock Text="R E P A R T I" Style="{StaticResource MicroLabel}" />
+                    <TextBlock Foreground="{StaticResource TextSecondaryBrush}" FontSize="12.5" TextWrapping="Wrap" Margin="0,2,0,0"
+                               Text="Spunta i reparti che avete e dai loro il nome che usate in azienda. Ogni reparto diventa un'area a cui assegnare persone e commesse, con i suoi centri di lavoro tipici: al terminale ogni operatore vedrà per primo il lavoro del suo reparto." />
                 </StackPanel>
-            </ScrollViewer>
-
-            <!-- Sector: choosing one resets the modules below to that sector's preset. -->
-            <DockPanel Grid.Column="2">
-                <TextBlock DockPanel.Dock="Top" Text="S E T T O R E" Style="{StaticResource MicroLabel}" Margin="0,0,0,8" />
+                <Border DockPanel.Dock="Bottom" Background="{StaticResource SurfaceBrush}" BorderBrush="{StaticResource BorderBrush0}" BorderThickness="1" CornerRadius="8" Padding="12,10" Margin="0,10,0,0">
+                    <DockPanel>
+                        <TextBlock DockPanel.Dock="Left" Text="Aggiungi un reparto" VerticalAlignment="Center" FontWeight="SemiBold" Foreground="{StaticResource TextPrimaryBrush}" Margin="0,0,12,0" />
+                        <Button DockPanel.Dock="Right" Style="{StaticResource SecondaryButton}" Content="Aggiungi" Width="100" Height="32" Margin="10,0,0,0" Click="AddDepartment_Click" />
+                        <ComboBox x:Name="AddDepartmentCombo" DisplayMemberPath="Name" MinWidth="260" />
+                    </DockPanel>
+                </Border>
                 <ScrollViewer VerticalScrollBarVisibility="Auto">
-                    <ItemsControl x:Name="SectorList">
+                    <ItemsControl x:Name="DepartmentList">
                         <ItemsControl.ItemTemplate>
                             <DataTemplate>
-                                <RadioButton Style="{StaticResource SectorCard}" GroupName="Sector" Tag="{Binding}"
-                                             IsChecked="{Binding IsSelected, Mode=TwoWay}" Click="Sector_Click">
-                                    <StackPanel>
-                                        <TextBlock Text="{Binding Name}" FontWeight="SemiBold" FontSize="14" Foreground="{StaticResource TextPrimaryBrush}" />
-                                        <TextBlock Text="{Binding Description}" FontSize="12" TextWrapping="Wrap" Foreground="{StaticResource TextSecondaryBrush}" Margin="0,2,0,0" />
-                                    </StackPanel>
-                                </RadioButton>
+                                <Border Background="{StaticResource SurfaceBrush}" BorderBrush="{StaticResource BorderBrush0}" BorderThickness="1" CornerRadius="8" Padding="12,10" Margin="0,0,0,8">
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="Auto" />
+                                            <ColumnDefinition Width="240" />
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+                                        <CheckBox Grid.Column="0" IsChecked="{Binding IsIncluded, Mode=TwoWay}" VerticalAlignment="Center" Margin="0,0,10,0"
+                                                  ToolTip="Spunta se l'azienda ha questo reparto" Click="Department_Click" />
+                                        <TextBox Grid.Column="1" Text="{Binding Name, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" VerticalAlignment="Center" IsEnabled="{Binding IsIncluded}" />
+                                        <StackPanel Grid.Column="2" Margin="14,0,10,0" VerticalAlignment="Center">
+                                            <TextBlock Text="{Binding TypeName}" FontWeight="SemiBold" Foreground="{StaticResource TextPrimaryBrush}" />
+                                            <TextBlock Text="{Binding Description}" FontSize="12" TextWrapping="Wrap" Foreground="{StaticResource TextSecondaryBrush}" />
+                                            <TextBlock Text="{Binding ExistingText}" FontSize="12" Foreground="{StaticResource SuccessTextBrush}" Visibility="{Binding IsExisting, Converter={StaticResource BoolToVisibility}}" />
+                                        </StackPanel>
+                                        <CheckBox Grid.Column="3" IsChecked="{Binding CreateWorkCenters, Mode=TwoWay}" VerticalAlignment="Center" MaxWidth="260"
+                                                  IsEnabled="{Binding IsIncluded}" Visibility="{Binding HasWorkCenters, Converter={StaticResource BoolToVisibility}}">
+                                            <TextBlock Text="{Binding WorkCentersText}" TextWrapping="Wrap" FontSize="12" Foreground="{StaticResource TextSecondaryBrush}" />
+                                        </CheckBox>
+                                    </Grid>
+                                </Border>
                             </DataTemplate>
                         </ItemsControl.ItemTemplate>
                     </ItemsControl>
                 </ScrollViewer>
             </DockPanel>
 
-            <!-- Modules: common ones first, then the ones specific to a sector. -->
-            <DockPanel Grid.Column="4">
-                <TextBlock DockPanel.Dock="Top" Text="M O D U L I" Style="{StaticResource MicroLabel}" Margin="0,0,0,8" />
+            <!-- Step 3: modules and services -->
+            <DockPanel x:Name="Step3Panel" Visibility="Collapsed">
+                <StackPanel DockPanel.Dock="Top" Margin="0,0,0,10">
+                    <TextBlock Text="M O D U L I   E   S E R V I Z I" Style="{StaticResource MicroLabel}" />
+                    <TextBlock Foreground="{StaticResource TextSecondaryBrush}" FontSize="12.5" TextWrapping="Wrap" Margin="0,2,0,0"
+                               Text="Già spuntati quelli proposti da attività e reparti, con il motivo. Puoi aggiungerne o toglierne: spegnere un modulo lo nasconde, non cancella i dati." />
+                </StackPanel>
                 <ScrollViewer VerticalScrollBarVisibility="Auto">
                     <ItemsControl x:Name="ModuleList">
+                        <ItemsControl.ItemsPanel>
+                            <ItemsPanelTemplate>
+                                <UniformGrid Columns="2" />
+                            </ItemsPanelTemplate>
+                        </ItemsControl.ItemsPanel>
                         <ItemsControl.ItemTemplate>
                             <DataTemplate>
-                                <CheckBox IsChecked="{Binding IsChecked, Mode=TwoWay}" IsEnabled="{Binding Available}" Margin="0,0,0,10" VerticalContentAlignment="Top">
+                                <CheckBox IsChecked="{Binding IsChecked, Mode=TwoWay}" IsEnabled="{Binding Available}" Margin="0,0,16,12" VerticalContentAlignment="Top" Click="Module_Click">
                                     <StackPanel Margin="4,0,0,0">
                                         <StackPanel Orientation="Horizontal">
                                             <TextBlock Text="{Binding Name}" FontWeight="SemiBold" Foreground="{StaticResource TextPrimaryBrush}" />
@@ -119,6 +194,8 @@
                                             </Border>
                                         </StackPanel>
                                         <TextBlock Text="{Binding Description}" FontSize="12" TextWrapping="Wrap" Foreground="{StaticResource TextSecondaryBrush}" />
+                                        <TextBlock Text="{Binding ReasonText}" FontSize="11.5" TextWrapping="Wrap" Foreground="{StaticResource PrimaryBrush}"
+                                                   Visibility="{Binding HasReason, Converter={StaticResource BoolToVisibility}}" />
                                     </StackPanel>
                                 </CheckBox>
                             </DataTemplate>

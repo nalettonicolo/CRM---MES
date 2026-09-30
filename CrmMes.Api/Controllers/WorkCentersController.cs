@@ -1,4 +1,4 @@
-using CrmMes.Api.Services;
+﻿using CrmMes.Api.Services;
 using CrmMes.Core.Data;
 using CrmMes.Core.Models;
 using Microsoft.AspNetCore.Authorization;
@@ -46,7 +46,7 @@ public class WorkCentersController : ControllerBase
 
         var workCenters = await query
             .OrderBy(w => w.Name)
-            .Select(w => new WorkCenterResponse(w.Id, w.Code, w.Name, w.Description, w.DailyCapacityMinutes, w.IsActive, w.SiteId, w.HourlyRate))
+            .Select(w => new WorkCenterResponse(w.Id, w.Code, w.Name, w.Description, w.DailyCapacityMinutes, w.IsActive, w.SiteId, w.HourlyRate, w.AreaId))
             .ToListAsync(cancellationToken);
 
         // Hourly rates are company cost data: only management sees them (see MarginAccess).
@@ -98,7 +98,7 @@ public class WorkCentersController : ControllerBase
         _dbContext.WorkCenters.Add(workCenter);
         await _dbContext.SaveChangesAsync(cancellationToken);
 
-        return Ok(new WorkCenterResponse(workCenter.Id, workCenter.Code, workCenter.Name, workCenter.Description, workCenter.DailyCapacityMinutes, workCenter.IsActive, workCenter.SiteId, MarginAccess.CanView(User) ? workCenter.HourlyRate : null));
+        return Ok(new WorkCenterResponse(workCenter.Id, workCenter.Code, workCenter.Name, workCenter.Description, workCenter.DailyCapacityMinutes, workCenter.IsActive, workCenter.SiteId, MarginAccess.CanView(User) ? workCenter.HourlyRate : null, workCenter.AreaId));
     }
 
     [Authorize(Policy = "Warehouse")]
@@ -136,7 +136,7 @@ public class WorkCentersController : ControllerBase
         workCenter.SiteId = request.SiteId;
 
         await _dbContext.SaveChangesAsync(cancellationToken);
-        return Ok(new WorkCenterResponse(workCenter.Id, workCenter.Code, workCenter.Name, workCenter.Description, workCenter.DailyCapacityMinutes, workCenter.IsActive, workCenter.SiteId, MarginAccess.CanView(User) ? workCenter.HourlyRate : null));
+        return Ok(new WorkCenterResponse(workCenter.Id, workCenter.Code, workCenter.Name, workCenter.Description, workCenter.DailyCapacityMinutes, workCenter.IsActive, workCenter.SiteId, MarginAccess.CanView(User) ? workCenter.HourlyRate : null, workCenter.AreaId));
     }
 
     /// <summary>Costo orario del centro di lavoro (null = non impostato). Endpoint separato dalla modifica
@@ -265,7 +265,7 @@ public class WorkCentersController : ControllerBase
 
 public sealed record CreateWorkCenterRequest(string Code, string Name, string? Description, decimal DailyCapacityMinutes, Guid? SiteId = null);
 public sealed record EditWorkCenterRequest(string Name, string? Description, decimal DailyCapacityMinutes, Guid? SiteId = null);
-public sealed record WorkCenterResponse(Guid Id, string Code, string Name, string? Description, decimal DailyCapacityMinutes, bool IsActive, Guid? SiteId = null, decimal? HourlyRate = null);
+public sealed record WorkCenterResponse(Guid Id, string Code, string Name, string? Description, decimal DailyCapacityMinutes, bool IsActive, Guid? SiteId = null, decimal? HourlyRate = null, Guid? AreaId = null);
 
 public sealed record SetHourlyRateRequest(decimal? HourlyRate);
 

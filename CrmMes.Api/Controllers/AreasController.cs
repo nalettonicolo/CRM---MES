@@ -18,6 +18,22 @@ public class AreasController : ControllerBase
         _dbContext = dbContext;
     }
 
+    /// <summary>The departments of a user (the logged-in one without userId): what the terminal and the
+    /// phone page show first, and how they name the "my department" filter.</summary>
+    [HttpGet("of-user")]
+    public async Task<ActionResult<List<UserDepartmentResponse>>> GetUserDepartments(
+        [FromQuery] Guid? userId = null, CancellationToken cancellationToken = default)
+    {
+        var id = userId ?? (Guid.TryParse(User.FindFirst(System.IdentityModel.Tokens.Jwt.JwtRegisteredClaimNames.Sub)?.Value
+            ?? User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value, out var parsed) ? parsed : Guid.Empty);
+        var areas = await _dbContext.Users.AsNoTracking().Where(u => u.Id == id)
+            .SelectMany(u => u.Areas.Where(a => a.IsActive))
+            .OrderBy(a => a.Name)
+            .Select(a => new UserDepartmentResponse(a.Id, a.Name, a.Code, a.DepartmentType))
+            .ToListAsync(cancellationToken);
+        return Ok(areas);
+    }
+
     [HttpGet]
     public async Task<ActionResult<IEnumerable<Area>>> GetAreas([FromQuery] Guid? siteId = null, CancellationToken cancellationToken = default)
     {
@@ -178,3 +194,5 @@ public sealed record AreaDetailResponse(
     List<AreaUserResponse> Users,
     List<AreaWorkOrderResponse> WorkOrders,
     List<AreaWithdrawalSlipResponse> WithdrawalSlips);
+
+public sealed record UserDepartmentResponse(Guid Id, string Name, string Code, string? DepartmentType);

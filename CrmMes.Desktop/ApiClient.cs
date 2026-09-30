@@ -630,6 +630,22 @@ public sealed class ApiClient
         return await response.Content.ReadFromJsonAsync<List<string>>(cancellationToken: cancellationToken);
     }
 
+    /// <summary>Departments configured so far; empty on a server older than the company structure.</summary>
+    public async Task<IReadOnlyList<DepartmentDto>> GetCompanyStructureAsync(CancellationToken cancellationToken = default)
+    {
+        using var response = await _httpClient.GetAsync("api/company-profile/structure", cancellationToken);
+        if (response.StatusCode is HttpStatusCode.NotFound or HttpStatusCode.MethodNotAllowed)
+        {
+            return [];
+        }
+
+        await EnsureSuccessAsync(response, cancellationToken);
+        return await response.Content.ReadFromJsonAsync<List<DepartmentDto>>(cancellationToken: cancellationToken) ?? [];
+    }
+
+    public Task<StructureResultDto> SaveCompanyStructureAsync(List<SaveDepartmentDto> departments, CancellationToken cancellationToken = default)
+        => SendAsync<StructureResultDto>(HttpMethod.Put, "api/company-profile/structure", new { departments }, cancellationToken);
+
     public Task<AccessChannelsDto> GetAccessChannelsAsync(CancellationToken cancellationToken = default)
         => GetOneAsync<AccessChannelsDto>("api/company-profile/access", cancellationToken);
 
@@ -2208,17 +2224,27 @@ public sealed record MaterialLotUsageDto(
 
 public sealed record CompanyProfileDto(
     bool IsConfigured, string CompanyName, string? VatNumber, string? Address, string? Phone, string? Email,
-    string Sector, List<string> EnabledModules, string? Gs1CompanyPrefix = null);
+    string Sector, List<string> EnabledModules, string? Gs1CompanyPrefix = null, List<string>? Activities = null);
 
 public sealed record SaveCompanyProfileDto(
     string CompanyName, string? VatNumber, string? Address, string? Phone, string? Email,
-    string Sector, List<string> EnabledModules);
+    string Sector, List<string> EnabledModules, List<string>? Activities = null);
 
-public sealed record SectorDto(string Key, string Name, string Description, List<string> Modules);
+public sealed record SectorDto(string Key, string Name, string Description, List<string> Modules, List<string>? Departments = null);
+
+public sealed record WorkCenterTemplateDto(string Code, string Name);
+
+public sealed record DepartmentCatalogDto(string Key, string Name, string Description, List<string> Modules, List<WorkCenterTemplateDto> WorkCenters);
+
+public sealed record DepartmentDto(Guid Id, string Type, string Name, string Code, Guid? SiteId, int WorkCenterCount);
+
+public sealed record SaveDepartmentDto(string Type, string Name, Guid? SiteId, bool CreateWorkCenters);
+
+public sealed record StructureResultDto(int CreatedDepartments, int UpdatedDepartments, int CreatedWorkCenters);
 
 public sealed record ModuleDto(string Key, string Name, string Description, bool SectorSpecific, bool Available = true);
 
-public sealed record CompanyCatalogDto(List<SectorDto> Sectors, List<ModuleDto> Modules);
+public sealed record CompanyCatalogDto(List<SectorDto> Sectors, List<ModuleDto> Modules, List<DepartmentCatalogDto>? Departments = null);
 
 public sealed record AccessAreaDto(string Key, string Name, string? Module);
 
