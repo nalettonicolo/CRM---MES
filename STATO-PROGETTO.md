@@ -7,7 +7,7 @@ Aggiornato: 30 settembre 2026. Questo file si aggiorna a ogni sessione di lavoro
 - **Cos'è**: gestionale di produzione (MES) con parte commerciale e documentale, per piccole e medie aziende manifatturiere. Nato per un quadrista, oggi si configura per cinque settori.
 - **Versione pubblicata**: v1.6.0 (30/09/2026), con installer per Windows e aggiornamento automatico: i PC con una versione precedente si aggiornano da soli. Comprende tutto il lavoro della v1.5.0 (la cui release si era fermata sui test).
 - **Architettura**: client Windows (WPF, .NET 8) + API web (ASP.NET Core 8) su Render + database Postgres su Neon. La stessa API serve la piattaforma web (`/app/`, Blazor WebAssembly) e la pagina dei tecnici (`/tecnici/`).
-- **Test automatici**: 290 sull'API, 116 sul client desktop e 48 sulla piattaforma web, tutti verdi (30/09/2026). Le fatture elettroniche sono validate contro lo schema ufficiale FatturaPA.
+- **Test automatici**: 292 sull'API, 116 sul client desktop e 48 sulla piattaforma web, tutti verdi (30/09/2026). Le fatture elettroniche sono validate contro lo schema ufficiale FatturaPA.
 - **Backtest end-to-end** (30/09/2026): 68 passi su 68 superati su un database vuoto e isolato, percorrendo tutti i ruoli, dal preventivo alla fattura, più cantiere, alimentare, macchine e 14 controlli di sicurezza. Dettaglio nella sezione "Backtest".
 - **Uso attuale**: interno, un'azienda con due sedi.
 
@@ -115,7 +115,7 @@ Non ancora provato: la pagina web dei tecnici dal browser con accesso reale (il 
 | Import ed export articoli da Excel (listino "LISTA WEL") | Da fare (prossimo) | Colonne Articolo, Descrizione, CodIVA, UMBase, PrezzoBase, DataCreazione; l'import lo lancia il titolare |
 | Console fornitore remota (pagamenti, stato installazioni, attivazione servizi e canone, teleassistenza) | Da progettare | Richiesta del titolare del 30/09/2026 |
 | Piattaforma web: creare e modificare anagrafiche e documenti | Da fare | Oggi si consulta tutto e si fanno i passaggi dei preventivi; la creazione di clienti, preventivi e commesse resta nel desktop |
-| Server presso il cliente | Basi pronte | L'API gira come servizio di Windows, legge `C:\ProgramData\NicoloMES\server.json`, aggiorna il database da sola (`--migrate` o `Database:AutoMigrate`), scrive log giornalieri. Mancano l'installer del server, il backup locale e la variante Docker con database incluso |
+| Server presso il cliente | Fatto, da provare su un server reale | Installer `NicoloMES-Server-Setup.exe` (dalla prossima release): crea database e utente PostgreSQL, chiave, `server.json` protetto, servizio di Windows con riavvio automatico, firewall solo rete aziendale, migrazioni, backup notturno con verifica e copia su NAS; aggiornamento rieseguendo l'installer; variante Docker con database incluso (`server/docker`); istruzioni in `server/LEGGIMI-SERVER.md`. Manca solo la prova su un Windows Server vero |
 | Teleassistenza | Basi pronte | Lato server: contatti di assistenza leggibili prima del login e diagnostica per l'amministratore (versione, database, migrazioni, disco), senza segreti. Mancano nel client: finestra Teleassistenza, avvio della sessione remota (RustDesk), pacchetto diagnostico |
 | Installer del client "da collegare in seguito" | Fatto, pubblicato con la v1.6.0 | L'installer chiede server aziendale, cloud o "collegherò il server in seguito"; nel terzo caso il programma chiede l'indirizzo al primo avvio |
 | Log centralizzati su Grafana | Pronto, non attivo | Account gratuito Grafana e variabili su Render |

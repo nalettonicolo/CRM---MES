@@ -116,12 +116,28 @@ jobs:
           $hash = Get-FileHash -Path NicoloMES-Setup.exe -Algorithm SHA256
           $hash.Hash | Out-File -FilePath NicoloMES-Setup.exe.sha256 -Encoding ascii -NoNewline
 
+      # Server installer (installer/NicoloMES-Server.iss) for a customer's own Windows server: the API is
+      # published self-contained, so the server needs no .NET installation.
+      - name: Build server installer
+        shell: pwsh
+        run: |
+          dotnet publish CrmMes.Api/CrmMes.Api.csproj -c Release -r win-x64 --self-contained true -p:Version=${{ steps.version.outputs.version }} -o publish-server
+          $iscc = Get-ChildItem "C:\Program Files (x86)\Inno Setup 6", "C:\Program Files\Inno Setup 6" -Filter ISCC.exe -ErrorAction SilentlyContinue |
+            Select-Object -First 1 -ExpandProperty FullName
+          & $iscc "/DMyAppVersion=${{ steps.version.outputs.version }}" installer\NicoloMES-Server.iss
+          if ($LASTEXITCODE -ne 0) { throw "Compilazione dell'installer del server fallita." }
+          Copy-Item installer-output\NicoloMES-Server-Setup.exe NicoloMES-Server-Setup.exe
+          $hash = Get-FileHash -Path NicoloMES-Server-Setup.exe -Algorithm SHA256
+          $hash.Hash | Out-File -FilePath NicoloMES-Server-Setup.exe.sha256 -Encoding ascii -NoNewline
+
       - name: Publish GitHub release
         uses: softprops/action-gh-release@v2
         with:
           files: |
             NicoloMES-Setup.exe
             NicoloMES-Setup.exe.sha256
+            NicoloMES-Server-Setup.exe
+            NicoloMES-Server-Setup.exe.sha256
             CrmMes.Desktop-win-x64.zip
             CrmMes.Desktop-win-x64.zip.sha256
           generate_release_notes: true

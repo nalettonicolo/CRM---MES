@@ -44,6 +44,14 @@ jobs:
           if (-not $iscc) { throw "ISCC.exe non trovato dopo l'installazione di Inno Setup." }
           & $iscc "/DMyAppVersion=0.0.0" installer\NicoloMES.iss
           if ($LASTEXITCODE -ne 0) { throw "Compilazione dell'installer fallita." }
+          dotnet publish CrmMes.Api/CrmMes.Api.csproj -c Release -r win-x64 --self-contained true -o publish-server
+          & $iscc "/DMyAppVersion=0.0.0" installer\NicoloMES-Server.iss
+          if ($LASTEXITCODE -ne 0) { throw "Compilazione dell'installer del server fallita." }
+          foreach ($script in Get-ChildItem server\windows\*.ps1) {
+            $errors = $null
+            [void][System.Management.Automation.Language.Parser]::ParseFile($script.FullName, [ref]$null, [ref]$errors)
+            if ($errors.Count -gt 0) { throw "Errore di sintassi in $($script.Name): $($errors[0].Message)" }
+          }
 
       - name: Publish test results
         if: always()

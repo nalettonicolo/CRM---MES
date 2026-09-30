@@ -1,0 +1,83 @@
+# Nicolò MES presso il cliente su un server Linux (o Windows con Docker): database, gestionale e backup
+# notturno in tre contenitori. Istruzioni in ../LEGGIMI-SERVER.md, sezione "Docker".
+#
+#   1. copia .env.example in .env e compila le tre password/chiavi (vedi i comandi nel file);
+#   2. dalla cartella principale del progetto:  docker compose -f server/docker/docker-compose.yml up -d --build
+#   3. il gestionale risponde su http://<server>:5092/ (programma desktop), /app/ (web), /tecnici/ (telefono).
+services:
+  db:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: nicolomes
+      POSTGRES_USER: nicolomes
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?imposta DB_PASSWORD in .env}
+    volumes:
+      - db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U nicolomes -d nicolomes"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  api:
+    build:
+      context: ../..
+      dockerfile: CrmMes.Api/Dockerfile
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    ports:
+      - "${PORT:-5092}:8080"
+    environment:
+      ASPNETCORE_ENVIRONMENT: Production
+      ConnectionStrings__DefaultConnection: "Host=db;Port=5432;Database=nicolomes;Username=nicolomes;Password=${DB_PASSWORD}"
+      CRM_MES_JWT_KEY: ${JWT_KEY:?imposta JWT_KEY in .env}
+      # The database is brought up to date at every start: updating = pull + up -d --build.
+      Database__AutoMigrate: "true"
+      Logs__Path: /app/logs
+      Support__Name: ${SUPPORT_NAME:-}
+      Support__Phone: ${SUPPORT_PHONE:-}
+      Support__Email: ${SUPPORT_EMAIL:-}
+      Support__RustDeskIdServer: ${RUSTDESK_SERVER:-}
+      Support__RustDeskKey: ${RUSTDESK_KEY:-}
+    volumes:
+      - api-logs:/app/logs
+
+  backup:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      PGHOST: db
+      PGDATABASE: nicolomes
+      PGUSER: nicolomes
+      PGPASSWORD: ${DB_PASSWORD}
+      RETENTION_DAYS: ${BACKUP_RETENTION_DAYS:-30}
+    volumes:
+      - ${BACKUP_DIR:-./backup}:/backup
+    # Every night at about 02:00 (container time): compressed dump, readability check, old dumps removed.
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        while true; do
+          now=$$(date +%H%M)
+          if [ "$$now" = "0200" ]; then
+            file=/backup/nicolomes-$$(date +%Y%m%d-%H%M%S).dump
+            if pg_dump --format=custom --no-owner --file "$$file" && pg_restore --list "$$file" | grep -q "TABLE DATA"; then
+              echo "$$(date) OK $$file"
+            else
+              echo "$$(date) ERRORE backup" >&2
+            fi
+            find /backup -name 'nicolomes-*.dump' -mtime +$$RETENTION_DAYS -delete
+            sleep 61
+          fi
+          sleep 30
+        done
+
+volumes:
+  db-data:
+  api-logs:

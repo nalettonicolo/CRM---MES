@@ -10,3 +10,5 @@ obj/
 *.user
 installer-output/
 publish/
+publish-server/
+server/docker/backup/
