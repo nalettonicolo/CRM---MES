@@ -1,0 +1,55 @@
+<Window x:Class="CrmMes.Desktop.SupportWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Teleassistenza" Icon="Assets/logo.ico" Width="600" SizeToContent="Height"
+        WindowStartupLocation="CenterOwner" ResizeMode="NoResize"
+        Background="{StaticResource BackgroundBrush}">
+    <StackPanel Margin="28,24">
+        <TextBlock Text="A S S I S T E N Z A" Style="{StaticResource MicroLabel}" />
+        <TextBlock Text="Teleassistenza" FontSize="22" FontWeight="SemiBold" Foreground="{StaticResource TextPrimaryBrush}" />
+        <TextBlock Foreground="{StaticResource TextSecondaryBrush}" TextWrapping="Wrap" Margin="0,6,0,14"
+                   Text="Chiama l'assistenza, fai vedere lo schermo con una sessione remota o invia il pacchetto diagnostico: niente password, solo le informazioni tecniche utili." />
+
+        <Border Background="{StaticResource SurfaceBrush}" BorderBrush="{StaticResource BorderBrush0}" BorderThickness="1" CornerRadius="8" Padding="16,12" Margin="0,0,0,12">
+            <StackPanel>
+                <TextBlock Text="Contatti" FontWeight="SemiBold" Foreground="{StaticResource TextPrimaryBrush}" Margin="0,0,0,4" />
+                <TextBlock x:Name="ContactsText" TextWrapping="Wrap" Foreground="{StaticResource TextPrimaryBrush}" Text="Caricamento..." />
+            </StackPanel>
+        </Border>
+
+        <Border Background="{StaticResource SurfaceBrush}" BorderBrush="{StaticResource BorderBrush0}" BorderThickness="1" CornerRadius="8" Padding="16,12" Margin="0,0,0,12">
+            <StackPanel>
+                <TextBlock Text="Sessione remota" FontWeight="SemiBold" Foreground="{StaticResource TextPrimaryBrush}" Margin="0,0,0,4" />
+                <TextBlock x:Name="RemoteText" TextWrapping="Wrap" Foreground="{StaticResource TextSecondaryBrush}"
+                           Text="Avvia RustDesk e comunica all'assistenza l'ID e la password che compaiono: l'assistente vede lo schermo solo finché la finestra resta aperta." />
+                <StackPanel x:Name="RustDeskServerPanel" Visibility="Collapsed" Margin="0,8,0,0">
+                    <TextBlock Foreground="{StaticResource TextSecondaryBrush}" TextWrapping="Wrap"
+                               Text="Se è la prima volta, in RustDesk apri Impostazioni &gt; Rete &gt; Server ID/Relay e inserisci:" />
+                    <DockPanel Margin="0,6,0,0">
+                        <Button DockPanel.Dock="Right" Style="{StaticResource SecondaryButton}" Content="Copia" Width="70" Height="28" Margin="8,0,0,0" Click="CopyServer_Click" />
+                        <TextBox x:Name="RustDeskServerBox" IsReadOnly="True" FontFamily="Consolas" />
+                    </DockPanel>
+                    <DockPanel Margin="0,6,0,0">
+                        <Button DockPanel.Dock="Right" Style="{StaticResource SecondaryButton}" Content="Copia" Width="70" Height="28" Margin="8,0,0,0" Click="CopyKey_Click" />
+                        <TextBox x:Name="RustDeskKeyBox" IsReadOnly="True" FontFamily="Consolas" />
+                    </DockPanel>
+                </StackPanel>
+                <Button x:Name="RemoteButton" Content="Avvia assistenza remota" Width="210" Height="36" HorizontalAlignment="Left" Margin="0,10,0,0" Click="Remote_Click" />
+            </StackPanel>
+        </Border>
+
+        <Border Background="{StaticResource SurfaceBrush}" BorderBrush="{StaticResource BorderBrush0}" BorderThickness="1" CornerRadius="8" Padding="16,12">
+            <StackPanel>
+                <TextBlock Text="Informazioni per l'assistenza" FontWeight="SemiBold" Foreground="{StaticResource TextPrimaryBrush}" Margin="0,0,0,4" />
+                <TextBlock x:Name="InfoText" TextWrapping="Wrap" FontFamily="Consolas" FontSize="12.5" Foreground="{StaticResource TextPrimaryBrush}" />
+                <StackPanel Orientation="Horizontal" Margin="0,10,0,0">
+                    <Button x:Name="PackageButton" Content="Crea pacchetto diagnostico" Width="210" Height="36" Margin="0,0,10,0" Click="Package_Click" />
+                    <Button Style="{StaticResource SecondaryButton}" Content="Copia informazioni" Width="160" Height="36" Click="CopyInfo_Click" />
+                </StackPanel>
+            </StackPanel>
+        </Border>
+
+        <TextBlock x:Name="ResultText" TextWrapping="Wrap" Margin="0,12,0,0" />
+        <Button Style="{StaticResource SecondaryButton}" Content="Chiudi" Width="110" Height="36" HorizontalAlignment="Right" Margin="0,14,0,0" Click="Close_Click" />
+    </StackPanel>
+</Window>

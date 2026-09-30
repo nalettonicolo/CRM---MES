@@ -405,6 +405,12 @@ public partial class MainWindow : Window
         return await _apiClient.RefreshAsync(auth.RefreshToken);
     }
 
+    private void SupportButton_Click(object sender, RoutedEventArgs e)
+    {
+        var window = new SupportWindow(_apiClient, new OfflineActionQueue().Count) { Owner = this };
+        window.ShowDialog();
+    }
+
     private void SecurityButton_Click(object sender, RoutedEventArgs e)
     {
         var window = new TwoFactorWindow(_apiClient) { Owner = this };

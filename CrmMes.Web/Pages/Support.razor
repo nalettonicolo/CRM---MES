@@ -1,0 +1,106 @@
+@page "/assistenza"
+@inject Api Api
+@inject Session Session
+
+<PageTitle>Assistenza · Nicolò MES</PageTitle>
+
+<div class="page-head">
+    <div>
+        <div class="eyebrow">Aiuto</div>
+        <h1>Assistenza</h1>
+        <p class="sub">Chi chiamare, come far vedere lo schermo e lo stato del server.</p>
+    </div>
+</div>
+
+@if (_error is not null)
+{
+    <div class="alert" role="alert">@_error</div>
+}
+
+@if (_info is null && _error is null)
+{
+    <div class="card state">Caricamento...</div>
+}
+else if (_info is not null)
+{
+    <div class="stack">
+        <div class="card card-pad">
+            <h2>Contatti</h2>
+            @if (_info.Name is null && _info.Phone is null && _info.Email is null)
+            {
+                <p class="muted">Contatti non ancora impostati: chiedi all'amministratore chi presta assistenza.</p>
+            }
+            else
+            {
+                <div class="facts">
+                    @if (_info.Name is not null) {<div class="fact"><div class="label">Assistenza</div><div class="value">@_info.Name</div></div>}
+                    @if (_info.Phone is not null) {<div class="fact"><div class="label">Telefono</div><div class="value"><a href="tel:@_info.Phone">@_info.Phone</a></div></div>}
+                    @if (_info.Email is not null) {<div class="fact"><div class="label">Email</div><div class="value"><a href="mailto:@_info.Email">@_info.Email</a></div></div>}
+                    @if (_info.Hours is not null) {<div class="fact"><div class="label">Orari</div><div class="value">@_info.Hours</div></div>}
+                </div>
+            }
+        </div>
+
+        <div class="card card-pad">
+            <h2>Sessione remota</h2>
+            <p class="muted small">Scarica e avvia RustDesk (gratuito), poi comunica all'assistenza l'ID e la password che compaiono: l'assistente vede lo schermo solo finché la finestra resta aperta.</p>
+            @if (_info.RustDeskIdServer is not null)
+            {
+                <p class="small">Server da impostare in RustDesk (Impostazioni &gt; Rete): <CopyCode Value="@_info.RustDeskIdServer" />
+                    @if (_info.RustDeskKey is not null) {<span> · chiave <CopyCode Value="@_info.RustDeskKey" /></span>}
+                </p>
+            }
+            <a class="button" href="https://rustdesk.com/download" target="_blank" rel="noopener noreferrer">Scarica RustDesk</a>
+        </div>
+
+        <div class="card card-pad">
+            <h2>Server</h2>
+            <div class="facts">
+                <div class="fact"><div class="label">Versione</div><div class="value">@_info.ServerVersion</div></div>
+                <div class="fact"><div class="label">Installazione</div><div class="value">@HostingName(_info.Hosting)</div></div>
+                @if (_diagnostics is not null)
+                {
+                    <div class="fact"><div class="label">Database</div><div class="value">@(_diagnostics.Database.CanConnect ? "raggiungibile" : "NON raggiungibile")</div></div>
+                    <div class="fact"><div class="label">Migrazioni in attesa</div><div class="value">@(_diagnostics.Database.PendingMigrations.Count == 0 ? "nessuna" : string.Join(", ", _diagnostics.Database.PendingMigrations))</div></div>
+                    <div class="fact"><div class="label">Acceso da</div><div class="value">@Labels.Number((decimal)_diagnostics.UptimeHours) ore</div></div>
+                    <div class="fact"><div class="label">Spazio libero</div><div class="value">@(_diagnostics.FreeDiskGigabytes is null ? "—" : Labels.Number((decimal)_diagnostics.FreeDiskGigabytes.Value) + " GB")</div></div>
+                    <div class="fact"><div class="label">Utenti attivi</div><div class="value">@(_diagnostics.Database.ActiveUsers?.ToString() ?? "—")</div></div>
+                    <div class="fact"><div class="label">Commesse aperte</div><div class="value">@(_diagnostics.Database.OpenWorkOrders?.ToString() ?? "—")</div></div>
+                }
+            </div>
+            @if (_diagnostics?.LogsPath is not null)
+            {
+                <p class="muted small">Log del server: <span class="code">@_diagnostics.LogsPath</span></p>
+            }
+        </div>
+    </div>
+}
+
+@code {
+    private SupportInfo? _info;
+    private ServerDiagnostics? _diagnostics;
+    private string? _error;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            _info = await Api.GetAsync<SupportInfo>("api/support/info");
+            if (Session.IsAdmin)
+            {
+                _diagnostics = await Api.GetAsync<ServerDiagnostics>("api/support/diagnostics");
+            }
+        }
+        catch (ApiException exception)
+        {
+            _error = exception.Message;
+        }
+    }
+
+    private static string HostingName(string hosting) => hosting switch
+    {
+        "cloud" => "Cloud",
+        "on-premise" => "Server aziendale",
+        _ => "Altro",
+    };
+}

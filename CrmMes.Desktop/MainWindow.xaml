@@ -52,6 +52,7 @@
                         <Button x:Name="LoginButton" Content="ACCEDI →" Height="42" Margin="0,26,0,0" Click="LoginButton_Click" IsEnabled="False" />
                         <TextBlock x:Name="LoginError" Margin="0,12,0,0" Foreground="{StaticResource DangerBrush}" TextWrapping="Wrap" />
                         <Button x:Name="LoginSettingsButton" Style="{StaticResource SidebarLinkButton}" Content="Impostazioni server" Foreground="{StaticResource TextMutedBrush}" HorizontalAlignment="Center" Margin="0,18,0,0" Click="SettingsButton_Click" />
+                        <Button x:Name="LoginSupportButton" Style="{StaticResource SidebarLinkButton}" Content="Teleassistenza" Foreground="{StaticResource TextMutedBrush}" HorizontalAlignment="Center" Margin="0,6,0,0" Click="SupportButton_Click" />
                     </StackPanel>
                 </Border>
             </Grid>
@@ -77,6 +78,7 @@
                                 <Button x:Name="UpdateButton" Style="{StaticResource SidebarLinkButton}" Content="Controlla aggiornamenti" Margin="0,10,0,0" Click="UpdateButton_Click" />
                                 <Button x:Name="ChangePasswordButton" Style="{StaticResource SidebarLinkButton}" Content="Cambia password" Margin="0,6,0,0" Click="ChangePasswordButton_Click" />
                                 <Button x:Name="SecurityButton" Style="{StaticResource SidebarLinkButton}" Content="Verifica in due passaggi" Margin="0,6,0,0" Click="SecurityButton_Click" />
+                                <Button x:Name="SupportButton" Style="{StaticResource SidebarLinkButton}" Content="Teleassistenza" Margin="0,6,0,0" Click="SupportButton_Click" />
                                 <Button x:Name="SidebarSettingsButton" Style="{StaticResource SidebarLinkButton}" Content="Impostazioni server" Margin="0,6,0,0" Click="SettingsButton_Click" Visibility="Collapsed" />
                             </StackPanel>
                         </Border>

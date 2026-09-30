@@ -172,6 +172,23 @@ public sealed class ApiClient
         }
     }
 
+    /// <summary>Support contacts: readable without login (the login screen's Teleassistenza link).</summary>
+    public async Task<SupportInfoDto> GetSupportInfoAsync(CancellationToken cancellationToken = default)
+    {
+        using var response = await _httpClient.GetAsync("api/support/info", cancellationToken);
+        await EnsureSuccessAsync(response, cancellationToken);
+        return await response.Content.ReadFromJsonAsync<SupportInfoDto>(cancellationToken: cancellationToken)
+            ?? throw new InvalidOperationException("Risposta di assistenza non valida.");
+    }
+
+    /// <summary>Server state for the diagnostic package (Admin only), kept as raw JSON.</summary>
+    public async Task<System.Text.Json.JsonElement> GetServerDiagnosticsAsync(CancellationToken cancellationToken = default)
+    {
+        using var response = await _httpClient.GetAsync("api/support/diagnostics", cancellationToken);
+        await EnsureSuccessAsync(response, cancellationToken);
+        return await response.Content.ReadFromJsonAsync<System.Text.Json.JsonElement>(cancellationToken: cancellationToken);
+    }
+
     public Task<TwoFactorStatusDto> GetTwoFactorStatusAsync(CancellationToken cancellationToken = default)
         => GetOneAsync<TwoFactorStatusDto>("api/account/2fa", cancellationToken);
 
@@ -1832,6 +1849,10 @@ public sealed record AuthDto(
     bool TwoFactorSetupRequired = false);
 
 public sealed record TwoFactorStatusDto(bool Enabled, bool Required, int RecoveryCodesLeft);
+
+public sealed record SupportInfoDto(
+    string? Name, string? Email, string? Phone, string? Hours, string? RustDeskIdServer, string? RustDeskKey,
+    string? RemoteToolUrl, string ServerVersion, string Hosting);
 
 public sealed record TwoFactorSetupDto(string Secret, string OtpAuthUri, string QrCodePng);
 

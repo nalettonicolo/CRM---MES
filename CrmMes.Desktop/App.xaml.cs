@@ -21,6 +21,28 @@ public partial class App : Application
             typeof(FrameworkElement),
             new FrameworkPropertyMetadata(XmlLanguage.GetLanguage(italian.IetfLanguageTag)));
 
+        // Every error the program didn't handle ends up in the client log (Teleassistenza sends it).
+        DispatcherUnhandledException += (_, args) =>
+        {
+            ClientLog.Error("Errore non gestito", args.Exception);
+            MessageBox.Show($"Si è verificato un errore imprevisto: {args.Exception.Message}\n\nL'errore è stato registrato: da Teleassistenza puoi inviarlo all'assistenza.",
+                "Nicolò MES", MessageBoxButton.OK, MessageBoxImage.Warning);
+            args.Handled = true;
+        };
+        AppDomain.CurrentDomain.UnhandledException += (_, args) =>
+        {
+            if (args.ExceptionObject is Exception exception)
+            {
+                ClientLog.Error("Errore fatale", exception);
+            }
+        };
+        System.Threading.Tasks.TaskScheduler.UnobservedTaskException += (_, args) =>
+        {
+            ClientLog.Error("Operazione in background", args.Exception);
+            args.SetObserved();
+        };
+        ClientLog.Info($"Avvio versione {SupportPackage.ClientVersion}");
+
         base.OnStartup(e);
     }
 }

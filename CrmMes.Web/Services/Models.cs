@@ -14,6 +14,19 @@ public sealed record RecoveryCodeList(List<string> RecoveryCodes);
 
 public sealed record SecuritySettings(List<string> TwoFactorRoles, List<string> KnownRoles);
 
+public sealed record SupportInfo(
+    string? Name, string? Email, string? Phone, string? Hours, string? RustDeskIdServer, string? RustDeskKey,
+    string? RemoteToolUrl, string ServerVersion, string Hosting);
+
+public sealed record DatabaseState(
+    string Provider, bool CanConnect, int? AppliedMigrations, string? LastMigration, List<string> PendingMigrations,
+    long? SizeBytes, int? ActiveUsers, int? OpenWorkOrders);
+
+public sealed record ServerDiagnostics(
+    string ServerVersion, string Hosting, string Environment, string MachineName, string OperatingSystem, string Runtime,
+    DateTime ServerTimeUtc, DateTime StartedAtUtc, double UptimeHours, bool ConfigFileLoaded, string? LogsPath,
+    double? FreeDiskGigabytes, double? FreeLogDiskGigabytes, DatabaseState Database);
+
 public sealed record CompanyProfile(
     bool IsConfigured, string CompanyName, string? VatNumber, string? Address, string? Phone, string? Email,
     string Sector, List<string> EnabledModules, string? Gs1CompanyPrefix = null);
