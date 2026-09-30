@@ -1,0 +1,238 @@
+@page "/ordini-fornitore/{Id:guid}"
+@inject Api Api
+@inject Session Session
+
+<PageTitle>@(_order?.Code ?? "Ordine fornitore") · Nicolò MES</PageTitle>
+
+<div class="page-head">
+    <div>
+        <div class="eyebrow"><a href="ordini-fornitore">Ordini fornitore</a></div>
+        <h1>@(_order is null ? "Ordine fornitore" : $"Ordine {_order.Code}")</h1>
+        @if (_supplier is not null)
+        {
+            <p class="sub"><a href="fornitori/@_supplier.Id">@_supplier.Name</a></p>
+        }
+    </div>
+    @if (_order is not null)
+    {
+        <span class="badge @Labels.PurchaseOrderStatusClass(_order.Status)">@Labels.PurchaseOrderStatus(_order.Status)</span>
+    }
+</div>
+
+@if (_error is not null)
+{
+    <div class="card state"><strong>Impossibile aprire l'ordine</strong>@_error</div>
+}
+else if (_order is null)
+{
+    <div class="card state">Caricamento...</div>
+}
+else
+{
+    <div class="stack">
+        @if (PurchasingRules.IsLate(_order.ExpectedDeliveryDate, _order.Status, DateTime.UtcNow))
+        {
+            <div class="alert">Consegna prevista il @Labels.Date(_order.ExpectedDeliveryDate): in ritardo. Sollecita il fornitore.</div>
+        }
+
+        <div class="card card-pad">
+            <div class="facts">
+                <div class="fact"><div class="label">Codice</div><div class="value"><CopyCode Value="@_order.Code" /></div></div>
+                <div class="fact"><div class="label">Creato</div><div class="value">@Labels.Date(_order.CreatedAt)</div></div>
+                <div class="fact"><div class="label">Confermato</div><div class="value">@Labels.DateTime(_order.ConfirmedAt)</div></div>
+                <div class="fact"><div class="label">Consegna prevista</div><div class="value">@Labels.Date(_order.ExpectedDeliveryDate)</div></div>
+                <div class="fact"><div class="label">Ricevuto</div><div class="value">@Labels.DateTime(_order.ReceivedAt)</div></div>
+                <div class="fact"><div class="label">Valore</div><div class="value">@Labels.Money(_order.Items.Sum(i => i.Quantity * i.UnitPrice))</div></div>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="section-head">
+                <h2>@(_receiving ? "Ricevimento merce" : "Righe")</h2>
+                @if (_receiving)
+                {
+                    <span class="small muted">Quantità arrivata e lotto del fornitore; senza lotto ne viene creato uno</span>
+                }
+            </div>
+            <div class="table-wrap">
+                <table class="cards">
+                    <thead>
+                        <tr>
+                            <th>Materiale</th><th class="num">Ordinato</th><th class="num">Ricevuto</th>
+                            @if (_receiving) {<th>Arrivato ora</th><th>Lotto</th>} else {<th class="num">Prezzo</th><th>Stato</th>}
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var item in _order.Items)
+                        {
+                            <tr>
+                                <td data-label="Materiale">@item.Description <div class="small muted code">@item.MaterialCode</div></td>
+                                <td data-label="Ordinato" class="num">@Labels.Number(item.Quantity)</td>
+                                <td data-label="Ricevuto" class="num">@Labels.Number(item.ReceivedQuantity)</td>
+                                @if (_receiving)
+                                {
+                                    var entry = _entries[item.Id];
+                                    <td data-label="Arrivato ora">
+                                        <input type="number" min="0" step="any" inputmode="decimal" aria-label="Quantità arrivata di @item.MaterialCode"
+                                               disabled="@(item.Remaining == 0)" @bind="entry.Quantity" />
+                                    </td>
+                                    <td data-label="Lotto">
+                                        <input type="text" aria-label="Lotto di @item.MaterialCode" placeholder="Facoltativo"
+                                               disabled="@(item.Remaining == 0)" @bind="entry.LotNumber" />
+                                    </td>
+                                }
+                                else
+                                {
+                                    <td data-label="Prezzo" class="num">@Labels.Money(item.UnitPrice)</td>
+                                    <td data-label="Stato">
+                                        @if (item.Remaining == 0)
+                                        {
+                                            <span class="badge ok">Completa</span>
+                                        }
+                                        else if (item.ReceivedQuantity > 0)
+                                        {
+                                            <span class="badge warn">Mancano @Labels.Number(item.Remaining)</span>
+                                        }
+                                        else
+                                        {
+                                            <span class="badge">Da ricevere</span>
+                                        }
+                                    </td>
+                                }
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        @if (_message is not null)
+        {
+            <div class="success" role="status">@_message</div>
+        }
+        @if (_actionError is not null)
+        {
+            <div class="alert" role="alert">@_actionError</div>
+        }
+
+        <div class="actions">
+            @if (_receiving)
+            {
+                <button class="secondary" @onclick="() => _receiving = false" disabled="@_busy">Annulla</button>
+                <button @onclick="ReceiveAsync" disabled="@_busy">@(_busy ? "Registrazione..." : "Registra l'arrivo")</button>
+            }
+            else
+            {
+                @if (PurchasingRules.CanConfirm(_order, Session.Role))
+                {
+                    <button @onclick="ConfirmAsync" disabled="@_busy">Conferma l'ordine</button>
+                }
+                @if (PurchasingRules.CanReceive(_order, Session.Role))
+                {
+                    <button @onclick="StartReceiving">Ricevi merce</button>
+                }
+            }
+        </div>
+    </div>
+}
+
+@code {
+    [Parameter] public Guid Id { get; set; }
+
+    private sealed class ReceiveEntry
+    {
+        public decimal? Quantity { get; set; }
+        public string? LotNumber { get; set; }
+    }
+
+    private PurchaseOrder? _order;
+    private Supplier? _supplier;
+    private Dictionary<Guid, ReceiveEntry> _entries = [];
+    private bool _receiving;
+    private bool _busy;
+    private string? _error;
+    private string? _actionError;
+    private string? _message;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        _order = null;
+        _error = null;
+        try
+        {
+            _order = await Api.GetAsync<PurchaseOrder>($"api/procurement/purchase-orders/{Id}");
+            var suppliers = await Api.GetAsync<List<Supplier>>("api/suppliers");
+            _supplier = suppliers.FirstOrDefault(s => s.Id == _order.SupplierId);
+        }
+        catch (ApiException exception)
+        {
+            _error = exception.Message;
+        }
+    }
+
+    /// <summary>Proposes what is still missing on each line: usually the whole delivery arrives.</summary>
+    private void StartReceiving()
+    {
+        _entries = _order!.Items.ToDictionary(i => i.Id, i => new ReceiveEntry { Quantity = i.Remaining > 0 ? i.Remaining : null });
+        _message = null;
+        _actionError = null;
+        _receiving = true;
+    }
+
+    private async Task ConfirmAsync()
+    {
+        await RunAsync(async () =>
+        {
+            _order = await Api.PostAsync<PurchaseOrder>($"api/procurement/purchase-orders/{Id}/confirm");
+            _message = "Ordine confermato.";
+        });
+    }
+
+    private async Task ReceiveAsync()
+    {
+        var lines = _order!.Items
+            .Where(i => _entries.TryGetValue(i.Id, out var e) && e.Quantity is > 0)
+            .Select(i => new { purchaseOrderItemId = i.Id, quantity = _entries[i.Id].Quantity!.Value, lotNumber = string.IsNullOrWhiteSpace(_entries[i.Id].LotNumber) ? null : _entries[i.Id].LotNumber!.Trim() })
+            .ToList();
+        if (lines.Count == 0)
+        {
+            _actionError = "Indica la quantità arrivata di almeno una riga.";
+            return;
+        }
+
+        var over = _order.Items.FirstOrDefault(i => _entries[i.Id].Quantity > i.Remaining);
+        if (over is not null)
+        {
+            _actionError = $"Per {over.MaterialCode} mancano solo {Labels.Number(over.Remaining)}: controlla la quantità.";
+            return;
+        }
+
+        await RunAsync(async () =>
+        {
+            _order = await Api.PostAsync<PurchaseOrder>($"api/procurement/purchase-orders/{Id}/receive", new { items = lines });
+            _receiving = false;
+            _message = _order.Status == "Received"
+                ? "Merce registrata: ordine completo, giacenze e lotti aggiornati."
+                : "Merce registrata: giacenze e lotti aggiornati. L'ordine resta aperto per il resto.";
+        });
+    }
+
+    private async Task RunAsync(Func<Task> action)
+    {
+        _busy = true;
+        _actionError = null;
+        _message = null;
+        try
+        {
+            await action();
+        }
+        catch (ApiException exception)
+        {
+            _actionError = exception.Message;
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+}

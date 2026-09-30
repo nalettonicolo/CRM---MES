@@ -1,0 +1,121 @@
+@page "/fornitori/{Id:guid}"
+@inject Api Api
+@inject Session Session
+@inject NavigationManager Nav
+
+<PageTitle>@(_supplier?.Name ?? "Fornitore") · Nicolò MES</PageTitle>
+
+<div class="page-head">
+    <div>
+        <div class="eyebrow"><a href="fornitori">Fornitori</a></div>
+        <h1>@(_supplier?.Name ?? "Fornitore")</h1>
+    </div>
+</div>
+
+@if (_error is not null)
+{
+    <div class="card state"><strong>Impossibile aprire il fornitore</strong>@_error</div>
+}
+else if (_supplier is null)
+{
+    <div class="card state">Caricamento...</div>
+}
+else
+{
+    <div class="stack">
+        <div class="card card-pad">
+            <div class="facts">
+                <div class="fact"><div class="label">Codice</div><div class="value"><CopyCode Value="@_supplier.Code" /></div></div>
+                <div class="fact"><div class="label">Telefono</div><div class="value">@(_supplier.Phone ?? "—")</div></div>
+                <div class="fact"><div class="label">Email</div><div class="value">@(_supplier.Email ?? "—")</div></div>
+                <div class="fact"><div class="label">Sito</div><div class="value">@(_supplier.Website ?? "—")</div></div>
+            </div>
+        </div>
+
+        <div class="grid-2">
+            <div class="card">
+                <div class="section-head"><h2>Ordini</h2><span class="small muted">@_supplier.PurchaseOrders.Count</span></div>
+                @if (_supplier.PurchaseOrders.Count == 0)
+                {
+                    <div class="state">Nessun ordine a questo fornitore.</div>
+                }
+                else
+                {
+                    <div class="table-wrap">
+                        <table class="cards">
+                            <thead><tr><th>Ordine</th><th>Data</th><th>Stato</th></tr></thead>
+                            <tbody>
+                                @foreach (var order in _supplier.PurchaseOrders.OrderByDescending(o => o.CreatedAt))
+                                {
+                                    <tr class="@(CanOpenOrders ? "link" : "")" @onclick="@(() => OpenOrder(order.Id))">
+                                        <td data-label="Ordine" class="code">@order.Code</td>
+                                        <td data-label="Data">@Labels.Date(order.CreatedAt)</td>
+                                        <td data-label="Stato"><span class="badge @Labels.PurchaseOrderStatusClass(order.Status)">@Labels.PurchaseOrderStatus(order.Status)</span></td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                }
+            </div>
+
+            <div class="card">
+                <div class="section-head"><h2>Listino</h2><span class="small muted">@_supplier.CatalogEntries.Count articoli</span></div>
+                @if (_supplier.CatalogEntries.Count == 0)
+                {
+                    <div class="state">Nessun articolo a listino.</div>
+                }
+                else
+                {
+                    <div class="table-wrap">
+                        <table class="cards">
+                            <thead><tr><th>Materiale</th><th>Codice fornitore</th><th class="num">Prezzo</th><th class="num">Consegna</th></tr></thead>
+                            <tbody>
+                                @foreach (var entry in _supplier.CatalogEntries)
+                                {
+                                    <tr>
+                                        <td data-label="Materiale">@entry.MaterialName <div class="small muted code">@entry.MaterialCode</div></td>
+                                        <td data-label="Codice fornitore"><CopyCode Value="@entry.PartNumber" /></td>
+                                        <td data-label="Prezzo" class="num">@Labels.Money(entry.UnitPrice)</td>
+                                        <td data-label="Consegna" class="num">@Labels.Number(entry.LeadTimeDays) gg</td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                }
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    [Parameter] public Guid Id { get; set; }
+
+    private SupplierDetail? _supplier;
+    private string? _error;
+
+    private bool CanOpenOrders => PurchasingRules.CanSeeOrders(Session.Role);
+
+    private void OpenOrder(Guid id)
+    {
+        if (CanOpenOrders)
+        {
+            Nav.NavigateTo($"ordini-fornitore/{id}");
+        }
+    }
+
+    protected override async Task OnParametersSetAsync()
+    {
+        _supplier = null;
+        _error = null;
+        try
+        {
+            _supplier = await Api.GetAsync<SupplierDetail>($"api/suppliers/{Id}/detail");
+        }
+        catch (ApiException exception)
+        {
+            _error = exception.Message;
+        }
+    }
+}

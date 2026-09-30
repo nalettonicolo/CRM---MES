@@ -1,0 +1,118 @@
+@page "/da-ordinare"
+@inject Api Api
+@inject Session Session
+
+<PageTitle>Da ordinare · Nicolò MES</PageTitle>
+
+<div class="page-head">
+    <div>
+        <div class="eyebrow">Acquisti</div>
+        <h1>Da ordinare</h1>
+        <p class="sub">Materiali sotto la scorta minima e mancanti segnalati.</p>
+    </div>
+</div>
+
+@if (!PurchasingRules.CanSeeOrders(Session.Role))
+{
+    <div class="card state"><strong>Non disponibile per il tuo ruolo</strong>Questa pagina è per acquisti e magazzino.</div>
+}
+else if (_error is not null)
+{
+    <div class="card state"><strong>Impossibile caricare i dati</strong>@_error
+        <div class="actions"><button class="secondary small" @onclick="LoadAsync">Riprova</button></div></div>
+}
+else if (_lowStock is null || _missing is null)
+{
+    <div class="card state">Caricamento...</div>
+}
+else
+{
+    <div class="stack">
+        <div class="card">
+            <div class="section-head"><h2>Sotto scorta</h2><span class="small muted">@_lowStock.Count materiali</span></div>
+            @if (_lowStock.Count == 0)
+            {
+                <div class="state"><strong>Tutto sopra la scorta minima</strong>Nessun materiale da riordinare.</div>
+            }
+            else
+            {
+                <div class="table-wrap">
+                    <table class="cards">
+                        <thead><tr><th>Materiale</th><th class="num">Giacenza</th><th class="num">Minimo</th><th class="num">Da ordinare</th><th>Stato</th></tr></thead>
+                        <tbody>
+                            @foreach (var material in _lowStock)
+                            {
+                                <tr>
+                                    <td data-label="Materiale">@material.Name <div class="small muted code">@material.Code</div></td>
+                                    <td data-label="Giacenza" class="num">@Labels.Number(material.Stock) @material.Unit</td>
+                                    <td data-label="Minimo" class="num muted">@Labels.Number(material.MinStock) @material.Unit</td>
+                                    <td data-label="Da ordinare" class="num"><strong>@Labels.Number(material.SuggestedQuantity) @material.Unit</strong></td>
+                                    <td data-label="Stato">
+                                        @if (material.AlreadyRequested)
+                                        {
+                                            <span class="badge info">Già richiesto</span>
+                                        }
+                                        else
+                                        {
+                                            <span class="badge warn">Da ordinare</span>
+                                        }
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            }
+        </div>
+
+        <div class="card">
+            <div class="section-head"><h2>Mancanti segnalati</h2><span class="small muted">@_missing.Count aperti</span></div>
+            @if (_missing.Count == 0)
+            {
+                <div class="state">Nessun materiale mancante aperto.</div>
+            }
+            else
+            {
+                <div class="table-wrap">
+                    <table class="cards">
+                        <thead><tr><th>Materiale</th><th class="num">Quantità</th><th>Origine</th><th>Dal</th></tr></thead>
+                        <tbody>
+                            @foreach (var item in _missing)
+                            {
+                                <tr>
+                                    <td data-label="Materiale" class="code">@item.MaterialCode</td>
+                                    <td data-label="Quantità" class="num">@Labels.Number(item.Quantity)</td>
+                                    <td data-label="Origine" class="muted">@Labels.MissingSource(item.Source)</td>
+                                    <td data-label="Dal">@Labels.Date(item.CreatedAt)</td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            }
+        </div>
+        <p class="small muted">Gli ordini ai fornitori si creano dal programma desktop, partendo da questi elenchi.</p>
+    </div>
+}
+
+@code {
+    private List<LowStockMaterial>? _lowStock;
+    private List<MissingMaterial>? _missing;
+    private string? _error;
+
+    protected override Task OnInitializedAsync() => PurchasingRules.CanSeeOrders(Session.Role) ? LoadAsync() : Task.CompletedTask;
+
+    private async Task LoadAsync()
+    {
+        _error = null;
+        try
+        {
+            _lowStock = await Api.GetAsync<List<LowStockMaterial>>("api/procurement/low-stock");
+            _missing = await Api.GetAsync<List<MissingMaterial>>("api/procurement/missing");
+        }
+        catch (ApiException exception)
+        {
+            _error = exception.Message;
+        }
+    }
+}

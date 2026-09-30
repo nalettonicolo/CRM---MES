@@ -1,0 +1,127 @@
+@page "/ordini-fornitore"
+@inject Api Api
+@inject Session Session
+@inject NavigationManager Nav
+
+<PageTitle>Ordini fornitore · Nicolò MES</PageTitle>
+
+<div class="page-head">
+    <div>
+        <div class="eyebrow">Acquisti</div>
+        <h1>Ordini fornitore</h1>
+        <p class="sub">Ordini in corso, consegne in ritardo e merce da ricevere.</p>
+    </div>
+</div>
+
+@if (!PurchasingRules.CanSeeOrders(Session.Role))
+{
+    <div class="card state"><strong>Non disponibile per il tuo ruolo</strong>Gli ordini fornitore sono per acquisti e magazzino.</div>
+}
+else
+{
+    <div class="toolbar">
+        <input class="search" type="search" placeholder="Codice ordine o fornitore" aria-label="Filtra ordini" @bind="_search" @bind:event="oninput" />
+        <div class="chips" role="group" aria-label="Stato">
+            @foreach (var (key, label) in Filters)
+            {
+                <button class="chip @(_status == key ? "active" : "")" aria-pressed="@(_status == key)" @onclick="() => ChangeStatusAsync(key)">@label</button>
+            }
+        </div>
+    </div>
+
+    <div class="card">
+        @if (_error is not null)
+        {
+            <div class="state"><strong>Impossibile caricare gli ordini</strong>@_error
+                <div class="actions"><button class="secondary small" @onclick="LoadAsync">Riprova</button></div></div>
+        }
+        else if (_orders is null)
+        {
+            <div class="state">Caricamento...</div>
+        }
+        else if (Visible.Count == 0)
+        {
+            <div class="state"><strong>Nessun ordine</strong>@(string.IsNullOrWhiteSpace(_search) ? "Nessun ordine in questo stato." : $"Nessun ordine corrisponde a \"{_search}\".")</div>
+        }
+        else
+        {
+            <div class="table-wrap">
+                <table class="cards">
+                    <thead><tr><th>Ordine</th><th>Fornitore</th><th>Creato</th><th>Consegna prevista</th><th class="num">Righe</th><th>Stato</th></tr></thead>
+                    <tbody>
+                        @foreach (var order in Visible)
+                        {
+                            <tr class="link" @onclick="@(() => Nav.NavigateTo($"ordini-fornitore/{order.Id}"))">
+                                <td data-label="Ordine"><CopyCode Value="@order.Code" /></td>
+                                <td data-label="Fornitore">@SupplierName(order.SupplierId)</td>
+                                <td data-label="Creato">@Labels.Date(order.CreatedAt)</td>
+                                <td data-label="Consegna prevista">
+                                    @Labels.Date(order.ExpectedDeliveryDate)
+                                    @if (PurchasingRules.IsLate(order.ExpectedDeliveryDate, order.Status, DateTime.UtcNow))
+                                    {
+                                        <span class="badge danger">In ritardo</span>
+                                    }
+                                </td>
+                                <td data-label="Righe" class="num">@order.ItemCount</td>
+                                <td data-label="Stato"><span class="badge @Labels.PurchaseOrderStatusClass(order.Status)">@Labels.PurchaseOrderStatus(order.Status)</span></td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        }
+    </div>
+}
+
+@code {
+    private static readonly (string Key, string Label)[] Filters =
+    [
+        ("open", "Da ricevere"), ("Draft", "Bozze"), ("Received", "Ricevuti"), ("Cancelled", "Annullati"), ("", "Tutti"),
+    ];
+
+    private string _status = "open";
+    private string _search = string.Empty;
+    private List<PurchaseOrderSummary>? _orders;
+    private Dictionary<Guid, string> _suppliers = [];
+    private string? _error;
+
+    private string SupplierName(Guid id) => _suppliers.GetValueOrDefault(id, "—");
+
+    /// <summary>"Da ricevere" is confirmed plus partly received: what the warehouse is waiting for.</summary>
+    private List<PurchaseOrderSummary> Visible => (_orders ?? [])
+        .Where(o => _status != "open" || o.Status is "Confirmed" or "PartiallyReceived")
+        .Where(o => string.IsNullOrWhiteSpace(_search)
+            || o.Code.Contains(_search.Trim(), StringComparison.OrdinalIgnoreCase)
+            || SupplierName(o.SupplierId).Contains(_search.Trim(), StringComparison.OrdinalIgnoreCase))
+        .OrderBy(o => o.ExpectedDeliveryDate ?? DateTime.MaxValue)
+        .ThenByDescending(o => o.CreatedAt)
+        .ToList();
+
+    protected override Task OnInitializedAsync() => PurchasingRules.CanSeeOrders(Session.Role) ? LoadAsync() : Task.CompletedTask;
+
+    private async Task ChangeStatusAsync(string status)
+    {
+        _status = status;
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        _error = null;
+        _orders = null;
+        try
+        {
+            if (_suppliers.Count == 0)
+            {
+                _suppliers = (await Api.GetAsync<List<Supplier>>("api/suppliers")).ToDictionary(s => s.Id, s => s.Name);
+            }
+
+            var status = _status is "open" or "" ? string.Empty : _status;
+            _orders = await Api.GetAsync<List<PurchaseOrderSummary>>(status.Length == 0 ? "api/procurement/purchase-orders" : $"api/procurement/purchase-orders?status={status}");
+        }
+        catch (ApiException exception)
+        {
+            _error = exception.Message;
+        }
+    }
+}

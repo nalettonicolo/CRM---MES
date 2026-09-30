@@ -1,0 +1,81 @@
+@page "/fornitori"
+@inject Api Api
+@inject NavigationManager Nav
+
+<PageTitle>Fornitori · Nicolò MES</PageTitle>
+
+<div class="page-head">
+    <div>
+        <div class="eyebrow">Acquisti</div>
+        <h1>Fornitori</h1>
+        <p class="sub">Fornitori e terzisti, con ordini e listino.</p>
+    </div>
+</div>
+
+<div class="toolbar">
+    <input class="search" type="search" placeholder="Nome o codice" aria-label="Filtra fornitori" @bind="_search" @bind:event="oninput" />
+</div>
+
+<div class="card">
+    @if (_error is not null)
+    {
+        <div class="state"><strong>Impossibile caricare i fornitori</strong>@_error
+            <div class="actions"><button class="secondary small" @onclick="LoadAsync">Riprova</button></div></div>
+    }
+    else if (_suppliers is null)
+    {
+        <div class="state">Caricamento...</div>
+    }
+    else if (Visible.Count == 0)
+    {
+        <div class="state"><strong>Nessun fornitore</strong>@(string.IsNullOrWhiteSpace(_search) ? "I fornitori si aggiungono dal programma desktop." : $"Nessun fornitore corrisponde a \"{_search}\".")</div>
+    }
+    else
+    {
+        <div class="table-wrap">
+            <table class="cards">
+                <thead><tr><th>Codice</th><th>Nome</th><th>Telefono</th><th>Email</th></tr></thead>
+                <tbody>
+                    @foreach (var supplier in Visible)
+                    {
+                        <tr class="link" @onclick="@(() => Nav.NavigateTo($"fornitori/{supplier.Id}"))">
+                            <td data-label="Codice" class="code">@supplier.Code</td>
+                            <td data-label="Nome">@supplier.Name</td>
+                            <td data-label="Telefono" class="muted">@(supplier.Phone ?? "—")</td>
+                            <td data-label="Email" class="muted">@(supplier.Email ?? "—")</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    }
+</div>
+
+@code {
+    private string _search = string.Empty;
+    private List<Supplier>? _suppliers;
+    private string? _error;
+
+    private List<Supplier> Visible => (_suppliers ?? [])
+        .Where(s => string.IsNullOrWhiteSpace(_search)
+            || s.Name.Contains(_search.Trim(), StringComparison.OrdinalIgnoreCase)
+            || s.Code.Contains(_search.Trim(), StringComparison.OrdinalIgnoreCase))
+        .OrderBy(s => s.Name)
+        .ToList();
+
+    protected override Task OnInitializedAsync() => LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        _error = null;
+        _suppliers = null;
+        try
+        {
+            _suppliers = await Api.GetAsync<List<Supplier>>("api/suppliers");
+        }
+        catch (ApiException exception)
+        {
+            _error = exception.Message;
+        }
+    }
+}

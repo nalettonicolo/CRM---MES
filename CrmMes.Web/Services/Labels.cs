@@ -88,6 +88,32 @@ public static class Labels
         _ => string.Empty,
     };
 
+    public static string PurchaseOrderStatus(string status) => status switch
+    {
+        "Draft" => "Bozza",
+        "Confirmed" => "Confermato",
+        "PartiallyReceived" => "Ricevuto in parte",
+        "Received" => "Ricevuto",
+        "Cancelled" => "Annullato",
+        _ => status,
+    };
+
+    public static string PurchaseOrderStatusClass(string status) => status switch
+    {
+        "Confirmed" => "info",
+        "PartiallyReceived" => "warn",
+        "Received" => "ok",
+        "Cancelled" => "danger",
+        _ => string.Empty,
+    };
+
+    public static string MissingSource(string source) => source switch
+    {
+        "MinStock" => "Scorta minima",
+        "Manual" => "Segnalazione manuale",
+        _ => source,
+    };
+
     public static string InvoiceType(string documentType) => documentType switch
     {
         "TD24" => "Differita (da DDT)",
