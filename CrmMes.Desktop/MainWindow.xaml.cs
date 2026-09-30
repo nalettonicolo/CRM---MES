@@ -58,6 +58,7 @@ public partial class MainWindow : Window
     private bool _subcontractingLoaded;
     private bool _haccpLoaded;
     private bool _siteReportsLoaded;
+    private bool _invoicesLoaded;
 
     private static readonly Dictionary<int, string> PageTitles = new()
     {
@@ -88,6 +89,7 @@ public partial class MainWindow : Window
         [24] = "Conto lavoro",
         [25] = "Registri HACCP",
         [26] = "Rapportini di cantiere",
+        [27] = "Fatture",
     };
 
     private static readonly Dictionary<int, string> PageEyebrows = new()
@@ -119,10 +121,12 @@ public partial class MainWindow : Window
         [24] = "A C Q U I S T I",
         [25] = "P R O D U Z I O N E",
         [26] = "P R O D U Z I O N E",
+        [27] = "V E N D I T E",
     };
 
     private static readonly Dictionary<int, string> PageHelpTexts = new()
     {
+        [27] = "Fatture elettroniche (FatturaPA). \"Fattura da DDT\" crea la fattura differita dai DDT emessi di un cliente, già con i prezzi venduti (prezzo della commessa o riga del preventivo): controlla IVA e prezzi, poi \"Emetti\". Il file XML si carica gratis sul portale Fatture e Corrispettivi dell'Agenzia delle Entrate o si consegna al commercialista. Servono i dati fiscali dell'azienda (Amministrazione) e del cliente (Clienti > Dati fiscali).",
         [25] = "Piano HACCP: i punti di controllo critici con i loro limiti e le letture registrate. Una lettura fuori limite richiede l'azione correttiva; le letture non si modificano né si cancellano, perché il registro vale come prova per i controlli. \"Registro\" esporta il periodo per l'ispezione.",
         [26] = "Rapportini di intervento presso il cliente: lavori eseguiti, ore per tecnico, materiali installati e firma del cliente. La firma si raccoglie sul posto dalla pagina web dei tecnici (telefono o tablet). Firmato, il rapportino si blocca, le ore entrano nella commessa e i materiali nel suo costo reale.",
         [23] = "Documenti di trasporto (DDT) per qualsiasi causale: vendita, conto lavorazione, riparazione, reso, conto visione. Una bozza si modifica liberamente e non ha numero; \"Emetti\" assegna il numero progressivo dell'anno e la blocca. Un DDT emesso non si modifica né si cancella: si annulla (resta in archivio con il suo numero). Da una commessa, \"Crea DDT\" prepara la bozza con cliente, prodotto, lotto e quantità.",
@@ -167,6 +171,11 @@ public partial class MainWindow : Window
         InitializeComponent();
         MaximizeToWorkArea.Attach(this);
         NavMaterials.IsChecked = true;
+        CopySupport.Attach(WorkOrdersList, ("Copia codice commessa", row => ((WorkOrderSummaryDto)row).Code), ("Copia lotto", row => ((WorkOrderSummaryDto)row).ProductLotNumber));
+        CopySupport.Attach(MaterialLotsList, ("Copia lotto", row => ((MaterialLotSummaryDto)row).LotNumber), ("Copia codice materiale", row => ((MaterialLotSummaryDto)row).MaterialCode));
+        CopySupport.Attach(MaterialsList, ("Copia codice materiale", row => ((MaterialDto)row).Code));
+        CopySupport.Attach(TransportDocumentsList, ("Copia numero DDT", row => ((TransportDocumentSummaryDto)row).DocumentCode));
+        CopySupport.Attach(SiteReportsList, ("Copia codice rapportino", row => ((SiteReportSummaryDto)row).Code), ("Copia codice commessa", row => ((SiteReportSummaryDto)row).WorkOrderCode));
         Loaded += MainWindow_Loaded;
         Closing += MainWindow_Closing;
         _refreshTimer.Tick += RefreshTimer_Tick;
@@ -288,6 +297,15 @@ public partial class MainWindow : Window
         {
             ConnectionStatus.Text = "Avvio collegamento...";
             var healthy = await _apiClient.EnsureLocalApiAsync();
+            // A free-tier server that was asleep answers "unavailable" for up to a minute while it wakes
+            // up: keep trying instead of declaring it down at the first attempt.
+            for (var attempt = 1; !healthy && !_apiClient.BaseAddress.IsLoopback && attempt <= 8; attempt++)
+            {
+                ConnectionStatus.Text = $"Server in avvio, attendere... ({attempt * 10} s)";
+                await Task.Delay(TimeSpan.FromSeconds(10));
+                healthy = await _apiClient.EnsureLocalApiAsync();
+            }
+
             ConnectionStatus.Text = healthy ? "API e Neon online" : "API non disponibile";
             LoginButton.IsEnabled = healthy;
 
@@ -337,6 +355,11 @@ public partial class MainWindow : Window
         _ = FlagAvailableUpdateAsync();
         ApplyEnabledModules();
         CompanySetupButton.Visibility = auth.Role == "Admin" ? Visibility.Visible : Visibility.Collapsed;
+        if (reloadMaterials && auth.Role is "Admin" or "Management")
+        {
+            // Management opens on what the floor is working on: released and in-progress jobs.
+            WorkOrderStatusFilter.SelectedIndex = 1;
+        }
         _refreshToken = auth.RefreshToken;
         ScheduleTokenRefresh(auth.ExpiresAt);
         LoginPanel.Visibility = Visibility.Collapsed;
@@ -384,6 +407,8 @@ public partial class MainWindow : Window
         NavMaintenanceSection.Visibility = Show(_apiClient.IsModuleEnabled("maintenance"));
         NavShippingSection.Visibility = Show(_apiClient.IsModuleEnabled("shipping"));
         NavSubcontracting.Visibility = Show(_apiClient.IsModuleEnabled("subcontracting"));
+        NavInvoices.Visibility = Show(_apiClient.IsModuleEnabled("invoicing") && _apiClient.CurrentRole is "Admin" or "Sales" or "Management");
+        CompanyFiscalButton.Visibility = Show(_apiClient.IsModuleEnabled("invoicing") && _apiClient.CurrentRole == "Admin");
         NavHaccp.Visibility = Show(_apiClient.IsModuleEnabled("haccp"));
         NavSiteReports.Visibility = Show(_apiClient.IsModuleEnabled("site-work"));
         MaterialFoodButton.Visibility = Show(_apiClient.IsModuleEnabled("food-labels"));
@@ -404,7 +429,7 @@ public partial class MainWindow : Window
 
     private RadioButton? FindCheckedNavItem() =>
         new[] { NavCustomers, NavQuotes, NavOrders, NavSuppliers, NavCatalogSearch, NavPlanning, NavEquipment,
-                NavMaintenance, NavCarriers, NavShipments, NavMargins, NavTransportDocuments, NavSubcontracting, NavHaccp, NavSiteReports }
+                NavMaintenance, NavCarriers, NavShipments, NavMargins, NavTransportDocuments, NavSubcontracting, NavHaccp, NavSiteReports, NavInvoices }
             .FirstOrDefault(item => item.IsChecked == true);
 
     // ---------- Documenti di trasporto
@@ -526,6 +551,74 @@ public partial class MainWindow : Window
 
         ExportList($"DDT {prompt.From:dd-MM-yyyy} {prompt.To:dd-MM-yyyy}", $"DDT_{prompt.From:yyyyMMdd}_{prompt.To:yyyyMMdd}.xlsx",
             TransportExportColumns, rows, asPdf: false);
+    }
+
+    // ---------- Invoices
+
+    private Task LoadInvoicesAsync() => RunBusyAsync(string.Empty, async () =>
+    {
+        var invoices = await _apiClient.GetInvoicesAsync((InvoiceStatusFilter.SelectedItem as ComboBoxItem)?.Tag as string);
+        InvoicesList.ItemsSource = invoices;
+        var pending = await _apiClient.GetUninvoicedDocumentsAsync();
+        InvoicesInfoText.Text = pending.Count == 0
+            ? "Nessun DDT in attesa di fattura."
+            : $"{pending.Count} DDT emessi ancora da fatturare ({pending.Select(p => p.CustomerId).Distinct().Count()} clienti).";
+        _invoicesLoaded = true;
+    });
+
+    private async void RefreshInvoices_Click(object sender, RoutedEventArgs e) => await LoadInvoicesAsync();
+
+    private async void InvoiceStatusFilter_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (_isAuthenticated && IsLoaded && _invoicesLoaded)
+        {
+            await LoadInvoicesAsync();
+        }
+    }
+
+    private async void InvoiceFromDocuments_Click(object sender, RoutedEventArgs e)
+    {
+        var picker = new InvoiceFromDocumentsWindow(_apiClient) { Owner = this };
+        if (picker.ShowDialog() == true && picker.CreatedInvoice is { } invoice)
+        {
+            await OpenInvoiceAsync(invoice.Id);
+        }
+    }
+
+    private async void NewInvoice_Click(object sender, RoutedEventArgs e) => await OpenInvoiceAsync(null);
+
+    private async void InvoicesList_MouseDoubleClick(object sender, MouseButtonEventArgs e)
+    {
+        if (InvoicesList.SelectedItem is InvoiceSummaryDto invoice)
+        {
+            await OpenInvoiceAsync(invoice.Id);
+        }
+    }
+
+    private async Task OpenInvoiceAsync(Guid? id)
+    {
+        new InvoiceWindow(_apiClient, id) { Owner = this }.ShowDialog();
+        await LoadInvoicesAsync();
+    }
+
+    private void CustomerFiscalButton_Click(object sender, RoutedEventArgs e)
+    {
+        if (CustomersList.SelectedItem is not CustomerDto customer)
+        {
+            MessageBox.Show("Seleziona un cliente.", "Dati fiscali", MessageBoxButton.OK, MessageBoxImage.Information);
+            return;
+        }
+
+        var window = FiscalDataWindow.ForCustomer(_apiClient, customer);
+        window.Owner = this;
+        window.ShowDialog();
+    }
+
+    private void CompanyFiscalButton_Click(object sender, RoutedEventArgs e)
+    {
+        var window = FiscalDataWindow.ForCompany(_apiClient);
+        window.Owner = this;
+        window.ShowDialog();
     }
 
     // ---------- Food data, recall
@@ -892,6 +985,9 @@ public partial class MainWindow : Window
                 break;
             case "Rapportini di cantiere" when !_siteReportsLoaded:
                 await LoadSiteReportsAsync();
+                break;
+            case "Fatture" when !_invoicesLoaded:
+                await LoadInvoicesAsync();
                 break;
         }
     }
@@ -2006,6 +2102,31 @@ public partial class MainWindow : Window
         }
     }
 
+    /// <summary>Filters the loaded list as the user types: the last digits of a code are enough, the
+    /// matches ending with the text come first.</summary>
+    private void ApplyWorkOrderSearch()
+    {
+        var term = WorkOrderSearchBox.Text.Trim();
+        WorkOrdersList.ItemsSource = term.Length == 0
+            ? _workOrders
+            : _workOrders
+                .Where(o => o.Code.Contains(term, StringComparison.OrdinalIgnoreCase) ||
+                            o.ProductLotNumber.Contains(term, StringComparison.OrdinalIgnoreCase) ||
+                            o.ProductName.Contains(term, StringComparison.OrdinalIgnoreCase))
+                .OrderBy(o => o.Code.EndsWith(term, StringComparison.OrdinalIgnoreCase) ? 0 : 1)
+                .ToList();
+    }
+
+    private void WorkOrderSearchBox_TextChanged(object sender, TextChangedEventArgs e) => ApplyWorkOrderSearch();
+
+    private async void WorkOrderStatusFilter_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (_isAuthenticated && IsLoaded && _workOrdersLoaded)
+        {
+            await LoadWorkOrdersAsync();
+        }
+    }
+
     private async void RefreshMaterialLotsButton_Click(object sender, RoutedEventArgs e) => await LoadMaterialLotsAsync();
 
     private async void SetLotExpiryButton_Click(object sender, RoutedEventArgs e)
@@ -2656,9 +2777,13 @@ public partial class MainWindow : Window
         }
     }
 
+    private IReadOnlyList<WorkOrderSummaryDto> _workOrders = [];
+
     private Task LoadWorkOrdersAsync() => RunBusyAsync(string.Empty, async () =>
     {
-        WorkOrdersList.ItemsSource = await _apiClient.GetWorkOrdersAsync(siteId: _siteFilterId);
+        _workOrders = await _apiClient.GetWorkOrdersAsync(
+            status: (WorkOrderStatusFilter.SelectedItem as ComboBoxItem)?.Tag as string, siteId: _siteFilterId);
+        ApplyWorkOrderSearch();
         _workOrdersLoaded = true;
         _selectedWorkOrder = null;
         OpenWorkOrderButton.IsEnabled = false;

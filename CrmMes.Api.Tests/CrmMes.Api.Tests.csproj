@@ -23,6 +23,12 @@
     <Using Include="Xunit" />
   </ItemGroup>
 
+  <!-- Official FatturaPA schema (fatturapa.gov.it, FPR12 v1.2.3) and the W3C XML-DSig schema it imports:
+       every generated invoice XML is validated against them, offline. -->
+  <ItemGroup>
+    <None Include="Schemas\*.xsd" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
   <ItemGroup>
     <ProjectReference Include="..\CrmMes.Api\CrmMes.Api.csproj" />
     <ProjectReference Include="..\CrmMes.Core\CrmMes.Core.csproj" />

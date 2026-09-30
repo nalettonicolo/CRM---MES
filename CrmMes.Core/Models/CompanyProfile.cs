@@ -22,6 +22,19 @@ public class CompanyProfile
     /// <summary>GS1 company prefix (7–10 digits, assigned by GS1 Italy) used to build SSCC pallet codes,
     /// and the last serial reference handed out: SSCCs are never reused.</summary>
     public string? Gs1CompanyPrefix { get; set; }
+
+    /// <summary>Tax data printed in the electronic invoices (CedentePrestatore): tax code, tax regime
+    /// (RF01 ordinary), address in structured form, REA registration and the IBAN for bank transfers.</summary>
+    public string? FiscalCode { get; set; }
+    public string TaxRegime { get; set; } = "RF01";
+    public string? Street { get; set; }
+    public string? PostalCode { get; set; }
+    public string? City { get; set; }
+    public string? Province { get; set; }
+    public string Country { get; set; } = "IT";
+    public string? ReaOffice { get; set; }
+    public string? ReaNumber { get; set; }
+    public string? Iban { get; set; }
     public long LastSsccSerial { get; set; }
 
     public DateTime ConfiguredAt { get; set; } = DateTime.UtcNow;

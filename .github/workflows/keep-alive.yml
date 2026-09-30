@@ -1,25 +1,34 @@
 name: Keep API awake
 
-# Render's Free plan spins the service down after ~15 minutes of inactivity; the next real request
-# then waits 30-60s for a cold start. This pings /health every 10 minutes so the instance never sits
-# idle long enough to spin down. It costs nothing (GitHub Actions free minutes, a health check has no
-# side effects) and needs no third-party account.
+# Render's Free plan spins the service down after ~15 minutes without incoming requests; the next real
+# request then waits 30-60s for a cold start. The API keeps itself awake once it is running (see
+# KeepWarmService), but once stopped it can't wake itself: this external ping restarts it.
 #
-# Limitation: GitHub's cron scheduler is best-effort, not exact-interval - under load it can run a few
-# minutes late, and it's automatically disabled if this repository goes 60 days without any commit.
+# Every 5 minutes: /health during working hours (Mon-Sat 6:00-20:00 Italian time, also wakes the Neon
+# database so the first login is fast), /ping otherwise (keeps the web service up without keeping the
+# database, billed by compute time, awake all night).
+#
+# Limitation: GitHub's scheduler is best-effort - it can run late or skip runs under load, and it is
+# disabled after 60 days without commits. For a guaranteed interval add a free external monitor (e.g.
+# cron-job.org or UptimeRobot) pointing at https://crmmes-api.onrender.com/ping every 5 minutes.
 on:
   schedule:
-    - cron: "*/10 * * * *"
+    - cron: "*/5 * * * *"
   workflow_dispatch:
 
 jobs:
   ping:
     runs-on: ubuntu-latest
+    timeout-minutes: 3
     steps:
-      - name: Ping /health
+      - name: Ping the API
         run: |
-          status=$(curl -s -o /dev/null -w "%{http_code}" https://crmmes-api.onrender.com/health)
-          echo "Health check responded with HTTP $status"
+          hour=$(TZ=Europe/Rome date +%-H)
+          weekday=$(TZ=Europe/Rome date +%u)
+          path=ping
+          if [ "$weekday" -le 6 ] && [ "$hour" -ge 6 ] && [ "$hour" -lt 20 ]; then path=health; fi
+          status=$(curl -s -o /dev/null -m 90 -w "%{http_code}" "https://crmmes-api.onrender.com/$path")
+          echo "GET /$path responded with HTTP $status"
           if [ "$status" != "200" ]; then
-            echo "::warning::API health check did not return 200 (got $status) - service may be cold-starting or down."
+            echo "::warning::API /$path did not return 200 (got $status) - service may be cold-starting or down."
           fi

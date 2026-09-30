@@ -1,0 +1,95 @@
+<Window x:Class="CrmMes.Desktop.FiscalDataWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Dati per la fattura elettronica" Icon="Assets/logo.ico" Width="560" SizeToContent="Height"
+        WindowStartupLocation="CenterOwner" ResizeMode="NoResize"
+        Background="{StaticResource BackgroundBrush}">
+    <StackPanel Margin="24">
+        <TextBlock Text="F A T T U R A   E L E T T R O N I C A" Style="{StaticResource MicroLabel}" />
+        <TextBlock x:Name="HeaderText" FontSize="18" FontWeight="SemiBold" Foreground="{StaticResource TextPrimaryBrush}" TextWrapping="Wrap" />
+        <TextBlock x:Name="HintText" Foreground="{StaticResource TextSecondaryBrush}" FontSize="12.5" TextWrapping="Wrap" Margin="0,4,0,14" />
+
+        <Grid Margin="0,0,0,10">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="12" />
+                <ColumnDefinition Width="*" />
+            </Grid.ColumnDefinitions>
+            <StackPanel Grid.Column="0">
+                <TextBlock Text="Codice fiscale" Foreground="{StaticResource TextSecondaryBrush}" FontSize="12.5" Margin="0,0,0,5" />
+                <TextBox x:Name="FiscalCodeBox" />
+            </StackPanel>
+            <StackPanel Grid.Column="2" x:Name="SdiPanel">
+                <TextBlock Text="Codice destinatario SDI" Foreground="{StaticResource TextSecondaryBrush}" FontSize="12.5" Margin="0,0,0,5" />
+                <TextBox x:Name="SdiBox" Tag="7 caratteri" />
+            </StackPanel>
+            <StackPanel Grid.Column="2" x:Name="RegimePanel" Visibility="Collapsed">
+                <TextBlock Text="Regime fiscale" Foreground="{StaticResource TextSecondaryBrush}" FontSize="12.5" Margin="0,0,0,5" />
+                <ComboBox x:Name="RegimeCombo" Height="34" SelectedValuePath="Tag">
+                    <ComboBoxItem Content="RF01 Ordinario" Tag="RF01" IsSelected="True" />
+                    <ComboBoxItem Content="RF19 Forfettario" Tag="RF19" />
+                    <ComboBoxItem Content="RF02 Contribuenti minimi" Tag="RF02" />
+                </ComboBox>
+            </StackPanel>
+        </Grid>
+        <StackPanel x:Name="PecPanel">
+            <TextBlock Text="PEC (se il cliente non ha codice SDI)" Foreground="{StaticResource TextSecondaryBrush}" FontSize="12.5" Margin="0,0,0,5" />
+            <TextBox x:Name="PecBox" Margin="0,0,0,10" />
+        </StackPanel>
+        <TextBlock Text="Indirizzo (via e numero civico)" Foreground="{StaticResource TextSecondaryBrush}" FontSize="12.5" Margin="0,0,0,5" />
+        <TextBox x:Name="StreetBox" Margin="0,0,0,10" />
+        <Grid Margin="0,0,0,10">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="90" />
+                <ColumnDefinition Width="12" />
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="12" />
+                <ColumnDefinition Width="70" />
+                <ColumnDefinition Width="12" />
+                <ColumnDefinition Width="70" />
+            </Grid.ColumnDefinitions>
+            <StackPanel Grid.Column="0">
+                <TextBlock Text="CAP" Foreground="{StaticResource TextSecondaryBrush}" FontSize="12.5" Margin="0,0,0,5" />
+                <TextBox x:Name="CapBox" />
+            </StackPanel>
+            <StackPanel Grid.Column="2">
+                <TextBlock Text="Comune" Foreground="{StaticResource TextSecondaryBrush}" FontSize="12.5" Margin="0,0,0,5" />
+                <TextBox x:Name="CityBox" />
+            </StackPanel>
+            <StackPanel Grid.Column="4">
+                <TextBlock Text="Prov." Foreground="{StaticResource TextSecondaryBrush}" FontSize="12.5" Margin="0,0,0,5" />
+                <TextBox x:Name="ProvinceBox" />
+            </StackPanel>
+            <StackPanel Grid.Column="6">
+                <TextBlock Text="Nazione" Foreground="{StaticResource TextSecondaryBrush}" FontSize="12.5" Margin="0,0,0,5" />
+                <TextBox x:Name="CountryBox" Text="IT" />
+            </StackPanel>
+        </Grid>
+        <Grid x:Name="CompanyExtra" Visibility="Collapsed" Margin="0,0,0,10">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="70" />
+                <ColumnDefinition Width="12" />
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="12" />
+                <ColumnDefinition Width="2*" />
+            </Grid.ColumnDefinitions>
+            <StackPanel Grid.Column="0">
+                <TextBlock Text="REA prov." Foreground="{StaticResource TextSecondaryBrush}" FontSize="12.5" Margin="0,0,0,5" />
+                <TextBox x:Name="ReaOfficeBox" />
+            </StackPanel>
+            <StackPanel Grid.Column="2">
+                <TextBlock Text="Numero REA" Foreground="{StaticResource TextSecondaryBrush}" FontSize="12.5" Margin="0,0,0,5" />
+                <TextBox x:Name="ReaNumberBox" />
+            </StackPanel>
+            <StackPanel Grid.Column="4">
+                <TextBlock Text="IBAN per i bonifici" Foreground="{StaticResource TextSecondaryBrush}" FontSize="12.5" Margin="0,0,0,5" />
+                <TextBox x:Name="IbanBox" />
+            </StackPanel>
+        </Grid>
+        <TextBlock x:Name="ErrorText" Foreground="{StaticResource DangerBrush}" TextWrapping="Wrap" Margin="0,0,0,8" />
+        <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+            <Button Style="{StaticResource SecondaryButton}" Content="Annulla" Width="100" Height="36" Margin="0,0,10,0" IsCancel="True" />
+            <Button x:Name="SaveButton" Content="Salva" Width="110" Height="36" Click="Save_Click" IsEnabled="False" />
+        </StackPanel>
+    </StackPanel>
+</Window>

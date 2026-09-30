@@ -114,6 +114,8 @@ builder.Services.AddScoped<CrmMes.Api.Services.WithdrawalItemBuilder>();
 builder.Services.AddSingleton<CrmMes.Api.Services.WorkOrderFactory>();
 builder.Services.AddScoped<CrmMes.Api.Services.MaterialPricing>();
 builder.Services.AddScoped<CrmMes.Api.Services.WorkOrderCosting>();
+builder.Services.AddHostedService<CrmMes.Api.Services.KeepWarmService>();
+builder.Services.AddHttpClient(CrmMes.Api.Services.KeepWarmService.HttpClientName);
 
 var connectionString = Environment.GetEnvironmentVariable("NEON_DATABASE_URL")
     ?? Environment.GetEnvironmentVariable("DATABASE_URL")
@@ -179,6 +181,10 @@ app.UseAuthentication();
 app.UseRateLimiter();
 app.UseAuthorization();
 app.MapControllers();
+
+// Liveness without touching the database: what keeps the web service awake outside working hours,
+// so the database (billed by compute time) can still sleep at night.
+app.MapGet("/ping", () => Results.Ok(new { status = "ok" }));
 
 app.MapGet("/health", async (ApplicationDbContext db) =>
 {

@@ -1,4 +1,4 @@
-using System.Net.Http;
+﻿using System.Net.Http;
 using System.Net.Http.Json;
 using System.Diagnostics;
 using System.IO;
@@ -773,6 +773,56 @@ public sealed class ApiClient
         await EnsureSuccessAsync(response, cancellationToken);
     }
 
+    // ---------- Electronic invoices
+
+    public Task<IReadOnlyList<InvoiceSummaryDto>> GetInvoicesAsync(string? status = null, CancellationToken cancellationToken = default)
+        => GetAsync<InvoiceSummaryDto>("api/invoices" + (string.IsNullOrWhiteSpace(status) ? string.Empty : $"?status={Uri.EscapeDataString(status)}"), cancellationToken);
+
+    public Task<InvoiceDto> GetInvoiceAsync(Guid id, CancellationToken cancellationToken = default)
+        => GetOneAsync<InvoiceDto>($"api/invoices/{id}", cancellationToken);
+
+    public Task<IReadOnlyList<UninvoicedDocumentDto>> GetUninvoicedDocumentsAsync(Guid? customerId = null, CancellationToken cancellationToken = default)
+        => GetAsync<UninvoicedDocumentDto>("api/invoices/uninvoiced-transport-documents" + (customerId.HasValue ? $"?customerId={customerId}" : string.Empty), cancellationToken);
+
+    public Task<InvoiceDto> CreateInvoiceFromDocumentsAsync(IReadOnlyList<Guid> transportDocumentIds, CancellationToken cancellationToken = default)
+        => SendAsync<InvoiceDto>(HttpMethod.Post, "api/invoices/from-transport-documents", new { transportDocumentIds }, cancellationToken);
+
+    public Task<InvoiceDto> SaveInvoiceAsync(Guid? id, SaveInvoiceDto invoice, CancellationToken cancellationToken = default)
+        => id is { } existing
+            ? SendAsync<InvoiceDto>(HttpMethod.Put, $"api/invoices/{existing}", invoice, cancellationToken)
+            : SendAsync<InvoiceDto>(HttpMethod.Post, "api/invoices", invoice, cancellationToken);
+
+    public async Task DeleteInvoiceAsync(Guid id, CancellationToken cancellationToken = default)
+    {
+        using var response = await _httpClient.DeleteAsync($"api/invoices/{id}", cancellationToken);
+        await EnsureSuccessAsync(response, cancellationToken);
+    }
+
+    public Task<InvoiceDto> IssueInvoiceAsync(Guid id, DateTime? issueDate, CancellationToken cancellationToken = default)
+        => SendAsync<InvoiceDto>(HttpMethod.Post, $"api/invoices/{id}/issue",
+            new { issueDate = issueDate.HasValue ? DateTime.SpecifyKind(issueDate.Value.Date, DateTimeKind.Utc) : (DateTime?)null }, cancellationToken);
+
+    /// <summary>The FatturaPA XML and the file name the Exchange System expects.</summary>
+    public async Task<(string FileName, byte[] Content)> DownloadInvoiceXmlAsync(Guid id, CancellationToken cancellationToken = default)
+    {
+        using var response = await _httpClient.GetAsync($"api/invoices/{id}/xml", cancellationToken);
+        await EnsureSuccessAsync(response, cancellationToken);
+        var name = response.Content.Headers.ContentDisposition?.FileNameStar ?? response.Content.Headers.ContentDisposition?.FileName ?? "fattura.xml";
+        return (name.Trim('"'), await response.Content.ReadAsByteArrayAsync(cancellationToken));
+    }
+
+    public Task<CustomerFiscalDto> GetCustomerFiscalAsync(Guid customerId, CancellationToken cancellationToken = default)
+        => GetOneAsync<CustomerFiscalDto>($"api/customers/{customerId}/fiscal", cancellationToken);
+
+    public Task<CustomerFiscalDto> SaveCustomerFiscalAsync(Guid customerId, CustomerFiscalDto data, CancellationToken cancellationToken = default)
+        => SendAsync<CustomerFiscalDto>(HttpMethod.Put, $"api/customers/{customerId}/fiscal", data, cancellationToken);
+
+    public Task<CompanyFiscalDto> GetCompanyFiscalAsync(CancellationToken cancellationToken = default)
+        => GetOneAsync<CompanyFiscalDto>("api/company-profile/fiscal", cancellationToken);
+
+    public Task<CompanyFiscalDto> SaveCompanyFiscalAsync(CompanyFiscalDto data, CancellationToken cancellationToken = default)
+        => SendAsync<CompanyFiscalDto>(HttpMethod.Put, "api/company-profile/fiscal", data, cancellationToken);
+
     // ---------- Recall
 
     public Task<RecallDto> GetRecallFromMaterialLotAsync(Guid lotId, CancellationToken cancellationToken = default)
@@ -1222,6 +1272,9 @@ public sealed class ApiClient
 
     /// <summary>Looks a work order up by its printed code — what the shop-floor terminal calls after
     /// reading a barcode/QR label, since the operator scans a printed code, not a GUID.</summary>
+    public Task<IReadOnlyList<WorkOrderLookupDto>> LookupWorkOrdersAsync(string? q, CancellationToken cancellationToken = default)
+        => GetAsync<WorkOrderLookupDto>("api/work-orders/lookup" + (string.IsNullOrWhiteSpace(q) ? string.Empty : $"?q={Uri.EscapeDataString(q.Trim())}"), cancellationToken);
+
     public async Task<WorkOrderDetailDto> GetWorkOrderByCodeAsync(string code, CancellationToken cancellationToken = default)
     {
         using var response = await _httpClient.GetAsync($"api/work-orders/by-code/{Uri.EscapeDataString(code)}", cancellationToken);
@@ -2319,3 +2372,52 @@ public sealed record SiteWorkOrderDto(Guid Id, string Code, string ProductName, 
 {
     public string Label => $"{Code} · {CustomerName ?? ProductName}";
 }
+
+public sealed record WorkOrderLookupDto(
+    Guid Id, string Code, string ProductLotNumber, string ProductName, decimal Quantity, string Status, DateTime? DueDate,
+    string? CustomerName, string? ActiveOperation)
+{
+    public string StatusLabel => StatusToItalianTextConverter.Translate(Status);
+}
+
+public sealed record InvoiceSummaryDto(
+    Guid Id, string Code, string Status, string DocumentType, Guid CustomerId, string CustomerName, DateTime? IssueDate,
+    decimal Total, DateTime CreatedAt)
+{
+    public string StatusLabel => Status == "Issued" ? "Emessa" : "Bozza";
+    public string BrushStatus => Status == "Issued" ? "Completed" : "Draft";
+    public string TypeLabel => DocumentType == "TD24" ? "Differita (DDT)" : "Immediata";
+}
+
+public sealed record InvoiceLineDto(
+    Guid Id, int LineNumber, string? Code, string Description, decimal Quantity, string Unit, decimal UnitPrice,
+    decimal DiscountPercent, decimal VatRate, string? VatNature, decimal LineTotal, Guid? TransportDocumentId);
+
+public sealed record InvoiceDocumentDto(Guid Id, string DocumentCode, DateTime? IssuedAt);
+
+public sealed record InvoiceVatSummaryDto(decimal Rate, string? Nature, decimal Taxable, decimal Tax);
+
+public sealed record InvoiceDto(
+    Guid Id, string Code, int? Number, int? Year, string Status, string DocumentType, Guid CustomerId, string CustomerName,
+    DateTime? IssueDate, string PaymentMethod, DateTime? PaymentDueDate, string? Notes, List<InvoiceLineDto> Lines,
+    List<InvoiceDocumentDto> TransportDocuments, List<InvoiceVatSummaryDto> VatSummary, decimal Total,
+    List<string> Warnings, DateTime? IssuedAt, string? IssuedBy)
+{
+    public bool IsDraft => Status == "Draft";
+}
+
+public sealed record InvoiceLineRequestDto(
+    string? Code, string Description, decimal Quantity, string? Unit, decimal UnitPrice, decimal DiscountPercent,
+    decimal VatRate, string? VatNature, Guid? TransportDocumentId);
+
+public sealed record SaveInvoiceDto(
+    Guid? CustomerId, string PaymentMethod, DateTime? PaymentDueDate, string? Notes, List<InvoiceLineRequestDto> Lines);
+
+public sealed record UninvoicedDocumentDto(Guid Id, string DocumentCode, DateTime? IssuedAt, Guid CustomerId, string CustomerName, string Reason);
+
+public sealed record CustomerFiscalDto(
+    string? FiscalCode, string? SdiCode, string? Pec, string? Street, string? PostalCode, string? City, string? Province, string? Country);
+
+public sealed record CompanyFiscalDto(
+    string? FiscalCode, string? TaxRegime, string? Street, string? PostalCode, string? City, string? Province, string? Country,
+    string? ReaOffice, string? ReaNumber, string? Iban);

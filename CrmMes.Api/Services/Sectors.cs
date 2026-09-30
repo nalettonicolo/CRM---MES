@@ -25,6 +25,7 @@ public static class Sectors
         new("shipping", "Spedizioni e DDT", "Corrieri, spedizioni e documenti di trasporto.", false),
         new("subcontracting", "Conto lavoro", "Materiale inviato a terzisti e rientri delle lavorazioni.", false),
         new("costing", "Costi e margini", "Ore lavorate, costo reale e margine di commessa (solo direzione).", false),
+        new("invoicing", "Fattura elettronica", "Fatture differite dai DDT e fatture immediate, file XML FatturaPA per lo SdI.", false),
         new("panel-verification", "Verifica quadri CEI EN 61439", "Verifica individuale e dichiarazione di conformità del quadro.", true),
         new("metel", "Listini Metel", "Importazione dei listini dei produttori di materiale elettrico.", true, Available: false),
         new("lot-expiry", "Scadenze lotti", "Data di scadenza dei lotti e prelievo del lotto che scade prima.", true),
@@ -33,7 +34,7 @@ public static class Sectors
         new("site-work", "Lavori in cantiere", "Rapportini con ore, materiali e firma del cliente, anche da telefono.", true),
     ];
 
-    private static readonly string[] Common = ["sales", "purchasing", "planning", "shopfloor", "quality", "maintenance", "shipping", "costing"];
+    private static readonly string[] Common = ["sales", "purchasing", "planning", "shopfloor", "quality", "maintenance", "shipping", "costing", "invoicing"];
 
     public static readonly IReadOnlyList<SectorInfo> All =
     [

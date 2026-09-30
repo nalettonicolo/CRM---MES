@@ -129,11 +129,12 @@ public partial class ShopFloorTerminalWindow : Window
             OperatorNameText.Text = operatorDto.Name;
             PinBox.Password = string.Empty;
 
-            TitleText.Text = "Scansiona o digita il codice commessa";
+            TitleText.Text = "Scansiona o digita il codice commessa (bastano le ultime cifre)";
             OperatorGatePanel.Visibility = Visibility.Collapsed;
             OperatorBar.Visibility = Visibility.Visible;
             ScanPanel.Visibility = Visibility.Visible;
             ScanBox.Focus();
+            _ = ShowOpenJobsAsync();
         }
         catch (Exception exception)
         {
@@ -156,6 +157,7 @@ public partial class ShopFloorTerminalWindow : Window
         OperatorBar.Visibility = Visibility.Collapsed;
         ScanPanel.Visibility = Visibility.Collapsed;
         JobPanel.Visibility = Visibility.Collapsed;
+        LookupPanel.Visibility = Visibility.Collapsed;
         ErrorText.Text = string.Empty;
         GateErrorText.Text = string.Empty;
         ScanBox.Text = string.Empty;
@@ -173,10 +175,36 @@ public partial class ShopFloorTerminalWindow : Window
 
     private async void Scan_Click(object sender, RoutedEventArgs e) => await LookupAsync();
 
+    /// <summary>Office roles see the jobs released or in progress right away, to pick one with a tap
+    /// instead of typing its code; operators keep the plain scan box.</summary>
+    private bool ShowsOpenJobs => _apiClient.CurrentRole is "Admin" or "Management" or "Warehouse";
+
+    private async Task ShowOpenJobsAsync()
+    {
+        if (!ShowsOpenJobs || _order is not null)
+        {
+            return;
+        }
+
+        try
+        {
+            var jobs = await _apiClient.LookupWorkOrdersAsync(null);
+            LookupTitle.Text = jobs.Count == 0 ? "Nessuna commessa aperta o in lavorazione." : $"Commesse aperte e in lavorazione ({jobs.Count})";
+            LookupList.ItemsSource = jobs;
+            LookupPanel.Visibility = Visibility.Visible;
+        }
+        catch (Exception exception)
+        {
+            ErrorText.Text = exception.Message;
+        }
+    }
+
+    /// <summary>The scanned or typed text: a full code opens the job at once; the last digits of a code
+    /// (or part of a lot) open it when only one job matches, otherwise the matches are listed.</summary>
     private async Task LookupAsync()
     {
-        var code = ScanBox.Text.Trim();
-        if (string.IsNullOrWhiteSpace(code))
+        var text = ScanBox.Text.Trim();
+        if (string.IsNullOrWhiteSpace(text))
         {
             return;
         }
@@ -184,14 +212,21 @@ public partial class ShopFloorTerminalWindow : Window
         ErrorText.Text = string.Empty;
         try
         {
-            _order = await _apiClient.GetWorkOrderByCodeAsync(code);
-            var product = await _apiClient.GetProductAsync(_order.ProductId);
+            var matches = await _apiClient.LookupWorkOrdersAsync(text);
+            var exact = matches.FirstOrDefault(m => string.Equals(m.Code, text, StringComparison.OrdinalIgnoreCase));
+            var endsWith = matches.Where(m => m.Code.EndsWith(text, StringComparison.OrdinalIgnoreCase)).ToList();
+            var pick = exact ?? (endsWith.Count == 1 ? endsWith[0] : matches.Count == 1 ? matches[0] : null);
+            if (pick is not null)
+            {
+                await OpenJobAsync(pick);
+                return;
+            }
 
-            JobProductText.Text = $"{product.Name} · quantità {_order.Quantity}";
-            ApplyOrderToUi();
-
-            JobPanel.Visibility = Visibility.Visible;
-            ScanBox.Text = string.Empty;
+            JobPanel.Visibility = Visibility.Collapsed;
+            _order = null;
+            LookupTitle.Text = matches.Count == 0 ? $"Nessuna commessa trovata per \"{text}\"." : $"{matches.Count} commesse per \"{text}\": tocca quella giusta";
+            LookupList.ItemsSource = matches;
+            LookupPanel.Visibility = Visibility.Visible;
         }
         catch (Exception exception)
         {
@@ -204,6 +239,48 @@ public partial class ShopFloorTerminalWindow : Window
         }
     }
 
+    private async Task OpenJobAsync(WorkOrderLookupDto job)
+    {
+        ErrorText.Text = string.Empty;
+        try
+        {
+            _order = await _apiClient.GetWorkOrderByCodeAsync(job.Code);
+            JobProductText.Text = $"{job.ProductName} · quantità {_order.Quantity}" + (job.CustomerName is null ? string.Empty : $" · {job.CustomerName}");
+            ApplyOrderToUi();
+            LookupPanel.Visibility = Visibility.Collapsed;
+            JobPanel.Visibility = Visibility.Visible;
+            ScanBox.Text = string.Empty;
+        }
+        catch (Exception exception)
+        {
+            ErrorText.Text = exception.Message;
+        }
+        finally
+        {
+            ScanBox.Focus();
+        }
+    }
+
+    private async void LookupList_MouseLeftButtonUp(object sender, MouseButtonEventArgs e)
+    {
+        if (LookupList.SelectedItem is WorkOrderLookupDto job)
+        {
+            await OpenJobAsync(job);
+        }
+    }
+
+    private async void LookupList_KeyDown(object sender, KeyEventArgs e)
+    {
+        if (e.Key == Key.Enter && LookupList.SelectedItem is WorkOrderLookupDto job)
+        {
+            await OpenJobAsync(job);
+        }
+    }
+
+    private void CopyCode_Click(object sender, RoutedEventArgs e) => CopySupport.Copy(_order?.Code);
+
+    private void CopyLot_Click(object sender, RoutedEventArgs e) => CopySupport.Copy(_order?.ProductLotNumber);
+
     private void ApplyOrderToUi()
     {
         if (_order is null)
@@ -213,6 +290,7 @@ public partial class ShopFloorTerminalWindow : Window
 
         JobCodeText.Text = _order.Code;
         JobLotText.Text = $"Lotto {_order.ProductLotNumber}";
+        JobLotText.ToolTip = "Seleziona per copiare, oppure usa Copia lotto";
         JobStatusText.Text = StatusToItalianTextConverter.Translate(_order.Status);
         JobStatusPill.Background = (System.Windows.Media.Brush)StatusBrush.Convert(_order.Status, typeof(System.Windows.Media.Brush), null, System.Globalization.CultureInfo.CurrentCulture)!;
         JobStatusText.Foreground = (System.Windows.Media.Brush)StatusBrush.Convert(_order.Status, typeof(System.Windows.Media.Brush), "Foreground", System.Globalization.CultureInfo.CurrentCulture)!;
@@ -334,5 +412,6 @@ public partial class ShopFloorTerminalWindow : Window
         ErrorText.Text = string.Empty;
         ScanBox.Text = string.Empty;
         ScanBox.Focus();
+        _ = ShowOpenJobsAsync();
     }
 }

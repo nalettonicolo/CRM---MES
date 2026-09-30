@@ -102,6 +102,21 @@ public class Gs1Tests : IDisposable
         AssertPdf(path => ListExporter.ExportSiteReport(report, company, path), "rapportino-bozza.pdf");
     }
 
+    [Fact]
+    public void InvoiceCourtesyCopy_IsGenerated_WithReverseChargeNote()
+    {
+        var company = new CompanyProfileDto(true, "Impianti Rossi srl", "IT01234567890", null, null, null, "installations", ["invoicing"]);
+        var companyFiscal = new CompanyFiscalDto("01234567890", "RF01", "Via Po 1", "10123", "Torino", "TO", "IT", "TO", "123456", "IT60X0542811101000000123456");
+        var customer = new CustomerFiscalDto(null, "M5UXCR1", null, "Via Milano 5", "24121", "Bergamo", "BG", "IT");
+        var invoice = new InvoiceDto(Guid.NewGuid(), "7/2026", 7, 2026, "Issued", "TD24", Guid.NewGuid(), "Condominio Aurora", DateTime.Today, "MP05",
+            DateTime.Today.AddDays(30), "Lavori di settembre",
+            [new(Guid.NewGuid(), 1, "MAN", "Manodopera", 16, "h", 38.5m, 0, 0, "N6.3", 616m, null),
+             new(Guid.NewGuid(), 2, "CAV", "Cavo FG16", 120, "m", 1.2345m, 10, 22, null, 133.33m, null)],
+            [new(Guid.NewGuid(), "12/2026", DateTime.UtcNow)],
+            [new(22, null, 133.33m, 29.33m), new(0, "N6.3", 616m, 0)], 778.66m, [], DateTime.UtcNow, "Admin");
+        AssertPdf(path => ListExporter.ExportInvoice(invoice, customer, company, companyFiscal, path), "fattura.pdf");
+    }
+
     private void AssertPdf(Action<string> export, string name)
     {
         var path = Path.Combine(_dir, name);

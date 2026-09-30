@@ -34,7 +34,12 @@ public class WorkOrdersController : ControllerBase
         CancellationToken cancellationToken = default)
     {
         var query = _dbContext.WorkOrders.AsNoTracking();
-        if (!string.IsNullOrWhiteSpace(status))
+        if (string.Equals(status?.Trim(), "Open", StringComparison.OrdinalIgnoreCase))
+        {
+            // "Open": what the floor is working on or can start, i.e. released or in progress.
+            query = query.Where(order => order.Status == "Released" || order.Status == "InProgress");
+        }
+        else if (!string.IsNullOrWhiteSpace(status))
         {
             query = query.Where(order => order.Status == status.Trim());
         }
@@ -88,6 +93,55 @@ public class WorkOrdersController : ControllerBase
             .SingleOrDefaultAsync(o => o.Code == code, cancellationToken);
 
         return order is null ? NotFound() : Ok(ToResponse(order));
+    }
+
+    /// <summary>Quick search for the shop floor terminal: the last digits of the code are enough. Exact
+    /// code first, then codes ending with the text, then codes or lots containing it; open jobs (in
+    /// progress, then released) before the others. Without text: the open jobs, for picking from a list.</summary>
+    [HttpGet("lookup")]
+    public async Task<ActionResult<IEnumerable<WorkOrderLookupResponse>>> Lookup(
+        [FromQuery] string? q = null, CancellationToken cancellationToken = default)
+    {
+        var term = q?.Trim() ?? string.Empty;
+        var query = _dbContext.WorkOrders.AsNoTracking();
+        if (term.Length == 0)
+        {
+            query = query.Where(order => order.Status == "Released" || order.Status == "InProgress");
+        }
+        else
+        {
+            var lower = term.ToLower();
+            query = query.Where(order => order.Code.ToLower().Contains(lower) || order.ProductLotNumber.ToLower().Contains(lower));
+        }
+
+        var rows = await query
+            .Select(order => new
+            {
+                order.Id, order.Code, order.ProductLotNumber, ProductName = order.Product.Name, order.Quantity, order.Status, order.DueDate,
+                CustomerName = order.Customer != null ? order.Customer.Name : order.CustomerReference,
+                ActiveOperation = order.Operations.Where(op => op.Status == "InProgress" || op.Status == "Pending")
+                    .OrderBy(op => op.SequenceNumber).Select(op => op.Name).FirstOrDefault()
+            })
+            .Take(500)
+            .ToListAsync(cancellationToken);
+
+        static int StatusRank(string status) => status switch { "InProgress" => 0, "Released" => 1, "Draft" => 2, _ => 3 };
+        int MatchRank(string code, string lot)
+        {
+            if (term.Length == 0) return 0;
+            if (string.Equals(code, term, StringComparison.OrdinalIgnoreCase)) return 0;
+            if (code.EndsWith(term, StringComparison.OrdinalIgnoreCase)) return 1;
+            if (string.Equals(lot, term, StringComparison.OrdinalIgnoreCase)) return 2;
+            return 3;
+        }
+
+        return Ok(rows
+            .OrderBy(r => MatchRank(r.Code, r.ProductLotNumber))
+            .ThenBy(r => StatusRank(r.Status))
+            .ThenBy(r => r.DueDate ?? DateTime.MaxValue)
+            .ThenBy(r => r.Code)
+            .Take(30)
+            .Select(r => new WorkOrderLookupResponse(r.Id, r.Code, r.ProductLotNumber, r.ProductName, r.Quantity, r.Status, r.DueDate, r.CustomerName, r.ActiveOperation)));
     }
 
     [Authorize(Policy = "Warehouse")]
@@ -1100,6 +1154,10 @@ public class WorkOrdersController : ControllerBase
             oeeRatio));
     }
 }
+
+public sealed record WorkOrderLookupResponse(
+    Guid Id, string Code, string ProductLotNumber, string ProductName, decimal Quantity, string Status, DateTime? DueDate,
+    string? CustomerName, string? ActiveOperation);
 
 public sealed record CreateWorkOrderRequest(
     Guid ProductId,

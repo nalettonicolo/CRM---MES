@@ -11,10 +11,16 @@
 </head>
 <body>
   <header class="bar">
-    <span class="brand">Rapportini</span>
+    <span class="brand">Nicolò MES</span>
     <span id="who" class="who"></span>
     <button id="logout" class="link" type="button" hidden>Esci</button>
   </header>
+
+  <nav id="main-nav" class="main-nav" aria-label="Sezioni" hidden>
+    <button class="nav-item active" type="button" data-section="reports">Rapportini</button>
+    <button class="nav-item" type="button" data-section="phases">Fasi</button>
+    <button class="nav-item" type="button" data-section="hours">Ore</button>
+  </nav>
 
   <main id="app" class="wrap" data-app="tecnici">
     <!-- Login -->
@@ -46,7 +52,7 @@
     <!-- Work order picker -->
     <section id="view-pick" class="view" hidden>
       <div class="row between">
-        <h1>Scegli la commessa</h1>
+        <h1 id="pick-title">Scegli la commessa</h1>
         <button class="link" type="button" data-back>Indietro</button>
       </div>
       <input id="pick-search" type="search" placeholder="Codice, cliente o prodotto" aria-label="Cerca commessa">
@@ -104,6 +110,34 @@
       <p class="hint">Firmando il cliente conferma i lavori, le ore e i materiali indicati. Dopo la firma il rapportino non si modifica.</p>
       <p id="sign-error" class="error" role="alert"></p>
       <button id="sign-confirm" class="primary wide" type="button">Conferma firma</button>
+    </section>
+
+    <!-- Phases of a work order, started and completed from the phone -->
+    <section id="view-phases" class="view" hidden>
+      <div class="row between">
+        <h1 id="phases-title">Fasi</h1>
+        <button class="link" type="button" data-back>Indietro</button>
+      </div>
+      <p id="phases-sub" class="muted"></p>
+      <p id="phases-state" class="state"></p>
+      <ul id="phases-list" class="cards"></ul>
+    </section>
+
+    <!-- Hours on a work order -->
+    <section id="view-hours" class="view" hidden>
+      <div class="row between">
+        <h1 id="hours-title">Registra ore</h1>
+        <button class="link" type="button" data-back>Indietro</button>
+      </div>
+      <p id="hours-sub" class="muted"></p>
+      <form id="hours-form" class="stack" novalidate>
+        <label>Data<input id="hours-date" type="date" required></label>
+        <label>Ore lavorate<input id="hours-value" type="text" inputmode="decimal" placeholder="1:30 oppure 1,5" required></label>
+        <label>Cosa hai fatto<input id="hours-notes" type="text" placeholder="Es. cablaggio a banco, collaudo"></label>
+        <p id="hours-error" class="error" role="alert"></p>
+        <p id="hours-ok" class="ok" role="status"></p>
+        <button class="primary" type="submit">Registra</button>
+      </form>
     </section>
 
     <!-- Signed report (read only) -->

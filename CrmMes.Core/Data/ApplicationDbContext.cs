@@ -60,6 +60,10 @@ public class ApplicationDbContext : DbContext
     public DbSet<SiteReport> SiteReports => Set<SiteReport>();
     public DbSet<SiteReportHours> SiteReportHours => Set<SiteReportHours>();
     public DbSet<SiteReportMaterial> SiteReportMaterials => Set<SiteReportMaterial>();
+    public DbSet<Invoice> Invoices => Set<Invoice>();
+    public DbSet<InvoiceLine> InvoiceLines => Set<InvoiceLine>();
+    public DbSet<InvoiceTransportDocument> InvoiceTransportDocuments => Set<InvoiceTransportDocument>();
+    public DbSet<CustomerFiscalData> CustomerFiscalData => Set<CustomerFiscalData>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -446,6 +450,54 @@ public class ApplicationDbContext : DbContext
             entity.Property(m => m.Unit).HasMaxLength(20);
         });
 
+        modelBuilder.Entity<Invoice>(entity =>
+        {
+            entity.HasIndex(i => new { i.Year, i.Number }).IsUnique();
+            entity.Property(i => i.Status).HasMaxLength(20);
+            entity.Property(i => i.DocumentType).HasMaxLength(4);
+            entity.Property(i => i.PaymentMethod).HasMaxLength(4);
+            entity.Property(i => i.Notes).HasMaxLength(2000);
+            entity.Property(i => i.CreatedBy).HasMaxLength(200);
+            entity.Property(i => i.IssuedBy).HasMaxLength(200);
+            entity.HasOne(i => i.Customer).WithMany().HasForeignKey(i => i.CustomerId).OnDelete(DeleteBehavior.Restrict);
+            entity.HasMany(i => i.Lines).WithOne(l => l.Invoice).HasForeignKey(l => l.InvoiceId).OnDelete(DeleteBehavior.Cascade);
+            entity.HasMany(i => i.TransportDocuments).WithOne(t => t.Invoice).HasForeignKey(t => t.InvoiceId).OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<InvoiceLine>(entity =>
+        {
+            entity.Property(l => l.Code).HasMaxLength(100);
+            entity.Property(l => l.Description).HasMaxLength(1000);
+            entity.Property(l => l.Quantity).HasPrecision(18, 3);
+            entity.Property(l => l.Unit).HasMaxLength(10);
+            entity.Property(l => l.UnitPrice).HasPrecision(18, 4);
+            entity.Property(l => l.DiscountPercent).HasPrecision(6, 2);
+            entity.Property(l => l.VatRate).HasPrecision(6, 2);
+            entity.Property(l => l.VatNature).HasMaxLength(5);
+        });
+
+        modelBuilder.Entity<InvoiceTransportDocument>(entity =>
+        {
+            entity.HasKey(t => new { t.InvoiceId, t.TransportDocumentId });
+            // A DDT is invoiced once: the unique index makes a second invoice for it fail even under a race.
+            entity.HasIndex(t => t.TransportDocumentId).IsUnique();
+            entity.HasOne(t => t.TransportDocument).WithMany().HasForeignKey(t => t.TransportDocumentId).OnDelete(DeleteBehavior.Restrict);
+        });
+
+        modelBuilder.Entity<CustomerFiscalData>(entity =>
+        {
+            entity.HasKey(f => f.CustomerId);
+            entity.HasOne(f => f.Customer).WithOne().HasForeignKey<CustomerFiscalData>(f => f.CustomerId).OnDelete(DeleteBehavior.Cascade);
+            entity.Property(f => f.FiscalCode).HasMaxLength(16);
+            entity.Property(f => f.SdiCode).HasMaxLength(7);
+            entity.Property(f => f.Pec).HasMaxLength(256);
+            entity.Property(f => f.Street).HasMaxLength(60);
+            entity.Property(f => f.PostalCode).HasMaxLength(5);
+            entity.Property(f => f.City).HasMaxLength(60);
+            entity.Property(f => f.Province).HasMaxLength(2);
+            entity.Property(f => f.Country).HasMaxLength(2);
+        });
+
         modelBuilder.Entity<CompanyProfile>(entity =>
         {
             entity.Property(c => c.CompanyName).HasMaxLength(250);
@@ -456,6 +508,16 @@ public class ApplicationDbContext : DbContext
             entity.Property(c => c.Sector).HasMaxLength(50);
             entity.Property(c => c.EnabledModules).HasMaxLength(1000);
             entity.Property(c => c.Gs1CompanyPrefix).HasMaxLength(12);
+            entity.Property(c => c.FiscalCode).HasMaxLength(16);
+            entity.Property(c => c.TaxRegime).HasMaxLength(4);
+            entity.Property(c => c.Street).HasMaxLength(60);
+            entity.Property(c => c.PostalCode).HasMaxLength(5);
+            entity.Property(c => c.City).HasMaxLength(60);
+            entity.Property(c => c.Province).HasMaxLength(2);
+            entity.Property(c => c.Country).HasMaxLength(2);
+            entity.Property(c => c.ReaOffice).HasMaxLength(2);
+            entity.Property(c => c.ReaNumber).HasMaxLength(20);
+            entity.Property(c => c.Iban).HasMaxLength(34);
         });
 
         modelBuilder.Entity<LaborEntry>(entity =>

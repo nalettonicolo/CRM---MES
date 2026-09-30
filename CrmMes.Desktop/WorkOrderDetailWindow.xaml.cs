@@ -112,6 +112,10 @@ public partial class WorkOrderDetailWindow : Window
         }
     }
 
+    private void CopyCode_Click(object sender, RoutedEventArgs e) => CopySupport.Copy(CodeText.Text);
+
+    private void CopyLot_Click(object sender, RoutedEventArgs e) => CopySupport.Copy(LotNumberText.Text);
+
     private void Cost_Click(object sender, RoutedEventArgs e) =>
         new WorkOrderCostWindow(_apiClient, _workOrderId) { Owner = this }.ShowDialog();
 
@@ -130,7 +134,7 @@ public partial class WorkOrderDetailWindow : Window
             var order = await _apiClient.GetWorkOrderAsync(_workOrderId);
 
             CodeText.Text = order.Code;
-            LotNumberText.Text = $"Lotto {order.ProductLotNumber}";
+            LotNumberText.Text = order.ProductLotNumber;
             StatusText.Text = StatusToItalianTextConverter.Translate(order.Status);
             StatusPill.Background = (System.Windows.Media.Brush)StatusBrush.Convert(order.Status, typeof(System.Windows.Media.Brush), null, System.Globalization.CultureInfo.CurrentCulture)!;
             StatusText.Foreground = (System.Windows.Media.Brush)StatusBrush.Convert(order.Status, typeof(System.Windows.Media.Brush), "Foreground", System.Globalization.CultureInfo.CurrentCulture)!;

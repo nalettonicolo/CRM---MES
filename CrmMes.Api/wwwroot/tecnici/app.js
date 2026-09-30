@@ -4,10 +4,10 @@
 (() => {
   "use strict";
 
-  const state = { token: null, refreshToken: null, name: "", status: "Draft", report: null, workOrder: null };
+  const state = { token: null, refreshToken: null, name: "", userId: null, status: "Draft", report: null, workOrder: null, pickMode: "report" };
   let refreshing = null;
   const $ = (id) => document.getElementById(id);
-  const views = ["login", "list", "pick", "edit", "sign", "show"];
+  const views = ["login", "list", "pick", "edit", "sign", "show", "phases", "hours"];
   let history = [];
 
   // ---------- helpers
@@ -75,7 +75,7 @@
         });
         if (!response.ok) return false;
         const auth = await response.json();
-        setSession(auth.token, auth.refreshToken, auth.name);
+        setSession(auth.token, auth.refreshToken, auth.name, auth.userId);
         return true;
       } catch {
         return false;
@@ -112,27 +112,31 @@
   }
 
   // ---------- session
-  function setSession(token, refreshToken, name) {
+  function setSession(token, refreshToken, name, userId) {
     state.token = token;
     state.refreshToken = refreshToken;
     state.name = name;
+    if (userId) state.userId = userId;
     try {
       sessionStorage.setItem("crmmes.token", token);
       sessionStorage.setItem("crmmes.refresh", refreshToken || "");
       sessionStorage.setItem("crmmes.name", name);
+      if (state.userId) sessionStorage.setItem("crmmes.user", state.userId);
     } catch { /* private mode: session lives in memory only */ }
     $("who").textContent = name;
     $("logout").hidden = false;
+    $("main-nav").hidden = false;
   }
 
   function logout(message) {
     state.token = null;
     state.refreshToken = null;
     try {
-      ["crmmes.token", "crmmes.refresh", "crmmes.name"].forEach((key) => sessionStorage.removeItem(key));
+      ["crmmes.token", "crmmes.refresh", "crmmes.name", "crmmes.user"].forEach((key) => sessionStorage.removeItem(key));
     } catch { /* ignore */ }
     $("who").textContent = "";
     $("logout").hidden = true;
+    $("main-nav").hidden = true;
     history = [];
     $("login-error").textContent = message || "";
     show("login", false);
@@ -149,7 +153,7 @@
         body: { email: $("login-email").value.trim(), password: $("login-password").value },
       });
       $("login-password").value = "";
-      setSession(auth.token, auth.refreshToken, auth.name);
+      setSession(auth.token, auth.refreshToken, auth.name, auth.userId);
       show("list", false);
       loadList();
     } catch (error) {
@@ -193,11 +197,27 @@
 
   // ---------- work order picker
   let searchTimer;
-  $("new-report").addEventListener("click", () => {
+  function openPicker(mode) {
+    state.pickMode = mode;
+    $("pick-title").textContent = { report: "Nuovo rapportino", phases: "Fasi: scegli la commessa", hours: "Ore: scegli la commessa" }[mode];
     $("pick-search").value = "";
-    show("pick");
+    show("pick", mode === "report");
     loadWorkOrders();
-  });
+  }
+
+  $("new-report").addEventListener("click", () => openPicker("report"));
+
+  // ---------- sections
+  document.querySelectorAll(".nav-item").forEach((item) => item.addEventListener("click", () => {
+    document.querySelectorAll(".nav-item").forEach((i) => i.classList.toggle("active", i === item));
+    history = [];
+    if (item.dataset.section === "reports") {
+      show("list", false);
+      loadList();
+    } else {
+      openPicker(item.dataset.section);
+    }
+  }));
   $("pick-search").addEventListener("input", () => {
     clearTimeout(searchTimer);
     searchTimer = setTimeout(loadWorkOrders, 300);
@@ -214,7 +234,7 @@
       const orders = await api(`/api/site-reports/open-work-orders${q ? `?q=${encodeURIComponent(q)}` : ""}`);
       info.textContent = orders.length ? "" : "Nessuna commessa aperta trovata.";
       orders.forEach((order) => list.append(el("li", {},
-        el("button", { class: "card", type: "button", onclick: () => startReport(order) },
+        el("button", { class: "card", type: "button", onclick: () => pickWorkOrder(order) },
           el("span", { class: "title", text: `${order.code} · ${order.customerName || "cliente non indicato"}` }),
           el("span", { class: "meta", text: [order.productName, order.customerAddress].filter(Boolean).join(" · ") })))));
     } catch (error) {
@@ -222,6 +242,103 @@
       info.textContent = error.message;
     }
   }
+
+  function pickWorkOrder(order) {
+    state.workOrder = order;
+    if (state.pickMode === "phases") openPhases(order);
+    else if (state.pickMode === "hours") openHours(order);
+    else startReport(order);
+  }
+
+  // ---------- phases (same rules as the shop floor terminal: only a released job, one phase at a time)
+  const phaseStatus = { Pending: ["pending", "Da fare"], InProgress: ["running", "In corso"], Completed: ["signed", "Completata"] };
+
+  async function openPhases(order, remember = true) {
+    $("phases-title").textContent = order.code;
+    $("phases-sub").textContent = [order.customerName, order.productName].filter(Boolean).join(" · ");
+    show("phases", remember);
+    const list = $("phases-list");
+    const info = $("phases-state");
+    list.replaceChildren();
+    info.className = "state";
+    info.textContent = "Caricamento...";
+    try {
+      const workOrder = await api(`/api/work-orders/${order.id}`);
+      info.textContent = workOrder.operations.length ? "" : "La commessa non ha fasi di lavoro.";
+      if (!["Released", "InProgress"].includes(workOrder.status)) {
+        info.textContent = "La commessa non è ancora rilasciata: le fasi si avviano dopo il rilascio in ufficio.";
+      }
+      workOrder.operations.forEach((operation) => {
+        const [css, label] = phaseStatus[operation.status] || ["pending", operation.status];
+        const card = el("li", { class: "phase" },
+          el("span", { class: "title", text: `${operation.sequenceNumber}. ${operation.name}` }),
+          el("span", { class: "meta", text: [operation.workCenter, `stimati ${Math.round(operation.estimatedMinutes)} min`].filter(Boolean).join(" · ") }),
+          el("span", { class: `badge ${css}`, text: label }));
+        const action = operation.status === "Pending" ? "start" : operation.status === "InProgress" ? "complete" : null;
+        if (action && ["Released", "InProgress"].includes(workOrder.status)) {
+          card.append(el("button", {
+            class: action === "start" ? "secondary" : "primary", type: "button",
+            text: action === "start" ? "Avvia fase" : "Completa fase",
+            onclick: async (event) => {
+              event.currentTarget.disabled = true;
+              try {
+                const query = new URLSearchParams({ operatorName: state.name });
+                if (state.userId) query.set("operatorId", state.userId);
+                await api(`/api/work-orders/${order.id}/operations/${operation.id}/${action}?${query}`, { method: "POST" });
+                openPhases(order, false);
+              } catch (error) {
+                info.className = "state error-state";
+                info.textContent = error.message;
+                event.currentTarget.disabled = false;
+              }
+            },
+          }));
+        }
+        list.append(card);
+      });
+    } catch (error) {
+      info.className = "state error-state";
+      info.textContent = error.message;
+    }
+  }
+
+  // ---------- hours
+  function openHours(order) {
+    $("hours-title").textContent = `Ore · ${order.code}`;
+    $("hours-sub").textContent = [order.customerName, order.productName].filter(Boolean).join(" · ");
+    $("hours-date").value = todayIso();
+    $("hours-value").value = "";
+    $("hours-notes").value = "";
+    $("hours-error").textContent = "";
+    $("hours-ok").textContent = "";
+    show("hours");
+  }
+
+  $("hours-form").addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const button = event.submitter;
+    $("hours-error").textContent = "";
+    $("hours-ok").textContent = "";
+    const minutes = parseDuration($("hours-value").value);
+    if (minutes === null) {
+      $("hours-error").textContent = "Ore non valide: scrivi per esempio 1:30 oppure 1,5.";
+      return;
+    }
+    button.disabled = true;
+    try {
+      await api(`/api/work-orders/${state.workOrder.id}/labor`, {
+        method: "POST",
+        body: { minutes, workDate: $("hours-date").value || todayIso(), workCenterId: null, operationId: null, notes: $("hours-notes").value.trim() || null },
+      });
+      $("hours-ok").textContent = `Registrate ${formatMinutes(minutes)} ore su ${state.workOrder.code}.`;
+      $("hours-value").value = "";
+      $("hours-notes").value = "";
+    } catch (error) {
+      $("hours-error").textContent = error.message;
+    } finally {
+      button.disabled = false;
+    }
+  });
 
   function startReport(order) {
     state.report = null;
@@ -530,7 +647,7 @@
   try {
     const token = sessionStorage.getItem("crmmes.token");
     if (token) {
-      setSession(token, sessionStorage.getItem("crmmes.refresh") || null, sessionStorage.getItem("crmmes.name") || "");
+      setSession(token, sessionStorage.getItem("crmmes.refresh") || null, sessionStorage.getItem("crmmes.name") || "", sessionStorage.getItem("crmmes.user"));
       show("list", false);
       loadList();
     } else {

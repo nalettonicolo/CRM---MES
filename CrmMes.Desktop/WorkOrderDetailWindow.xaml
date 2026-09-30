@@ -19,10 +19,13 @@
             <Border DockPanel.Dock="Right" x:Name="StatusPill" Style="{StaticResource Pill}" VerticalAlignment="Center">
                 <TextBlock x:Name="StatusText" Style="{StaticResource PillText}" />
             </Border>
-            <TextBlock x:Name="CodeText" FontSize="20" FontWeight="SemiBold" Foreground="{StaticResource TextPrimaryBrush}" />
+            <TextBox x:Name="CodeText" Style="{StaticResource SelectableText}" FontSize="20" FontWeight="SemiBold" VerticalAlignment="Center" ToolTip="Seleziona per copiare" />
+            <Button Style="{StaticResource SidebarLinkButton}" Foreground="{StaticResource PrimaryBrush}" Content="Copia" Margin="6,4,0,0" VerticalAlignment="Center" Click="CopyCode_Click" ToolTip="Copia il codice commessa" />
             <local:HelpIcon Margin="8,4,0,0"
                              Text="Dettaglio di una commessa di produzione. Rilascia verifica la disponibilità dei materiali della distinta base (se manca qualcosa, chiede conferma prima di procedere comunque). Pianifica assegna a ogni fase ancora aperta il giorno (o i giorni) in cui dovrebbe essere eseguita, in base alla capacità giornaliera registrata per il suo centro di lavoro — è una stima a livello di giorno, non un orario preciso. Ogni fase si avvia e si completa singolarmente; a fine fase il sistema calcola i minuti effettivi e il rapporto stimato/effettivo (performance)." />
-            <TextBlock x:Name="LotNumberText" FontSize="12.5" Foreground="{StaticResource TextSecondaryBrush}" Margin="12,4,0,0" VerticalAlignment="Center" />
+            <TextBlock Text="Lotto" FontSize="12.5" Foreground="{StaticResource TextSecondaryBrush}" Margin="12,4,4,0" VerticalAlignment="Center" />
+            <TextBox x:Name="LotNumberText" Style="{StaticResource SelectableText}" FontSize="12.5" Foreground="{StaticResource TextSecondaryBrush}" Margin="0,4,0,0" VerticalAlignment="Center" ToolTip="Seleziona per copiare" />
+            <Button Style="{StaticResource SidebarLinkButton}" Foreground="{StaticResource PrimaryBrush}" Content="Copia" Margin="6,4,0,0" VerticalAlignment="Center" Click="CopyLot_Click" ToolTip="Copia il lotto" />
         </DockPanel>
 
         <TextBlock Grid.Row="1" x:Name="LoadingText" Text="Caricamento..." Foreground="{StaticResource TextSecondaryBrush}" Margin="0,10,0,0" />

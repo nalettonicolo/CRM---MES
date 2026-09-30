@@ -95,6 +95,12 @@
                                             <TextBlock Text="Preventivi" Margin="6,0,0,0" />
                                         </StackPanel>
                                     </RadioButton>
+                                    <RadioButton x:Name="NavInvoices" Style="{StaticResource NavItem}" GroupName="Nav" Tag="27" Checked="NavItem_Checked">
+                                        <StackPanel Orientation="Horizontal">
+                                            <TextBlock Text="&#xE8C7;" FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets" FontSize="16" Width="24" />
+                                            <TextBlock Text="Fatture" Margin="6,0,0,0" />
+                                        </StackPanel>
+                                    </RadioButton>
                                 </StackPanel>
                             </Expander>
 
@@ -294,6 +300,12 @@
                                             <TextBlock Text="Sedi" Margin="6,0,0,0" />
                                         </StackPanel>
                                     </RadioButton>
+                                    <Button x:Name="CompanyFiscalButton" Style="{StaticResource SidebarLinkButton}" HorizontalAlignment="Stretch" HorizontalContentAlignment="Left" Margin="26,6,10,0" Click="CompanyFiscalButton_Click" Visibility="Collapsed">
+                                        <StackPanel Orientation="Horizontal">
+                                            <TextBlock Text="&#xE8C7;" FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets" FontSize="16" Width="24" />
+                                            <TextBlock Text="Dati per le fatture" Margin="6,0,0,0" />
+                                        </StackPanel>
+                                    </Button>
                                     <Button x:Name="CompanySetupButton" Style="{StaticResource SidebarLinkButton}" HorizontalAlignment="Stretch" HorizontalContentAlignment="Left" Margin="26,6,10,0" Click="CompanySetupButton_Click" Visibility="Collapsed">
                                         <StackPanel Orientation="Horizontal">
                                             <TextBlock Text="&#xE713;" FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets" FontSize="16" Width="24" />
@@ -651,7 +663,15 @@
                                     <Button DockPanel.Dock="Right" Content="Nuova commessa" Width="150" Height="36" Click="NewWorkOrderButton_Click" />
                                     <Button DockPanel.Dock="Right" Style="{StaticResource SecondaryButton}" Content="Aggiorna" Width="100" Height="36" Margin="0,0,10,0" Click="RefreshWorkOrdersButton_Click" />
                                     <ComboBox x:Name="WorkOrdersSiteFilterCombo" DockPanel.Dock="Right" Width="170" Height="36" Margin="0,0,10,0" DisplayMemberPath="Name" SelectionChanged="SiteFilter_SelectionChanged" />
-                                    <TextBlock Text="Commesse di produzione" VerticalAlignment="Center" Foreground="{StaticResource TextSecondaryBrush}" />
+                                    <ComboBox x:Name="WorkOrderStatusFilter" DockPanel.Dock="Right" Width="200" Height="36" Margin="0,0,10,0" SelectionChanged="WorkOrderStatusFilter_SelectionChanged">
+                                        <ComboBoxItem Content="Tutte le commesse" Tag="" IsSelected="True" />
+                                        <ComboBoxItem Content="Aperte e in lavorazione" Tag="Open" />
+                                        <ComboBoxItem Content="In lavorazione" Tag="InProgress" />
+                                        <ComboBoxItem Content="Rilasciate" Tag="Released" />
+                                        <ComboBoxItem Content="In bozza" Tag="Draft" />
+                                        <ComboBoxItem Content="Completate" Tag="Completed" />
+                                    </ComboBox>
+                                    <TextBox x:Name="WorkOrderSearchBox" Height="36" Margin="0,0,10,0" Tag="Cerca codice (anche le ultime cifre), lotto o prodotto" TextChanged="WorkOrderSearchBox_TextChanged" />
                                 </DockPanel>
                                 <Border Grid.Row="1" Style="{StaticResource CardBorder}" Padding="4">
                                     <ListView x:Name="WorkOrdersList" SelectionChanged="WorkOrdersList_SelectionChanged" MouseDoubleClick="WorkOrdersList_MouseDoubleClick">
@@ -1270,6 +1290,7 @@
                                 </Grid.RowDefinitions>
                                 <DockPanel Grid.Row="0" Margin="0,0,0,14">
                                     <Button DockPanel.Dock="Right" Content="Nuovo cliente" Width="130" Height="36" Click="NewCustomerButton_Click" />
+                                    <Button DockPanel.Dock="Right" Style="{StaticResource SecondaryButton}" Content="Dati fiscali" Width="110" Height="36" Margin="0,0,10,0" Click="CustomerFiscalButton_Click" />
                                     <Button DockPanel.Dock="Right" Style="{StaticResource SecondaryButton}" Content="Cerca" Width="90" Height="36" Margin="0,0,10,0" Click="SearchCustomersButton_Click" />
                                     <TextBox x:Name="CustomerSearchBox" Height="36" Padding="12,0" Margin="0,0,12,0" Tag="Cerca per nome, codice o partita IVA" KeyDown="CustomerSearchBox_KeyDown" />
                                 </DockPanel>
@@ -1632,6 +1653,48 @@
                                                 </GridViewColumn>
                                                 <GridViewColumn Header="Firmato da" DisplayMemberBinding="{Binding SignedByName}" Width="160" />
                                                 <GridViewColumn Header="Tecnico" DisplayMemberBinding="{Binding CreatedBy}" Width="140" />
+                                            </GridView>
+                                        </ListView.View>
+                                    </ListView>
+                                </Border>
+                            </Grid>
+                        </TabItem>
+
+                        <TabItem Header="Fatture">
+                            <Grid>
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto" />
+                                    <RowDefinition Height="*" />
+                                </Grid.RowDefinitions>
+                                <DockPanel Grid.Row="0" Margin="0,0,0,14">
+                                    <Button DockPanel.Dock="Right" Content="Fattura da DDT" Width="140" Height="36" Click="InvoiceFromDocuments_Click" />
+                                    <Button DockPanel.Dock="Right" Style="{StaticResource SecondaryButton}" Content="Nuova fattura" Width="130" Height="36" Margin="0,0,10,0" Click="NewInvoice_Click" />
+                                    <Button DockPanel.Dock="Right" Style="{StaticResource SecondaryButton}" Content="Aggiorna" Width="100" Height="36" Margin="0,0,10,0" Click="RefreshInvoices_Click" />
+                                    <ComboBox x:Name="InvoiceStatusFilter" DockPanel.Dock="Right" Width="150" Height="36" Margin="0,0,10,0" SelectionChanged="InvoiceStatusFilter_SelectionChanged">
+                                        <ComboBoxItem Content="Tutte" Tag="" IsSelected="True" />
+                                        <ComboBoxItem Content="Bozze" Tag="Draft" />
+                                        <ComboBoxItem Content="Emesse" Tag="Issued" />
+                                    </ComboBox>
+                                    <TextBlock x:Name="InvoicesInfoText" VerticalAlignment="Center" Foreground="{StaticResource TextSecondaryBrush}" TextWrapping="Wrap" />
+                                </DockPanel>
+                                <Border Grid.Row="1" Style="{StaticResource CardBorder}" Padding="4">
+                                    <ListView x:Name="InvoicesList" SelectionMode="Single" MouseDoubleClick="InvoicesList_MouseDoubleClick">
+                                        <ListView.View>
+                                            <GridView>
+                                                <GridViewColumn Header="Numero" DisplayMemberBinding="{Binding Code}" Width="100" />
+                                                <GridViewColumn Header="Data" DisplayMemberBinding="{Binding IssueDate, StringFormat=dd/MM/yyyy}" Width="100" />
+                                                <GridViewColumn Header="Cliente" DisplayMemberBinding="{Binding CustomerName}" Width="260" />
+                                                <GridViewColumn Header="Tipo" DisplayMemberBinding="{Binding TypeLabel}" Width="130" />
+                                                <GridViewColumn Header="Totale €" DisplayMemberBinding="{Binding Total, StringFormat=N2}" Width="120" />
+                                                <GridViewColumn Header="Stato" Width="110">
+                                                    <GridViewColumn.CellTemplate>
+                                                        <DataTemplate>
+                                                            <Border Style="{StaticResource Pill}">
+                                                                <TextBlock Style="{StaticResource PillText}" Text="{Binding StatusLabel}" Foreground="{Binding BrushStatus, Converter={StaticResource StatusToBrush}, ConverterParameter=Foreground}" />
+                                                            </Border>
+                                                        </DataTemplate>
+                                                    </GridViewColumn.CellTemplate>
+                                                </GridViewColumn>
                                             </GridView>
                                         </ListView.View>
                                     </ListView>

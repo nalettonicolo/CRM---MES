@@ -1053,6 +1053,124 @@ public static class ListExporter
         }).GeneratePdf(filePath);
     }
 
+    /// <summary>Courtesy copy of an electronic invoice. The legally valid invoice is the XML delivered by
+    /// the Exchange System: this copy says so, as the rules for courtesy copies require.</summary>
+    public static void ExportInvoice(InvoiceDto invoice, CustomerFiscalDto customer, CompanyProfileDto? company, CompanyFiscalDto companyFiscal, string filePath)
+    {
+        var italian = System.Globalization.CultureInfo.GetCultureInfo("it-IT");
+        string Money(decimal value) => value.ToString("N2", italian);
+        Document.Create(container =>
+        {
+            container.Page(page =>
+            {
+                page.Size(PageSizes.A4);
+                page.Margin(36);
+                page.DefaultTextStyle(style => style.FontSize(9.5f));
+                page.Header().Column(column =>
+                {
+                    column.Item().Row(row =>
+                    {
+                        row.RelativeItem().Column(left =>
+                        {
+                            left.Item().Text(company?.CompanyName ?? string.Empty).FontSize(13).Bold();
+                            left.Item().Text($"{companyFiscal.Street}, {companyFiscal.PostalCode} {companyFiscal.City} ({companyFiscal.Province})");
+                            left.Item().Text($"P.IVA {company?.VatNumber}" + (companyFiscal.FiscalCode is null ? string.Empty : $" · C.F. {companyFiscal.FiscalCode}"));
+                            if (companyFiscal.ReaNumber is not null)
+                            {
+                                left.Item().Text($"REA {companyFiscal.ReaOffice} {companyFiscal.ReaNumber}").FontSize(8.5f);
+                            }
+                        });
+                        row.ConstantItem(230).AlignRight().Column(right =>
+                        {
+                            right.Item().AlignRight().Text(invoice.DocumentType == "TD24" ? "FATTURA DIFFERITA" : "FATTURA").FontSize(14).Bold();
+                            right.Item().AlignRight().Text(invoice.Number is null ? "Bozza - non valida" : $"N. {invoice.Code} del {invoice.IssueDate:dd/MM/yyyy}").FontSize(11).Bold();
+                        });
+                    });
+                    column.Item().PaddingTop(10).Border(0.75f).BorderColor(Colors.Grey.Lighten1).Padding(8).Column(c =>
+                    {
+                        c.Item().Text("Cliente").FontSize(7.5f).FontColor(Colors.Grey.Darken1);
+                        c.Item().Text(invoice.CustomerName).FontSize(11).Bold();
+                        c.Item().Text($"{customer.Street}, {customer.PostalCode} {customer.City} ({customer.Province}) {customer.Country}");
+                        c.Item().Text(string.Join(" · ", new[]
+                        {
+                            customer.FiscalCode is null ? null : $"C.F. {customer.FiscalCode}",
+                            customer.SdiCode is null ? null : $"Codice SDI {customer.SdiCode}",
+                            customer.Pec is null ? null : $"PEC {customer.Pec}"
+                        }.Where(v => v is not null)));
+                    });
+                    if (invoice.TransportDocuments.Count > 0)
+                    {
+                        column.Item().PaddingTop(6).Text("Riferimento DDT: " + string.Join(", ",
+                            invoice.TransportDocuments.Select(d => $"{d.DocumentCode} del {d.IssuedAt?.ToLocalTime():dd/MM/yyyy}"))).FontSize(8.5f);
+                    }
+                });
+                page.Content().PaddingTop(12).Column(content =>
+                {
+                    content.Item().Table(table =>
+                    {
+                        table.ColumnsDefinition(c => { c.RelativeColumn(4); c.ConstantColumn(50); c.ConstantColumn(40); c.ConstantColumn(62); c.ConstantColumn(44); c.ConstantColumn(44); c.ConstantColumn(70); });
+                        foreach (var (text, right) in new[] { ("Descrizione", false), ("Q.tà", true), ("U.m.", false), ("Prezzo", true), ("Sconto", true), ("IVA", true), ("Importo", true) })
+                        {
+                            var cell = table.Cell().BorderBottom(1).PaddingBottom(3);
+                            (right ? cell.AlignRight() : cell).Text(text).Bold().FontSize(8.5f);
+                        }
+
+                        foreach (var line in invoice.Lines)
+                        {
+                            IContainer Cell() => table.Cell().BorderBottom(0.5f).BorderColor(Colors.Grey.Lighten2).PaddingVertical(3);
+                            Cell().Text((line.Code is null ? string.Empty : $"{line.Code} ") + line.Description);
+                            Cell().AlignRight().Text(line.Quantity.ToString("0.###", italian));
+                            Cell().Text(line.Unit);
+                            Cell().AlignRight().Text(line.UnitPrice.ToString("#,##0.00##", italian));
+                            Cell().AlignRight().Text(line.DiscountPercent > 0 ? $"{line.DiscountPercent:0.##}%" : "-");
+                            Cell().AlignRight().Text(line.VatRate == 0 ? line.VatNature ?? "0%" : $"{line.VatRate:0}%");
+                            Cell().AlignRight().Text(Money(line.LineTotal));
+                        }
+                    });
+
+                    content.Item().PaddingTop(10).AlignRight().Width(260).Table(table =>
+                    {
+                        table.ColumnsDefinition(c => { c.RelativeColumn(); c.RelativeColumn(); c.RelativeColumn(); });
+                        foreach (var text in new[] { "Aliquota", "Imponibile", "Imposta" })
+                        {
+                            table.Cell().BorderBottom(1).PaddingBottom(2).AlignRight().Text(text).Bold().FontSize(8.5f);
+                        }
+
+                        foreach (var summary in invoice.VatSummary)
+                        {
+                            table.Cell().AlignRight().Text(summary.Rate == 0 ? summary.Nature ?? "0%" : $"{summary.Rate:0}%");
+                            table.Cell().AlignRight().Text(Money(summary.Taxable));
+                            table.Cell().AlignRight().Text(Money(summary.Tax));
+                        }
+                    });
+                    content.Item().PaddingTop(6).AlignRight().Text($"Totale documento {Money(invoice.Total)} €").FontSize(13).Bold();
+                    var payment = invoice.PaymentMethod switch { "MP05" => "Bonifico", "MP12" => "RIBA", "MP01" => "Contanti", "MP02" => "Assegno", "MP08" => "Carta", "MP19" => "SEPA Direct Debit", _ => invoice.PaymentMethod };
+                    content.Item().PaddingTop(10).Text($"Pagamento: {payment}" + (invoice.PaymentDueDate is { } due ? $" entro il {due:dd/MM/yyyy}" : string.Empty)
+                        + (invoice.PaymentMethod == "MP05" && companyFiscal.Iban is not null ? $" · IBAN {companyFiscal.Iban}" : string.Empty));
+                    if (!string.IsNullOrWhiteSpace(invoice.Notes))
+                    {
+                        content.Item().PaddingTop(4).Text(invoice.Notes);
+                    }
+
+                    if (invoice.VatSummary.Any(s => s.Nature is not null && s.Nature.StartsWith("N6")))
+                    {
+                        content.Item().PaddingTop(4).Text("Operazione soggetta a inversione contabile (reverse charge), art. 17 DPR 633/72: l'IVA è a carico del committente.").Bold();
+                    }
+                });
+                page.Footer().Column(footer =>
+                {
+                    footer.Item().AlignCenter().Text("Copia di cortesia. La fattura valida ai fini fiscali è il file elettronico trasmesso tramite il Sistema di Interscambio (SdI).").FontSize(7.5f).FontColor(Colors.Grey.Darken1);
+                    footer.Item().AlignCenter().Text(text =>
+                    {
+                        text.CurrentPageNumber();
+                        text.Span(" / ");
+                        text.TotalPages();
+                    });
+                });
+            });
+        }).GeneratePdf(filePath);
+    }
+
     private static string Sanitize(string sheetName)
     {
         var invalid = new[] { '\\', '/', '?', '*', '[', ']', ':' };
