@@ -1,0 +1,133 @@
+@inject Api Api
+
+@* Article list import from Excel or CSV: the file is checked first, imported only on confirmation. *@
+<div class="card card-pad stack">
+    <div>
+        <h2>Importa articoli da Excel</h2>
+        <p class="muted small">File .xlsx o .csv con almeno le colonne del codice (es. "Articolo") e della descrizione. Riconosce anche UM, prezzo, IVA e data. Prima vedi cosa succederebbe, poi confermi.</p>
+    </div>
+
+    <InputFile OnChange="PickAsync" accept=".xlsx,.xlsm,.csv" />
+    <label class="check"><input type="checkbox" checked="@_update" @onchange="ToggleUpdateAsync" /> Aggiorna anche gli articoli già presenti</label>
+
+    @if (_busy)
+    {
+        <div class="notice" role="status">Controllo del file in corso...</div>
+    }
+    @if (_error is not null)
+    {
+        <div class="alert" role="alert">@_error</div>
+    }
+    @if (_result is not null)
+    {
+        <div class="@(_result.Preview ? "notice" : "success")" role="status">
+            @if (_result.Preview)
+            {
+                <span>@_result.Rows righe: <strong>@_result.Created nuovi</strong>, @_result.Updated da aggiornare, @_result.Skipped già presenti. @_result.ErrorCount righe con errori (saltate), @_result.WarningCount avvisi.</span>
+            }
+            else
+            {
+                <span>Importazione completata: @_result.Created nuovi, @_result.Updated aggiornati, @_result.Skipped già presenti lasciati com'erano.</span>
+            }
+        </div>
+
+        @if (_result.Errors.Count > 0)
+        {
+            <details>
+                <summary>Righe con errori (@_result.ErrorCount)</summary>
+                <ul class="small">
+                    @foreach (var issue in _result.Errors)
+                    {
+                        <li>Riga @issue.Row@(issue.Code is null ? "" : $" ({issue.Code})"): @issue.Message</li>
+                    }
+                </ul>
+            </details>
+        }
+        @if (_result.Warnings.Count > 0)
+        {
+            <details>
+                <summary>Avvisi (@_result.WarningCount)</summary>
+                <ul class="small">
+                    @foreach (var issue in _result.Warnings)
+                    {
+                        <li>Riga @issue.Row@(issue.Code is null ? "" : $" ({issue.Code})"): @issue.Message</li>
+                    }
+                </ul>
+            </details>
+        }
+
+        @if (_result.Preview && _result.Created + _result.Updated > 0)
+        {
+            <div class="actions"><button @onclick="ImportAsync" disabled="@_busy">Importa @(_result.Created + _result.Updated) articoli</button></div>
+        }
+    }
+</div>
+
+@code {
+    [Parameter] public EventCallback Imported { get; set; }
+
+    private byte[]? _content;
+    private string? _fileName;
+    private bool _update;
+    private bool _busy;
+    private string? _error;
+    private ArticleImportResult? _result;
+
+    private async Task PickAsync(InputFileChangeEventArgs e)
+    {
+        _error = null;
+        _result = null;
+        try
+        {
+            using var stream = e.File.OpenReadStream(maxAllowedSize: 20_000_000);
+            using var memory = new MemoryStream();
+            await stream.CopyToAsync(memory);
+            _content = memory.ToArray();
+            _fileName = e.File.Name;
+        }
+        catch (IOException)
+        {
+            _error = "File troppo grande (massimo 20 MB) o non leggibile.";
+            return;
+        }
+
+        await RunAsync(preview: true);
+    }
+
+    private async Task ToggleUpdateAsync(ChangeEventArgs e)
+    {
+        _update = e.Value is true;
+        if (_content is not null)
+        {
+            await RunAsync(preview: true);
+        }
+    }
+
+    private async Task ImportAsync()
+    {
+        await RunAsync(preview: false);
+        if (_result is { Preview: false })
+        {
+            await Imported.InvokeAsync();
+        }
+    }
+
+    private async Task RunAsync(bool preview)
+    {
+        _busy = true;
+        _error = null;
+        try
+        {
+            _result = await Api.PostFileAsync<ArticleImportResult>(
+                $"api/materials/import?preview={(preview ? "true" : "false")}&update={(_update ? "true" : "false")}", _content!, _fileName!);
+        }
+        catch (ApiException exception)
+        {
+            _error = exception.Message;
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+}

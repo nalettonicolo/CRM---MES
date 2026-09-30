@@ -59,6 +59,45 @@ public sealed class Api
     /// <summary>A new pair of tokens now (after two-factor was switched on, to lift the setup limit).</summary>
     public async Task<bool> RenewSessionAsync() => await RefreshAsync();
 
+    /// <summary>A file sent as multipart form data (field "file"), with the same 401 renewal as every call.</summary>
+    public async Task<T> PostFileAsync<T>(string path, byte[] content, string fileName)
+    {
+        async Task<HttpResponseMessage> SendAsync()
+        {
+            using var request = new HttpRequestMessage(HttpMethod.Post, path);
+            request.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
+            if (_session.Auth is { } auth)
+            {
+                request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", auth.Token);
+            }
+
+            var form = new MultipartFormDataContent();
+            form.Add(new ByteArrayContent(content), "file", fileName);
+            request.Content = form;
+            try
+            {
+                return await _http.SendAsync(request);
+            }
+            catch (HttpRequestException)
+            {
+                throw new ApiException("Server non raggiungibile. Controlla la connessione e riprova.");
+            }
+        }
+
+        var response = await SendAsync();
+        if (response.StatusCode == HttpStatusCode.Unauthorized && _session.Auth is not null && await RefreshAsync())
+        {
+            response.Dispose();
+            response = await SendAsync();
+        }
+
+        using (response)
+        {
+            await EnsureSuccessAsync(response);
+            return await response.Content.ReadFromJsonAsync<T>() ?? throw new ApiException("Risposta del server vuota.");
+        }
+    }
+
     public async Task PostNoContentAsync(string path, object? body = null)
     {
         using var response = await SendAuthenticatedAsync(HttpMethod.Post, path, body);

@@ -1,3 +1,5 @@
+using System.Security.Claims;
+using CrmMes.Api.Services;
 using CrmMes.Core.Data;
 using CrmMes.Core.Models;
 using Microsoft.AspNetCore.Authorization;
@@ -55,7 +57,9 @@ public class MaterialsController : ControllerBase
                 material.Stock,
                 material.MinStock,
                 material.IsActive,
-                material.Stock <= material.MinStock))
+                material.Stock <= material.MinStock,
+                material.ListPrice,
+                material.VatRate))
             .ToListAsync(cancellationToken);
 
         return Ok(materials);
@@ -77,10 +81,144 @@ public class MaterialsController : ControllerBase
                 item.Stock,
                 item.MinStock,
                 item.IsActive,
-                item.Stock <= item.MinStock))
+                item.Stock <= item.MinStock,
+                item.ListPrice,
+                item.VatRate))
             .SingleOrDefaultAsync(cancellationToken);
 
         return material is null ? NotFound() : Ok(material);
+    }
+
+    /// <summary>Imports an article list (Excel .xlsx or CSV). preview=true only checks and counts; the
+    /// real import runs with preview=false. update=false leaves articles already present untouched;
+    /// update=true refreshes their description, unit, price, VAT and minimum stock (never the stock: that
+    /// comes from lots). Nothing is deleted.</summary>
+    [Authorize(Policy = "PurchasingOrWarehouse")]
+    [HttpPost("import")]
+    [RequestSizeLimit(20_000_000)]
+    public async Task<ActionResult<ArticleImportResponse>> Import(
+        IFormFile? file, [FromQuery] bool preview = true, [FromQuery] bool update = false, CancellationToken cancellationToken = default)
+    {
+        if (file is null || file.Length == 0)
+        {
+            return BadRequest(new { message = "Scegli un file Excel (.xlsx) o CSV." });
+        }
+
+        List<string?[]> rows;
+        try
+        {
+            var extension = Path.GetExtension(file.FileName).ToLowerInvariant();
+            if (extension == ".csv" || extension == ".txt")
+            {
+                using var reader = new StreamReader(file.OpenReadStream(), System.Text.Encoding.UTF8, detectEncodingFromByteOrderMarks: true);
+                rows = ArticleImport.ReadCsv(await reader.ReadToEndAsync(cancellationToken));
+            }
+            else if (extension == ".xlsx" || extension == ".xlsm")
+            {
+                using var stream = file.OpenReadStream();
+                rows = ArticleImport.ReadExcel(stream);
+            }
+            else
+            {
+                return BadRequest(new { message = "Formato non supportato: salva il file come Excel (.xlsx) o CSV." });
+            }
+        }
+        catch (Exception exception) when (exception is not OperationCanceledException)
+        {
+            return BadRequest(new { message = $"Il file non si legge: {exception.Message}" });
+        }
+
+        var parsed = ArticleImport.Parse(rows);
+        var existing = await _dbContext.Materials.ToDictionaryAsync(m => m.Code, StringComparer.OrdinalIgnoreCase, cancellationToken);
+        int created = 0, updated = 0, unchanged = 0, skipped = 0;
+        var samples = new List<ArticleImportSample>();
+
+        foreach (var article in parsed.Articles)
+        {
+            if (existing.TryGetValue(article.Code, out var material))
+            {
+                if (!update)
+                {
+                    skipped++;
+                    continue;
+                }
+
+                var changed = material.Name != article.Name || material.Unit != article.Unit
+                    || (article.Price is not null && material.ListPrice != article.Price)
+                    || (article.VatRate is not null && material.VatRate != article.VatRate)
+                    || (article.MinStock is not null && material.MinStock != article.MinStock);
+                if (!changed)
+                {
+                    unchanged++;
+                    continue;
+                }
+
+                updated++;
+                if (samples.Count < 10) samples.Add(new ArticleImportSample(article.Row, article.Code, article.Name, article.Unit, article.Price, article.VatRate, "Aggiornato"));
+                if (!preview)
+                {
+                    material.Name = article.Name;
+                    material.Unit = article.Unit;
+                    material.ListPrice = article.Price ?? material.ListPrice;
+                    material.VatRate = article.VatRate ?? material.VatRate;
+                    material.MinStock = article.MinStock ?? material.MinStock;
+                }
+
+                continue;
+            }
+
+            created++;
+            if (samples.Count < 10) samples.Add(new ArticleImportSample(article.Row, article.Code, article.Name, article.Unit, article.Price, article.VatRate, "Nuovo"));
+            if (!preview)
+            {
+                var newMaterial = new Material
+                {
+                    Code = article.Code,
+                    Name = article.Name,
+                    Unit = article.Unit,
+                    ListPrice = article.Price,
+                    VatRate = article.VatRate,
+                    MinStock = article.MinStock ?? 0,
+                    CreatedAt = article.CreatedAt ?? DateTime.UtcNow,
+                };
+                _dbContext.Materials.Add(newMaterial);
+                existing[article.Code] = newMaterial;
+            }
+        }
+
+        if (!preview && (created > 0 || updated > 0))
+        {
+            _dbContext.AuditLogs.Add(new AuditLog
+            {
+                Action = "ArticlesImported",
+                EntityType = "Material",
+                UserName = User.FindFirstValue(ClaimTypes.Name),
+                Details = $"Import articoli da {file.FileName}: {created} nuovi, {updated} aggiornati, {skipped} già presenti, {parsed.Errors.Count} righe con errori."
+            });
+            await _dbContext.SaveChangesAsync(cancellationToken);
+        }
+
+        return Ok(new ArticleImportResponse(
+            preview, parsed.Articles.Count + parsed.Errors.Count(e => e.Row > 0), created, updated, unchanged, skipped,
+            parsed.Errors.Select(e => new ArticleImportIssue(e.Row, e.Code, e.Message)).Take(500).ToList(),
+            parsed.Warnings.Select(w => new ArticleImportIssue(w.Row, w.Code, w.Message)).Take(500).ToList(),
+            parsed.Errors.Count, parsed.Warnings.Count, parsed.Columns, samples));
+    }
+
+    /// <summary>All articles in the same columns the import reads (Articolo, Descrizione, CodIVA, UMBase,
+    /// PrezzoBase, DataCreazione...), so the file can be edited and imported back.</summary>
+    [HttpGet("export")]
+    public async Task<IActionResult> Export([FromQuery] bool activeOnly = false, CancellationToken cancellationToken = default)
+    {
+        var query = _dbContext.Materials.AsNoTracking();
+        if (activeOnly)
+        {
+            query = query.Where(m => m.IsActive);
+        }
+
+        var materials = await query.OrderBy(m => m.Code).ToListAsync(cancellationToken);
+        return File(ArticleImport.Export(materials), "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            $"articoli-{DateTime.Now:yyyyMMdd}.xlsx");
     }
 
     [Authorize(Policy = "Warehouse")]
@@ -181,4 +319,15 @@ public sealed record MaterialResponse(
     decimal Stock,
     decimal MinStock,
     bool IsActive,
-    bool BelowMinimum);
+    bool BelowMinimum,
+    decimal? ListPrice = null,
+    decimal? VatRate = null);
+
+public sealed record ArticleImportIssue(int Row, string? Code, string Message);
+
+public sealed record ArticleImportSample(int Row, string Code, string Name, string Unit, decimal? Price, decimal? VatRate, string Outcome);
+
+public sealed record ArticleImportResponse(
+    bool Preview, int Rows, int Created, int Updated, int Unchanged, int Skipped,
+    List<ArticleImportIssue> Errors, List<ArticleImportIssue> Warnings, int ErrorCount, int WarningCount,
+    Dictionary<string, string> Columns, List<ArticleImportSample> Samples);

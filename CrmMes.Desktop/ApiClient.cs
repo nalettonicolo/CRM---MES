@@ -1152,6 +1152,33 @@ public sealed class ApiClient
         await EnsureSuccessAsync(response, cancellationToken);
     }
 
+    /// <summary>Article list (Excel or CSV): preview=true checks and counts without saving.</summary>
+    public async Task<ArticleImportDto> ImportArticlesAsync(string filePath, bool preview, bool update, CancellationToken cancellationToken = default)
+    {
+        using var content = new MultipartFormDataContent();
+        await using var stream = File.OpenRead(filePath);
+        using var fileContent = new StreamContent(stream);
+        fileContent.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue(
+            Path.GetExtension(filePath).Equals(".csv", StringComparison.OrdinalIgnoreCase)
+                ? "text/csv"
+                : "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+        content.Add(fileContent, "file", Path.GetFileName(filePath));
+
+        using var response = await _httpClient.PostAsync(
+            $"api/materials/import?preview={(preview ? "true" : "false")}&update={(update ? "true" : "false")}", content, cancellationToken);
+        await EnsureSuccessAsync(response, cancellationToken);
+        return await response.Content.ReadFromJsonAsync<ArticleImportDto>(cancellationToken: cancellationToken)
+            ?? throw new InvalidOperationException("Risposta di importazione non valida.");
+    }
+
+    public async Task<(string FileName, byte[] Content)> ExportArticlesAsync(CancellationToken cancellationToken = default)
+    {
+        using var response = await _httpClient.GetAsync("api/materials/export", cancellationToken);
+        await EnsureSuccessAsync(response, cancellationToken);
+        var name = response.Content.Headers.ContentDisposition?.FileNameStar ?? response.Content.Headers.ContentDisposition?.FileName ?? "articoli.xlsx";
+        return (name.Trim('"'), await response.Content.ReadAsByteArrayAsync(cancellationToken));
+    }
+
     public async Task<ImportSummaryDto> ImportCatalogExcelAsync(string filePath, CancellationToken cancellationToken = default)
     {
         using var content = new MultipartFormDataContent();
@@ -1826,6 +1853,15 @@ public sealed class ApiClient
         }
     }
 }
+
+public sealed record ArticleImportIssueDto(int Row, string? Code, string Message);
+
+public sealed record ArticleImportSampleDto(int Row, string Code, string Name, string Unit, decimal? Price, decimal? VatRate, string Outcome);
+
+public sealed record ArticleImportDto(
+    bool Preview, int Rows, int Created, int Updated, int Unchanged, int Skipped,
+    List<ArticleImportIssueDto> Errors, List<ArticleImportIssueDto> Warnings, int ErrorCount, int WarningCount,
+    Dictionary<string, string> Columns, List<ArticleImportSampleDto> Samples);
 
 public sealed record MaterialDto(
     Guid Id,

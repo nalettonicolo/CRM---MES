@@ -405,6 +405,43 @@ public partial class MainWindow : Window
         return await _apiClient.RefreshAsync(auth.RefreshToken);
     }
 
+    private async void ImportArticlesButton_Click(object sender, RoutedEventArgs e)
+    {
+        var dialog = new Microsoft.Win32.OpenFileDialog
+        {
+            Title = "Scegli l'elenco articoli",
+            Filter = "Excel o CSV (*.xlsx;*.csv)|*.xlsx;*.xlsm;*.csv|Tutti i file (*.*)|*.*",
+        };
+        if (dialog.ShowDialog(this) != true)
+        {
+            return;
+        }
+
+        var window = new ArticleImportWindow(_apiClient, dialog.FileName) { Owner = this };
+        window.ShowDialog();
+        if (window.Imported)
+        {
+            await SearchMaterialsAsync();
+        }
+    }
+
+    private async void ExportArticlesButton_Click(object sender, RoutedEventArgs e)
+    {
+        try
+        {
+            var (fileName, content) = await _apiClient.ExportArticlesAsync();
+            var dialog = new Microsoft.Win32.SaveFileDialog { FileName = fileName, Filter = "Excel (*.xlsx)|*.xlsx" };
+            if (dialog.ShowDialog(this) == true)
+            {
+                await System.IO.File.WriteAllBytesAsync(dialog.FileName, content);
+            }
+        }
+        catch (InvalidOperationException exception)
+        {
+            MessageBox.Show(this, exception.Message, "Esporta articoli", MessageBoxButton.OK, MessageBoxImage.Warning);
+        }
+    }
+
     private void SupportButton_Click(object sender, RoutedEventArgs e)
     {
         var window = new SupportWindow(_apiClient, new OfflineActionQueue().Count) { Owner = this };

@@ -138,6 +138,8 @@ public class ApplicationDbContext : DbContext
             entity.Property(m => m.Code).HasMaxLength(100);
             entity.Property(m => m.Name).HasMaxLength(250);
             entity.Property(m => m.Unit).HasMaxLength(50);
+            entity.Property(m => m.ListPrice).HasPrecision(18, 6);
+            entity.Property(m => m.VatRate).HasPrecision(5, 2);
         });
 
         modelBuilder.Entity<Supplier>(entity =>

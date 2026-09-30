@@ -17,6 +17,11 @@ public class Material
     /// <summary>Food module: allergens of Reg. (UE) 1169/2011 Annex II contained, comma-separated keys
     /// (see FoodAllergens in CrmMes.Api).</summary>
     public string? Allergens { get; set; }
+    /// <summary>List price per unit ("PrezzoBase" of the company's article list), and its VAT rate for the
+    /// invoice lines. Both optional: cost of a job still comes from lots and supplier prices.</summary>
+    public decimal? ListPrice { get; set; }
+    public decimal? VatRate { get; set; }
+
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     public ICollection<MaterialSupplier> Suppliers { get; set; } = new List<MaterialSupplier>();
 }

@@ -1,0 +1,65 @@
+<Window x:Class="CrmMes.Desktop.ArticleImportWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Importa articoli" Icon="Assets/logo.ico" Width="820" Height="640" MinWidth="680" MinHeight="480"
+        WindowStartupLocation="CenterOwner"
+        Background="{StaticResource BackgroundBrush}">
+    <DockPanel Margin="28,24">
+        <StackPanel DockPanel.Dock="Top" Margin="0,0,0,12">
+            <TextBlock Text="M A G A Z Z I N O" Style="{StaticResource MicroLabel}" />
+            <TextBlock Text="Importa articoli da Excel" FontSize="22" FontWeight="SemiBold" Foreground="{StaticResource TextPrimaryBrush}" />
+            <TextBlock x:Name="FileText" Foreground="{StaticResource TextSecondaryBrush}" TextWrapping="Wrap" Margin="0,4,0,0" />
+        </StackPanel>
+
+        <DockPanel DockPanel.Dock="Bottom" Margin="0,14,0,0">
+            <CheckBox DockPanel.Dock="Left" x:Name="UpdateBox" Content="Aggiorna anche gli articoli già presenti (descrizione, unità, prezzo, IVA)" VerticalAlignment="Center" Click="UpdateBox_Click" />
+            <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" HorizontalAlignment="Right">
+                <Button Style="{StaticResource SecondaryButton}" Content="Annulla" Width="110" Height="36" Margin="0,0,10,0" Click="Cancel_Click" />
+                <Button x:Name="ImportButton" Content="Importa" Width="150" Height="36" Click="Import_Click" IsEnabled="False" />
+            </StackPanel>
+        </DockPanel>
+
+        <Border DockPanel.Dock="Top" Background="{StaticResource SurfaceBrush}" BorderBrush="{StaticResource BorderBrush0}" BorderThickness="1" CornerRadius="8" Padding="16,12" Margin="0,0,0,12">
+            <TextBlock x:Name="SummaryText" TextWrapping="Wrap" Foreground="{StaticResource TextPrimaryBrush}" Text="Controllo del file in corso..." />
+        </Border>
+
+        <TabControl>
+            <TabItem Header="Anteprima">
+                <ListView x:Name="SampleList">
+                    <ListView.View>
+                        <GridView>
+                            <GridViewColumn Header="Riga" DisplayMemberBinding="{Binding Row}" Width="50" />
+                            <GridViewColumn Header="Codice" DisplayMemberBinding="{Binding Code}" Width="110" />
+                            <GridViewColumn Header="Descrizione" DisplayMemberBinding="{Binding Name}" Width="330" />
+                            <GridViewColumn Header="UM" DisplayMemberBinding="{Binding Unit}" Width="60" />
+                            <GridViewColumn Header="Prezzo" DisplayMemberBinding="{Binding Price, StringFormat=N2}" Width="80" />
+                            <GridViewColumn Header="Esito" DisplayMemberBinding="{Binding Outcome}" Width="90" />
+                        </GridView>
+                    </ListView.View>
+                </ListView>
+            </TabItem>
+            <TabItem x:Name="ErrorsTab" Header="Errori">
+                <ListView x:Name="ErrorList">
+                    <ListView.View>
+                        <GridView>
+                            <GridViewColumn Header="Riga" DisplayMemberBinding="{Binding Row}" Width="60" />
+                            <GridViewColumn Header="Codice" DisplayMemberBinding="{Binding Code}" Width="120" />
+                            <GridViewColumn Header="Problema" DisplayMemberBinding="{Binding Message}" Width="520" />
+                        </GridView>
+                    </ListView.View>
+                </ListView>
+            </TabItem>
+            <TabItem x:Name="WarningsTab" Header="Avvisi">
+                <ListView x:Name="WarningList">
+                    <ListView.View>
+                        <GridView>
+                            <GridViewColumn Header="Riga" DisplayMemberBinding="{Binding Row}" Width="60" />
+                            <GridViewColumn Header="Codice" DisplayMemberBinding="{Binding Code}" Width="120" />
+                            <GridViewColumn Header="Avviso" DisplayMemberBinding="{Binding Message}" Width="520" />
+                        </GridView>
+                    </ListView.View>
+                </ListView>
+            </TabItem>
+        </TabControl>
+    </DockPanel>
+</Window>

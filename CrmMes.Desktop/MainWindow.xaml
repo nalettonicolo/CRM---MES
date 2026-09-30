@@ -353,6 +353,8 @@
                                 </Grid.RowDefinitions>
                                 <DockPanel Grid.Row="0" Margin="0,0,0,14">
                                     <Button DockPanel.Dock="Right" Content="Nuovo materiale" Width="140" Height="36" Click="NewMaterialButton_Click" />
+                                    <Button DockPanel.Dock="Right" Style="{StaticResource SecondaryButton}" Content="Esporta Excel" Width="120" Height="36" Margin="0,0,10,0" Click="ExportArticlesButton_Click" />
+                                    <Button x:Name="ImportArticlesButton" DockPanel.Dock="Right" Style="{StaticResource SecondaryButton}" Content="Importa da Excel" Width="140" Height="36" Margin="0,0,10,0" Click="ImportArticlesButton_Click" />
                                     <Button x:Name="MaterialFoodButton" DockPanel.Dock="Right" Style="{StaticResource SecondaryButton}" Content="Dati alimentari" Width="130" Height="36" Margin="0,0,10,0" Click="MaterialFoodButton_Click" Visibility="Collapsed" />
                                     <Button DockPanel.Dock="Right" Style="{StaticResource SecondaryButton}" Content="Importa catalogo Excel" Width="170" Height="36" Margin="0,0,10,0" Click="ImportCatalogButton_Click" />
                                     <Button DockPanel.Dock="Right" Style="{StaticResource SecondaryButton}" Content="Importa catalogo PDF" Width="160" Height="36" Margin="0,0,10,0" Click="ImportCatalogPdfButton_Click" />

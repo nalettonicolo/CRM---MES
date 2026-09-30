@@ -81,4 +81,14 @@ public sealed record WorkOrderDashboard(
     decimal? OeeRatio);
 
 public sealed record Material(
-    Guid Id, string Code, string Name, string Unit, decimal Stock, decimal MinStock, bool IsActive, bool BelowMinimum);
+    Guid Id, string Code, string Name, string Unit, decimal Stock, decimal MinStock, bool IsActive, bool BelowMinimum,
+    decimal? ListPrice = null, decimal? VatRate = null);
+
+public sealed record ArticleImportIssue(int Row, string? Code, string Message);
+
+public sealed record ArticleImportSample(int Row, string Code, string Name, string Unit, decimal? Price, decimal? VatRate, string Outcome);
+
+public sealed record ArticleImportResult(
+    bool Preview, int Rows, int Created, int Updated, int Unchanged, int Skipped,
+    List<ArticleImportIssue> Errors, List<ArticleImportIssue> Warnings, int ErrorCount, int WarningCount,
+    Dictionary<string, string> Columns, List<ArticleImportSample> Samples);

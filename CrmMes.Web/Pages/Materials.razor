@@ -1,6 +1,8 @@
 @page "/materiali"
 @implements IDisposable
 @inject Api Api
+@inject Session Session
+@inject IJSRuntime Js
 
 <PageTitle>Materiali · Nicolò MES</PageTitle>
 
@@ -8,9 +10,25 @@
     <div>
         <div class="eyebrow">Magazzino</div>
         <h1>Materiali</h1>
-        <p class="sub">Giacenze attuali e materiali sotto la scorta minima.</p>
+        <p class="sub">Giacenze attuali e materiali sotto la scorta minima. La ricerca mostra i primi 100 risultati.</p>
+    </div>
+    <div class="actions">
+        @if (CanImport)
+        {
+            <button class="secondary" @onclick="() => _showImport = !_showImport">@(_showImport ? "Chiudi importazione" : "Importa da Excel")</button>
+        }
+        <button class="secondary" @onclick="ExportAsync" disabled="@_exporting">@(_exporting ? "Preparazione..." : "Esporta Excel")</button>
     </div>
 </div>
+
+@if (_exportError is not null)
+{
+    <div class="alert" role="alert">@_exportError</div>
+}
+@if (_showImport)
+{
+    <div class="stack-gap"><ArticleImport Imported="LoadAsync" /></div>
+}
 
 <div class="toolbar">
     <input class="search" type="search" placeholder="Codice o descrizione" aria-label="Cerca materiale" value="@_search" @oninput="OnSearchInput" />
@@ -35,7 +53,7 @@
     {
         <div class="table-wrap">
             <table class="cards">
-                <thead><tr><th>Codice</th><th>Descrizione</th><th class="num">Giacenza</th><th class="num">Scorta minima</th><th>Stato</th></tr></thead>
+                <thead><tr><th>Codice</th><th>Descrizione</th><th class="num">Giacenza</th><th class="num">Scorta minima</th><th class="num">Prezzo</th><th>Stato</th></tr></thead>
                 <tbody>
                     @foreach (var material in _materials)
                     {
@@ -44,6 +62,7 @@
                             <td data-label="Descrizione">@material.Name</td>
                             <td data-label="Giacenza" class="num">@Labels.Number(material.Stock) @material.Unit</td>
                             <td data-label="Scorta minima" class="num muted">@Labels.Number(material.MinStock) @material.Unit</td>
+                            <td data-label="Prezzo" class="num">@(material.ListPrice is null ? "—" : Labels.Money(material.ListPrice.Value))</td>
                             <td data-label="Stato">
                                 @if (material.BelowMinimum)
                                 {
@@ -68,8 +87,36 @@
     private List<Material>? _materials;
     private string? _error;
     private CancellationTokenSource? _debounce;
+    private bool _showImport;
+    private bool _exporting;
+    private string? _exportError;
+
+    private bool CanImport => Session.Role is "Admin" or "Warehouse" or "Purchasing";
 
     protected override Task OnInitializedAsync() => LoadAsync();
+
+    private async Task ExportAsync()
+    {
+        _exporting = true;
+        _exportError = null;
+        try
+        {
+            var file = await Api.GetFileAsync("api/materials/export", $"articoli-{DateTime.Now:yyyyMMdd}.xlsx");
+            await Js.InvokeVoidAsync("nicolomes.saveFile", file.FileName, file.ContentType, Convert.ToBase64String(file.Content));
+        }
+        catch (ApiException exception)
+        {
+            _exportError = exception.Message;
+        }
+        catch (JSException)
+        {
+            _exportError = "Il browser non ha permesso di salvare il file.";
+        }
+        finally
+        {
+            _exporting = false;
+        }
+    }
 
     private async Task ToggleBelowAsync(ChangeEventArgs e)
     {
