@@ -8,12 +8,14 @@ WORKDIR /src
 COPY CrmMes.Api/CrmMes.Api.csproj CrmMes.Api/
 COPY CrmMes.Core/CrmMes.Core.csproj CrmMes.Core/
 COPY CrmMes.Web/CrmMes.Web.csproj CrmMes.Web/
+COPY CrmMes.Licensing/CrmMes.Licensing.csproj CrmMes.Licensing/
 RUN dotnet restore CrmMes.Api/CrmMes.Api.csproj
 
 COPY CrmMes.Api/ CrmMes.Api/
 COPY CrmMes.Core/ CrmMes.Core/
 # The web platform (Blazor WebAssembly) is published with the API and served under /app/.
 COPY CrmMes.Web/ CrmMes.Web/
+COPY CrmMes.Licensing/ CrmMes.Licensing/
 RUN dotnet publish CrmMes.Api/CrmMes.Api.csproj -c Release -o /app/publish --no-restore
 
 FROM mcr.microsoft.com/dotnet/aspnet:8.0 AS final
