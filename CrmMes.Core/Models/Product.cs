@@ -16,6 +16,9 @@ public class Product
     public bool UseByDate { get; set; }
     public string? StorageConditions { get; set; }
     public string? NetQuantity { get; set; }
+    /// <summary>Engineering revision (A, B, C...): moves on when an approved engineering change is applied.</summary>
+    public string Revision { get; set; } = "A";
+
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     public ICollection<BillOfMaterialItem> BillOfMaterial { get; set; } = new List<BillOfMaterialItem>();
     public ICollection<RoutingStep> RoutingSteps { get; set; } = new List<RoutingStep>();

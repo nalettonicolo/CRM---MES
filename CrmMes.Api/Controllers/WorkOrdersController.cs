@@ -1,4 +1,4 @@
-using System.Security.Claims;
+﻿using System.Security.Claims;
 using CrmMes.Api.Services;
 using CrmMes.Core.Data;
 using CrmMes.Core.Models;
@@ -1041,7 +1041,8 @@ public class WorkOrdersController : ControllerBase
                     op.StartedBy, op.CompletedBy))
                 .ToList(),
             order.CustomerId,
-            order.QuoteId);
+            order.QuoteId,
+            order.ProductRevision);
     }
 
     /// <summary>Minutes actually spent on a finished operation, or null while it's still open — the raw
@@ -1217,7 +1218,8 @@ public sealed record WorkOrderResponse(
     DateTime? CompletedAt,
     IReadOnlyList<WorkOrderOperationResponse> Operations,
     Guid? CustomerId = null,
-    Guid? QuoteId = null);
+    Guid? QuoteId = null,
+    string? ProductRevision = null);
 
 public sealed record WorkOrderOperationResponse(
     Guid Id,

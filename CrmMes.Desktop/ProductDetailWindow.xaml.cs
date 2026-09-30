@@ -1,4 +1,4 @@
-using System.Collections.ObjectModel;
+﻿using System.Collections.ObjectModel;
 using System.Windows;
 
 namespace CrmMes.Desktop;
@@ -229,6 +229,12 @@ public partial class ProductDetailWindow : Window
     }
 
     private void Close_Click(object sender, RoutedEventArgs e) => Close();
+
+    private void TechnicalDocuments_Click(object sender, RoutedEventArgs e)
+    {
+        var steps = _routingSteps.Select(step => (step.Sequence, step.Name)).ToList();
+        new TechnicalDocumentsWindow(_apiClient, _productId, $"{CodeText.Text} {NameText.Text}".Trim(), steps) { Owner = this }.ShowDialog();
+    }
 
     private void QualityPlan_Click(object sender, RoutedEventArgs e)
     {

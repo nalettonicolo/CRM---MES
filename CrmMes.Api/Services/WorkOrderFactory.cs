@@ -37,7 +37,8 @@ public sealed class WorkOrderFactory
             QuoteId = quoteId,
             DueDate = dueDate,
             Notes = string.IsNullOrWhiteSpace(notes) ? null : notes.Trim(),
-            Status = "Draft"
+            Status = "Draft",
+            ProductRevision = product.Revision
         };
 
         // Snapshot the product's routing now: later edits to the product's template must not

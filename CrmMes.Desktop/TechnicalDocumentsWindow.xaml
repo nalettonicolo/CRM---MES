@@ -1,0 +1,79 @@
+﻿<Window x:Class="CrmMes.Desktop.TechnicalDocumentsWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Documenti tecnici" Icon="Assets/logo.ico" Height="620" Width="900"
+        WindowStartupLocation="CenterOwner" ResizeMode="CanResize" MinHeight="420" MinWidth="700"
+        Background="{StaticResource BackgroundBrush}">
+    <Grid Margin="28,24">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
+        <StackPanel Grid.Row="0">
+            <TextBlock Text="U F F I C I O   T E C N I C O" Style="{StaticResource MicroLabel}" />
+            <TextBlock x:Name="TitleText" FontSize="22" FontWeight="SemiBold" Foreground="{StaticResource TextPrimaryBrush}" />
+            <TextBlock x:Name="SubtitleText" Foreground="{StaticResource TextSecondaryBrush}" TextWrapping="Wrap" Margin="0,6,0,12" />
+        </StackPanel>
+
+        <!-- Upload (engineering office only). -->
+        <Border Grid.Row="1" x:Name="UploadPanel" Style="{StaticResource CardBorder}" Padding="16,12" Margin="0,0,0,12" Visibility="Collapsed">
+            <StackPanel>
+                <TextBlock Text="Carica un documento" FontWeight="SemiBold" Foreground="{StaticResource TextPrimaryBrush}" Margin="0,0,0,6" />
+                <TextBlock Foreground="{StaticResource TextSecondaryBrush}" TextWrapping="Wrap" FontSize="12.5" Margin="0,0,0,8"
+                           Text="Stesso titolo e stessa fase di un documento attuale: diventa la versione successiva e la precedente va nello storico. Massimo 20 MB; niente file eseguibili." />
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="2*" />
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="2*" />
+                    </Grid.ColumnDefinitions>
+                    <StackPanel Grid.Column="0" Margin="0,0,8,0">
+                        <TextBlock Text="Titolo (vuoto = nome del file)" Foreground="{StaticResource TextSecondaryBrush}" FontSize="12.5" />
+                        <TextBox x:Name="DocTitleBox" MaxLength="200" />
+                    </StackPanel>
+                    <StackPanel Grid.Column="1" Margin="0,0,8,0">
+                        <TextBlock Text="Tipo" Foreground="{StaticResource TextSecondaryBrush}" FontSize="12.5" />
+                        <ComboBox x:Name="KindBox" DisplayMemberPath="Value" SelectedValuePath="Key" />
+                    </StackPanel>
+                    <StackPanel Grid.Column="2" Margin="0,0,8,0">
+                        <TextBlock Text="Fase" Foreground="{StaticResource TextSecondaryBrush}" FontSize="12.5" />
+                        <ComboBox x:Name="StepBox" DisplayMemberPath="Label" />
+                    </StackPanel>
+                    <StackPanel Grid.Column="3">
+                        <TextBlock Text="Nota di versione" Foreground="{StaticResource TextSecondaryBrush}" FontSize="12.5" />
+                        <TextBox x:Name="VersionNoteBox" MaxLength="500" />
+                    </StackPanel>
+                </Grid>
+                <Button x:Name="UploadButton" Content="Scegli il file e carica..." Width="200" Height="34" HorizontalAlignment="Left" Margin="0,10,0,0" Click="Upload_Click" />
+            </StackPanel>
+        </Border>
+
+        <Border Grid.Row="2" Style="{StaticResource CardBorder}" Padding="4">
+            <ListView x:Name="DocumentsList" SelectionMode="Single" MouseDoubleClick="DocumentsList_MouseDoubleClick" FontSize="14">
+                <ListView.View>
+                    <GridView>
+                        <GridViewColumn Header="Fase" DisplayMemberBinding="{Binding PhaseLabel}" Width="120" />
+                        <GridViewColumn Header="Tipo" DisplayMemberBinding="{Binding KindName}" Width="140" />
+                        <GridViewColumn Header="Titolo" DisplayMemberBinding="{Binding Title}" Width="230" />
+                        <GridViewColumn Header="Versione" DisplayMemberBinding="{Binding VersionLabel}" Width="70" />
+                        <GridViewColumn Header="Stato" DisplayMemberBinding="{Binding StateLabel}" Width="80" />
+                        <GridViewColumn Header="Caricato" DisplayMemberBinding="{Binding UploadedLabel}" Width="170" />
+                        <GridViewColumn Header="Dimensione" DisplayMemberBinding="{Binding SizeLabel}" Width="80" />
+                    </GridView>
+                </ListView.View>
+            </ListView>
+        </Border>
+
+        <DockPanel Grid.Row="3" Margin="0,14,0,0">
+            <Button DockPanel.Dock="Right" Style="{StaticResource SecondaryButton}" Content="Chiudi" Width="100" Height="36" Click="Close_Click" />
+            <Button DockPanel.Dock="Right" x:Name="WithdrawButton" Style="{StaticResource SecondaryButton}" Content="Ritira" Width="100" Height="36" Margin="0,0,10,0" Click="Withdraw_Click" Visibility="Collapsed" />
+            <Button DockPanel.Dock="Right" x:Name="OpenButton" Content="Apri" Width="120" Height="36" Margin="0,0,10,0" Click="Open_Click" />
+            <CheckBox x:Name="HistoryBox" Content="Mostra anche lo storico" VerticalAlignment="Center" Click="HistoryBox_Click" Visibility="Collapsed" />
+            <TextBlock x:Name="ErrorText" Foreground="{StaticResource DangerBrush}" TextWrapping="Wrap" VerticalAlignment="Center" Margin="12,0" />
+        </DockPanel>
+    </Grid>
+</Window>

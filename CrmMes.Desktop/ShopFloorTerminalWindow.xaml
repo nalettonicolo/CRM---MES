@@ -130,7 +130,11 @@
                 </Border>
 
                 <StackPanel Grid.Row="3" Margin="0,20,0,0">
-                    <TextBlock x:Name="ActiveOperationText" FontSize="15" Foreground="{StaticResource TextSecondaryBrush}" Margin="0,0,0,10" TextWrapping="Wrap" />
+                    <DockPanel Margin="0,0,0,10">
+                        <Button DockPanel.Dock="Right" x:Name="DocumentsButton" Style="{StaticResource SecondaryButton}" Height="44" FontSize="16" Padding="16,0"
+                                Visibility="Collapsed" Click="Documents_Click" />
+                        <TextBlock x:Name="ActiveOperationText" FontSize="15" Foreground="{StaticResource TextSecondaryBrush}" TextWrapping="Wrap" VerticalAlignment="Center" />
+                    </DockPanel>
                     <UniformGrid Columns="2" Rows="2">
                         <Button x:Name="ActionButton" Height="72" FontSize="22" Margin="0,0,10,10" Click="Action_Click" />
                         <Button x:Name="DowntimeButton" Style="{StaticResource SecondaryButton}" Content="Segnala fermo" Height="72" FontSize="20" Margin="0,0,0,10" Click="Downtime_Click" />

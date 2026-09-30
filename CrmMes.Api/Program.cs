@@ -119,6 +119,8 @@ builder.Services.AddAuthorization(options =>
     // Transport documents leave with sales (Sales/Warehouse) and with goods sent to subcontractors (Purchasing).
     options.AddPolicy("TransportDocuments", policy => policy.RequireRole("Admin", "Sales", "Warehouse", "Purchasing"));
     // Costs, hourly rates and margins: company-confidential, visible only to management.
+    // Engineering office: technical documents, product revisions and engineering changes.
+    options.AddPolicy("Engineering", policy => policy.RequireRole("Admin", "Management"));
     options.AddPolicy("ViewMargins", policy => policy.RequireRole(CrmMes.Api.Services.MarginAccess.Roles));
 });
 builder.Services.AddSingleton<IPasswordHasher<CrmMes.Core.Models.User>, PasswordHasher<CrmMes.Core.Models.User>>();

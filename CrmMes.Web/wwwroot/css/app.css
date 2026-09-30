@@ -190,3 +190,9 @@ textarea.textarea { font: inherit; color: var(--ink); background: var(--surface)
 details summary { cursor: pointer; font-weight: 600; }
 details ul { margin: 8px 0 0; padding-left: 18px; max-height: 240px; overflow-y: auto; }
 .actions { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; justify-content: flex-end; margin-top: 16px; }
+
+/* Engineering office */
+.form-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; }
+tr.subrow td { padding-top: 0; border-top: 0; }
+tr.muted td { color: var(--muted); }
+h3 { font-size: 14px; font-weight: 650; margin: 0 0 8px; }

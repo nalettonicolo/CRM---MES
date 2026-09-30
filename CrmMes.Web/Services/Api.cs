@@ -60,7 +60,7 @@ public sealed class Api
     public async Task<bool> RenewSessionAsync() => await RefreshAsync();
 
     /// <summary>A file sent as multipart form data (field "file"), with the same 401 renewal as every call.</summary>
-    public async Task<T> PostFileAsync<T>(string path, byte[] content, string fileName)
+    public async Task<T> PostFileAsync<T>(string path, byte[] content, string fileName, IReadOnlyDictionary<string, string?>? fields = null)
     {
         async Task<HttpResponseMessage> SendAsync()
         {
@@ -73,6 +73,14 @@ public sealed class Api
 
             var form = new MultipartFormDataContent();
             form.Add(new ByteArrayContent(content), "file", fileName);
+            foreach (var (name, value) in fields ?? new Dictionary<string, string?>())
+            {
+                if (!string.IsNullOrWhiteSpace(value))
+                {
+                    form.Add(new StringContent(value), name);
+                }
+            }
+
             request.Content = form;
             try
             {

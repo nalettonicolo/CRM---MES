@@ -22,6 +22,10 @@ public class ApplicationDbContext : DbContext
     public DbSet<AuditLog> AuditLogs => Set<AuditLog>();
     public DbSet<RefreshToken> RefreshTokens => Set<RefreshToken>();
     public DbSet<Product> Products => Set<Product>();
+    public DbSet<TechnicalDocument> TechnicalDocuments => Set<TechnicalDocument>();
+    public DbSet<TechnicalDocumentContent> TechnicalDocumentContents => Set<TechnicalDocumentContent>();
+    public DbSet<ProductRevision> ProductRevisions => Set<ProductRevision>();
+    public DbSet<EngineeringChange> EngineeringChanges => Set<EngineeringChange>();
     public DbSet<BillOfMaterialItem> BillOfMaterialItems => Set<BillOfMaterialItem>();
     public DbSet<RoutingStep> RoutingSteps => Set<RoutingStep>();
     public DbSet<WorkOrder> WorkOrders => Set<WorkOrder>();
@@ -257,7 +261,35 @@ public class ApplicationDbContext : DbContext
             entity.Property(p => p.Code).HasMaxLength(100);
             entity.Property(p => p.Name).HasMaxLength(250);
             entity.Property(p => p.Description).HasMaxLength(1000);
+            entity.Property(p => p.Revision).HasMaxLength(10);
             entity.HasIndex(p => p.Code).IsUnique();
+        });
+
+        modelBuilder.Entity<TechnicalDocument>(entity =>
+        {
+            entity.Property(d => d.Title).HasMaxLength(200);
+            entity.Property(d => d.FileName).HasMaxLength(260);
+            entity.Property(d => d.ContentType).HasMaxLength(120);
+            entity.Property(d => d.Kind).HasMaxLength(20);
+            entity.HasIndex(d => new { d.ProductId, d.IsCurrent });
+            entity.HasOne(d => d.Product).WithMany().HasForeignKey(d => d.ProductId).OnDelete(DeleteBehavior.Cascade);
+            entity.HasOne(d => d.Content).WithOne().HasForeignKey<TechnicalDocumentContent>(c => c.TechnicalDocumentId).OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<TechnicalDocumentContent>(entity => entity.HasKey(c => c.TechnicalDocumentId));
+
+        modelBuilder.Entity<ProductRevision>(entity =>
+        {
+            entity.Property(r => r.Revision).HasMaxLength(10);
+            entity.HasIndex(r => new { r.ProductId, r.Revision }).IsUnique();
+        });
+
+        modelBuilder.Entity<EngineeringChange>(entity =>
+        {
+            entity.HasIndex(c => c.Number).IsUnique();
+            entity.Property(c => c.Title).HasMaxLength(200);
+            entity.Property(c => c.Status).HasMaxLength(20);
+            entity.HasOne(c => c.Product).WithMany().HasForeignKey(c => c.ProductId).OnDelete(DeleteBehavior.Cascade);
         });
 
         modelBuilder.Entity<BillOfMaterialItem>(entity =>

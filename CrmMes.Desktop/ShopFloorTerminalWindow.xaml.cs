@@ -343,6 +343,7 @@ public partial class ShopFloorTerminalWindow : Window
                 : "Tutte le fasi sono state completate. Completa la commessa dal client per chiuderla.";
             ActionButton.Content = "-";
             ActionButton.IsEnabled = false;
+            DocumentsButton.Visibility = Visibility.Collapsed;
             DowntimeButton.IsEnabled = false;
             NonConformityButton.IsEnabled = false;
             return;
@@ -351,6 +352,7 @@ public partial class ShopFloorTerminalWindow : Window
         var workCenterSuffix = string.IsNullOrWhiteSpace(_activeOperation.WorkCenter) ? "" : $" ({_activeOperation.WorkCenter})";
         ActiveOperationText.Text = $"Fase corrente: {_activeOperation.Name}{workCenterSuffix}";
         ActionButton.Content = _activeOperation.Status == "Pending" ? "Avvia fase" : "Completa fase";
+        _ = ShowDocumentsButtonAsync(_order!.Id, _activeOperation.Id);
         ActionButton.IsEnabled = true;
         DowntimeButton.IsEnabled = _activeOperation.Status == "InProgress";
         NonConformityButton.IsEnabled = _activeOperation.Status != "Pending";
@@ -406,6 +408,31 @@ public partial class ShopFloorTerminalWindow : Window
 
         _order = await _apiClient.GetWorkOrderAsync(_order.Id);
         ApplyOrderToUi();
+    }
+
+    /// <summary>Drawings and instructions of the phase in hand, when the engineering office has uploaded any.</summary>
+    private async Task ShowDocumentsButtonAsync(Guid workOrderId, Guid operationId)
+    {
+        DocumentsButton.Visibility = Visibility.Collapsed;
+        var documents = await _apiClient.GetOperationDocumentsAsync(workOrderId, operationId);
+        if (documents.Count == 0 || _activeOperation?.Id != operationId)
+        {
+            return;
+        }
+
+        var hasInstructions = documents.Any(d => d.Kind == "instructions");
+        DocumentsButton.Content = $"{(hasInstructions ? "Istruzioni e disegni" : "Disegni")} ({documents.Count})";
+        DocumentsButton.Visibility = Visibility.Visible;
+    }
+
+    private void Documents_Click(object sender, RoutedEventArgs e)
+    {
+        if (_order is null || _activeOperation is null)
+        {
+            return;
+        }
+
+        new TechnicalDocumentsWindow(_apiClient, _order.Id, _activeOperation.Id, $"{_order.Code} · fase {_activeOperation.SequenceNumber} {_activeOperation.Name}") { Owner = this }.ShowDialog();
     }
 
     private async void Downtime_Click(object sender, RoutedEventArgs e)

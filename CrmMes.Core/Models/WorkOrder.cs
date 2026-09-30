@@ -33,6 +33,9 @@ public class WorkOrder
     public decimal? SalePrice { get; set; }
 
     public string Status { get; set; } = "Draft";
+
+    /// <summary>Product revision the job was built to (traceability of engineering changes).</summary>
+    public string? ProductRevision { get; set; }
     public DateTime? DueDate { get; set; }
     public string? Notes { get; set; }
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;

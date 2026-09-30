@@ -1,0 +1,656 @@
+@page "/ufficio-tecnico"
+@inject Api Api
+@inject Session Session
+@inject IJSRuntime Js
+
+<PageTitle>Ufficio tecnico · Nicolò MES</PageTitle>
+
+<div class="page-head">
+    <div>
+        <div class="eyebrow">Produzione</div>
+        <h1>Ufficio tecnico</h1>
+        <p class="sub">Disegni, schemi e istruzioni per fase; revisioni del prodotto; modifiche tecniche proposte, approvate e applicate.</p>
+    </div>
+</div>
+
+<div class="toolbar">
+    <input class="search" type="search" placeholder="Cerca prodotto per codice o nome" aria-label="Cerca prodotto" @bind="_search" @bind:event="oninput" @onkeydown="SearchOnEnterAsync" />
+    <button class="secondary" @onclick="SearchAsync">Cerca</button>
+    @if (_products is { Count: > 0 })
+    {
+        <select aria-label="Prodotto" @onchange="SelectProductAsync">
+            <option value="">Scegli il prodotto...</option>
+            @foreach (var p in _products)
+            {
+                <option value="@p.Id" selected="@(p.Id == _product?.Id)">@p.Code · @p.Name</option>
+            }
+        </select>
+    }
+</div>
+
+@if (_error is not null)
+{
+    <div class="alert" role="alert">@_error</div>
+}
+@if (_info is not null)
+{
+    <div class="success" role="status">@_info</div>
+}
+
+@if (_products is not null && _products.Count == 0)
+{
+    <div class="card state"><strong>Nessun prodotto</strong>Nessun prodotto corrisponde alla ricerca.</div>
+}
+else if (_product is null)
+{
+    <div class="card state">Scegli un prodotto per vederne documenti, revisioni e modifiche tecniche.</div>
+}
+else
+{
+    <div class="stack">
+        <div class="card card-pad">
+            <div class="facts">
+                <div class="fact"><div class="label">Prodotto</div><div class="value"><CopyCode Value="@_product.Code" /></div></div>
+                <div class="fact"><div class="label">Nome</div><div class="value">@_product.Name</div></div>
+                <div class="fact"><div class="label">Revisione attuale</div><div class="value">@(_revisions?.CurrentRevision ?? "—")</div></div>
+                <div class="fact"><div class="label">Distinta</div><div class="value">@_product.BillOfMaterial.Count righe</div></div>
+                <div class="fact"><div class="label">Ciclo</div><div class="value">@_product.RoutingSteps.Count fasi</div></div>
+            </div>
+        </div>
+
+        <div class="chips" role="tablist">
+            <button role="tab" class="chip @(_tab == "docs" ? "active" : "")" aria-selected="@(_tab == "docs")" @onclick='() => _tab = "docs"'>Documenti</button>
+            <button role="tab" class="chip @(_tab == "changes" ? "active" : "")" aria-selected="@(_tab == "changes")" @onclick='() => _tab = "changes"'>Modifiche tecniche</button>
+            <button role="tab" class="chip @(_tab == "revisions" ? "active" : "")" aria-selected="@(_tab == "revisions")" @onclick='() => _tab = "revisions"'>Revisioni</button>
+        </div>
+
+        @if (_tab == "docs")
+        {
+            @if (CanEdit)
+            {
+                <div class="card card-pad stack">
+                    <h2>Carica un documento</h2>
+                    <p class="muted small">Stesso titolo e stessa fase di un documento attuale: diventa la versione successiva e la precedente va nello storico. Massimo 20 MB.</p>
+                    <div class="form-grid">
+                        <label>File<InputFile OnChange="PickFileAsync" /></label>
+                        <label>Titolo<input @bind="_docTitle" placeholder="dal nome del file" /></label>
+                        <label>Tipo
+                            <select @bind="_docKind">
+                                @foreach (var (key, name) in EngineeringLabels.Kinds)
+                                {
+                                    <option value="@key">@name</option>
+                                }
+                            </select>
+                        </label>
+                        <label>Fase
+                            <select @bind="_docStep">
+                                <option value="">Tutto il prodotto</option>
+                                @foreach (var step in _product.RoutingSteps.OrderBy(s => s.SequenceNumber))
+                                {
+                                    <option value="@step.SequenceNumber">@step.SequenceNumber · @step.Name</option>
+                                }
+                            </select>
+                        </label>
+                        <label>Nota di versione<input @bind="_docNote" placeholder="cosa cambia" /></label>
+                    </div>
+                    <div class="actions"><button @onclick="UploadAsync" disabled="@(_busy || _docContent is null)">@(_busy ? "Caricamento..." : "Carica")</button></div>
+                </div>
+            }
+
+            <div class="card">
+                <div class="section-head">
+                    <h2>Documenti</h2>
+                    <label class="check small"><input type="checkbox" checked="@_history" @onchange="ToggleHistoryAsync" /> Mostra anche lo storico</label>
+                </div>
+                @if (_documents is null)
+                {
+                    <div class="state">Caricamento...</div>
+                }
+                else if (_documents.Count == 0)
+                {
+                    <div class="state"><strong>Nessun documento</strong>Carica disegni, schemi o istruzioni: gli operatori li vedono al terminale nella fase giusta.</div>
+                }
+                else
+                {
+                    <div class="table-wrap">
+                        <table class="cards">
+                            <thead><tr><th>Fase</th><th>Tipo</th><th>Titolo</th><th class="num">Versione</th><th>Caricato</th><th class="num">Dimensione</th><th></th></tr></thead>
+                            <tbody>
+                                @foreach (var doc in _documents)
+                                {
+                                    <tr class="@(doc.IsCurrent ? "" : "muted")">
+                                        <td data-label="Fase">@StepName(doc.StepSequence)</td>
+                                        <td data-label="Tipo">@doc.KindName</td>
+                                        <td data-label="Titolo">@doc.Title @if (!doc.IsCurrent) {<span class="badge">storico</span>} @if (doc.VersionNote is not null) {<div class="small muted">@doc.VersionNote</div>}</td>
+                                        <td data-label="Versione" class="num">v@(doc.Version)</td>
+                                        <td data-label="Caricato">@Labels.DateTime(doc.UploadedAt) <div class="small muted">@doc.UploadedBy</div></td>
+                                        <td data-label="Dimensione" class="num">@EngineeringLabels.Size(doc.SizeBytes)</td>
+                                        <td>
+                                            <div class="actions">
+                                                <button class="secondary small" @onclick="() => OpenAsync(doc)">Apri</button>
+                                                @if (CanEdit && doc.IsCurrent)
+                                                {
+                                                    <button class="secondary small" @onclick="() => WithdrawAsync(doc)">Ritira</button>
+                                                }
+                                            </div>
+                                        </td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                }
+            </div>
+        }
+        else if (_tab == "changes")
+        {
+            @if (_editor is not null)
+            {
+                <div class="card card-pad stack">
+                    <h2>Nuova modifica tecnica</h2>
+                    <div class="form-grid">
+                        <label>Titolo<input @bind="_editor.Title" placeholder="es. Aggiunta morsettiera ausiliari" /></label>
+                        <label>Motivo<input @bind="_editor.Reason" placeholder="richiesta cliente, non conformità, miglioria..." /></label>
+                    </div>
+                    <label>Descrizione<textarea class="textarea" @bind="_editor.Description"></textarea></label>
+
+                    <label class="check"><input type="checkbox" @bind="_editor.ChangeBom" /> Cambia la distinta</label>
+                    @if (_editor.ChangeBom)
+                    {
+                        <div class="table-wrap">
+                            <table>
+                                <thead><tr><th>Codice materiale</th><th class="num">Quantità</th><th>Note</th><th></th></tr></thead>
+                                <tbody>
+                                    @foreach (var row in _editor.Bom)
+                                    {
+                                        <tr>
+                                            <td><input @bind="row.MaterialCode" aria-label="Codice materiale" /></td>
+                                            <td class="num"><input type="number" step="any" min="0" @bind="row.Quantity" aria-label="Quantità" /></td>
+                                            <td><input @bind="row.Notes" aria-label="Note" /></td>
+                                            <td><button class="secondary small" @onclick="() => _editor.Bom.Remove(row)">Togli</button></td>
+                                        </tr>
+                                    }
+                                </tbody>
+                            </table>
+                        </div>
+                        <div class="actions"><button class="secondary small" @onclick="() => _editor.Bom.Add(new BomRow())">Aggiungi riga</button></div>
+                    }
+
+                    <label class="check"><input type="checkbox" @bind="_editor.ChangeRouting" /> Cambia il ciclo di lavoro</label>
+                    @if (_editor.ChangeRouting)
+                    {
+                        <div class="table-wrap">
+                            <table>
+                                <thead><tr><th>#</th><th>Fase</th><th>Centro di lavoro</th><th class="num">Minuti</th><th></th></tr></thead>
+                                <tbody>
+                                    @for (var i = 0; i < _editor.Routing.Count; i++)
+                                    {
+                                        var row = _editor.Routing[i];
+                                        var index = i;
+                                        <tr>
+                                            <td class="muted">@(i + 1)</td>
+                                            <td><input @bind="row.Name" aria-label="Fase" /></td>
+                                            <td><input @bind="row.WorkCenter" aria-label="Centro di lavoro" /></td>
+                                            <td class="num"><input type="number" step="any" min="0" @bind="row.EstimatedMinutes" aria-label="Minuti" /></td>
+                                            <td>
+                                                <div class="actions">
+                                                    <button class="secondary small" disabled="@(index == 0)" @onclick="() => Move(index, -1)" aria-label="Sposta su">Su</button>
+                                                    <button class="secondary small" @onclick="() => _editor.Routing.RemoveAt(index)">Togli</button>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    }
+                                </tbody>
+                            </table>
+                        </div>
+                        <div class="actions"><button class="secondary small" @onclick="() => _editor.Routing.Add(new RoutingRow())">Aggiungi fase</button></div>
+                    }
+
+                    <div class="actions">
+                        <button @onclick="SaveChangeAsync" disabled="@_busy">Salva come bozza</button>
+                        <button class="secondary" @onclick="() => _editor = null">Annulla</button>
+                    </div>
+                </div>
+            }
+
+            @if (_change is not null)
+            {
+                <div class="card card-pad stack">
+                    <div class="section-head">
+                        <h2>MT @_change.Number · @_change.Title</h2>
+                        <span class="badge @EngineeringLabels.StatusClass(_change.Status)">@EngineeringLabels.Status(_change.Status)</span>
+                    </div>
+                    <p class="muted small">
+                        Proposta da @(_change.RequestedBy ?? "—") il @Labels.Date(_change.CreatedAt)
+                        @if (_change.ApprovedBy is not null) {<span> · decisa da @_change.ApprovedBy il @Labels.Date(_change.ApprovedAt)</span>}
+                        @if (_change.AppliedAt is not null) {<span> · applicata il @Labels.DateTime(_change.AppliedAt): rev. @_change.FromRevision → @_change.ToRevision</span>}
+                    </p>
+                    @if (_change.Reason is not null) {<p><strong>Motivo:</strong> @_change.Reason</p>}
+                    @if (_change.Description is not null) {<p>@_change.Description</p>}
+                    @if (_change.ApplyReport is not null) {<div class="notice">@_change.ApplyReport</div>}
+
+                    <div class="grid-2">
+                        @if (_change.ProposedBom is not null)
+                        {
+                            <div>
+                                <h3>Distinta</h3>
+                                <table>
+                                    <thead><tr><th>Materiale</th><th class="num">Attuale</th><th class="num">Proposta</th></tr></thead>
+                                    <tbody>
+                                        @foreach (var line in BomDiff(_change))
+                                        {
+                                            <tr class="@(line.Current == line.Proposed ? "muted" : "")">
+                                                <td class="code">@line.Code</td>
+                                                <td class="num">@(line.Current is null ? "—" : Labels.Number(line.Current.Value))</td>
+                                                <td class="num">@(line.Proposed is null ? "tolto" : Labels.Number(line.Proposed.Value))</td>
+                                            </tr>
+                                        }
+                                    </tbody>
+                                </table>
+                            </div>
+                        }
+                        @if (_change.ProposedRouting is not null)
+                        {
+                            <div>
+                                <h3>Ciclo</h3>
+                                <div class="grid-2">
+                                    <ol class="small">@foreach (var s in _change.CurrentRouting) {<li>@s.Name · @Labels.Number(s.EstimatedMinutes) min</li>}</ol>
+                                    <ol class="small">@foreach (var s in _change.ProposedRouting) {<li><strong>@s.Name</strong> · @Labels.Number(s.EstimatedMinutes) min</li>}</ol>
+                                </div>
+                                <p class="small muted">A sinistra il ciclo attuale, a destra quello proposto.</p>
+                            </div>
+                        }
+                    </div>
+
+                    @if (_change.Status is "draft" or "approved" && _change.AffectedWorkOrders.Count > 0)
+                    {
+                        <div>
+                            <h3>Commesse aperte del prodotto</h3>
+                            <p class="small muted">All'applicazione quelle in bozza passano alla nuova revisione; quelle già rilasciate restano com'erano e vengono segnalate.</p>
+                            <div class="chips">
+                                @foreach (var w in _change.AffectedWorkOrders)
+                                {
+                                    <a class="badge @(w.Status == "Draft" ? "info" : "warn")" href="commesse/@w.Id">@w.Code · @Labels.WorkOrderStatus(w.Status) · rev. @(w.ProductRevision ?? "?")</a>
+                                }
+                            </div>
+                        </div>
+                    }
+
+                    @if (CanEdit)
+                    {
+                        <div class="actions">
+                            @if (_change.Status == "draft")
+                            {
+                                <button @onclick='() => ActAsync("approve", "Modifica approvata.")' disabled="@_busy">Approva</button>
+                            }
+                            @if (_change.Status == "approved")
+                            {
+                                <button @onclick='() => ActAsync("apply", "Modifica applicata.")' disabled="@_busy">Applica (nuova revisione)</button>
+                            }
+                            @if (_change.Status is "draft" or "approved")
+                            {
+                                <button class="secondary" @onclick='() => ActAsync("reject", "Modifica respinta.")' disabled="@_busy">Respingi</button>
+                            }
+                            <button class="secondary" @onclick="() => _change = null">Chiudi</button>
+                        </div>
+                    }
+                </div>
+            }
+
+            <div class="card">
+                <div class="section-head">
+                    <h2>Modifiche tecniche</h2>
+                    @if (CanEdit && _editor is null)
+                    {
+                        <button class="small" @onclick="NewChange">Nuova modifica</button>
+                    }
+                </div>
+                @if (_changes is null)
+                {
+                    <div class="state">Caricamento...</div>
+                }
+                else if (_changes.Count == 0)
+                {
+                    <div class="state"><strong>Nessuna modifica tecnica</strong>Le modifiche a distinta e ciclo passano da qui: proposta, approvazione, nuova revisione.</div>
+                }
+                else
+                {
+                    <div class="table-wrap">
+                        <table class="cards">
+                            <thead><tr><th>N.</th><th>Titolo</th><th>Cambia</th><th>Revisione</th><th>Proposta</th><th>Stato</th></tr></thead>
+                            <tbody>
+                                @foreach (var c in _changes)
+                                {
+                                    <tr class="link" @onclick="() => OpenChangeAsync(c.Id)">
+                                        <td data-label="N." class="code">MT @c.Number</td>
+                                        <td data-label="Titolo">@c.Title</td>
+                                        <td data-label="Cambia">@string.Join(" e ", new[] { c.ChangesBom ? "distinta" : null, c.ChangesRouting ? "ciclo" : null }.Where(x => x is not null))</td>
+                                        <td data-label="Revisione">@(c.ToRevision is null ? c.FromRevision : $"{c.FromRevision} → {c.ToRevision}")</td>
+                                        <td data-label="Proposta">@Labels.Date(c.CreatedAt) <div class="small muted">@c.RequestedBy</div></td>
+                                        <td data-label="Stato"><span class="badge @EngineeringLabels.StatusClass(c.Status)">@EngineeringLabels.Status(c.Status)</span></td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                }
+            </div>
+        }
+        else
+        {
+            <div class="card">
+                <div class="section-head"><h2>Revisioni archiviate</h2><span class="small muted">Attuale: @(_revisions?.CurrentRevision ?? "—")</span></div>
+                @if (_revisions is null)
+                {
+                    <div class="state">Caricamento...</div>
+                }
+                else if (_revisions.Archived.Count == 0)
+                {
+                    <div class="state">Il prodotto è ancora alla prima revisione: nessuna revisione precedente.</div>
+                }
+                else
+                {
+                    @foreach (var r in _revisions.Archived)
+                    {
+                        <details class="card-pad">
+                            <summary>Rev. @r.Revision · sostituita il @Labels.Date(r.ArchivedAt) · @r.Bom.Count righe di distinta, @r.Routing.Count fasi</summary>
+                            <div class="grid-2">
+                                <ul class="small">@foreach (var b in r.Bom) {<li><span class="code">@b.MaterialCode</span> × @Labels.Number(b.Quantity)</li>}</ul>
+                                <ol class="small">@foreach (var s in r.Routing) {<li>@s.Name · @Labels.Number(s.EstimatedMinutes) min</li>}</ol>
+                            </div>
+                        </details>
+                    }
+                }
+            </div>
+        }
+    </div>
+}
+
+@code {
+    private string _search = string.Empty;
+    private List<ProductListItem>? _products;
+    private ProductDetail? _product;
+    private ProductRevisions? _revisions;
+    private List<TechnicalDocument>? _documents;
+    private List<EngineeringChangeSummary>? _changes;
+    private EngineeringChange? _change;
+    private ChangeEditor? _editor;
+    private string _tab = "docs";
+    private bool _history;
+    private bool _busy;
+    private string? _error;
+    private string? _info;
+
+    private byte[]? _docContent;
+    private string? _docFileName;
+    private string? _docTitle;
+    private string _docKind = "drawing";
+    private string _docStep = string.Empty;
+    private string? _docNote;
+
+    private bool CanEdit => Session.Role is "Admin" or "Management";
+
+    protected override Task OnInitializedAsync() => SearchAsync();
+
+    private async Task SearchOnEnterAsync(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter")
+        {
+            await SearchAsync();
+        }
+    }
+
+    private async Task SearchAsync()
+    {
+        _error = null;
+        try
+        {
+            _products = await Api.GetAsync<List<ProductListItem>>($"api/products?q={Uri.EscapeDataString(_search.Trim())}");
+            if (_products.Count == 1 && _product?.Id != _products[0].Id)
+            {
+                await LoadProductAsync(_products[0].Id);
+            }
+        }
+        catch (ApiException exception)
+        {
+            _error = exception.Message;
+        }
+    }
+
+    private async Task SelectProductAsync(ChangeEventArgs e)
+    {
+        if (Guid.TryParse(e.Value?.ToString(), out var id))
+        {
+            await LoadProductAsync(id);
+        }
+    }
+
+    private async Task LoadProductAsync(Guid id)
+    {
+        _error = null;
+        _info = null;
+        _change = null;
+        _editor = null;
+        _documents = null;
+        _changes = null;
+        _revisions = null;
+        try
+        {
+            _product = await Api.GetAsync<ProductDetail>($"api/products/{id}");
+            await ReloadAsync();
+        }
+        catch (ApiException exception)
+        {
+            _error = exception.Message;
+        }
+    }
+
+    private async Task ReloadAsync()
+    {
+        var id = _product!.Id;
+        _documents = await Api.GetAsync<List<TechnicalDocument>>($"api/engineering/products/{id}/documents{(_history ? "?history=true" : "")}");
+        _changes = await Api.GetAsync<List<EngineeringChangeSummary>>($"api/engineering/changes?productId={id}");
+        _revisions = await Api.GetAsync<ProductRevisions>($"api/engineering/products/{id}/revisions");
+    }
+
+    private async Task ToggleHistoryAsync(ChangeEventArgs e)
+    {
+        _history = e.Value is true;
+        await ReloadAsync();
+    }
+
+    private string StepName(int? sequence) =>
+        sequence is null ? "Tutto il prodotto" : _product?.RoutingSteps.FirstOrDefault(s => s.SequenceNumber == sequence) is { } step ? $"{sequence} · {step.Name}" : $"Fase {sequence}";
+
+    private async Task PickFileAsync(InputFileChangeEventArgs e)
+    {
+        _error = null;
+        try
+        {
+            await using var stream = e.File.OpenReadStream(20 * 1024 * 1024);
+            using var memory = new MemoryStream();
+            await stream.CopyToAsync(memory);
+            _docContent = memory.ToArray();
+            _docFileName = e.File.Name;
+        }
+        catch (IOException)
+        {
+            _docContent = null;
+            _error = "Il file supera 20 MB.";
+        }
+    }
+
+    private async Task UploadAsync()
+    {
+        if (_docContent is null || _product is null)
+        {
+            return;
+        }
+
+        _busy = true;
+        _error = null;
+        try
+        {
+            var doc = await Api.PostFileAsync<TechnicalDocument>($"api/engineering/products/{_product.Id}/documents", _docContent, _docFileName ?? "documento",
+                new Dictionary<string, string?> { ["title"] = _docTitle, ["kind"] = _docKind, ["stepSequence"] = _docStep, ["versionNote"] = _docNote });
+            _info = $"Caricato \"{doc.Title}\" (versione {doc.Version}).";
+            _docContent = null;
+            _docTitle = null;
+            _docNote = null;
+            await ReloadAsync();
+        }
+        catch (ApiException exception)
+        {
+            _error = exception.Message;
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+
+    private async Task OpenAsync(TechnicalDocument doc)
+    {
+        try
+        {
+            var file = await Api.GetFileAsync($"api/engineering/documents/{doc.Id}/content", doc.FileName);
+            await Js.InvokeVoidAsync("nicolomes.openFile", file.FileName, file.ContentType, Convert.ToBase64String(file.Content));
+        }
+        catch (ApiException exception)
+        {
+            _error = exception.Message;
+        }
+    }
+
+    private async Task WithdrawAsync(TechnicalDocument doc)
+    {
+        try
+        {
+            await Api.PostNoContentAsync($"api/engineering/documents/{doc.Id}/withdraw");
+            _info = $"\"{doc.Title}\" ritirato: resta nello storico.";
+            await ReloadAsync();
+        }
+        catch (ApiException exception)
+        {
+            _error = exception.Message;
+        }
+    }
+
+    private void NewChange()
+    {
+        _change = null;
+        _editor = new ChangeEditor
+        {
+            Bom = _product!.BillOfMaterial.Select(b => new BomRow { MaterialCode = b.MaterialCode, Quantity = b.Quantity, Notes = b.Notes }).ToList(),
+            Routing = _product.RoutingSteps.OrderBy(s => s.SequenceNumber).Select(s => new RoutingRow { Name = s.Name, Description = s.Description, WorkCenter = s.WorkCenter, EstimatedMinutes = s.EstimatedMinutes }).ToList(),
+        };
+    }
+
+    private void Move(int index, int delta)
+    {
+        var rows = _editor!.Routing;
+        var target = index + delta;
+        if (target < 0 || target >= rows.Count)
+        {
+            return;
+        }
+
+        (rows[index], rows[target]) = (rows[target], rows[index]);
+    }
+
+    private async Task SaveChangeAsync()
+    {
+        var editor = _editor!;
+        _busy = true;
+        _error = null;
+        try
+        {
+            var request = new EngineeringChangeRequest(_product!.Id, editor.Title, editor.Description, editor.Reason,
+                editor.ChangeBom ? editor.Bom.Where(r => !string.IsNullOrWhiteSpace(r.MaterialCode)).Select(r => new BomLine(r.MaterialCode!.Trim(), r.Quantity, r.Notes)).ToList() : null,
+                editor.ChangeRouting ? editor.Routing.Where(r => !string.IsNullOrWhiteSpace(r.Name)).Select(r => new RoutingLine(r.Name!.Trim(), r.Description, r.WorkCenter, r.EstimatedMinutes)).ToList() : null);
+            _change = await Api.PostAsync<EngineeringChange>("api/engineering/changes", request);
+            _editor = null;
+            _info = $"Modifica MT {_change.Number} salvata in bozza: ora va approvata.";
+            await ReloadAsync();
+        }
+        catch (ApiException exception)
+        {
+            _error = exception.Message;
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+
+    private async Task OpenChangeAsync(Guid id)
+    {
+        _error = null;
+        _editor = null;
+        try
+        {
+            _change = await Api.GetAsync<EngineeringChange>($"api/engineering/changes/{id}");
+        }
+        catch (ApiException exception)
+        {
+            _error = exception.Message;
+        }
+    }
+
+    private async Task ActAsync(string action, string message)
+    {
+        _busy = true;
+        _error = null;
+        try
+        {
+            _change = await Api.PostAsync<EngineeringChange>($"api/engineering/changes/{_change!.Id}/{action}");
+            _info = message;
+            _product = await Api.GetAsync<ProductDetail>($"api/products/{_product!.Id}");
+            await ReloadAsync();
+        }
+        catch (ApiException exception)
+        {
+            _error = exception.Message;
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+
+    private sealed record DiffLine(string Code, decimal? Current, decimal? Proposed);
+
+    private static IEnumerable<DiffLine> BomDiff(EngineeringChange change)
+    {
+        var current = change.CurrentBom.GroupBy(b => b.MaterialCode, StringComparer.OrdinalIgnoreCase).ToDictionary(g => g.Key, g => g.Sum(b => b.Quantity), StringComparer.OrdinalIgnoreCase);
+        var proposed = (change.ProposedBom ?? []).GroupBy(b => b.MaterialCode, StringComparer.OrdinalIgnoreCase).ToDictionary(g => g.Key, g => g.Sum(b => b.Quantity), StringComparer.OrdinalIgnoreCase);
+        return current.Keys.Union(proposed.Keys, StringComparer.OrdinalIgnoreCase).OrderBy(k => k)
+            .Select(code => new DiffLine(code, current.TryGetValue(code, out var c) ? c : null, proposed.TryGetValue(code, out var p) ? p : null));
+    }
+
+    private sealed class ChangeEditor
+    {
+        public string? Title { get; set; }
+        public string? Reason { get; set; }
+        public string? Description { get; set; }
+        public bool ChangeBom { get; set; }
+        public bool ChangeRouting { get; set; }
+        public List<BomRow> Bom { get; set; } = [];
+        public List<RoutingRow> Routing { get; set; } = [];
+    }
+
+    private sealed class BomRow
+    {
+        public string? MaterialCode { get; set; }
+        public decimal Quantity { get; set; } = 1;
+        public string? Notes { get; set; }
+    }
+
+    private sealed class RoutingRow
+    {
+        public string? Name { get; set; }
+        public string? Description { get; set; }
+        public string? WorkCenter { get; set; }
+        public decimal EstimatedMinutes { get; set; }
+    }
+}

@@ -68,7 +68,7 @@ public sealed record WorkOrderDetail(
     Guid Id, string Code, string ProductLotNumber, Guid ProductId, decimal Quantity, Guid? AreaId,
     string? CustomerReference, string Status, DateTime? DueDate, string? Notes, DateTime CreatedAt,
     DateTime? ReleasedAt, DateTime? CompletedAt, List<WorkOrderOperation> Operations,
-    Guid? CustomerId = null, Guid? QuoteId = null);
+    Guid? CustomerId = null, Guid? QuoteId = null, string? ProductRevision = null);
 
 public sealed record WorkOrderMaterialLot(
     Guid MaterialLotId, string MaterialCode, string LotNumber, decimal QuantityConsumed, Guid WithdrawalSlipId, string WithdrawalSlipCode);

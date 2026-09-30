@@ -1205,6 +1205,73 @@ public sealed class ApiClient
         return (name.Trim('"'), await response.Content.ReadAsByteArrayAsync(cancellationToken));
     }
 
+    // ---------- Engineering office: technical documents ----------
+
+    public async Task<IReadOnlyList<TechnicalDocumentDto>> GetProductDocumentsAsync(Guid productId, bool history, CancellationToken cancellationToken = default)
+    {
+        using var response = await _httpClient.GetAsync($"api/engineering/products/{productId}/documents{(history ? "?history=true" : "")}", cancellationToken);
+        await EnsureSuccessAsync(response, cancellationToken);
+        return await response.Content.ReadFromJsonAsync<List<TechnicalDocumentDto>>(cancellationToken: cancellationToken) ?? [];
+    }
+
+    /// <summary>Documents of one phase for the terminal; none (or an older server) is simply an empty list.</summary>
+    public async Task<IReadOnlyList<TechnicalDocumentDto>> GetOperationDocumentsAsync(Guid workOrderId, Guid operationId, CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            using var response = await _httpClient.GetAsync($"api/engineering/work-orders/{workOrderId}/operations/{operationId}/documents", cancellationToken);
+            return response.IsSuccessStatusCode
+                ? await response.Content.ReadFromJsonAsync<List<TechnicalDocumentDto>>(cancellationToken: cancellationToken) ?? []
+                : [];
+        }
+        catch (HttpRequestException)
+        {
+            return [];
+        }
+    }
+
+    public async Task<TechnicalDocumentDto> UploadProductDocumentAsync(Guid productId, string filePath, string? title, string kind, int? stepSequence, string? versionNote, CancellationToken cancellationToken = default)
+    {
+        using var content = new MultipartFormDataContent();
+        await using var stream = File.OpenRead(filePath);
+        using var fileContent = new StreamContent(stream);
+        fileContent.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue("application/octet-stream");
+        content.Add(fileContent, "file", Path.GetFileName(filePath));
+        content.Add(new StringContent(kind), "kind");
+        if (!string.IsNullOrWhiteSpace(title))
+        {
+            content.Add(new StringContent(title.Trim()), "title");
+        }
+
+        if (stepSequence is not null)
+        {
+            content.Add(new StringContent(stepSequence.Value.ToString(System.Globalization.CultureInfo.InvariantCulture)), "stepSequence");
+        }
+
+        if (!string.IsNullOrWhiteSpace(versionNote))
+        {
+            content.Add(new StringContent(versionNote.Trim()), "versionNote");
+        }
+
+        using var response = await _httpClient.PostAsync($"api/engineering/products/{productId}/documents", content, cancellationToken);
+        await EnsureSuccessAsync(response, cancellationToken);
+        return await response.Content.ReadFromJsonAsync<TechnicalDocumentDto>(cancellationToken: cancellationToken)
+            ?? throw new InvalidOperationException("Risposta di caricamento non valida.");
+    }
+
+    public async Task<byte[]> DownloadTechnicalDocumentAsync(Guid documentId, CancellationToken cancellationToken = default)
+    {
+        using var response = await _httpClient.GetAsync($"api/engineering/documents/{documentId}/content", cancellationToken);
+        await EnsureSuccessAsync(response, cancellationToken);
+        return await response.Content.ReadAsByteArrayAsync(cancellationToken);
+    }
+
+    public async Task WithdrawTechnicalDocumentAsync(Guid documentId, CancellationToken cancellationToken = default)
+    {
+        using var response = await _httpClient.PostAsync($"api/engineering/documents/{documentId}/withdraw", null, cancellationToken);
+        await EnsureSuccessAsync(response, cancellationToken);
+    }
+
     public async Task<ImportSummaryDto> ImportCatalogExcelAsync(string filePath, CancellationToken cancellationToken = default)
     {
         using var content = new MultipartFormDataContent();
@@ -2263,6 +2330,16 @@ public sealed record WorkOrderSummaryDto(
     DateTime CreatedAt,
     int OperationCount,
     int CompletedOperationCount);
+
+public sealed record TechnicalDocumentDto(Guid Id, Guid ProductId, int? StepSequence, string Kind, string KindName, string Title, string FileName,
+    string ContentType, long SizeBytes, int Version, string? VersionNote, bool IsCurrent, string? UploadedBy, DateTime UploadedAt)
+{
+    public string PhaseLabel => StepSequence is null ? "Tutto il prodotto" : $"Fase {StepSequence}";
+    public string VersionLabel => $"v{Version}";
+    public string StateLabel => IsCurrent ? "Attuale" : "Storico";
+    public string SizeLabel => SizeBytes < 1024 * 1024 ? $"{SizeBytes / 1024.0:0.#} KB" : $"{SizeBytes / 1024.0 / 1024.0:0.#} MB";
+    public string UploadedLabel => $"{UploadedAt.ToLocalTime():dd/MM/yyyy HH:mm} {UploadedBy}";
+}
 
 public sealed record WorkOrderDetailDto(
     Guid Id,

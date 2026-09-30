@@ -1,5 +1,6 @@
 @page "/commesse/{Id:guid}"
 @inject Api Api
+@inject IJSRuntime Js
 
 <PageTitle>@(_order?.Code ?? "Commessa") · Nicolò MES</PageTitle>
 
@@ -30,6 +31,7 @@ else
                 <div class="fact"><div class="label">Codice commessa</div><div class="value"><CopyCode Value="@_order.Code" /></div></div>
                 <div class="fact"><div class="label">Lotto prodotto</div><div class="value"><CopyCode Value="@_order.ProductLotNumber" /></div></div>
                 <div class="fact"><div class="label">Quantità</div><div class="value">@Labels.Number(_order.Quantity)</div></div>
+                <div class="fact"><div class="label">Revisione prodotto</div><div class="value">@(_order.ProductRevision ?? "—")</div></div>
                 <div class="fact"><div class="label">Consegna</div><div class="value">@Labels.Date(_order.DueDate)</div></div>
                 <div class="fact"><div class="label">Riferimento cliente</div><div class="value">@(_order.CustomerReference ?? "—")</div></div>
                 <div class="fact"><div class="label">Creata</div><div class="value">@Labels.Date(_order.CreatedAt)</div></div>
@@ -66,6 +68,19 @@ else
                                     <td data-label="Fine">@Labels.DateTime(op.CompletedAt)</td>
                                     <td data-label="Stato"><span class="badge @Labels.OperationStatusClass(op.Status)">@Labels.OperationStatus(op.Status)</span></td>
                                 </tr>
+                                @if (_documents.TryGetValue(op.Id, out var docs) && docs.Count > 0)
+                                {
+                                    <tr class="subrow">
+                                        <td colspan="8" data-label="Documenti">
+                                            <div class="chips">
+                                                @foreach (var doc in docs)
+                                                {
+                                                    <button class="secondary small" @onclick="() => OpenDocumentAsync(doc)" title="@doc.FileName">@doc.KindName: @doc.Title (v@(doc.Version))</button>
+                                                }
+                                            </div>
+                                        </td>
+                                    </tr>
+                                }
                             }
                         </tbody>
                     </table>
@@ -111,6 +126,7 @@ else
 
     private WorkOrderDetail? _order;
     private List<WorkOrderMaterialLot>? _lots;
+    private Dictionary<Guid, List<TechnicalDocument>> _documents = [];
     private string? _error;
 
     protected override async Task OnParametersSetAsync()
@@ -122,6 +138,37 @@ else
         {
             _order = await Api.GetAsync<WorkOrderDetail>($"api/work-orders/{Id}");
             _lots = await Api.GetAsync<List<WorkOrderMaterialLot>>($"api/work-orders/{Id}/material-lots");
+            await LoadDocumentsAsync();
+        }
+        catch (ApiException exception)
+        {
+            _error = exception.Message;
+        }
+    }
+
+    /// <summary>Drawings and instructions of each phase (from the engineering office); none is fine.</summary>
+    private async Task LoadDocumentsAsync()
+    {
+        _documents = [];
+        foreach (var op in _order!.Operations)
+        {
+            try
+            {
+                _documents[op.Id] = await Api.GetAsync<List<TechnicalDocument>>($"api/engineering/work-orders/{Id}/operations/{op.Id}/documents");
+            }
+            catch (ApiException)
+            {
+                return;
+            }
+        }
+    }
+
+    private async Task OpenDocumentAsync(TechnicalDocument doc)
+    {
+        try
+        {
+            var file = await Api.GetFileAsync($"api/engineering/documents/{doc.Id}/content", doc.FileName);
+            await Js.InvokeVoidAsync("nicolomes.openFile", file.FileName, file.ContentType, Convert.ToBase64String(file.Content));
         }
         catch (ApiException exception)
         {
