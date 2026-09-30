@@ -7,7 +7,7 @@ Aggiornato: 30 settembre 2026. Questo file si aggiorna a ogni sessione di lavoro
 - **Cos'è**: gestionale di produzione (MES) con parte commerciale e documentale, per piccole e medie aziende manifatturiere. Nato per un quadrista, oggi si configura per cinque settori.
 - **Versione pubblicata**: v1.6.0 (30/09/2026), con installer per Windows e aggiornamento automatico: i PC con una versione precedente si aggiornano da soli. Comprende tutto il lavoro della v1.5.0 (la cui release si era fermata sui test).
 - **Architettura**: client Windows (WPF, .NET 8) + API web (ASP.NET Core 8) su Render + database Postgres su Neon. La stessa API serve la piattaforma web (`/app/`, Blazor WebAssembly) e la pagina dei tecnici (`/tecnici/`).
-- **Test automatici**: 282 sull'API, 116 sul client desktop e 47 sulla piattaforma web, tutti verdi (30/09/2026). Le fatture elettroniche sono validate contro lo schema ufficiale FatturaPA.
+- **Test automatici**: 290 sull'API, 116 sul client desktop e 48 sulla piattaforma web, tutti verdi (30/09/2026). Le fatture elettroniche sono validate contro lo schema ufficiale FatturaPA.
 - **Backtest end-to-end** (30/09/2026): 68 passi su 68 superati su un database vuoto e isolato, percorrendo tutti i ruoli, dal preventivo alla fattura, più cantiere, alimentare, macchine e 14 controlli di sicurezza. Dettaglio nella sezione "Backtest".
 - **Uso attuale**: interno, un'azienda con due sedi.
 
@@ -67,6 +67,8 @@ Aggiornato: 30 settembre 2026. Questo file si aggiorna a ogni sessione di lavoro
 
 ### Sicurezza e affidabilità
 - Accesso con JWT e token di rinnovo a rotazione; sei ruoli (Admin, Management, Warehouse, Purchasing, Sales, Operator).
+- **Verifica in due passaggi** (30/09/2026): codici dell'app di autenticazione, segreto cifrato, codici di recupero monouso, azzeramento dall'amministratore; facoltativa per tutti e obbligatoria per i ruoli scelti dall'amministratore. Al terminale resta il PIN.
+- **Selettore "solo il mio reparto"** nel terminale e nella pagina tecnici.
 - Blocco account dopo 5 password errate, limiti di richieste su login e PIN, PIN univoci, cambio e reimpostazione password.
 - Registro delle operazioni (audit).
 - Backup notturno del database con verifica del ripristino, procedura di disaster recovery provata.
@@ -108,10 +110,10 @@ Non ancora provato: la pagina web dei tecnici dal browser con accesso reale (il 
 | Scarico di magazzino da DDT e rapportini | Scelta aperta | Oggi DDT e rapportini registrano cosa esce ma non scaricano la giacenza |
 | Import catalogo PDF validato su cataloghi reali | Da verificare | Il primo catalogo reale disponibile |
 | Piattaforma web: altre aree (qualità, HACCP, cantiere, manutenzione, pianificazione) | In corso | Una alla volta; oggi cruscotto, commesse, materiali, vendite, acquisti, DDT, fatture, canali |
-| Selettore "mio reparto / tutto" nel terminale e nella pagina tecnici | Da fare (prossimo) | Il filtro lato server è pronto (`department=mine`) |
 | Ufficio tecnico, Collaudo macchine e CE, Service post-vendita | Deciso, da sviluppare | Moduli già in catalogo come "in arrivo", proposti dai reparti |
 | Monitoraggio energetico per l'iperammortamento 2026 | Da fare | Priorità alta dall'analisi di mercato: kWh per macchina e report ex ante/ex post |
-| Autenticazione a due fattori | Da fare | Priorità alta per la sicurezza |
+| Import ed export articoli da Excel (listino "LISTA WEL") | Da fare (prossimo) | Colonne Articolo, Descrizione, CodIVA, UMBase, PrezzoBase, DataCreazione; l'import lo lancia il titolare |
+| Console fornitore remota (pagamenti, stato installazioni, attivazione servizi e canone, teleassistenza) | Da progettare | Richiesta del titolare del 30/09/2026 |
 | Piattaforma web: creare e modificare anagrafiche e documenti | Da fare | Oggi si consulta tutto e si fanno i passaggi dei preventivi; la creazione di clienti, preventivi e commesse resta nel desktop |
 | Server presso il cliente | Basi pronte | L'API gira come servizio di Windows, legge `C:\ProgramData\NicoloMES\server.json`, aggiorna il database da sola (`--migrate` o `Database:AutoMigrate`), scrive log giornalieri. Mancano l'installer del server, il backup locale e la variante Docker con database incluso |
 | Teleassistenza | Basi pronte | Lato server: contatti di assistenza leggibili prima del login e diagnostica per l'amministratore (versione, database, migrazioni, disco), senza segreti. Mancano nel client: finestra Teleassistenza, avvio della sessione remota (RustDesk), pacchetto diagnostico |
