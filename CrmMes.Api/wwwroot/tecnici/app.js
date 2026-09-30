@@ -150,7 +150,7 @@
     try {
       const auth = await api("/api/auth/login", {
         method: "POST",
-        body: { email: $("login-email").value.trim(), password: $("login-password").value },
+        body: { email: $("login-email").value.trim(), password: $("login-password").value, channel: "mobile" },
       });
       $("login-password").value = "";
       setSession(auth.token, auth.refreshToken, auth.name, auth.userId);

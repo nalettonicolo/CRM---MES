@@ -9,6 +9,19 @@ using Serilog.Sinks.Grafana.Loki;
 
 var builder = WebApplication.CreateBuilder(args);
 
+// Server installed at the customer's premises: its settings (database, signing key, listening address,
+// log folder, support contacts) live in one file outside the program folder, see ServerConfiguration.
+var serverConfigPath = CrmMes.Api.Services.ServerConfiguration.ResolvePath();
+var serverConfigLoaded = File.Exists(serverConfigPath);
+if (serverConfigLoaded)
+{
+    builder.Configuration.AddJsonFile(serverConfigPath, optional: false, reloadOnChange: false);
+}
+builder.Configuration[CrmMes.Api.Controllers.SupportController.ServerConfigLoadedKey] = serverConfigLoaded.ToString();
+
+// Runs as a Windows service on a customer's server (no effect when started any other way).
+builder.Host.UseWindowsService();
+
 // Structured JSON to console always (readable in Render's log viewer); also ships to Grafana Cloud
 // Loki when LOKI_URL is configured (via appsettings, user-secrets locally, or Render env vars) — the
 // API runs fine without it, this is purely additive for log retention/search beyond Render's own window.
@@ -25,6 +38,18 @@ builder.Host.UseSerilog((context, services, loggerConfiguration) =>
         .Enrich.WithProperty("Application", "CrmMes.Api")
         .Enrich.WithProperty("Environment", context.HostingEnvironment.EnvironmentName)
         .WriteTo.Console(new Serilog.Formatting.Json.JsonFormatter());
+
+    // A Windows service has no console anyone reads: on a customer's server logs go to daily files,
+    // kept 30 days, which the support diagnostics point to.
+    var logsPath = context.Configuration["Logs:Path"];
+    if (!string.IsNullOrWhiteSpace(logsPath))
+    {
+        loggerConfiguration.WriteTo.File(
+            Path.Combine(logsPath, "api-.log"),
+            rollingInterval: RollingInterval.Day,
+            retainedFileCountLimit: 30,
+            outputTemplate: "{Timestamp:yyyy-MM-dd HH:mm:ss.fff zzz} [{Level:u3}] {Message:lj}{NewLine}{Exception}");
+    }
 
     var lokiUrl = context.Configuration["Loki:Url"] ?? Environment.GetEnvironmentVariable("LOKI_URL");
     if (!string.IsNullOrWhiteSpace(lokiUrl))
@@ -129,10 +154,29 @@ if (string.IsNullOrWhiteSpace(connectionString))
 
 builder.Services.AddDbContext<ApplicationDbContext>(options =>
 {
-    options.UseNpgsql(connectionString);
+    // The migrations live in this assembly, not in CrmMes.Core where the DbContext is: without this
+    // Migrate() at run time would find none.
+    options.UseNpgsql(connectionString, npgsql => npgsql.MigrationsAssembly(typeof(Program).Assembly.GetName().Name));
 });
 
 var app = builder.Build();
+
+// "CrmMes.Api --migrate": brings the database up to date and exits, used by the server installer and
+// on every update. "Database:AutoMigrate": the same at every start (the Docker on-premise setup).
+var migrateOnly = args.Contains("--migrate");
+if (migrateOnly || app.Configuration.GetValue<bool>("Database:AutoMigrate"))
+{
+    using var scope = app.Services.CreateScope();
+    var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+    var pending = (await db.Database.GetPendingMigrationsAsync()).ToList();
+    await db.Database.MigrateAsync();
+    app.Logger.LogInformation("Database aggiornato: {Count} migrazioni applicate", pending.Count);
+    if (migrateOnly)
+    {
+        Console.WriteLine($"Database aggiornato: {pending.Count} migrazioni applicate.");
+        return;
+    }
+}
 
 app.UseForwardedHeaders();
 app.UseExceptionHandler();
@@ -140,10 +184,26 @@ app.UseExceptionHandler();
 // framing — it handles a bearer token and a customer's signature.
 app.Use(async (context, next) =>
 {
-    if (context.Request.Path.Value == "/tecnici")
+    if (context.Request.Path.Value is "/tecnici" or "/app")
     {
-        context.Response.Redirect("/tecnici/");
+        context.Response.Redirect(context.Request.Path.Value + "/");
         return;
+    }
+
+    // The web platform (/app, Blazor WebAssembly): same rules, plus 'wasm-unsafe-eval' which is what
+    // lets the browser compile the .NET runtime (WebAssembly only, JavaScript eval stays forbidden), and
+    // base-uri 'self' for its <base href>. Revalidated at every visit so an update shows up at once.
+    if (context.Request.Path.StartsWithSegments("/app"))
+    {
+        var headers = context.Response.Headers;
+        headers["Content-Security-Policy"] =
+            "default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; style-src 'self'; img-src 'self' data:; " +
+            "connect-src 'self'; font-src 'self'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'";
+        headers["X-Content-Type-Options"] = "nosniff";
+        headers["Referrer-Policy"] = "no-referrer";
+        headers["X-Frame-Options"] = "DENY";
+        headers["Permissions-Policy"] = "camera=(), microphone=(), geolocation=()";
+        headers["Cache-Control"] = "no-cache";
     }
 
     if (context.Request.Path.StartsWithSegments("/tecnici"))
@@ -162,6 +222,7 @@ app.Use(async (context, next) =>
     await next();
 });
 app.UseDefaultFiles(); // /tecnici/ -> /tecnici/index.html
+app.UseBlazorFrameworkFiles("/app"); // the web platform's runtime files (/app/_framework)
 app.UseStaticFiles(); // serves wwwroot/favicon.ico, picked up automatically by the browser and by Swagger UI
 
 if (app.Environment.IsDevelopment())
@@ -181,6 +242,9 @@ app.UseAuthentication();
 app.UseRateLimiter();
 app.UseAuthorization();
 app.MapControllers();
+
+// Deep links of the web platform (/app/commesse/...) are pages of the app, not files: serve its index.
+app.MapFallbackToFile("app/{*path:nonfile}", "app/index.html");
 
 // Liveness without touching the database: what keeps the web service awake outside working hours,
 // so the database (billed by compute time) can still sleep at night.

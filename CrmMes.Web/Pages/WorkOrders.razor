@@ -1,0 +1,165 @@
+@page "/commesse"
+@implements IDisposable
+@inject Api Api
+@inject NavigationManager Nav
+
+<PageTitle>Commesse · Nicolò MES</PageTitle>
+
+<div class="page-head">
+    <div>
+        <div class="eyebrow">Produzione</div>
+        <h1>Commesse</h1>
+        <p class="sub">Cerca anche con le ultime cifre del codice o del lotto.</p>
+    </div>
+</div>
+
+<div class="toolbar">
+    <input class="search" type="search" placeholder="Codice, ultime cifre, lotto, prodotto o cliente" aria-label="Cerca commessa"
+           value="@_search" @oninput="OnSearchInput" />
+    <div class="chips" role="group" aria-label="Stato">
+        @foreach (var (key, label) in Filters)
+        {
+            <button class="chip @(_status == key ? "active" : "")" aria-pressed="@(_status == key)" @onclick="() => ChangeStatusAsync(key)">@label</button>
+        }
+    </div>
+</div>
+
+<div class="card">
+    @if (_error is not null)
+    {
+        <div class="state">
+            <strong>Impossibile caricare le commesse</strong>@_error
+            <div class="actions"><button class="secondary small" @onclick="LoadAsync">Riprova</button></div>
+        </div>
+    }
+    else if (_rows is null)
+    {
+        <div class="state">Caricamento...</div>
+    }
+    else if (_rows.Count == 0)
+    {
+        <div class="state">
+            <strong>Nessuna commessa</strong>
+            @(string.IsNullOrWhiteSpace(_search) ? "Nessuna commessa in questo stato." : $"Nessuna commessa corrisponde a \"{_search}\".")
+        </div>
+    }
+    else
+    {
+        <div class="table-wrap">
+            <table class="cards">
+                <thead>
+                    <tr><th>Commessa</th><th>Lotto</th><th>Prodotto</th><th class="num">Quantità</th><th>Avanzamento</th><th>Consegna</th><th>Stato</th></tr>
+                </thead>
+                <tbody>
+                    @foreach (var row in _rows)
+                    {
+                        <tr class="link" @onclick="() => Nav.NavigateTo(row.Href)">
+                            <td data-label="Commessa"><CopyCode Value="@row.Code" /></td>
+                            <td data-label="Lotto"><CopyCode Value="@row.Lot" /></td>
+                            <td data-label="Prodotto">@row.Product</td>
+                            <td data-label="Quantità" class="num">@Labels.Number(row.Quantity)</td>
+                            <td data-label="Avanzamento">
+                                @if (row.Total is > 0)
+                                {
+                                    <div class="progress" title="@row.Done di @row.Total fasi"><span class="@Labels.ProgressClass(row.Done, row.Total.Value)"></span></div>
+                                    <span class="small muted">@row.Done/@row.Total fasi</span>
+                                }
+                                else if (row.ActiveOperation is not null)
+                                {
+                                    <span class="small muted">@row.ActiveOperation</span>
+                                }
+                                else
+                                {
+                                    <span class="muted">—</span>
+                                }
+                            </td>
+                            <td data-label="Consegna">
+                                @Labels.Date(row.DueDate)
+                                @if (Labels.IsOverdue(row.DueDate, row.Status, DateTime.UtcNow))
+                                {
+                                    <span class="badge danger">In ritardo</span>
+                                }
+                            </td>
+                            <td data-label="Stato"><StatusBadge Status="@row.Status" /></td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    }
+</div>
+
+@code {
+    private static readonly (string Key, string Label)[] Filters =
+    [
+        ("Open", "Aperte"), ("Draft", "Bozze"), ("Released", "Rilasciate"), ("InProgress", "In lavorazione"),
+        ("Completed", "Completate"), ("", "Tutte"),
+    ];
+
+    private sealed record Row(string Href, string Code, string Lot, string Product, decimal Quantity, int Done, int? Total,
+        string? ActiveOperation, DateTime? DueDate, string Status);
+
+    private string _status = "Open";
+    private string _search = string.Empty;
+    private List<Row>? _rows;
+    private string? _error;
+    private CancellationTokenSource? _debounce;
+
+    protected override Task OnInitializedAsync() => LoadAsync();
+
+    private async Task ChangeStatusAsync(string status)
+    {
+        _status = status;
+        _search = string.Empty;
+        await LoadAsync();
+    }
+
+    /// <summary>Searches as the user types, a moment after the last key: the server matches the end of
+    /// the code too, so "0042" finds "C-2026-0042".</summary>
+    private async Task OnSearchInput(ChangeEventArgs e)
+    {
+        _search = e.Value?.ToString() ?? string.Empty;
+        _debounce?.Cancel();
+        _debounce = new CancellationTokenSource();
+        var token = _debounce.Token;
+        try
+        {
+            await Task.Delay(300, token);
+        }
+        catch (TaskCanceledException)
+        {
+            return;
+        }
+
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        _error = null;
+        _rows = null;
+        try
+        {
+            var term = _search.Trim();
+            if (term.Length > 0)
+            {
+                var found = await Api.GetAsync<List<WorkOrderLookup>>($"api/work-orders/lookup?q={Uri.EscapeDataString(term)}");
+                _rows = found.Select(o => new Row(o.DetailHref(), o.Code, o.ProductLotNumber, o.ProductName, o.Quantity, 0, null,
+                    o.ActiveOperation, o.DueDate, o.Status)).ToList();
+            }
+            else
+            {
+                var query = _status.Length == 0 ? "api/work-orders" : $"api/work-orders?status={_status}";
+                var orders = await Api.GetAsync<List<WorkOrderSummary>>(query);
+                _rows = orders.Select(o => new Row(o.DetailHref(), o.Code, o.ProductLotNumber, $"{o.ProductCode} · {o.ProductName}",
+                    o.Quantity, o.CompletedOperationCount, o.OperationCount, null, o.DueDate, o.Status)).ToList();
+            }
+        }
+        catch (ApiException exception)
+        {
+            _error = exception.Message;
+        }
+    }
+
+    public void Dispose() => _debounce?.Cancel();
+}

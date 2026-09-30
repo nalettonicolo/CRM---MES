@@ -38,6 +38,9 @@ jobs:
       - name: Test Desktop client
         run: dotnet test CrmMes.Desktop.Tests/CrmMes.Desktop.Tests.csproj --configuration Release
 
+      - name: Test web platform
+        run: dotnet test CrmMes.Web.Tests/CrmMes.Web.Tests.csproj --configuration Release
+
       - name: Publish CrmMes.Desktop
         run: >
           dotnet publish CrmMes.Desktop/CrmMes.Desktop.csproj

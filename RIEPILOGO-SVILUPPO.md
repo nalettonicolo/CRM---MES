@@ -6,6 +6,15 @@ Sintesi ad alto livello di cosa è stato costruito finora e cosa manca ancora. P
 
 ## Cosa è stato fatto
 
+### Piattaforma web, canali di accesso, basi per server del cliente e teleassistenza (2026-09-30, da pubblicare)
+- **Piattaforma web** (progetto `CrmMes.Web`, Blazor WebAssembly) servita dall'API su `/app/`: login con canale "web", rinnovo automatico della sessione (una sola volta anche con più richieste insieme), sessione nella scheda del browser (si chiude con la scheda). Pagine: cruscotto, commesse con ricerca per ultime cifre, dettaglio commessa con fasi e lotti, materiali, canali di accesso. Stati di caricamento, vuoto ed errore su ogni pagina; tabelle che diventano schede sul telefono; tema chiaro e scuro; nessuno stile o script in linea.
+- **Sicurezza della piattaforma web**: CSP dedicata (solo script dello stesso sito più `wasm-unsafe-eval` per il runtime .NET, nessun `unsafe-inline` né `unsafe-eval`), niente incorniciamento, niente referrer; i collegamenti diretti (`/app/commesse/...`) aprono l'app, mentre API e file mancanti restano 404.
+- **Canali di accesso** (`AccessChannels`): tre canali (desktop, web, telefono), per azienda, per ruolo e per area. Nuovi endpoint `GET/PUT api/company-profile/access` e `GET api/company-profile/areas?channel=`. Il login richiede il canale (se manca vale "desktop", per i client già installati); la sessione ricorda il canale e il rinnovo ricontrolla. Migrazione `AddAccessChannels`: le sessioni già aperte valgono come desktop.
+- **Client desktop**: finestra "Canali di accesso", menu filtrato per le aree del desktop, messaggi chiari se l'accesso da desktop non è consentito (prima un 403 o un account bloccato apparivano come "server non raggiungibile").
+- **Server presso il cliente (basi)**: servizio di Windows, file `server.json` fuori dalla cartella del programma, `--migrate` e `Database:AutoMigrate` (le migrazioni ora si trovano anche a runtime), log giornalieri conservati 30 giorni.
+- **Teleassistenza (basi)**: `GET api/support/info` (contatti e dati per la sessione remota, leggibili prima del login) e `GET api/support/diagnostics` (solo amministratore, senza segreti).
+- **Prove**: 276 test API, 113 desktop, 32 web (bUnit); prova dal vivo nel browser su un database nuovo, con migrazione automatica di tutte le 30 migrazioni.
+
 ### Backtest completo e PDF senza legature (2026-09-30, v1.5.1)
 - **Backtest end-to-end**: 68 passi su 68 superati su un database vuoto e isolato, con tutti i ruoli (commerciale, acquisti, magazzino, reparto, qualità, capocantiere, direzione) e 14 controlli di sicurezza. Esito per area in STATO-PROGETTO.md, sezione "Backtest".
 - **PDF**: disattivate le legature tipografiche in tutti i documenti generati (DDT, fatture, etichette, rapportini, richiami); prima, copiando un codice che conteneva "ff", "fi", "fl" o "tt", alcune lettere sparivano. Test dedicato con controllo positivo.

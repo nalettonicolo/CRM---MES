@@ -1,0 +1,134 @@
+@page "/cruscotto"
+@inject Api Api
+@inject NavigationManager Nav
+
+<PageTitle>Cruscotto · Nicolò MES</PageTitle>
+
+<div class="page-head">
+    <div>
+        <div class="eyebrow">Produzione</div>
+        <h1>Cruscotto</h1>
+        <p class="sub">Andamento degli ultimi @Days giorni e commesse su cui il reparto sta lavorando.</p>
+    </div>
+    <div class="chips" role="group" aria-label="Periodo">
+        @foreach (var days in new[] { 7, 30, 90 })
+        {
+            <button class="chip @(Days == days ? "active" : "")" aria-pressed="@(Days == days)" @onclick="() => ChangePeriodAsync(days)">@days giorni</button>
+        }
+    </div>
+</div>
+
+@if (_error is not null)
+{
+    <div class="alert" role="alert">@_error <button class="secondary small" @onclick="LoadAsync">Riprova</button></div>
+}
+else if (_dashboard is null)
+{
+    <div class="kpis">
+        @for (var i = 0; i < 4; i++)
+        {
+            <div class="card kpi"><div class="skeleton"></div></div>
+        }
+    </div>
+}
+else
+{
+    <div class="kpis">
+        <div class="card kpi">
+            <div class="label">Commesse aperte</div>
+            <div class="value">@(Count("Released") + Count("InProgress"))</div>
+            <div class="hint">@Count("InProgress") in lavorazione, @Count("Released") da iniziare</div>
+        </div>
+        <div class="card kpi">
+            <div class="label">Completate nel periodo</div>
+            <div class="value">@_dashboard.WorkOrdersCompletedInPeriod</div>
+            <div class="hint">Puntualità @Labels.Percent(_dashboard.OnTimeCompletionRate)</div>
+        </div>
+        <div class="card kpi">
+            <div class="label">OEE</div>
+            <div class="value">@Labels.Percent(_dashboard.OeeRatio)</div>
+            <div class="hint">Disponibilità @Labels.Percent(_dashboard.AvailabilityRatio) · qualità @Labels.Percent(_dashboard.QualityRatio)</div>
+        </div>
+        <div class="card kpi">
+            <div class="label">Fermi nel periodo</div>
+            <div class="value">@Labels.Number(Math.Round(_dashboard.TotalDowntimeMinutes / 60m, 1)) h</div>
+            <div class="hint">@_dashboard.OperationsCompletedInPeriod fasi completate</div>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="section-head">
+            <h2>Commesse aperte</h2>
+            <a href="commesse" class="small">Tutte le commesse</a>
+        </div>
+        @if (_open is null)
+        {
+            <div class="state">Caricamento...</div>
+        }
+        else if (_open.Count == 0)
+        {
+            <div class="state"><strong>Nessuna commessa aperta</strong>Le commesse rilasciate o in lavorazione compaiono qui.</div>
+        }
+        else
+        {
+            <div class="table-wrap">
+                <table class="cards">
+                    <thead>
+                        <tr><th>Commessa</th><th>Prodotto</th><th>Cliente</th><th>Fase attuale</th><th>Consegna</th><th>Stato</th></tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var order in _open)
+                        {
+                            <tr class="link" @onclick="() => Nav.NavigateTo(order.DetailHref())">
+                                <td data-label="Commessa"><CopyCode Value="@order.Code" /></td>
+                                <td data-label="Prodotto">@order.ProductName</td>
+                                <td data-label="Cliente" class="muted">@(order.CustomerName ?? "—")</td>
+                                <td data-label="Fase attuale" class="muted">@(order.ActiveOperation ?? "—")</td>
+                                <td data-label="Consegna">
+                                    @Labels.Date(order.DueDate)
+                                    @if (Labels.IsOverdue(order.DueDate, order.Status, DateTime.UtcNow))
+                                    {
+                                        <span class="badge danger">In ritardo</span>
+                                    }
+                                </td>
+                                <td data-label="Stato"><StatusBadge Status="@order.Status" /></td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        }
+    </div>
+}
+
+@code {
+    private int Days = 7;
+    private WorkOrderDashboard? _dashboard;
+    private List<WorkOrderLookup>? _open;
+    private string? _error;
+
+    protected override Task OnInitializedAsync() => LoadAsync();
+
+    private async Task ChangePeriodAsync(int days)
+    {
+        Days = days;
+        _dashboard = null;
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        _error = null;
+        try
+        {
+            _dashboard = await Api.GetAsync<WorkOrderDashboard>($"api/work-orders/dashboard?days={Days}");
+            _open ??= (await Api.GetAsync<List<WorkOrderLookup>>("api/work-orders/lookup")).Take(10).ToList();
+        }
+        catch (ApiException exception)
+        {
+            _error = exception.Message;
+        }
+    }
+
+    private int Count(string status) => _dashboard?.WorkOrdersByStatus.GetValueOrDefault(status) ?? 0;
+}

@@ -2,6 +2,7 @@ using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Security.Cryptography;
 using System.Text;
+using CrmMes.Api.Services;
 using CrmMes.Core.Data;
 using CrmMes.Core.Models;
 using Microsoft.AspNetCore.Identity;
@@ -133,7 +134,21 @@ public class AuthController : ControllerBase
             user.LockoutEndsAt = null;
         }
 
-        return Ok(await CreateResponseAsync(user, cancellationToken));
+        // Checked only after the password: a refusal must not tell a stranger that the account exists.
+        var channel = AccessChannels.NormalizeChannel(request.Channel);
+        if (channel is null)
+        {
+            return BadRequest(new { message = "Canale di accesso non riconosciuto." });
+        }
+
+        var channelRefusal = await ChannelRefusalAsync(user.Role, channel, cancellationToken);
+        if (channelRefusal is not null)
+        {
+            await _dbContext.SaveChangesAsync(cancellationToken);
+            return StatusCode(StatusCodes.Status403Forbidden, new { message = channelRefusal });
+        }
+
+        return Ok(await CreateResponseAsync(user, cancellationToken, channel: channel));
     }
 
     [HttpPost("refresh")]
@@ -157,7 +172,15 @@ public class AuthController : ControllerBase
         }
 
         existing.RevokedAt = DateTime.UtcNow;
-        var response = await CreateResponseAsync(existing.User, cancellationToken, replaces: existing);
+        var sessionChannel = AccessChannels.NormalizeChannel(existing.Channel) ?? AccessChannels.Desktop;
+        var channelRefusal = await ChannelRefusalAsync(existing.User.Role, sessionChannel, cancellationToken);
+        if (channelRefusal is not null)
+        {
+            await _dbContext.SaveChangesAsync(cancellationToken);
+            return StatusCode(StatusCodes.Status403Forbidden, new { message = channelRefusal });
+        }
+
+        var response = await CreateResponseAsync(existing.User, cancellationToken, replaces: existing, channel: sessionChannel);
         return Ok(response);
     }
 
@@ -261,7 +284,23 @@ public class AuthController : ControllerBase
         return NoContent();
     }
 
-    private async Task<AuthResponse> CreateResponseAsync(User user, CancellationToken cancellationToken, RefreshToken? replaces = null)
+    /// <summary>Why this role may not log in from this channel, or null when it may.</summary>
+    private async Task<string?> ChannelRefusalAsync(string role, string channel, CancellationToken cancellationToken)
+    {
+        var stored = await _dbContext.CompanyProfiles.AsNoTracking().Select(p => p.AccessChannels).FirstOrDefaultAsync(cancellationToken);
+        var settings = AccessChannels.Parse(stored);
+        if (AccessChannels.CanLogIn(settings, role, channel))
+        {
+            return null;
+        }
+
+        return settings.Channels.Contains(channel)
+            ? $"Il tuo ruolo non può accedere dalla {AccessChannels.ChannelName(channel)}. Chiedi all'amministratore."
+            : $"L'azienda non usa la {AccessChannels.ChannelName(channel)}. Chiedi all'amministratore.";
+    }
+
+    private async Task<AuthResponse> CreateResponseAsync(
+        User user, CancellationToken cancellationToken, RefreshToken? replaces = null, string channel = AccessChannels.Desktop)
     {
         var key = _configuration["Jwt:Key"]
             ?? Environment.GetEnvironmentVariable("CRM_MES_JWT_KEY")
@@ -272,7 +311,8 @@ public class AuthController : ControllerBase
             new Claim(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString()),
             new Claim(ClaimTypes.Name, user.Name),
             new Claim(ClaimTypes.Email, user.Email),
-            new Claim(ClaimTypes.Role, user.Role)
+            new Claim(ClaimTypes.Role, user.Role),
+            new Claim("channel", channel)
         };
         var credentials = new SigningCredentials(new SymmetricSecurityKey(Encoding.UTF8.GetBytes(key)), SecurityAlgorithms.HmacSha256);
         var expiresAt = DateTime.UtcNow.Add(AccessTokenLifetime);
@@ -283,7 +323,8 @@ public class AuthController : ControllerBase
         {
             UserId = user.Id,
             TokenHash = HashToken(rawRefreshToken),
-            ExpiresAt = DateTime.UtcNow.Add(RefreshTokenLifetime)
+            ExpiresAt = DateTime.UtcNow.Add(RefreshTokenLifetime),
+            Channel = channel
         };
         _dbContext.RefreshTokens.Add(refreshToken);
 
@@ -310,7 +351,8 @@ public class AuthController : ControllerBase
 }
 
 public sealed record RegisterRequest(string? Name, string? Email, string? Password);
-public sealed record LoginRequest(string? Email, string? Password);
+/// <summary>Channel: "desktop" (also when missing, older clients), "web" or "mobile".</summary>
+public sealed record LoginRequest(string? Email, string? Password, string? Channel = null);
 public sealed record ChangePasswordRequest(string? CurrentPassword, string? NewPassword);
 public sealed record RefreshRequest(string? RefreshToken);
 public sealed record AuthResponse(

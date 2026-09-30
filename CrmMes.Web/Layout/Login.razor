@@ -1,0 +1,74 @@
+@inject Api Api
+
+<PageTitle>Accedi · Nicolò MES</PageTitle>
+
+<div class="login">
+    <form class="login-card" @onsubmit="SubmitAsync" @onsubmit:preventDefault>
+        <div class="brand">Nicolò MES</div>
+        <h1>Accedi</h1>
+        <p>Usa le stesse credenziali del programma desktop.</p>
+
+        <label>
+            Email
+            <input type="email" autocomplete="username" required @bind="_email" disabled="@_busy" />
+        </label>
+        <label>
+            Password
+            <input type="password" autocomplete="current-password" required @bind="_password" disabled="@_busy" />
+        </label>
+
+        @if (_error is not null)
+        {
+            <div class="alert" role="alert">@_error</div>
+        }
+        @if (_waking)
+        {
+            <div class="notice" role="status">Il server si sta avviando, attendi qualche secondo...</div>
+        }
+
+        <button type="submit" disabled="@_busy">@(_busy ? "Accesso in corso..." : "Accedi")</button>
+    </form>
+</div>
+
+@code {
+    private string _email = string.Empty;
+    private string _password = string.Empty;
+    private string? _error;
+    private bool _busy;
+    private bool _waking;
+
+    private async Task SubmitAsync()
+    {
+        if (string.IsNullOrWhiteSpace(_email) || string.IsNullOrEmpty(_password))
+        {
+            _error = "Inserisci email e password.";
+            return;
+        }
+
+        _busy = true;
+        _error = null;
+        try
+        {
+            // A server on a free plan may be asleep: wait for it (up to about a minute) before logging in.
+            for (var attempt = 0; attempt < 8 && !await Api.IsServerUpAsync(); attempt++)
+            {
+                _waking = true;
+                StateHasChanged();
+                await Task.Delay(TimeSpan.FromSeconds(8));
+            }
+
+            _waking = false;
+            await Api.LoginAsync(_email.Trim(), _password);
+            _password = string.Empty;
+        }
+        catch (ApiException exception)
+        {
+            _error = exception.Message;
+        }
+        finally
+        {
+            _busy = false;
+            _waking = false;
+        }
+    }
+}

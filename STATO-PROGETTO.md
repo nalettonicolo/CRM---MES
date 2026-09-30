@@ -6,8 +6,8 @@ Aggiornato: 30 settembre 2026. Questo file si aggiorna a ogni sessione di lavoro
 
 - **Cos'è**: gestionale di produzione (MES) con parte commerciale e documentale, per piccole e medie aziende manifatturiere. Nato per un quadrista, oggi si configura per cinque settori.
 - **Versione pubblicata**: v1.4.0 (30/09/2026), con installer per Windows e aggiornamento automatico. La release v1.5.0 si è fermata sui test automatici: il difetto è corretto e verificato, va pubblicata come v1.5.1.
-- **Architettura**: client Windows (WPF, .NET 8) + API web (ASP.NET Core 8) su Render + database Postgres su Neon. Una pagina web per i tecnici è servita dalla stessa API.
-- **Test automatici**: 264 sull'API e 112 sul client, tutti verdi e stabili in 15 esecuzioni complete consecutive (30/09/2026). Le fatture elettroniche sono validate contro lo schema ufficiale FatturaPA.
+- **Architettura**: client Windows (WPF, .NET 8) + API web (ASP.NET Core 8) su Render + database Postgres su Neon. La stessa API serve la piattaforma web (`/app/`, Blazor WebAssembly) e la pagina dei tecnici (`/tecnici/`).
+- **Test automatici**: 276 sull'API, 113 sul client desktop e 32 sulla piattaforma web, tutti verdi (30/09/2026). Le fatture elettroniche sono validate contro lo schema ufficiale FatturaPA.
 - **Backtest end-to-end** (30/09/2026): 68 passi su 68 superati su un database vuoto e isolato, percorrendo tutti i ruoli, dal preventivo alla fattura, più cantiere, alimentare, macchine e 14 controlli di sicurezza. Dettaglio nella sezione "Backtest".
 - **Uso attuale**: interno, un'azienda con due sedi.
 
@@ -52,6 +52,11 @@ Aggiornato: 30 settembre 2026. Questo file si aggiorna a ogni sessione di lavoro
 - **Impiantistica**: rapportini di cantiere con ore, materiali e firma del cliente. Firmati, entrano nei costi della commessa. PDF con la firma.
 
 ### Web e mobile
+- **Piattaforma web** `/app/` (da pubblicare, sviluppata il 30/09/2026): stesso indirizzo e stesse credenziali del programma desktop, si adatta a PC, tablet e telefono, tema chiaro o scuro automatico.
+  - Oggi contiene: cruscotto (commesse aperte, completate, puntualità, OEE, fermi), commesse (filtri per stato, ricerca anche con le ultime cifre, avanzamento, ritardi, codici copiabili), dettaglio commessa (fasi, lotti di materiale usati), materiali (giacenze, sotto scorta), canali di accesso per l'amministratore.
+  - Le altre aree restano nel programma desktop e il menu web le elenca, così nessuno si chiede dove siano finite.
+  - Provata dal vivo: login, cruscotto, ricerca per ultime cifre, dettaglio, canali (il menu cambia subito), blocco per ruolo, vista da telefono, tema chiaro e scuro.
+- **Canali di accesso configurabili dall'amministratore** (desktop, piattaforma web, pagina tecnici da telefono): quali canali usa l'azienda, da dove entra ogni ruolo, su quale canale si vede ogni area. L'amministratore entra sempre da tutti i canali attivi. La scelta vale al login e al rinnovo della sessione (entro 30 minuti), con un messaggio chiaro a chi non è abilitato. Configurabile sia dal desktop ("Canali di accesso" in Amministrazione) sia dal web.
 - Pagina `/tecnici/` per telefono e tablet (stesse credenziali del gestionale):
   - rapportini con firma col dito;
   - avvio e completamento delle fasi;
@@ -100,6 +105,11 @@ Non ancora provato: la pagina web dei tecnici dal browser con accesso reale (il 
 | Alimentare: GTIN sui prodotti, piano HACCP guidato per tipologia | Da fare | Un'azienda pilota del settore |
 | Scarico di magazzino da DDT e rapportini | Scelta aperta | Oggi DDT e rapportini registrano cosa esce ma non scaricano la giacenza |
 | Import catalogo PDF validato su cataloghi reali | Da verificare | Il primo catalogo reale disponibile |
+| Piattaforma web: altre aree (vendite, acquisti, DDT, fatture, qualità, HACCP, cantiere, manutenzione) | In corso | Una alla volta; oggi cruscotto, commesse, materiali, canali |
+| Piattaforma web: operazioni di scrittura (creare e modificare) | Da fare | Oggi la web è in consultazione più la configurazione dei canali |
+| Server presso il cliente | Basi pronte | L'API gira come servizio di Windows, legge `C:\ProgramData\NicoloMES\server.json`, aggiorna il database da sola (`--migrate` o `Database:AutoMigrate`), scrive log giornalieri. Mancano l'installer del server, il backup locale e la variante Docker con database incluso |
+| Teleassistenza | Basi pronte | Lato server: contatti di assistenza leggibili prima del login e diagnostica per l'amministratore (versione, database, migrazioni, disco), senza segreti. Mancano nel client: finestra Teleassistenza, avvio della sessione remota (RustDesk), pacchetto diagnostico |
+| Installer del client "da collegare in seguito" | Da fare | Scelta nell'installer: server aziendale, cloud o "configura in seguito", e prima configurazione guidata al primo avvio |
 | Log centralizzati su Grafana | Pronto, non attivo | Account gratuito Grafana e variabili su Render |
 | Password dell'account di sviluppo esposto in passato | Da fare | Va cambiata dal titolare |
 
@@ -114,12 +124,13 @@ Non ancora provato: la pagina web dei tecnici dal browser con accesso reale (il 
 | 30/09/2026 | v1.4.0 | Fattura elettronica FatturaPA; terminale con ricerca per ultime cifre ed elenco commesse aperte; filtro commesse; codici copiabili; server sempre sveglio e login più rapido; pagina web con Fasi e Ore; istruzioni per hosting e firma |
 | 30/09/2026 | v1.5.1 (da pubblicare) | Backtest end-to-end 68/68; legature disattivate nei PDF (codici copiabili senza lettere perse), test PDF resi stabili |
 | 30/09/2026 | v1.5.0 (release fermata dai test) | Interconnessione macchine (token per macchina, giornata con disponibilità e pezzi, gateway OPC UA/MQTT); corretto l'import catalogo PDF con codici contenenti ff/fi/fl |
-| prossimo | - | OEE dai dati macchina nel cruscotto; importatore Metel appena arriva un file reale |
+| 30/09/2026 | da pubblicare | Piattaforma web `/app/` (cruscotto, commesse, materiali); canali di accesso configurabili dall'amministratore; basi per server presso il cliente (servizio Windows, configurazione, migrazioni automatiche, log) e per la teleassistenza (contatti e diagnostica) |
+| prossimo | - | Altre aree sulla piattaforma web; installer del server e teleassistenza nel client; OEE dai dati macchina |
 
 ## Pubblicazione e ambienti
 
 - **API**: https://crmmes-api.onrender.com (piano gratuito Render), deploy automatico a ogni push su `main`.
-- **Database**: Neon Postgres, progetto `cool-field-94626300`. Tutte le migrazioni fino a `AddMachineInterconnection` sono applicate in produzione il 30/09/2026, dopo prova su un branch dedicato.
+- **Database**: Neon Postgres, progetto `cool-field-94626300`. Tutte le migrazioni fino a `AddMachineInterconnection` sono applicate in produzione il 30/09/2026, dopo prova su un branch dedicato. La nuova `AddAccessChannels` è provata sul branch di prova (anche con `--migrate` e con la migrazione automatica all'avvio) e va applicata in produzione **prima** di pubblicare il codice nuovo.
 - **Client**: release GitHub con `NicoloMES-Setup.exe` e checksum; il programma avvisa e si aggiorna da solo.
 - **Branch Neon di prova ancora esistente**: `test-multisettore`, da eliminare quando non serve più.
 
@@ -127,4 +138,5 @@ Non ancora provato: la pagina web dei tecnici dal browser con accesso reale (il 
 
 1. Acquisto dell'hosting a pagamento su Render e del certificato di firma: vedi le istruzioni in fondo a [RIEPILOGO-SVILUPPO.md](RIEPILOGO-SVILUPPO.md), sezione "Hosting e firma".
 2. Invio delle fatture elettroniche: caricamento manuale gratuito sul portale "Fatture e Corrispettivi" oppure intermediario a pagamento (invio automatico).
-3. Eliminare il branch Neon `test-multisettore` (contiene anche il database `backtest`).
+3. Eliminare il branch Neon `test-multisettore` (contiene i database di prova `backtest`, `webtest` e `webtest2`).
+4. Pubblicare piattaforma web e canali: migrazione `AddAccessChannels` in produzione, push su `main` (Render si aggiorna da solo) e nuova release del client.

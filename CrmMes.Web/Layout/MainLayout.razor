@@ -1,0 +1,145 @@
+@inherits LayoutComponentBase
+@implements IDisposable
+@inject Session Session
+@inject Api Api
+@inject NavigationManager Nav
+
+@if (!_restored)
+{
+    <div class="boot"><div class="boot-brand">Nicolò MES</div><div class="boot-text">Caricamento...</div></div>
+}
+else if (!Session.IsLoggedIn)
+{
+    <Login />
+}
+else
+{
+    <div class="shell @(_menuOpen ? "menu-open" : "")">
+        <header class="topbar">
+            <button class="ghost" aria-label="Apri o chiudi il menu" aria-expanded="@_menuOpen" @onclick="ToggleMenu">Menu</button>
+            <span class="brand">Nicolò MES</span>
+        </header>
+
+        <nav class="sidebar" aria-label="Menu principale">
+            <div class="brand">Nicolò MES</div>
+            @if (!string.IsNullOrWhiteSpace(Session.Company?.CompanyName))
+            {
+                <div class="company">@Session.Company!.CompanyName</div>
+            }
+
+            @if (_loadError is not null)
+            {
+                <div class="nav-note">@_loadError</div>
+            }
+
+            @foreach (var group in Navigation.Visible(Session.WebAreas, Session.Role).GroupBy(entry => entry.Group))
+            {
+                <div class="nav-group">
+                    <div class="nav-title">@group.Key</div>
+                    @foreach (var entry in group)
+                    {
+                        <NavLink class="nav-link" href="@entry.Href" @onclick="CloseMenu">@entry.Title</NavLink>
+                    }
+                </div>
+            }
+
+            @if (Session.IsAdmin)
+            {
+                <div class="nav-group">
+                    <div class="nav-title">Amministrazione</div>
+                    <NavLink class="nav-link" href="amministrazione/canali" @onclick="CloseMenu">Canali di accesso</NavLink>
+                </div>
+            }
+
+            @if (DesktopOnlyNames is { Count: > 0 } desktopOnly)
+            {
+                <div class="nav-note">
+                    Nel programma desktop: @string.Join(", ", desktopOnly). Arriveranno anche qui.
+                </div>
+            }
+
+            <div class="user">
+                <div>
+                    <div class="name">@Session.Auth!.Name</div>
+                    <div class="role">@Labels.Role(Session.Role)</div>
+                </div>
+                <button class="secondary small" @onclick="LogoutAsync">Esci</button>
+            </div>
+        </nav>
+
+        <main class="main">
+            @Body
+        </main>
+    </div>
+}
+
+@code {
+    private bool _restored;
+    private bool _menuOpen;
+    private string? _loadError;
+    private Dictionary<string, string> _areaNames = [];
+    private Guid? _loadedFor;
+
+    protected override async Task OnInitializedAsync()
+    {
+        Session.Changed += OnSessionChanged;
+        await Session.RestoreAsync();
+        _restored = true;
+        await LoadMenuAsync();
+    }
+
+    private void OnSessionChanged() => _ = InvokeAsync(async () =>
+    {
+        await LoadMenuAsync();
+        StateHasChanged();
+    });
+
+    /// <summary>Company, areas shown on the web and their names: once per login.</summary>
+    private async Task LoadMenuAsync()
+    {
+        if (!Session.IsLoggedIn || _loadedFor == Session.Auth!.UserId)
+        {
+            return;
+        }
+
+        _loadedFor = Session.Auth.UserId;
+        _loadError = null;
+        try
+        {
+            Session.Company = await Api.GetAsync<CompanyProfile>("api/company-profile");
+            Session.WebAreas = await Api.GetAsync<List<string>>("api/company-profile/areas?channel=web");
+            var access = await Api.GetAsync<AccessChannels>("api/company-profile/access");
+            _areaNames = access.KnownAreas.ToDictionary(area => area.Key, area => area.Name);
+
+            if (Nav.ToBaseRelativePath(Nav.Uri).Length == 0)
+            {
+                var first = Navigation.Visible(Session.WebAreas, Session.Role).FirstOrDefault();
+                Nav.NavigateTo(first?.Href ?? (Session.IsAdmin ? "amministrazione/canali" : "cruscotto"), replace: true);
+            }
+        }
+        catch (ApiException exception)
+        {
+            _loadedFor = null;
+            _loadError = exception.Message;
+        }
+
+        StateHasChanged();
+    }
+
+    /// <summary>Recomputed at every render: the Admin's changes to the channels show up at once.</summary>
+    private List<string> DesktopOnlyNames =>
+        Navigation.DesktopOnly(Session.WebAreas).Select(key => _areaNames.GetValueOrDefault(key, key)).ToList();
+
+    private void ToggleMenu() => _menuOpen = !_menuOpen;
+
+    private void CloseMenu() => _menuOpen = false;
+
+    private async Task LogoutAsync()
+    {
+        _loadedFor = null;
+        await Api.LogoutAsync();
+        Nav.NavigateTo("", replace: true);
+    }
+
+    public void Dispose() => Session.Changed -= OnSessionChanged;
+}

@@ -1,0 +1,5 @@
+<span class="badge @Labels.WorkOrderStatusClass(Status)">@Labels.WorkOrderStatus(Status)</span>
+
+@code {
+    [Parameter, EditorRequired] public string Status { get; set; } = string.Empty;
+}

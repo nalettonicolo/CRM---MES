@@ -9,14 +9,18 @@
 
   <ItemGroup>
     <ProjectReference Include="..\CrmMes.Core\CrmMes.Core.csproj" />
+    <!-- The web platform (Blazor WebAssembly), published with the API and served under /app/. -->
+    <ProjectReference Include="..\CrmMes.Web\CrmMes.Web.csproj" />
   </ItemGroup>
 
   <ItemGroup>
     <PackageReference Include="ClosedXML" Version="0.104.1" />
+    <PackageReference Include="Microsoft.Extensions.Hosting.WindowsServices" Version="8.0.1" />
     <!-- Pinned above ClosedXML's transitive 8.0.0: CVE-2024-43484 (denial of service on crafted
          Office files), and the API parses uploaded .xlsx files. -->
     <PackageReference Include="System.IO.Packaging" Version="8.0.1" />
     <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="8.0.31" />
+    <PackageReference Include="Microsoft.AspNetCore.Components.WebAssembly.Server" Version="8.0.31" />
     <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="8.0.31" />
     <PackageReference Include="Microsoft.EntityFrameworkCore" Version="9.0.0" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="9.0.0">

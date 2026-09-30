@@ -1,0 +1,204 @@
+@page "/amministrazione/canali"
+@inject Api Api
+@inject Session Session
+
+<PageTitle>Canali di accesso · Nicolò MES</PageTitle>
+
+<div class="page-head">
+    <div>
+        <div class="eyebrow">Amministrazione</div>
+        <h1>Canali di accesso</h1>
+        <p class="sub">Programma desktop, piattaforma web o entrambi: per l'azienda, per ogni ruolo e per ogni area.</p>
+    </div>
+</div>
+
+@if (!Session.IsAdmin)
+{
+    <div class="card state"><strong>Solo per l'amministratore</strong>Chiedi all'amministratore di cambiare i canali di accesso.</div>
+}
+else if (_loadError is not null)
+{
+    <div class="card state"><strong>Impossibile caricare le impostazioni</strong>@_loadError</div>
+}
+else if (_settings is null)
+{
+    <div class="card state">Caricamento...</div>
+}
+else
+{
+    <div class="stack">
+        <div class="notice">L'amministratore entra sempre da tutti i canali attivi, così nessuno resta chiuso fuori. I permessi di ogni ruolo restano gli stessi su ogni canale.</div>
+
+        <div class="card card-pad">
+            <h2>Canali dell'azienda</h2>
+            <div class="checks">
+                @foreach (var channel in AllChannels)
+                {
+                    <label class="check">
+                        <input type="checkbox" checked="@_channels.Contains(channel)" @onchange="e => Toggle(_channels, channel, e)" />
+                        @ChannelDescription(channel)
+                    </label>
+                }
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="section-head"><h2>Da dove entra ogni ruolo</h2></div>
+            <div class="table-wrap">
+                <table class="matrix">
+                    <thead><tr><th>Ruolo</th>@foreach (var channel in AllChannels) {<th>@Labels.Channel(channel)</th>}</tr></thead>
+                    <tbody>
+                        @foreach (var role in _settings.KnownRoles)
+                        {
+                            <tr>
+                                <td>@Labels.Role(role) @if (role == "Admin") {<span class="small muted"> · sempre tutti</span>}</td>
+                                @foreach (var channel in AllChannels)
+                                {
+                                    <td>
+                                        <input type="checkbox" aria-label="@Labels.Role(role): @Labels.Channel(channel)"
+                                               checked="@(role == "Admin" || _roles[role].Contains(channel))"
+                                               disabled="@(role == "Admin" || !_channels.Contains(channel))"
+                                               @onchange="e => Toggle(_roles[role], channel, e)" />
+                                    </td>
+                                }
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="section-head"><h2>Dove si vede ogni area</h2><span class="small muted">Le aree dei moduli spenti non compaiono comunque</span></div>
+            <div class="table-wrap">
+                <table class="matrix">
+                    <thead><tr><th>Area</th>@foreach (var channel in AreaChannels) {<th>@Labels.Channel(channel)</th>}</tr></thead>
+                    <tbody>
+                        @foreach (var area in _settings.KnownAreas)
+                        {
+                            <tr>
+                                <td>@area.Name</td>
+                                @foreach (var channel in AreaChannels)
+                                {
+                                    <td>
+                                        <input type="checkbox" aria-label="@area.Name: @Labels.Channel(channel)"
+                                               checked="@_areas[area.Key].Contains(channel)"
+                                               disabled="@(!_channels.Contains(channel))"
+                                               @onchange="e => Toggle(_areas[area.Key], channel, e)" />
+                                    </td>
+                                }
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        @if (_saveError is not null)
+        {
+            <div class="alert" role="alert">@_saveError</div>
+        }
+        @if (_saved)
+        {
+            <div class="success" role="status">Impostazioni salvate. Le sessioni aperte si adeguano entro 30 minuti.</div>
+        }
+        <div class="actions">
+            <button @onclick="SaveAsync" disabled="@_saving">@(_saving ? "Salvataggio..." : "Salva")</button>
+        </div>
+    </div>
+}
+
+@code {
+    private static readonly string[] AllChannels = ["desktop", "web", "mobile"];
+    private static readonly string[] AreaChannels = ["desktop", "web"];
+
+    private AccessChannels? _settings;
+    private HashSet<string> _channels = [];
+    private Dictionary<string, HashSet<string>> _roles = [];
+    private Dictionary<string, HashSet<string>> _areas = [];
+    private string? _loadError;
+    private string? _saveError;
+    private bool _saving;
+    private bool _saved;
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (!Session.IsAdmin)
+        {
+            return;
+        }
+
+        try
+        {
+            Apply(await Api.GetAsync<AccessChannels>("api/company-profile/access"));
+        }
+        catch (ApiException exception)
+        {
+            _loadError = exception.Message;
+        }
+    }
+
+    private void Apply(AccessChannels settings)
+    {
+        _settings = settings;
+        _channels = [.. settings.Channels];
+        _roles = settings.KnownRoles.ToDictionary(role => role,
+            role => settings.Roles.TryGetValue(role, out var allowed) ? allowed.ToHashSet() : AllChannels.ToHashSet());
+        _areas = settings.KnownAreas.ToDictionary(area => area.Key,
+            area => settings.Areas.TryGetValue(area.Key, out var shown) ? shown.ToHashSet() : AreaChannels.ToHashSet());
+    }
+
+    private void Toggle(HashSet<string> set, string channel, ChangeEventArgs e)
+    {
+        _saved = false;
+        if (e.Value is true)
+        {
+            set.Add(channel);
+        }
+        else
+        {
+            set.Remove(channel);
+        }
+    }
+
+    private static string ChannelDescription(string channel) => channel switch
+    {
+        "desktop" => "Programma desktop (Windows)",
+        "web" => "Piattaforma web (browser)",
+        "mobile" => "Pagina web dei tecnici da telefono (rapportini, fasi, ore)",
+        _ => channel,
+    };
+
+    private async Task SaveAsync()
+    {
+        _saveError = null;
+        _saved = false;
+        if (!_channels.Contains("desktop") && !_channels.Contains("web"))
+        {
+            _saveError = "Serve almeno il programma desktop o la piattaforma web.";
+            return;
+        }
+
+        _saving = true;
+        try
+        {
+            var request = new SaveAccessChannels(
+                AllChannels.Where(_channels.Contains).ToList(),
+                AccessRestrictions.From(_roles.Where(pair => pair.Key != "Admin").ToDictionary(p => p.Key, p => p.Value), AllChannels),
+                AccessRestrictions.From(_areas, AreaChannels));
+            Apply(await Api.PutAsync<AccessChannels>("api/company-profile/access", request));
+            _saved = true;
+            // The menu of this very page follows the new settings straight away.
+            Session.WebAreas = await Api.GetAsync<List<string>>("api/company-profile/areas?channel=web");
+            Session.NotifyChanged();
+        }
+        catch (ApiException exception)
+        {
+            _saveError = exception.Message;
+        }
+        finally
+        {
+            _saving = false;
+        }
+    }
+}

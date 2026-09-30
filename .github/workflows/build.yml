@@ -29,6 +29,9 @@ jobs:
       - name: Test Desktop client
         run: dotnet test CrmMes.Desktop.Tests/CrmMes.Desktop.Tests.csproj --no-build --configuration Release --logger "trx;LogFileName=test-results.trx"
 
+      - name: Test web platform
+        run: dotnet test CrmMes.Web.Tests/CrmMes.Web.Tests.csproj --no-build --configuration Release --logger "trx;LogFileName=test-results.trx"
+
       - name: Publish test results
         if: always()
         uses: actions/upload-artifact@v4
@@ -37,3 +40,4 @@ jobs:
           path: |
             CrmMes.Api.Tests/TestResults/test-results.trx
             CrmMes.Desktop.Tests/TestResults/test-results.trx
+            CrmMes.Web.Tests/TestResults/test-results.trx

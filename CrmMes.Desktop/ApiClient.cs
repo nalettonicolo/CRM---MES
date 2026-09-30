@@ -24,7 +24,15 @@ public sealed class ApiClient
     /// <summary>Whether a module (see Sectors in CrmMes.Api) is switched on for this company. Only
     /// decides what the UI offers: switching a module off hides it, it never deletes data.</summary>
     public bool IsModuleEnabled(string module) =>
-        CompanyProfile is null || CompanyProfile.EnabledModules.Contains(module, StringComparer.OrdinalIgnoreCase);
+        (CompanyProfile is null || CompanyProfile.EnabledModules.Contains(module, StringComparer.OrdinalIgnoreCase))
+        && IsAreaShown(module);
+
+    /// <summary>Areas the Admin shows in the desktop program (see AccessChannels in CrmMes.Api). Null
+    /// before login and on servers without channels: everything is shown.</summary>
+    public IReadOnlyList<string>? DesktopAreas { get; set; }
+
+    public bool IsAreaShown(string area) =>
+        DesktopAreas is null || DesktopAreas.Contains(area, StringComparer.OrdinalIgnoreCase);
 
     /// <summary>Costs, margins and hourly rates: Admin and Management only (mirrors the API's
     /// "ViewMargins" policy), and only with the costing module enabled.</summary>
@@ -118,11 +126,19 @@ public sealed class ApiClient
         {
             using var response = await _httpClient.PostAsJsonAsync(
                 "api/auth/login",
-                new { email, password },
+                new { email, password, channel = "desktop" },
                 cancellationToken);
             if (response.StatusCode == System.Net.HttpStatusCode.Unauthorized)
             {
                 throw new InvalidOperationException("Credenziali non valide.");
+            }
+
+            // 403: the Admin doesn't let this role use the desktop program; 429: account locked. Both come
+            // with a message for the user, which must not be turned into "server unreachable".
+            if (!response.IsSuccessStatusCode && (int)response.StatusCode < 500)
+            {
+                var body = await response.Content.ReadAsStringAsync(cancellationToken);
+                throw new InvalidOperationException(TryExtractMessage(body) ?? $"Accesso non riuscito ({(int)response.StatusCode}).");
             }
 
             response.EnsureSuccessStatusCode();
@@ -146,6 +162,12 @@ public sealed class ApiClient
             if (response.StatusCode == HttpStatusCode.Unauthorized)
             {
                 throw new InvalidOperationException("Sessione scaduta, effettua di nuovo il login.");
+            }
+
+            if (response.StatusCode == HttpStatusCode.Forbidden)
+            {
+                var body = await response.Content.ReadAsStringAsync(cancellationToken);
+                throw new InvalidOperationException(TryExtractMessage(body) ?? "Accesso non più consentito da questo programma.");
             }
 
             response.EnsureSuccessStatusCode();
@@ -594,6 +616,25 @@ public sealed class ApiClient
         await EnsureSuccessAsync(response, cancellationToken);
         return await response.Content.ReadFromJsonAsync<CompanyProfileDto>(cancellationToken: cancellationToken);
     }
+
+    /// <summary>Areas to show on a channel, or null on a server older than the channel settings.</summary>
+    public async Task<IReadOnlyList<string>?> GetChannelAreasAsync(string channel, CancellationToken cancellationToken = default)
+    {
+        using var response = await _httpClient.GetAsync($"api/company-profile/areas?channel={channel}", cancellationToken);
+        if (response.StatusCode is HttpStatusCode.NotFound or HttpStatusCode.MethodNotAllowed)
+        {
+            return null;
+        }
+
+        await EnsureSuccessAsync(response, cancellationToken);
+        return await response.Content.ReadFromJsonAsync<List<string>>(cancellationToken: cancellationToken);
+    }
+
+    public Task<AccessChannelsDto> GetAccessChannelsAsync(CancellationToken cancellationToken = default)
+        => GetOneAsync<AccessChannelsDto>("api/company-profile/access", cancellationToken);
+
+    public Task<AccessChannelsDto> SaveAccessChannelsAsync(SaveAccessChannelsDto settings, CancellationToken cancellationToken = default)
+        => SendAsync<AccessChannelsDto>(HttpMethod.Put, "api/company-profile/access", settings, cancellationToken);
 
     public async Task<CompanyCatalogDto> GetCompanyCatalogAsync(CancellationToken cancellationToken = default)
     {
@@ -2178,6 +2219,20 @@ public sealed record SectorDto(string Key, string Name, string Description, List
 public sealed record ModuleDto(string Key, string Name, string Description, bool SectorSpecific, bool Available = true);
 
 public sealed record CompanyCatalogDto(List<SectorDto> Sectors, List<ModuleDto> Modules);
+
+public sealed record AccessAreaDto(string Key, string Name, string? Module);
+
+public sealed record AccessChannelsDto(
+    List<string> Channels,
+    Dictionary<string, List<string>> Roles,
+    Dictionary<string, List<string>> Areas,
+    List<AccessAreaDto> KnownAreas,
+    List<string> KnownRoles);
+
+public sealed record SaveAccessChannelsDto(
+    List<string> Channels,
+    Dictionary<string, List<string>> Roles,
+    Dictionary<string, List<string>> Areas);
 
 public sealed record TransportReasonDto(string Key, string Label);
 

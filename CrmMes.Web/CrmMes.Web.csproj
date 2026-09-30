@@ -1,0 +1,24 @@
+<Project Sdk="Microsoft.NET.Sdk.BlazorWebAssembly">
+
+  <!-- Piattaforma web di Nicolò MES: servita dall'API stessa sotto /app/ (stesso indirizzo, stesso login,
+       nessun server in più). StaticWebAssetBasePath mette i file pubblicati in wwwroot/app dell'API. -->
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <StaticWebAssetBasePath>app</StaticWebAssetBasePath>
+    <!-- Italian dates and numbers whatever the browser's language: Blazor allows setting the culture at
+         startup only with the full globalization data (a one-off download, then cached). -->
+    <BlazorWebAssemblyLoadAllGlobalizationData>true</BlazorWebAssemblyLoadAllGlobalizationData>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.AspNetCore.Components.WebAssembly" Version="8.0.31" />
+    <PackageReference Include="Microsoft.AspNetCore.Components.WebAssembly.DevServer" Version="8.0.31" PrivateAssets="all" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="CrmMes.Web.Tests" />
+  </ItemGroup>
+
+</Project>

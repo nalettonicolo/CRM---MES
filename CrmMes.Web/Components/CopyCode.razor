@@ -1,0 +1,32 @@
+@inject IJSRuntime Js
+
+@* A code people paste elsewhere (job, lot): selectable text plus a copy button that says when it worked. *@
+<span class="copy">
+    <span class="code">@Value</span>
+    <button type="button" title="Copia @Value" aria-label="Copia @Value" @onclick="CopyAsync" @onclick:stopPropagation>@_label</button>
+</span>
+
+@code {
+    [Parameter, EditorRequired] public string Value { get; set; } = string.Empty;
+
+    private string _label = "Copia";
+
+    private async Task CopyAsync()
+    {
+        try
+        {
+            await Js.InvokeVoidAsync("navigator.clipboard.writeText", Value);
+            _label = "Copiato";
+        }
+        catch (JSException)
+        {
+            // Clipboard refused (not a secure page, or permission denied): the text stays selectable.
+            _label = "Seleziona e copia";
+        }
+
+        StateHasChanged();
+        await Task.Delay(1800);
+        _label = "Copia";
+        StateHasChanged();
+    }
+}

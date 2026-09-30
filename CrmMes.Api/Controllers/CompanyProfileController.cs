@@ -93,6 +93,78 @@ public class CompanyProfileController : ControllerBase
         return Ok(ToResponse(profile));
     }
 
+    /// <summary>The Admin's channel settings with everything a settings screen needs to show them.
+    /// Readable by every logged-in user: the menus of every client are built from it.</summary>
+    [HttpGet("access")]
+    public async Task<ActionResult<AccessChannelsResponse>> GetAccess(CancellationToken cancellationToken = default)
+    {
+        var stored = await _dbContext.CompanyProfiles.AsNoTracking().Select(p => p.AccessChannels).FirstOrDefaultAsync(cancellationToken);
+        return Ok(ToAccessResponse(AccessChannels.Parse(stored)));
+    }
+
+    [Authorize(Policy = "AdminOnly")]
+    [HttpPut("access")]
+    public async Task<ActionResult<AccessChannelsResponse>> SaveAccess(
+        SaveAccessChannelsRequest request, CancellationToken cancellationToken = default)
+    {
+        var settings = new AccessChannels.Settings
+        {
+            Channels = request.Channels ?? [],
+            Roles = request.Roles ?? [],
+            Areas = request.Areas ?? [],
+        };
+        var serialized = AccessChannels.Serialize(settings);
+        settings = AccessChannels.Parse(serialized);
+        var error = AccessChannels.Validate(settings);
+        if (error is not null)
+        {
+            return BadRequest(new { message = error });
+        }
+
+        var profile = await _dbContext.CompanyProfiles.FirstOrDefaultAsync(cancellationToken);
+        if (profile is null)
+        {
+            return Conflict(new { message = "Configura prima l'azienda (ragione sociale e settore)." });
+        }
+
+        profile.AccessChannels = serialized;
+        profile.UpdatedAt = DateTime.UtcNow;
+        _dbContext.AuditLogs.Add(new AuditLog
+        {
+            Action = "AccessChannelsSaved",
+            EntityType = "CompanyProfile",
+            EntityId = profile.Id,
+            UserName = User.FindFirstValue(ClaimTypes.Name),
+            Details = $"Canali di accesso: {serialized}"
+        });
+        await _dbContext.SaveChangesAsync(cancellationToken);
+        return Ok(ToAccessResponse(settings));
+    }
+
+    /// <summary>Areas to show on a channel: modules switched on and allowed there by the Admin.</summary>
+    [HttpGet("areas")]
+    public async Task<ActionResult<List<string>>> GetAreas([FromQuery] string? channel, CancellationToken cancellationToken = default)
+    {
+        var normalized = AccessChannels.NormalizeChannel(channel);
+        if (normalized is null || !AccessChannels.AreaChannels.Contains(normalized))
+        {
+            return BadRequest(new { message = "Canale non valido: desktop o web." });
+        }
+
+        var profile = await _dbContext.CompanyProfiles.AsNoTracking().FirstOrDefaultAsync(cancellationToken);
+        var modules = profile is null
+            ? Sectors.Modules.Select(module => module.Key).ToList()
+            : Sectors.Parse(profile.EnabledModules).ToList();
+        return Ok(AccessChannels.AreasFor(AccessChannels.Parse(profile?.AccessChannels), modules, normalized));
+    }
+
+    private static AccessChannelsResponse ToAccessResponse(AccessChannels.Settings settings) => new(
+        settings.Channels,
+        settings.Roles,
+        settings.Areas,
+        AccessChannels.Areas.Select(area => new AccessAreaResponse(area.Key, area.Name, area.Module)).ToList(),
+        AccessChannels.Roles.ToList());
+
     private static CompanyProfileResponse ToResponse(CompanyProfile profile) => new(
         true, profile.CompanyName, profile.VatNumber, profile.Address, profile.Phone, profile.Email,
         profile.Sector, Sectors.Parse(profile.EnabledModules).ToList(), profile.Gs1CompanyPrefix);
@@ -113,3 +185,17 @@ public sealed record SectorResponse(string Key, string Name, string Description,
 public sealed record ModuleResponse(string Key, string Name, string Description, bool SectorSpecific, bool Available);
 
 public sealed record CompanyCatalogResponse(List<SectorResponse> Sectors, List<ModuleResponse> Modules);
+
+public sealed record AccessAreaResponse(string Key, string Name, string? Module);
+
+public sealed record AccessChannelsResponse(
+    List<string> Channels,
+    Dictionary<string, List<string>> Roles,
+    Dictionary<string, List<string>> Areas,
+    List<AccessAreaResponse> KnownAreas,
+    List<string> KnownRoles);
+
+public sealed record SaveAccessChannelsRequest(
+    List<string>? Channels,
+    Dictionary<string, List<string>>? Roles,
+    Dictionary<string, List<string>>? Areas);

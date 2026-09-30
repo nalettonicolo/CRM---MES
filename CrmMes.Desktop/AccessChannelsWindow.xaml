@@ -1,0 +1,48 @@
+<Window x:Class="CrmMes.Desktop.AccessChannelsWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Canali di accesso" Icon="Assets/logo.ico" Width="900" Height="720" MinWidth="760" MinHeight="560"
+        WindowStartupLocation="CenterOwner"
+        Background="{StaticResource BackgroundBrush}">
+    <DockPanel Margin="28,24">
+        <StackPanel DockPanel.Dock="Top" Margin="0,0,0,16">
+            <TextBlock Text="A M M I N I S T R A Z I O N E" Style="{StaticResource MicroLabel}" />
+            <TextBlock Text="Canali di accesso" FontSize="24" FontWeight="SemiBold" Foreground="{StaticResource TextPrimaryBrush}" />
+            <TextBlock Foreground="{StaticResource TextSecondaryBrush}" FontSize="12.5" TextWrapping="Wrap" Margin="0,4,0,0"
+                       Text="Decidi se il gestionale si usa dal programma desktop, dalla piattaforma web o da entrambi, e per ogni ruolo e area da dove. L'amministratore entra sempre da tutti i canali attivi, così non resti mai chiuso fuori. I permessi di ogni ruolo restano gli stessi su ogni canale." />
+        </StackPanel>
+
+        <DockPanel DockPanel.Dock="Bottom" Margin="0,16,0,0">
+            <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
+                <Button Style="{StaticResource SecondaryButton}" Content="Annulla" Width="110" Height="36" Margin="0,0,10,0" Click="Cancel_Click" />
+                <Button x:Name="SaveButton" Content="Salva" Width="140" Height="36" Click="Save_Click" IsEnabled="False" />
+            </StackPanel>
+            <TextBlock x:Name="StatusText" Foreground="{StaticResource TextSecondaryBrush}" TextWrapping="Wrap" VerticalAlignment="Center" Margin="0,0,16,0" Text="Caricamento..." />
+        </DockPanel>
+
+        <ScrollViewer VerticalScrollBarVisibility="Auto">
+            <StackPanel>
+                <TextBlock Text="C A N A L I   D E L L ' A Z I E N D A" Style="{StaticResource MicroLabel}" Margin="0,0,0,8" />
+                <Border Background="{StaticResource SurfaceBrush}" BorderBrush="{StaticResource BorderBrush0}" BorderThickness="1" CornerRadius="8" Padding="16,12" Margin="0,0,0,20">
+                    <StackPanel>
+                        <CheckBox x:Name="DesktopChannelBox" Content="Programma desktop (Windows)" Margin="0,0,0,8" Click="ChannelBox_Click" />
+                        <CheckBox x:Name="WebChannelBox" Content="Piattaforma web (browser, indirizzo /app/)" Margin="0,0,0,8" Click="ChannelBox_Click" />
+                        <CheckBox x:Name="MobileChannelBox" Content="Pagina web dei tecnici da telefono (rapportini, fasi, ore)" Click="ChannelBox_Click" />
+                    </StackPanel>
+                </Border>
+
+                <TextBlock Text="R U O L I" Style="{StaticResource MicroLabel}" Margin="0,0,0,8" />
+                <Border Background="{StaticResource SurfaceBrush}" BorderBrush="{StaticResource BorderBrush0}" BorderThickness="1" CornerRadius="8" Padding="16,12" Margin="0,0,0,20">
+                    <Grid x:Name="RolesGrid" />
+                </Border>
+
+                <TextBlock Text="A R E E   M O S T R A T E" Style="{StaticResource MicroLabel}" Margin="0,0,0,8" />
+                <TextBlock Foreground="{StaticResource TextMutedBrush}" FontSize="11.5" TextWrapping="Wrap" Margin="0,0,0,8"
+                           Text="Le aree dei moduli spenti in &quot;Azienda e settore&quot; non compaiono comunque. Nascondere un'area su un canale non cancella dati." />
+                <Border Background="{StaticResource SurfaceBrush}" BorderBrush="{StaticResource BorderBrush0}" BorderThickness="1" CornerRadius="8" Padding="16,12">
+                    <Grid x:Name="AreasGrid" />
+                </Border>
+            </StackPanel>
+        </ScrollViewer>
+    </DockPanel>
+</Window>

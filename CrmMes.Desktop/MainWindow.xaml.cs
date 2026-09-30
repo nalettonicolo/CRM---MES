@@ -1,4 +1,4 @@
-using System.ComponentModel;
+﻿using System.ComponentModel;
 using System.Diagnostics;
 using System.Windows;
 using System.Windows.Controls;
@@ -386,6 +386,15 @@ public partial class MainWindow : Window
             _apiClient.CompanyProfile = null; // every module stays visible, as before the configuration existed
         }
 
+        try
+        {
+            _apiClient.DesktopAreas = await _apiClient.GetChannelAreasAsync("desktop");
+        }
+        catch (InvalidOperationException)
+        {
+            _apiClient.DesktopAreas = null;
+        }
+
         ApplyEnabledModules();
         if (offerSetup && _apiClient.CompanyProfile is { IsConfigured: false })
         {
@@ -419,18 +428,55 @@ public partial class MainWindow : Window
         NavManagementSection.Visibility = Show(_apiClient.CanViewMargins);
         WorkCenterRateButton.Visibility = Show(_apiClient.CanViewMargins);
 
-        // A section just switched off may be the page on screen: fall back to Materiali (always on).
-        if (MainTabs.SelectedIndex > 0 && FindCheckedNavItem() is { IsVisible: false } hidden)
+        // Always-on areas the Admin may still keep off the desktop program (Canali di accesso).
+        foreach (var item in new[] { NavMaterials, NavLowStock, NavMissing, NavSlips, NavMaterialLots })
+        {
+            item.Visibility = Show(_apiClient.IsAreaShown("warehouse"));
+        }
+
+        foreach (var item in new[] { NavProducts, NavWorkOrders })
+        {
+            item.Visibility = Show(_apiClient.IsAreaShown("production"));
+        }
+
+        foreach (var item in new[] { NavAreas, NavSites, NavWorkCenters })
+        {
+            item.Visibility = Show(_apiClient.IsAreaShown("registry"));
+        }
+
+        NavDashboard.Visibility = Show(_apiClient.IsAreaShown("dashboard"));
+        NavUsers.Visibility = Show(_apiClient.IsAreaShown("users"));
+        AccessChannelsButton.Visibility = Show(_apiClient.CurrentRole == "Admin");
+
+        // A section just switched off may be the page on screen: fall back to the first one still shown.
+        if (FindCheckedNavItem() is { Visibility: not Visibility.Visible } hidden)
         {
             hidden.IsChecked = false;
-            NavMaterials.IsChecked = true;
+            var first = AllNavItems().FirstOrDefault(item => item.Visibility == Visibility.Visible);
+            if (first is not null)
+            {
+                first.IsChecked = true;
+            }
         }
     }
 
-    private RadioButton? FindCheckedNavItem() =>
-        new[] { NavCustomers, NavQuotes, NavOrders, NavSuppliers, NavCatalogSearch, NavPlanning, NavEquipment,
-                NavMaintenance, NavCarriers, NavShipments, NavMargins, NavTransportDocuments, NavSubcontracting, NavHaccp, NavSiteReports, NavInvoices }
-            .FirstOrDefault(item => item.IsChecked == true);
+    private RadioButton[] AllNavItems() =>
+        [NavMaterials, NavLowStock, NavMissing, NavSlips, NavMaterialLots, NavProducts, NavWorkOrders, NavWorkCenters,
+         NavDashboard, NavCustomers, NavQuotes, NavInvoices, NavOrders, NavSuppliers, NavCatalogSearch, NavSubcontracting,
+         NavPlanning, NavHaccp, NavSiteReports, NavEquipment, NavMaintenance, NavCarriers, NavShipments,
+         NavTransportDocuments, NavMargins, NavAreas, NavUsers, NavSites];
+
+    private RadioButton? FindCheckedNavItem() => AllNavItems().FirstOrDefault(item => item.IsChecked == true);
+
+    private void AccessChannelsButton_Click(object sender, RoutedEventArgs e)
+    {
+        var window = new AccessChannelsWindow(_apiClient) { Owner = this };
+        window.ShowDialog();
+        if (window.Saved)
+        {
+            _ = LoadCompanyProfileAsync(offerSetup: false);
+        }
+    }
 
     // ---------- Documenti di trasporto
 

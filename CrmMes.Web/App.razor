@@ -1,0 +1,15 @@
+<Router AppAssembly="@typeof(App).Assembly">
+    <Found Context="routeData">
+        <RouteView RouteData="@routeData" DefaultLayout="@typeof(MainLayout)" />
+        <FocusOnNavigate RouteData="@routeData" Selector="h1" />
+    </Found>
+    <NotFound>
+        <PageTitle>Pagina non trovata · Nicolò MES</PageTitle>
+        <LayoutView Layout="@typeof(MainLayout)">
+            <div class="card state">
+                <strong>Pagina non trovata</strong>
+                L'indirizzo non corrisponde a nessuna pagina. <a href="cruscotto">Torna al cruscotto</a>.
+            </div>
+        </LayoutView>
+    </NotFound>
+</Router>

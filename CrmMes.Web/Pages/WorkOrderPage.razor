@@ -1,0 +1,131 @@
+@page "/commesse/{Id:guid}"
+@inject Api Api
+
+<PageTitle>@(_order?.Code ?? "Commessa") · Nicolò MES</PageTitle>
+
+<div class="page-head">
+    <div>
+        <div class="eyebrow"><a href="commesse">Commesse</a></div>
+        <h1>@(_order is null ? "Commessa" : $"Commessa {_order.Code}")</h1>
+    </div>
+    @if (_order is not null)
+    {
+        <StatusBadge Status="@_order.Status" />
+    }
+</div>
+
+@if (_error is not null)
+{
+    <div class="card state"><strong>Impossibile aprire la commessa</strong>@_error</div>
+}
+else if (_order is null)
+{
+    <div class="card state">Caricamento...</div>
+}
+else
+{
+    <div class="stack">
+        <div class="card card-pad">
+            <div class="facts">
+                <div class="fact"><div class="label">Codice commessa</div><div class="value"><CopyCode Value="@_order.Code" /></div></div>
+                <div class="fact"><div class="label">Lotto prodotto</div><div class="value"><CopyCode Value="@_order.ProductLotNumber" /></div></div>
+                <div class="fact"><div class="label">Quantità</div><div class="value">@Labels.Number(_order.Quantity)</div></div>
+                <div class="fact"><div class="label">Consegna</div><div class="value">@Labels.Date(_order.DueDate)</div></div>
+                <div class="fact"><div class="label">Riferimento cliente</div><div class="value">@(_order.CustomerReference ?? "—")</div></div>
+                <div class="fact"><div class="label">Creata</div><div class="value">@Labels.Date(_order.CreatedAt)</div></div>
+                <div class="fact"><div class="label">Rilasciata</div><div class="value">@Labels.DateTime(_order.ReleasedAt)</div></div>
+                <div class="fact"><div class="label">Completata</div><div class="value">@Labels.DateTime(_order.CompletedAt)</div></div>
+            </div>
+            @if (!string.IsNullOrWhiteSpace(_order.Notes))
+            {
+                <p class="muted small">@_order.Notes</p>
+            }
+        </div>
+
+        <div class="card">
+            <div class="section-head"><h2>Fasi</h2><span class="small muted">@_order.Operations.Count(o => o.Status == "Completed") di @_order.Operations.Count completate</span></div>
+            @if (_order.Operations.Count == 0)
+            {
+                <div class="state">Questa commessa non ha fasi: il prodotto non ha un ciclo di lavoro.</div>
+            }
+            else
+            {
+                <div class="table-wrap">
+                    <table class="cards">
+                        <thead><tr><th>#</th><th>Fase</th><th>Centro</th><th class="num">Previsti</th><th class="num">Effettivi</th><th>Inizio</th><th>Fine</th><th>Stato</th></tr></thead>
+                        <tbody>
+                            @foreach (var op in _order.Operations.OrderBy(o => o.SequenceNumber))
+                            {
+                                <tr>
+                                    <td data-label="#" class="muted">@op.SequenceNumber</td>
+                                    <td data-label="Fase">@op.Name @if (op.StartedBy is not null) {<div class="small muted">@op.StartedBy</div>}</td>
+                                    <td data-label="Centro" class="muted">@(op.WorkCenter ?? "—")</td>
+                                    <td data-label="Previsti" class="num">@Labels.Number(op.EstimatedMinutes) min</td>
+                                    <td data-label="Effettivi" class="num">@(op.ActualMinutes is null ? "—" : Labels.Number(Math.Round(op.ActualMinutes.Value)) + " min")</td>
+                                    <td data-label="Inizio">@Labels.DateTime(op.StartedAt)</td>
+                                    <td data-label="Fine">@Labels.DateTime(op.CompletedAt)</td>
+                                    <td data-label="Stato"><span class="badge @Labels.OperationStatusClass(op.Status)">@Labels.OperationStatus(op.Status)</span></td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            }
+        </div>
+
+        <div class="card">
+            <div class="section-head"><h2>Lotti di materiale usati</h2></div>
+            @if (_lots is null)
+            {
+                <div class="state">Caricamento...</div>
+            }
+            else if (_lots.Count == 0)
+            {
+                <div class="state">Nessun prelievo chiuso per questa commessa.</div>
+            }
+            else
+            {
+                <div class="table-wrap">
+                    <table class="cards">
+                        <thead><tr><th>Materiale</th><th>Lotto</th><th class="num">Quantità</th><th>Prelievo</th></tr></thead>
+                        <tbody>
+                            @foreach (var lot in _lots)
+                            {
+                                <tr>
+                                    <td data-label="Materiale" class="code">@lot.MaterialCode</td>
+                                    <td data-label="Lotto"><CopyCode Value="@lot.LotNumber" /></td>
+                                    <td data-label="Quantità" class="num">@Labels.Number(lot.QuantityConsumed)</td>
+                                    <td data-label="Prelievo" class="code muted">@lot.WithdrawalSlipCode</td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            }
+        </div>
+    </div>
+}
+
+@code {
+    [Parameter] public Guid Id { get; set; }
+
+    private WorkOrderDetail? _order;
+    private List<WorkOrderMaterialLot>? _lots;
+    private string? _error;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        _order = null;
+        _lots = null;
+        _error = null;
+        try
+        {
+            _order = await Api.GetAsync<WorkOrderDetail>($"api/work-orders/{Id}");
+            _lots = await Api.GetAsync<List<WorkOrderMaterialLot>>($"api/work-orders/{Id}/material-lots");
+        }
+        catch (ApiException exception)
+        {
+            _error = exception.Message;
+        }
+    }
+}

@@ -37,6 +37,11 @@ public class CompanyProfile
     public string? Iban { get; set; }
     public long LastSsccSerial { get; set; }
 
+    /// <summary>From where people may use the system (desktop program, web platform, technicians' phone
+    /// page), per role and per area, as JSON (see AccessChannels in CrmMes.Api). Empty: everything
+    /// everywhere.</summary>
+    public string AccessChannels { get; set; } = string.Empty;
+
     public DateTime ConfiguredAt { get; set; } = DateTime.UtcNow;
     public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
 }

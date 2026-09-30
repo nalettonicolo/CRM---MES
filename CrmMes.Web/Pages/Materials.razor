@@ -1,0 +1,118 @@
+@page "/materiali"
+@implements IDisposable
+@inject Api Api
+
+<PageTitle>Materiali · Nicolò MES</PageTitle>
+
+<div class="page-head">
+    <div>
+        <div class="eyebrow">Magazzino</div>
+        <h1>Materiali</h1>
+        <p class="sub">Giacenze attuali e materiali sotto la scorta minima.</p>
+    </div>
+</div>
+
+<div class="toolbar">
+    <input class="search" type="search" placeholder="Codice o descrizione" aria-label="Cerca materiale" value="@_search" @oninput="OnSearchInput" />
+    <label class="check"><input type="checkbox" checked="@_belowOnly" @onchange="ToggleBelowAsync" /> Solo sotto scorta</label>
+</div>
+
+<div class="card">
+    @if (_error is not null)
+    {
+        <div class="state"><strong>Impossibile caricare i materiali</strong>@_error
+            <div class="actions"><button class="secondary small" @onclick="LoadAsync">Riprova</button></div></div>
+    }
+    else if (_materials is null)
+    {
+        <div class="state">Caricamento...</div>
+    }
+    else if (_materials.Count == 0)
+    {
+        <div class="state"><strong>Nessun materiale</strong>@(_belowOnly ? "Nessun materiale sotto scorta." : "Nessun materiale corrisponde alla ricerca.")</div>
+    }
+    else
+    {
+        <div class="table-wrap">
+            <table class="cards">
+                <thead><tr><th>Codice</th><th>Descrizione</th><th class="num">Giacenza</th><th class="num">Scorta minima</th><th>Stato</th></tr></thead>
+                <tbody>
+                    @foreach (var material in _materials)
+                    {
+                        <tr>
+                            <td data-label="Codice"><CopyCode Value="@material.Code" /></td>
+                            <td data-label="Descrizione">@material.Name</td>
+                            <td data-label="Giacenza" class="num">@Labels.Number(material.Stock) @material.Unit</td>
+                            <td data-label="Scorta minima" class="num muted">@Labels.Number(material.MinStock) @material.Unit</td>
+                            <td data-label="Stato">
+                                @if (material.BelowMinimum)
+                                {
+                                    <span class="badge warn">Sotto scorta</span>
+                                }
+                                else
+                                {
+                                    <span class="badge ok">Disponibile</span>
+                                }
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    }
+</div>
+
+@code {
+    private string _search = string.Empty;
+    private bool _belowOnly;
+    private List<Material>? _materials;
+    private string? _error;
+    private CancellationTokenSource? _debounce;
+
+    protected override Task OnInitializedAsync() => LoadAsync();
+
+    private async Task ToggleBelowAsync(ChangeEventArgs e)
+    {
+        _belowOnly = e.Value is true;
+        await LoadAsync();
+    }
+
+    private async Task OnSearchInput(ChangeEventArgs e)
+    {
+        _search = e.Value?.ToString() ?? string.Empty;
+        _debounce?.Cancel();
+        _debounce = new CancellationTokenSource();
+        try
+        {
+            await Task.Delay(300, _debounce.Token);
+        }
+        catch (TaskCanceledException)
+        {
+            return;
+        }
+
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        _error = null;
+        _materials = null;
+        try
+        {
+            var query = $"api/materials?belowMinimumOnly={(_belowOnly ? "true" : "false")}";
+            if (!string.IsNullOrWhiteSpace(_search))
+            {
+                query += "&q=" + Uri.EscapeDataString(_search.Trim());
+            }
+
+            _materials = await Api.GetAsync<List<Material>>(query);
+        }
+        catch (ApiException exception)
+        {
+            _error = exception.Message;
+        }
+    }
+
+    public void Dispose() => _debounce?.Cancel();
+}
