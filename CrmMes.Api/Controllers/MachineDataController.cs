@@ -1,4 +1,4 @@
-using System.Security.Claims;
+﻿using System.Security.Claims;
 using System.Security.Cryptography;
 using System.Text;
 using CrmMes.Api.Services;
@@ -67,6 +67,11 @@ public class MachineDataController : ControllerBase
                 return BadRequest(new { message = $"Lettura {index + 1}: contatori negativi." });
             }
 
+            if (reading.EnergyKwh < 0)
+            {
+                return BadRequest(new { message = $"Lettura {index + 1}: energia negativa." });
+            }
+
             accepted.Add(new MachineEvent
             {
                 EquipmentId = equipmentId,
@@ -77,6 +82,7 @@ public class MachineDataController : ControllerBase
                 AlarmCode = Clip(reading.AlarmCode, 50),
                 AlarmText = Clip(reading.AlarmText, 200),
                 WorkOrderCode = Clip(reading.WorkOrderCode, 50),
+                EnergyKwh = reading.EnergyKwh,
                 ReceivedAt = now
             });
         }
@@ -236,7 +242,8 @@ public class MachineDataController : ControllerBase
 }
 
 public sealed record MachineReadingRequest(
-    DateTime? Timestamp, string? State, long? PieceCounter, long? ScrapCounter, string? AlarmCode, string? AlarmText, string? WorkOrderCode);
+    DateTime? Timestamp, string? State, long? PieceCounter, long? ScrapCounter, string? AlarmCode, string? AlarmText, string? WorkOrderCode,
+    decimal? EnergyKwh = null);
 
 public sealed record MachineIngestResponse(int Accepted, int Duplicates);
 

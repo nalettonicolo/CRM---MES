@@ -27,6 +27,7 @@ public static class ModuleCatalog
         new("engineering", "Ufficio tecnico"),
         new("machine-testing", "Collaudo macchine e CE"),
         new("service", "Service post-vendita"),
+        new("energy-monitoring", "Monitoraggio energetico"),
     ];
 
     public static string NameOf(string key) => All.FirstOrDefault(m => m.Key == key)?.Name ?? key;

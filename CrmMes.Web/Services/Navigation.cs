@@ -23,6 +23,7 @@ public static class Navigation
         new("machine-testing", "Collaudo e CE", "collaudi", "Produzione"),
         new("maintenance", "Manutenzione", "manutenzione", "Produzione"),
         new("service", "Service post-vendita", "service", "Produzione"),
+        new("energy-monitoring", "Monitoraggio energetico", "energia", "Produzione"),
     ];
 
     /// <summary>Area names (from the server) for areas without a web page yet.</summary>

@@ -77,6 +77,7 @@ public class ApplicationDbContext : DbContext
     public DbSet<CustomerFiscalData> CustomerFiscalData => Set<CustomerFiscalData>();
     public DbSet<MachineConnection> MachineConnections => Set<MachineConnection>();
     public DbSet<MachineEvent> MachineEvents => Set<MachineEvent>();
+    public DbSet<EnergyProject> EnergyProjects => Set<EnergyProject>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -655,6 +656,17 @@ public class ApplicationDbContext : DbContext
             entity.Property(e => e.AlarmCode).HasMaxLength(50);
             entity.Property(e => e.AlarmText).HasMaxLength(200);
             entity.Property(e => e.WorkOrderCode).HasMaxLength(50);
+            entity.Property(e => e.EnergyKwh).HasColumnType("numeric(18,3)");
+        });
+
+        modelBuilder.Entity<EnergyProject>(entity =>
+        {
+            entity.HasOne(p => p.Equipment).WithMany().HasForeignKey(p => p.EquipmentId).OnDelete(DeleteBehavior.Cascade);
+            entity.HasIndex(p => p.EquipmentId);
+            entity.Property(p => p.Title).HasMaxLength(200);
+            entity.Property(p => p.Description).HasMaxLength(2000);
+            entity.Property(p => p.Notes).HasMaxLength(2000);
+            entity.Property(p => p.CreatedBy).HasMaxLength(200);
         });
 
         modelBuilder.Entity<CompanyProfile>(entity =>

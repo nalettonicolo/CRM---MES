@@ -1,4 +1,4 @@
-namespace CrmMes.Core.Models;
+﻿namespace CrmMes.Core.Models;
 
 /// <summary>Link between a machine and the program: the machine (or the gateway reading it over OPC UA,
 /// MQTT, Modbus...) authenticates with a token of its own, stored here only as a SHA-256 hash. One per
@@ -33,6 +33,11 @@ public class MachineEvent
     public string State { get; set; } = "Running";
     public long? PieceCounter { get; set; }
     public long? ScrapCounter { get; set; }
+
+    /// <summary>Cumulative energy meter reading in kWh, when the machine or gateway reports one (monotonic,
+    /// may reset on a meter change or rollover: consumption is computed from positive deltas between
+    /// consecutive readings, never from a single value).</summary>
+    public decimal? EnergyKwh { get; set; }
     public string? AlarmCode { get; set; }
     public string? AlarmText { get; set; }
     public string? WorkOrderCode { get; set; }

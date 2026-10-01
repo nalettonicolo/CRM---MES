@@ -112,6 +112,12 @@ public sealed class Api
         await EnsureSuccessAsync(response);
     }
 
+    public async Task DeleteAsync(string path)
+    {
+        using var response = await SendAuthenticatedAsync(HttpMethod.Delete, path, null);
+        await EnsureSuccessAsync(response);
+    }
+
     public async Task LogoutAsync()
     {
         var refreshToken = _session.Auth?.RefreshToken;

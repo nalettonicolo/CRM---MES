@@ -35,6 +35,7 @@ public static class Sectors
         new("engineering", "Ufficio tecnico", "Revisioni di distinte e cicli, disegni e schemi allegati, modifiche tecniche approvate.", true),
         new("machine-testing", "Collaudo macchine e CE", "Collaudi in fabbrica e presso il cliente, fascicolo tecnico, dichiarazione CE.", true),
         new("service", "Service post-vendita", "Macchine installate presso i clienti con matricola e garanzia, richieste di assistenza, interventi.", true),
+        new("energy-monitoring", "Monitoraggio energetico", "Consumi kWh per macchina dai dati macchina, progetti di efficientamento con confronto prima/dopo per l'iperammortamento.", true),
     ];
 
     private static readonly string[] Common = ["sales", "purchasing", "planning", "shopfloor", "quality", "maintenance", "shipping", "costing", "invoicing"];
@@ -43,13 +44,13 @@ public static class Sectors
     [
         new("machine-building", "Costruzione macchine e impianti",
             "Macchine e impianti su progetto: lavorazioni, montaggio, quadri a bordo macchina, collaudo e assistenza.",
-            [.. Common, "subcontracting", "panel-verification", "engineering", "machine-testing", "service"]),
+            [.. Common, "subcontracting", "panel-verification", "engineering", "machine-testing", "service", "energy-monitoring"]),
         new("electrical-panels", "Quadri elettrici e automazione",
             "Quadristi, costruttori di quadri e bordo macchina.",
-            [.. Common, "subcontracting", "panel-verification", "metel"]),
+            [.. Common, "subcontracting", "panel-verification", "metel", "energy-monitoring"]),
         new("mechanical", "Meccanica e carpenteria",
             "Lavorazioni meccaniche, carpenteria, lamiera, con trattamenti presso terzi.",
-            [.. Common, "subcontracting"]),
+            [.. Common, "subcontracting", "energy-monitoring"]),
         new("food", "Alimentare",
             "Produzioni alimentari con lotti a scadenza e tracciabilità di filiera.",
             [.. Common, "lot-expiry", "food-labels", "haccp"]),
@@ -58,7 +59,7 @@ public static class Sectors
             [.. Common.Where(module => module != "shopfloor"), "site-work", "metel"]),
         new("generic", "Manifattura generica",
             "Qualsiasi produzione su commessa o a lotti: solo i moduli comuni.",
-            Common),
+            [.. Common, "energy-monitoring"]),
     ];
 
     public static SectorInfo? Find(string? key) =>

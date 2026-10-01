@@ -1,0 +1,317 @@
+@page "/energia"
+@inject Api Api
+@inject Session Session
+
+<PageTitle>Monitoraggio energetico · Nicolò MES</PageTitle>
+
+<div class="page-head">
+    <div>
+        <div class="eyebrow">Produzione</div>
+        <h1>Monitoraggio energetico</h1>
+        <p class="sub">Consumi kWh per macchina dai dati macchina; progetti di efficientamento con confronto prima/dopo per l'iperammortamento.</p>
+    </div>
+</div>
+
+@if (_error is not null)
+{
+    <div class="alert" role="alert">@_error</div>
+}
+@if (_info is not null)
+{
+    <div class="success" role="status">@_info</div>
+}
+
+<div class="card">
+    <div class="section-head"><h2>Progetti di efficientamento</h2></div>
+    @if (_projects is null)
+    {
+        <div class="state">Caricamento...</div>
+    }
+    else if (_projects.Count == 0)
+    {
+        <div class="state"><strong>Nessun progetto</strong>Nessun progetto di efficientamento energetico ancora registrato.</div>
+    }
+    else
+    {
+        <div class="table-wrap">
+            <table class="cards">
+                <thead><tr><th>Macchina</th><th>Progetto</th><th>Periodo ex ante</th><th class="num">kWh ex ante</th><th>Periodo ex post</th><th class="num">kWh ex post</th><th class="num">Risparmio</th><th></th></tr></thead>
+                <tbody>
+                    @foreach (var p in _projects)
+                    {
+                        <tr>
+                            <td data-label="Macchina">@p.EquipmentName <span class="small muted">@p.EquipmentCode</span></td>
+                            <td data-label="Progetto">@p.Title @if (p.Description is not null) {<div class="small muted">@p.Description</div>}</td>
+                            <td data-label="Periodo ex ante">@Labels.Date(p.BaselineFrom) → @Labels.Date(p.BaselineTo)</td>
+                            <td data-label="kWh ex ante" class="num">@(p.BaselineKwh is null ? "nessuna lettura" : Labels.Number(p.BaselineKwh.Value))</td>
+                            <td data-label="Periodo ex post">@(p.AfterFrom is null ? "da definire" : $"{Labels.Date(p.AfterFrom)} → {Labels.Date(p.AfterTo)}")</td>
+                            <td data-label="kWh ex post" class="num">@(p.AfterKwh is null ? "—" : Labels.Number(p.AfterKwh.Value))</td>
+                            <td data-label="Risparmio" class="num">
+                                @if (p.SavingsPercent is { } percent)
+                                {
+                                    <span class="badge @(percent >= 0 ? "ok" : "danger")">@(percent >= 0 ? "-" : "+")@Labels.Number(Math.Abs(percent))%</span>
+                                }
+                                else
+                                {
+                                    <span class="muted">—</span>
+                                }
+                            </td>
+                            <td>
+                                @if (CanManage)
+                                {
+                                    <div class="actions">
+                                        <button class="secondary small" @onclick="() => StartAfterPeriod(p)">@(p.AfterFrom is null ? "Imposta ex post" : "Modifica ex post")</button>
+                                        <button class="secondary small" @onclick="() => DeleteAsync(p)" disabled="@_busy">Elimina</button>
+                                    </div>
+                                }
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    }
+</div>
+
+@if (_afterPeriodProject is not null)
+{
+    <div class="card card-pad stack">
+        <h2>Periodo ex post · @_afterPeriodProject.Title</h2>
+        <p class="muted small">Il consumo si calcola da solo dalle letture della macchina nel periodo che scegli: non si digita a mano.</p>
+        <div class="form-grid">
+            <label>Dal<input type="date" @bind="_afterFrom" /></label>
+            <label>Al<input type="date" @bind="_afterTo" /></label>
+        </div>
+        <div class="actions">
+            <button @onclick="SaveAfterPeriodAsync" disabled="@_busy">Salva periodo</button>
+            <button class="secondary" @onclick="ClearAfterPeriodAsync" disabled="@_busy">Annulla periodo</button>
+            <button class="secondary" @onclick="() => _afterPeriodProject = null">Chiudi</button>
+        </div>
+    </div>
+}
+
+@if (CanManage)
+{
+    <div class="card card-pad stack">
+        <h2>Nuovo progetto</h2>
+        <div class="form-grid">
+            <label>Macchina
+                <select @bind="_newEquipmentId">
+                    <option value="">Scegli...</option>
+                    @if (_equipment is not null)
+                    {
+                        @foreach (var e in _equipment)
+                        {
+                            <option value="@e.Id">@e.Name</option>
+                        }
+                    }
+                </select>
+            </label>
+            <label>Titolo<input @bind="_newTitle" placeholder="es. Sostituzione forno con pompa di calore" /></label>
+            <label>Ex ante dal<input type="date" @bind="_newBaselineFrom" /></label>
+            <label>Ex ante al<input type="date" @bind="_newBaselineTo" /></label>
+        </div>
+        <label>Descrizione<textarea class="textarea" @bind="_newDescription"></textarea></label>
+        <div class="actions"><button @onclick="CreateProjectAsync" disabled="@_busy">Crea progetto</button></div>
+    </div>
+}
+
+<div class="card card-pad stack">
+    <h2>Consumo di una macchina</h2>
+    <div class="form-grid">
+        <label>Macchina
+            <select @bind="_lookupEquipmentId">
+                <option value="">Scegli...</option>
+                @if (_equipment is not null)
+                {
+                    @foreach (var e in _equipment)
+                    {
+                        <option value="@e.Id">@e.Name</option>
+                    }
+                }
+            </select>
+        </label>
+        <label>Dal<input type="date" @bind="_lookupFrom" /></label>
+        <label>Al<input type="date" @bind="_lookupTo" /></label>
+    </div>
+    <div class="actions"><button class="secondary" @onclick="LookupAsync" disabled="@_busy">Calcola consumo</button></div>
+    @if (_lookupResult is not null)
+    {
+        <p>@(_lookupResult.TotalKwh is null
+            ? "Nessuna lettura di energia in questo periodo."
+            : $"{Labels.Number(_lookupResult.TotalKwh.Value)} kWh da {_lookupResult.ReadingCount} letture.")</p>
+    }
+</div>
+
+@code {
+    private List<EnergyProject>? _projects;
+    private List<Equipment>? _equipment;
+    private string? _error;
+    private string? _info;
+    private bool _busy;
+
+    private Guid? _newEquipmentId;
+    private string _newTitle = string.Empty;
+    private string _newDescription = string.Empty;
+    private DateTime? _newBaselineFrom = DateTime.Today.AddMonths(-1);
+    private DateTime? _newBaselineTo = DateTime.Today;
+
+    private EnergyProject? _afterPeriodProject;
+    private DateTime? _afterFrom;
+    private DateTime? _afterTo;
+
+    private Guid? _lookupEquipmentId;
+    private DateTime? _lookupFrom = DateTime.Today.AddDays(-30);
+    private DateTime? _lookupTo = DateTime.Today;
+    private EnergyConsumption? _lookupResult;
+
+    private bool CanManage => Session.Role is "Admin" or "Management";
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            _equipment = await Api.GetAsync<List<Equipment>>("api/equipment");
+            await LoadProjectsAsync();
+        }
+        catch (ApiException exception)
+        {
+            _error = exception.Message;
+        }
+    }
+
+    private async Task LoadProjectsAsync()
+    {
+        try
+        {
+            _projects = await Api.GetAsync<List<EnergyProject>>("api/energy/projects");
+        }
+        catch (ApiException exception)
+        {
+            _error = exception.Message;
+        }
+    }
+
+    private async Task CreateProjectAsync()
+    {
+        if (_newEquipmentId is null || string.IsNullOrWhiteSpace(_newTitle) || _newBaselineFrom is null || _newBaselineTo is null)
+        {
+            _error = "Scegli la macchina, scrivi il titolo e imposta il periodo di riferimento (ex ante).";
+            return;
+        }
+
+        _busy = true;
+        _error = null;
+        try
+        {
+            await Api.PostAsync<EnergyProject>("api/energy/projects",
+                new CreateEnergyProjectRequest(_newEquipmentId.Value, _newTitle, _newDescription, _newBaselineFrom.Value, _newBaselineTo.Value));
+            _info = "Progetto creato.";
+            _newTitle = string.Empty;
+            _newDescription = string.Empty;
+            await LoadProjectsAsync();
+        }
+        catch (ApiException exception)
+        {
+            _error = exception.Message;
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+
+    private void StartAfterPeriod(EnergyProject project)
+    {
+        _afterPeriodProject = project;
+        _afterFrom = project.AfterFrom ?? DateTime.Today.AddDays(-30);
+        _afterTo = project.AfterTo ?? DateTime.Today;
+    }
+
+    private async Task SaveAfterPeriodAsync()
+    {
+        _busy = true;
+        _error = null;
+        try
+        {
+            await Api.PutAsync<EnergyProject>($"api/energy/projects/{_afterPeriodProject!.Id}/after-period", new SetAfterPeriodRequest(_afterFrom, _afterTo));
+            _info = "Periodo ex post salvato: risparmio ricalcolato dai dati macchina.";
+            _afterPeriodProject = null;
+            await LoadProjectsAsync();
+        }
+        catch (ApiException exception)
+        {
+            _error = exception.Message;
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+
+    private async Task ClearAfterPeriodAsync()
+    {
+        _busy = true;
+        _error = null;
+        try
+        {
+            await Api.PutAsync<EnergyProject>($"api/energy/projects/{_afterPeriodProject!.Id}/after-period", new SetAfterPeriodRequest(null, null));
+            _info = "Periodo ex post annullato.";
+            _afterPeriodProject = null;
+            await LoadProjectsAsync();
+        }
+        catch (ApiException exception)
+        {
+            _error = exception.Message;
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+
+    private async Task DeleteAsync(EnergyProject project)
+    {
+        _busy = true;
+        _error = null;
+        try
+        {
+            await Api.DeleteAsync($"api/energy/projects/{project.Id}");
+            _info = "Progetto eliminato.";
+            await LoadProjectsAsync();
+        }
+        catch (ApiException exception)
+        {
+            _error = exception.Message;
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+
+    private async Task LookupAsync()
+    {
+        if (_lookupEquipmentId is null || _lookupFrom is null || _lookupTo is null)
+        {
+            _error = "Scegli la macchina e il periodo.";
+            return;
+        }
+
+        _busy = true;
+        _error = null;
+        try
+        {
+            _lookupResult = await Api.GetAsync<EnergyConsumption>(
+                $"api/energy/equipment/{_lookupEquipmentId}/consumption?from={_lookupFrom:yyyy-MM-dd}&to={_lookupTo:yyyy-MM-dd}");
+        }
+        catch (ApiException exception)
+        {
+            _error = exception.Message;
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+}
