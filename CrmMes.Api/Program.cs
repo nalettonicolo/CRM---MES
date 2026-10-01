@@ -121,6 +121,7 @@ builder.Services.AddAuthorization(options =>
     // Costs, hourly rates and margins: company-confidential, visible only to management.
     // Engineering office: technical documents, product revisions and engineering changes.
     options.AddPolicy("Engineering", policy => policy.RequireRole("Admin", "Management"));
+    options.AddPolicy("Service", policy => policy.RequireRole("Admin", "Management", "Sales"));
     options.AddPolicy("ViewMargins", policy => policy.RequireRole(CrmMes.Api.Services.MarginAccess.Roles));
 });
 builder.Services.AddSingleton<IPasswordHasher<CrmMes.Core.Models.User>, PasswordHasher<CrmMes.Core.Models.User>>();

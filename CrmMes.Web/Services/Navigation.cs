@@ -22,6 +22,7 @@ public static class Navigation
         new("engineering", "Ufficio tecnico", "ufficio-tecnico", "Produzione"),
         new("machine-testing", "Collaudo e CE", "collaudi", "Produzione"),
         new("maintenance", "Manutenzione", "manutenzione", "Produzione"),
+        new("service", "Service post-vendita", "service", "Produzione"),
     ];
 
     /// <summary>Area names (from the server) for areas without a web page yet.</summary>

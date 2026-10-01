@@ -1,0 +1,477 @@
+@page "/service"
+@inject Api Api
+@inject Session Session
+
+<PageTitle>Service post-vendita · Nicolò MES</PageTitle>
+
+<div class="page-head">
+    <div>
+        <div class="eyebrow">Produzione</div>
+        <h1>Service post-vendita</h1>
+        <p class="sub">Macchine installate presso i clienti, richieste di assistenza e interventi.</p>
+    </div>
+</div>
+
+@if (_error is not null)
+{
+    <div class="alert" role="alert">@_error</div>
+}
+@if (_info is not null)
+{
+    <div class="success" role="status">@_info</div>
+}
+
+<div class="chips" role="tablist">
+    <button role="tab" class="chip @(_tab == "requests" ? "active" : "")" @onclick='() => _tab = "requests"'>Richieste di assistenza</button>
+    <button role="tab" class="chip @(_tab == "machines" ? "active" : "")" @onclick='SelectMachinesTabAsync'>Macchine installate</button>
+</div>
+
+@if (_tab == "requests")
+{
+    @if (_detail is not null)
+    {
+        <div class="card card-pad stack">
+            <div class="section-head">
+                <h2>RA @_detail.Number · @_detail.Subject</h2>
+                <span class="badge @ServiceLabels.StatusClass(_detail.Status)">@ServiceLabels.Status(_detail.Status)</span>
+            </div>
+            <p class="muted small">
+                @_detail.CustomerName · @_detail.MachineName (@_detail.SerialNumber) · @ServiceLabels.Priority(_detail.Priority) · @ServiceLabels.Channel(_detail.Channel)
+                · aperta il @Labels.DateTime(_detail.OpenedAt)
+                @if (_detail.ClosedAt is not null) {<span> · chiusa il @Labels.DateTime(_detail.ClosedAt)</span>}
+            </p>
+            @if (_detail.Description is not null) {<p>@_detail.Description</p>}
+            @if (_detail.RequestedBy is not null) {<p class="small muted">Richiesta da @_detail.RequestedBy @(_detail.ContactInfo is null ? "" : $"· {_detail.ContactInfo}")</p>}
+
+            <div class="actions">
+                @if (_detail.Status != "Closed" && CanManage)
+                {
+                    <button class="secondary" @onclick="CloseRequestAsync" disabled="@_busy">Chiudi richiesta</button>
+                }
+                @if (_detail.Status == "Closed" && CanManage)
+                {
+                    <button class="secondary" @onclick="ReopenRequestAsync" disabled="@_busy">Riapri</button>
+                }
+                <button class="secondary" @onclick="() => _detail = null">Chiudi scheda</button>
+            </div>
+
+            <h3>Interventi</h3>
+            @if (_detail.Interventions.Count == 0)
+            {
+                <div class="state">Nessun intervento ancora registrato.</div>
+            }
+            else
+            {
+                <div class="table-wrap">
+                    <table>
+                        <thead><tr><th>Tecnico</th><th>Data</th><th>Descrizione</th><th class="num">Ore</th><th>Garanzia</th><th>Stato</th></tr></thead>
+                        <tbody>
+                            @foreach (var i in _detail.Interventions)
+                            {
+                                <tr>
+                                    <td>@(i.TechnicianName ?? "—")</td>
+                                    <td>@Labels.DateTime(i.ScheduledAt)</td>
+                                    <td>@(i.Description ?? "—") @if (i.MaterialsUsed is not null) {<div class="small muted">Materiali: @i.MaterialsUsed</div>}</td>
+                                    <td class="num">@(i.Hours is null ? "—" : Labels.Number(i.Hours.Value))</td>
+                                    <td>@(i.InWarranty ? "In garanzia" : "Fuori garanzia")</td>
+                                    <td>@(i.CompletedAt is null ? "In corso" : "Completato")</td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            }
+
+            @if (_detail.Status != "Closed")
+            {
+                <div class="form-grid">
+                    <label>Tecnico<input @bind="_newTechnician" /></label>
+                    <label>Ore<input type="number" step="0.5" min="0" @bind="_newHours" /></label>
+                    <label class="check"><input type="checkbox" @bind="_newInWarranty" /> In garanzia</label>
+                    <label class="check"><input type="checkbox" @bind="_newCompleted" /> Visita completata</label>
+                </div>
+                <label>Descrizione dell'intervento<textarea class="textarea" @bind="_newDescription"></textarea></label>
+                <label>Materiali usati<input @bind="_newMaterials" /></label>
+                <div class="actions"><button @onclick="AddInterventionAsync" disabled="@_busy">Registra intervento</button></div>
+            }
+        </div>
+    }
+
+    <div class="toolbar">
+        <select aria-label="Stato" @onchange="StatusChangedAsync">
+            <option value="" selected="@(_status == "")">Tutti gli stati</option>
+            <option value="Open" selected="@(_status == "Open")">Aperte</option>
+            <option value="InProgress" selected="@(_status == "InProgress")">In lavorazione</option>
+            <option value="Closed" selected="@(_status == "Closed")">Chiuse</option>
+        </select>
+    </div>
+
+    <div class="card">
+        @if (_requests is null)
+        {
+            <div class="state">Caricamento...</div>
+        }
+        else if (_requests.Count == 0)
+        {
+            <div class="state"><strong>Nessuna richiesta</strong>Nessuna richiesta di assistenza corrisponde al filtro scelto.</div>
+        }
+        else
+        {
+            <div class="table-wrap">
+                <table class="cards">
+                    <thead><tr><th>N.</th><th>Cliente</th><th>Macchina</th><th>Oggetto</th><th>Priorità</th><th>Aperta</th><th>Stato</th></tr></thead>
+                    <tbody>
+                        @foreach (var r in _requests)
+                        {
+                            <tr class="link" @onclick="() => OpenRequestAsync(r.Id)">
+                                <td data-label="N." class="code">RA @r.Number</td>
+                                <td data-label="Cliente">@r.CustomerName</td>
+                                <td data-label="Macchina">@r.MachineName <span class="small muted">@r.SerialNumber</span></td>
+                                <td data-label="Oggetto">@r.Subject</td>
+                                <td data-label="Priorità">@ServiceLabels.Priority(r.Priority)</td>
+                                <td data-label="Aperta">@Labels.Date(r.OpenedAt)</td>
+                                <td data-label="Stato"><span class="badge @ServiceLabels.StatusClass(r.Status)">@ServiceLabels.Status(r.Status)</span></td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        }
+    </div>
+
+    @if (CanManage)
+    {
+        <div class="card card-pad stack">
+            <h2>Nuova richiesta</h2>
+            <div class="form-grid">
+                <label>Macchina installata
+                    <select @bind="_newRequestMachineId">
+                        <option value="">Scegli...</option>
+                        @if (_machines is not null)
+                        {
+                            @foreach (var m in _machines)
+                            {
+                                <option value="@m.Id">@m.Name · @m.SerialNumber · @m.CustomerName</option>
+                            }
+                        }
+                    </select>
+                </label>
+                <label>Oggetto<input @bind="_newRequestSubject" /></label>
+                <label>Priorità
+                    <select @bind="_newRequestPriority">
+                        <option value="Normal">Normale</option>
+                        <option value="Urgente">Urgente</option>
+                    </select>
+                </label>
+                <label>Canale
+                    <select @bind="_newRequestChannel">
+                        <option value="Phone">Telefono</option>
+                        <option value="Email">Email</option>
+                        <option value="Portal">Portale</option>
+                    </select>
+                </label>
+                <label>Richiesta da<input @bind="_newRequestedBy" /></label>
+                <label>Contatto<input @bind="_newContactInfo" /></label>
+            </div>
+            <label>Descrizione<textarea class="textarea" @bind="_newRequestDescription"></textarea></label>
+            <div class="actions"><button @onclick="CreateRequestAsync" disabled="@_busy">Apri richiesta</button></div>
+        </div>
+    }
+}
+else
+{
+    <div class="card">
+        @if (_machines is null)
+        {
+            <div class="state">Caricamento...</div>
+        }
+        else if (_machines.Count == 0)
+        {
+            <div class="state"><strong>Nessuna macchina</strong>Nessuna macchina installata ancora registrata.</div>
+        }
+        else
+        {
+            <div class="table-wrap">
+                <table class="cards">
+                    <thead><tr><th>Macchina</th><th>Matricola</th><th>Cliente</th><th>Ubicazione</th><th>Garanzia</th><th class="num">Richieste aperte</th></tr></thead>
+                    <tbody>
+                        @foreach (var m in _machines)
+                        {
+                            <tr>
+                                <td data-label="Macchina">@m.Name @if (m.Model is not null) {<div class="small muted">@m.Model</div>}</td>
+                                <td data-label="Matricola" class="code">@m.SerialNumber</td>
+                                <td data-label="Cliente">@m.CustomerName</td>
+                                <td data-label="Ubicazione">@(m.Location ?? "—")</td>
+                                <td data-label="Garanzia">
+                                    @(m.WarrantyUntil is null ? "—" : Labels.Date(m.WarrantyUntil))
+                                    @if (m.WarrantyUntil is not null)
+                                    {
+                                        <span class="badge @(ServiceLabels.UnderWarranty(m.WarrantyUntil) ? "ok" : "")">@(ServiceLabels.UnderWarranty(m.WarrantyUntil) ? "in garanzia" : "scaduta")</span>
+                                    }
+                                </td>
+                                <td data-label="Richieste aperte" class="num">@m.OpenRequestCount</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        }
+    </div>
+
+    @if (CanManage)
+    {
+        <div class="card card-pad stack">
+            <h2>Nuova macchina installata</h2>
+            <div class="form-grid">
+                <label>Cliente
+                    <select @bind="_newMachineCustomerId">
+                        <option value="">Scegli...</option>
+                        @if (_customers is not null)
+                        {
+                            @foreach (var c in _customers)
+                            {
+                                <option value="@c.Id">@c.Name</option>
+                            }
+                        }
+                    </select>
+                </label>
+                <label>Nome<input @bind="_newMachineName" placeholder="es. Quadro generale BT" /></label>
+                <label>Modello<input @bind="_newMachineModel" /></label>
+                <label>Matricola<input @bind="_newMachineSerial" /></label>
+                <label>Ubicazione<input @bind="_newMachineLocation" /></label>
+                <label>Installata il<input type="date" @bind="_newMachineInstalledAt" /></label>
+                <label>Garanzia fino al<input type="date" @bind="_newMachineWarrantyUntil" /></label>
+            </div>
+            <div class="actions"><button @onclick="CreateMachineAsync" disabled="@_busy">Registra macchina</button></div>
+        </div>
+    }
+}
+
+@code {
+    private string _tab = "requests";
+    private string _status = string.Empty;
+    private List<ServiceRequestRow>? _requests;
+    private List<InstalledMachine>? _machines;
+    private List<Customer>? _customers;
+    private ServiceRequestDetail? _detail;
+    private string? _error;
+    private string? _info;
+    private bool _busy;
+
+    private Guid? _newRequestMachineId;
+    private string _newRequestSubject = string.Empty;
+    private string _newRequestPriority = "Normal";
+    private string _newRequestChannel = "Phone";
+    private string _newRequestedBy = string.Empty;
+    private string _newContactInfo = string.Empty;
+    private string _newRequestDescription = string.Empty;
+
+    private Guid? _newMachineCustomerId;
+    private string _newMachineName = string.Empty;
+    private string _newMachineModel = string.Empty;
+    private string _newMachineSerial = string.Empty;
+    private string _newMachineLocation = string.Empty;
+    private DateTime? _newMachineInstalledAt;
+    private DateTime? _newMachineWarrantyUntil;
+
+    private string _newTechnician = string.Empty;
+    private decimal? _newHours;
+    private bool _newInWarranty;
+    private bool _newCompleted;
+    private string _newDescription = string.Empty;
+    private string _newMaterials = string.Empty;
+
+    private bool CanManage => Session.Role is "Admin" or "Management" or "Sales";
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadRequestsAsync();
+        try
+        {
+            _machines = await Api.GetAsync<List<InstalledMachine>>("api/service/machines");
+            if (CanManage)
+            {
+                _customers = await Api.GetAsync<List<Customer>>("api/customers");
+            }
+        }
+        catch (ApiException exception)
+        {
+            _error = exception.Message;
+        }
+    }
+
+    private async Task SelectMachinesTabAsync()
+    {
+        _tab = "machines";
+        try
+        {
+            _machines = await Api.GetAsync<List<InstalledMachine>>("api/service/machines");
+        }
+        catch (ApiException exception)
+        {
+            _error = exception.Message;
+        }
+    }
+
+    private async Task LoadRequestsAsync()
+    {
+        _error = null;
+        try
+        {
+            _requests = await Api.GetAsync<List<ServiceRequestRow>>($"api/service/requests?status={Uri.EscapeDataString(_status)}");
+        }
+        catch (ApiException exception)
+        {
+            _error = exception.Message;
+        }
+    }
+
+    private async Task StatusChangedAsync(ChangeEventArgs e)
+    {
+        _status = e.Value?.ToString() ?? string.Empty;
+        await LoadRequestsAsync();
+    }
+
+    private async Task OpenRequestAsync(Guid id)
+    {
+        _error = null;
+        try
+        {
+            _detail = await Api.GetAsync<ServiceRequestDetail>($"api/service/requests/{id}");
+        }
+        catch (ApiException exception)
+        {
+            _error = exception.Message;
+        }
+    }
+
+    private async Task CreateRequestAsync()
+    {
+        if (_newRequestMachineId is null || string.IsNullOrWhiteSpace(_newRequestSubject))
+        {
+            _error = "Scegli la macchina e scrivi l'oggetto della richiesta.";
+            return;
+        }
+
+        _busy = true;
+        _error = null;
+        try
+        {
+            _detail = await Api.PostAsync<ServiceRequestDetail>("api/service/requests",
+                new CreateServiceRequestRequest(_newRequestMachineId.Value, _newRequestSubject, _newRequestDescription, _newRequestPriority, _newRequestChannel, _newRequestedBy, _newContactInfo));
+            _info = $"Richiesta RA {_detail.Number} aperta.";
+            _newRequestSubject = string.Empty;
+            _newRequestDescription = string.Empty;
+            _newRequestedBy = string.Empty;
+            _newContactInfo = string.Empty;
+            await LoadRequestsAsync();
+        }
+        catch (ApiException exception)
+        {
+            _error = exception.Message;
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+
+    private async Task CloseRequestAsync()
+    {
+        _busy = true;
+        try
+        {
+            _detail = await Api.PostAsync<ServiceRequestDetail>($"api/service/requests/{_detail!.Id}/close");
+            _info = "Richiesta chiusa.";
+            await LoadRequestsAsync();
+        }
+        catch (ApiException exception)
+        {
+            _error = exception.Message;
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+
+    private async Task ReopenRequestAsync()
+    {
+        _busy = true;
+        try
+        {
+            _detail = await Api.PostAsync<ServiceRequestDetail>($"api/service/requests/{_detail!.Id}/reopen");
+            _info = "Richiesta riaperta.";
+            await LoadRequestsAsync();
+        }
+        catch (ApiException exception)
+        {
+            _error = exception.Message;
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+
+    private async Task AddInterventionAsync()
+    {
+        _busy = true;
+        _error = null;
+        try
+        {
+            _detail = await Api.PostAsync<ServiceRequestDetail>($"api/service/requests/{_detail!.Id}/interventions",
+                new CreateServiceInterventionRequest(_newTechnician, null, _newCompleted, _newHours, _newInWarranty, _newDescription, _newMaterials, null));
+            _info = "Intervento registrato.";
+            _newTechnician = string.Empty;
+            _newHours = null;
+            _newInWarranty = false;
+            _newCompleted = false;
+            _newDescription = string.Empty;
+            _newMaterials = string.Empty;
+            await LoadRequestsAsync();
+        }
+        catch (ApiException exception)
+        {
+            _error = exception.Message;
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+
+    private async Task CreateMachineAsync()
+    {
+        if (_newMachineCustomerId is null || string.IsNullOrWhiteSpace(_newMachineName) || string.IsNullOrWhiteSpace(_newMachineSerial))
+        {
+            _error = "Scegli il cliente e scrivi nome e matricola della macchina.";
+            return;
+        }
+
+        _busy = true;
+        _error = null;
+        try
+        {
+            await Api.PostAsync<InstalledMachine>("api/service/machines",
+                new CreateInstalledMachineRequest(_newMachineCustomerId.Value, null, _newMachineName, _newMachineModel, _newMachineSerial,
+                    _newMachineLocation, _newMachineInstalledAt, _newMachineWarrantyUntil, null));
+            _info = "Macchina registrata.";
+            _newMachineName = string.Empty;
+            _newMachineModel = string.Empty;
+            _newMachineSerial = string.Empty;
+            _newMachineLocation = string.Empty;
+            _newMachineInstalledAt = null;
+            _newMachineWarrantyUntil = null;
+            _machines = await Api.GetAsync<List<InstalledMachine>>("api/service/machines");
+        }
+        catch (ApiException exception)
+        {
+            _error = exception.Message;
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+}

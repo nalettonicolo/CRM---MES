@@ -62,6 +62,9 @@ public class ApplicationDbContext : DbContext
     public DbSet<MachineTestItem> MachineTestItems => Set<MachineTestItem>();
     public DbSet<MachineTechnicalFileItem> MachineTechnicalFileItems => Set<MachineTechnicalFileItem>();
     public DbSet<MachineDeclaration> MachineDeclarations => Set<MachineDeclaration>();
+    public DbSet<InstalledMachine> InstalledMachines => Set<InstalledMachine>();
+    public DbSet<ServiceRequest> ServiceRequests => Set<ServiceRequest>();
+    public DbSet<ServiceIntervention> ServiceInterventions => Set<ServiceIntervention>();
     public DbSet<LogisticUnit> LogisticUnits => Set<LogisticUnit>();
     public DbSet<HaccpControlPoint> HaccpControlPoints => Set<HaccpControlPoint>();
     public DbSet<HaccpReading> HaccpReadings => Set<HaccpReading>();
@@ -474,6 +477,41 @@ public class ApplicationDbContext : DbContext
             entity.Property(d => d.SignatoryRole).HasMaxLength(200);
             entity.Property(d => d.Notes).HasMaxLength(2000);
             entity.Property(d => d.IssuedBy).HasMaxLength(200);
+        });
+
+        modelBuilder.Entity<InstalledMachine>(entity =>
+        {
+            entity.HasOne(m => m.Customer).WithMany().HasForeignKey(m => m.CustomerId).OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne(m => m.WorkOrder).WithMany().HasForeignKey(m => m.WorkOrderId).OnDelete(DeleteBehavior.SetNull);
+            entity.HasIndex(m => m.SerialNumber).IsUnique();
+            entity.Property(m => m.Name).HasMaxLength(200);
+            entity.Property(m => m.Model).HasMaxLength(100);
+            entity.Property(m => m.SerialNumber).HasMaxLength(100);
+            entity.Property(m => m.Location).HasMaxLength(300);
+            entity.Property(m => m.Status).HasMaxLength(20);
+            entity.Property(m => m.Notes).HasMaxLength(2000);
+        });
+
+        modelBuilder.Entity<ServiceRequest>(entity =>
+        {
+            entity.HasOne(r => r.InstalledMachine).WithMany(m => m.Requests).HasForeignKey(r => r.InstalledMachineId).OnDelete(DeleteBehavior.Cascade);
+            entity.HasIndex(r => r.Number).IsUnique();
+            entity.Property(r => r.Subject).HasMaxLength(200);
+            entity.Property(r => r.Description).HasMaxLength(2000);
+            entity.Property(r => r.Priority).HasMaxLength(20);
+            entity.Property(r => r.Status).HasMaxLength(20);
+            entity.Property(r => r.Channel).HasMaxLength(20);
+            entity.Property(r => r.RequestedBy).HasMaxLength(200);
+            entity.Property(r => r.ContactInfo).HasMaxLength(200);
+        });
+
+        modelBuilder.Entity<ServiceIntervention>(entity =>
+        {
+            entity.HasOne(i => i.ServiceRequest).WithMany(r => r.Interventions).HasForeignKey(i => i.ServiceRequestId).OnDelete(DeleteBehavior.Cascade);
+            entity.Property(i => i.TechnicianName).HasMaxLength(200);
+            entity.Property(i => i.Description).HasMaxLength(2000);
+            entity.Property(i => i.MaterialsUsed).HasMaxLength(2000);
+            entity.Property(i => i.Notes).HasMaxLength(2000);
         });
 
         modelBuilder.Entity<PanelVerificationCheck>(entity =>
