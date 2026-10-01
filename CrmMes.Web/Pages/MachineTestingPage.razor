@@ -1,0 +1,560 @@
+@page "/collaudi/{Id:guid}"
+@inject Api Api
+@inject Session Session
+@inject IJSRuntime Js
+
+<PageTitle>@(_dossier is null ? "Collaudo" : $"Collaudo {_dossier.WorkOrderCode}") · Nicolò MES</PageTitle>
+
+<div class="page-head no-print">
+    <div>
+        <div class="eyebrow"><a href="collaudi">Collaudo e CE</a></div>
+        <h1>@(_dossier is null ? "Collaudo e CE" : $"{_dossier.ProductName} · {_dossier.WorkOrderCode}")</h1>
+    </div>
+    @if (_dossier is not null)
+    {
+        <span class="badge @MachineTestingLabels.DeclarationClass(_dossier.Declaration.IsSaved ? _dossier.Declaration.Status : null)">
+            CE: @MachineTestingLabels.Declaration(_dossier.Declaration.IsSaved ? _dossier.Declaration.Status : null, _dossier.Declaration.Number)
+        </span>
+    }
+</div>
+
+@if (_loadError is not null)
+{
+    <div class="card state"><strong>Impossibile aprire il collaudo</strong>@_loadError
+        <div class="actions"><button class="secondary small" @onclick="LoadAsync">Riprova</button></div></div>
+}
+else if (_dossier is null)
+{
+    <div class="card state">Caricamento...</div>
+}
+else
+{
+    <div class="stack">
+        <div class="card card-pad no-print">
+            <div class="facts">
+                <div class="fact"><div class="label">Commessa</div><div class="value"><CopyCode Value="@_dossier.WorkOrderCode" /></div></div>
+                <div class="fact"><div class="label">Prodotto</div><div class="value">@_dossier.ProductCode @(_dossier.ProductRevision is null ? "" : $"rev. {_dossier.ProductRevision}")</div></div>
+                <div class="fact"><div class="label">Cliente</div><div class="value">@(_dossier.CustomerName ?? "—")</div></div>
+                <div class="fact"><div class="label">Stato commessa</div><div class="value"><StatusBadge Status="@_dossier.WorkOrderStatus" /></div></div>
+                <div class="fact"><div class="label">Collaudi superati</div><div class="value">@_dossier.Tests.Count(t => t.Status == "Passed") di @_dossier.Tests.Count</div></div>
+                <div class="fact"><div class="label">Fascicolo tecnico</div><div class="value">@(_dossier.TechnicalFileComplete ? "Completo" : "Incompleto")</div></div>
+            </div>
+        </div>
+
+        <div class="chips no-print" role="tablist">
+            <button role="tab" class="chip @(_tab == "tests" ? "active" : "")" aria-selected="@(_tab == "tests")" @onclick='() => SwitchTab("tests")'>Collaudi</button>
+            <button role="tab" class="chip @(_tab == "file" ? "active" : "")" aria-selected="@(_tab == "file")" @onclick='() => SwitchTab("file")'>Fascicolo tecnico</button>
+            <button role="tab" class="chip @(_tab == "declaration" ? "active" : "")" aria-selected="@(_tab == "declaration")" @onclick='() => SwitchTab("declaration")'>Dichiarazione CE</button>
+        </div>
+
+        @if (_error is not null)
+        {
+            <div class="alert no-print" role="alert">@_error</div>
+        }
+        @if (_info is not null)
+        {
+            <div class="success no-print" role="status">@_info</div>
+        }
+
+        @if (_confirm is not null)
+        {
+            <div class="card card-pad no-print">
+                <h2>@_confirm.Title</h2>
+                <p class="muted">@_confirm.Message</p>
+                <div class="actions">
+                    <button class="secondary" @onclick="() => _confirm = null" disabled="@_busy">Annulla</button>
+                    <button @onclick="_confirm.Run" disabled="@_busy">@(_busy ? "Attendere..." : _confirm.Title)</button>
+                </div>
+            </div>
+        }
+
+        @if (_tab == "tests")
+        {
+            <div class="card card-pad stack no-print">
+                <h2>Nuovo collaudo</h2>
+                <p class="muted small">Si parte dalla lista di verifiche standard (EN 60204-1, dispositivi di sicurezza, prove funzionali), modificabile prima della chiusura.</p>
+                <div class="form-grid">
+                    <label>Matricola della macchina<input @bind="_newSerial" placeholder="es. M-2026-015" /></label>
+                    <label>Luogo<input @bind="_newLocation" placeholder="stabilimento o sede del cliente" /></label>
+                </div>
+                <div class="actions">
+                    <button class="secondary" @onclick='() => CreateTestAsync("FAT")' disabled="@_busy">Nuovo FAT (in fabbrica)</button>
+                    <button class="secondary" @onclick='() => CreateTestAsync("SAT")' disabled="@_busy">Nuovo SAT (presso il cliente)</button>
+                </div>
+            </div>
+
+            @if (_dossier.Tests.Count == 0)
+            {
+                <div class="card state"><strong>Nessun collaudo</strong>Apri il FAT prima della spedizione e il SAT dopo l'installazione presso il cliente.</div>
+            }
+            else
+            {
+                <div class="card">
+                    <div class="table-wrap">
+                        <table class="cards">
+                            <thead><tr><th>Numero</th><th>Tipo</th><th>Matricola</th><th>Data</th><th>Esito</th><th>Collaudatore</th></tr></thead>
+                            <tbody>
+                                @foreach (var test in _dossier.Tests.OrderByDescending(t => t.Number))
+                                {
+                                    <tr class="link @(test.Id == _testId ? "selected" : "")" @onclick="() => SelectTest(test)">
+                                        <td data-label="Numero" class="code">COL @test.Number</td>
+                                        <td data-label="Tipo">@MachineTestingLabels.Kind(test.Kind)</td>
+                                        <td data-label="Matricola" class="code">@(test.SerialNumber ?? "—")</td>
+                                        <td data-label="Data">@Labels.Date(test.TestDate)</td>
+                                        <td data-label="Esito"><span class="badge @MachineTestingLabels.TestStatusClass(test.Status)">@MachineTestingLabels.TestStatus(test.Status)</span></td>
+                                        <td data-label="Collaudatore">@(test.TestedBy ?? "—")</td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            }
+
+            @if (SelectedTest is { } selected)
+            {
+                var editable = selected.Status == "Draft";
+                <div class="card card-pad stack">
+                    <div class="section-head">
+                        <h2>COL @selected.Number · @MachineTestingLabels.Kind(selected.Kind)</h2>
+                        <span class="badge @MachineTestingLabels.TestStatusClass(selected.Status)">@MachineTestingLabels.TestStatus(selected.Status)</span>
+                    </div>
+                    <div class="form-grid">
+                        <label>Matricola<input @bind="_testSerial" disabled="@(!editable)" /></label>
+                        <label>Data<input type="date" @bind="_testDate" disabled="@(!editable)" /></label>
+                        <label>Luogo<input @bind="_testLocation" disabled="@(!editable)" /></label>
+                        <label>Presente per il cliente<input @bind="_testWitness" disabled="@(!editable)" placeholder="nome e ruolo" /></label>
+                    </div>
+                    <label>Note<textarea class="textarea" rows="2" @bind="_testNotes" disabled="@(!editable)"></textarea></label>
+
+                    <div class="table-wrap">
+                        <table class="cards">
+                            <thead><tr><th>Verifica</th><th>Atteso</th><th>Rilevato</th><th>Esito</th><th>Note</th>@if (editable) {<th></th>}</tr></thead>
+                            <tbody>
+                                @foreach (var group in _testItems.GroupBy(i => i.Section))
+                                {
+                                    <tr class="subrow"><td colspan="@(editable ? 6 : 5)"><strong>@group.Key</strong></td></tr>
+                                    @foreach (var item in group)
+                                    {
+                                        <tr>
+                                            <td data-label="Verifica">@if (editable) {<input @bind="item.Description" aria-label="Verifica" />} else {@item.Description}</td>
+                                            <td data-label="Atteso">@if (editable) {<input @bind="item.Expected" aria-label="Valore atteso" />} else {<span class="muted">@(item.Expected ?? "—")</span>}</td>
+                                            <td data-label="Rilevato">@if (editable) {<input @bind="item.Measured" aria-label="Valore rilevato" />} else {@(item.Measured ?? "—")}</td>
+                                            <td data-label="Esito">
+                                                @if (editable)
+                                                {
+                                                    <select @bind="item.Result" aria-label="Esito">
+                                                        <option value="">Da fare</option>
+                                                        <option value="Pass">Superata</option>
+                                                        <option value="Fail">Non superata</option>
+                                                        <option value="NotApplicable">Non applicabile</option>
+                                                    </select>
+                                                }
+                                                else
+                                                {
+                                                    <span class="badge @MachineTestingLabels.ResultClass(item.Result)">@MachineTestingLabels.Result(item.Result)</span>
+                                                }
+                                            </td>
+                                            <td data-label="Note">@if (editable) {<input @bind="item.Notes" aria-label="Note" />} else {<span class="muted">@(item.Notes ?? "")</span>}</td>
+                                            @if (editable)
+                                            {
+                                                <td><button class="secondary small" @onclick="() => _testItems.Remove(item)" aria-label="Togli la verifica">Togli</button></td>
+                                            }
+                                        </tr>
+                                    }
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+
+                    @if (editable)
+                    {
+                        <div class="actions">
+                            <button class="secondary" @onclick="AddTestItem">Aggiungi verifica</button>
+                            <button class="secondary" @onclick="SaveTestAsync" disabled="@_busy">@(_busy ? "Salvataggio..." : "Salva")</button>
+                            <button @onclick="AskCloseTest" disabled="@_busy">Chiudi collaudo</button>
+                        </div>
+                        <p class="small muted">@_testItems.Count(i => string.IsNullOrEmpty(i.Result)) verifiche ancora da fare. Una sola verifica non superata chiude il collaudo come non superato: si corregge la macchina e se ne apre uno nuovo.</p>
+                    }
+                    else
+                    {
+                        <p class="small muted">Chiuso il @Labels.DateTime(selected.ClosedAt) da @selected.TestedBy.</p>
+                        @if (Session.IsAdmin)
+                        {
+                            <div class="actions"><button class="secondary" @onclick="AskReopenTest">Riapri</button></div>
+                        }
+                    }
+                </div>
+            }
+        }
+        else if (_tab == "file")
+        {
+            <div class="card card-pad stack no-print">
+                <div class="section-head">
+                    <h2>Fascicolo tecnico</h2>
+                    <span class="badge @(_dossier.TechnicalFileComplete ? "ok" : "warn")">@(_dossier.TechnicalFileComplete ? "Completo" : "Incompleto")</span>
+                </div>
+                <p class="muted small">Elementi dell'Allegato VII della Direttiva 2006/42/CE e dell'Allegato IV del Regolamento (UE) 2023/1230. Per ognuno indica dove si trova (codice del documento, cartella, file). Il fascicolo va conservato per 10 anni dalla messa in servizio.</p>
+                <div class="table-wrap">
+                    <table class="cards">
+                        <thead><tr><th>Elemento</th><th>Stato</th><th>Dove si trova</th></tr></thead>
+                        <tbody>
+                            @foreach (var item in _fileItems)
+                            {
+                                <tr>
+                                    <td data-label="Elemento">
+                                        @if (CanEditFile && item.Code is null)
+                                        {
+                                            <input @bind="item.Description" aria-label="Elemento aggiunto" placeholder="descrizione" />
+                                        }
+                                        else
+                                        {
+                                            @item.Description
+                                        }
+                                        @if (item.Optional) {<div class="small muted">se pertinente</div>}
+                                    </td>
+                                    <td data-label="Stato">
+                                        @if (CanEditFile)
+                                        {
+                                            <select @bind="item.Status" aria-label="Stato dell'elemento">
+                                                <option value="">Manca</option>
+                                                <option value="Present">Presente</option>
+                                                @if (item.Optional) {<option value="NotApplicable">Non applicabile</option>}
+                                            </select>
+                                        }
+                                        else
+                                        {
+                                            <span class="badge @(item.Status is null ? "warn" : item.Status == "Present" ? "ok" : "")">@FileStatus(item.Status)</span>
+                                        }
+                                    </td>
+                                    <td data-label="Dove si trova">@if (CanEditFile) {<input @bind="item.Reference" aria-label="Riferimento" placeholder="es. UT/2026/015/rischi.pdf" />} else {<span class="muted">@(item.Reference ?? "—")</span>}</td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+                @if (CanEditFile)
+                {
+                    <div class="actions">
+                        <button class="secondary" @onclick="AddFileItem">Aggiungi elemento</button>
+                        <button @onclick="SaveFileAsync" disabled="@_busy">@(_busy ? "Salvataggio..." : "Salva fascicolo")</button>
+                    </div>
+                }
+                else if (_dossier.Declaration.Status == "Issued")
+                {
+                    <p class="small muted">Dichiarazione emessa: il fascicolo non si modifica più.</p>
+                }
+                else
+                {
+                    <p class="small muted">Il fascicolo tecnico lo aggiornano l'ufficio tecnico e la direzione.</p>
+                }
+            </div>
+        }
+        else
+        {
+            var declaration = _dossier.Declaration;
+            var issued = declaration.Status == "Issued";
+            @if (!issued && _dossier.MissingForDeclaration.Count > 0)
+            {
+                <div class="card card-pad no-print">
+                    <h2>Prima di emettere</h2>
+                    <ul class="small">
+                        @foreach (var problem in _dossier.MissingForDeclaration)
+                        {
+                            <li>@problem</li>
+                        }
+                    </ul>
+                </div>
+            }
+
+            @if (CanEditDeclaration)
+            {
+                <div class="card card-pad stack no-print">
+                    <h2>Dati della dichiarazione</h2>
+                    <p class="muted small">Base giuridica applicata all'emissione: @declaration.LegalBasisText. Dal 20 gennaio 2027 vale il Regolamento (UE) 2023/1230 e il programma lo applica da solo.</p>
+                    <div class="form-grid">
+                        <label>Denominazione<input @bind="_declaration.MachineName" /></label>
+                        <label>Funzione<input @bind="_declaration.Function" placeholder="es. stampaggio a freddo di lamiera" /></label>
+                        <label>Modello<input @bind="_declaration.Model" /></label>
+                        <label>Tipo<input @bind="_declaration.Type" /></label>
+                        <label>Matricola<input @bind="_declaration.SerialNumber" /></label>
+                        <label>Anno di costruzione<input type="number" @bind="_declaration.YearOfConstruction" /></label>
+                        <label>Luogo<input @bind="_declaration.Place" /></label>
+                        <label>Firmatario<input @bind="_declaration.SignatoryName" /></label>
+                        <label>Qualifica del firmatario<input @bind="_declaration.SignatoryRole" placeholder="es. legale rappresentante" /></label>
+                    </div>
+                    <label>Persona autorizzata a costituire il fascicolo tecnico (nome e indirizzo)<input @bind="_declaration.TechnicalFileKeeper" /></label>
+                    <label>Altre normative UE rispettate<textarea class="textarea" rows="2" @bind="_declaration.OtherLegislation"></textarea></label>
+                    <label>Norme armonizzate e specifiche tecniche applicate (una per riga)<textarea class="textarea" rows="4" @bind="_declaration.Standards"></textarea></label>
+                    <label>Organismo notificato (solo se previsto)<input @bind="_declaration.NotifiedBody" placeholder="nome, numero e certificato" /></label>
+                    <div class="actions">
+                        <button class="secondary" @onclick="SaveDeclarationAsync" disabled="@_busy">@(_busy ? "Salvataggio..." : "Salva")</button>
+                        <button @onclick="AskIssue" disabled="@(_busy || !declaration.IsSaved || _dossier.MissingForDeclaration.Count > 0)">Emetti la dichiarazione</button>
+                    </div>
+                </div>
+            }
+
+            <div class="card card-pad printable">
+                <div class="section-head no-print">
+                    <h2>@(issued ? $"Dichiarazione n. {declaration.Number}" : "Anteprima")</h2>
+                    <div class="actions">
+                        @if (issued)
+                        {
+                            <button class="secondary" @onclick="PrintAsync">Stampa</button>
+                            @if (Session.IsAdmin)
+                            {
+                                <button class="secondary" @onclick="() => _withdrawing = !_withdrawing">Ritira</button>
+                            }
+                        }
+                    </div>
+                </div>
+                @if (_withdrawing && issued)
+                {
+                    <div class="form-grid no-print">
+                        <label>Motivo del ritiro<input @bind="_withdrawReason" placeholder="es. matricola errata" /></label>
+                    </div>
+                    <div class="actions no-print"><button @onclick="WithdrawAsync" disabled="@_busy">Conferma il ritiro</button></div>
+                }
+                @if (!issued)
+                {
+                    <p class="small muted no-print">Bozza: la stampa è disponibile dopo l'emissione.</p>
+                }
+                <div class="declaration">
+                    <h2>@(declaration.LegalBasis == "2023/1230" ? "Dichiarazione UE di conformità" : "Dichiarazione CE di conformità")@(declaration.Number is null ? "" : $" n. {declaration.Number}")</h2>
+                    <p class="small">ai sensi della @declaration.LegalBasisText</p>
+                    <p><strong>Il fabbricante</strong><br />@(_dossier.Manufacturer.Name ?? "—")<br />@(_dossier.Manufacturer.Address ?? "")@(_dossier.Manufacturer.VatNumber is null ? "" : $" · P. IVA {_dossier.Manufacturer.VatNumber}")</p>
+                    <p><strong>Persona autorizzata a costituire il fascicolo tecnico</strong><br />@(declaration.TechnicalFileKeeper ?? "—")</p>
+                    <p>dichiara sotto la propria esclusiva responsabilità che la macchina</p>
+                    <dl class="facts">
+                        <div class="fact"><dt class="label">Denominazione</dt><dd class="value">@declaration.MachineName</dd></div>
+                        <div class="fact"><dt class="label">Funzione</dt><dd class="value">@(declaration.Function ?? "—")</dd></div>
+                        <div class="fact"><dt class="label">Modello</dt><dd class="value">@(declaration.Model ?? "—")</dd></div>
+                        <div class="fact"><dt class="label">Tipo</dt><dd class="value">@(declaration.Type ?? "—")</dd></div>
+                        <div class="fact"><dt class="label">Matricola</dt><dd class="value">@(declaration.SerialNumber ?? "—")</dd></div>
+                        <div class="fact"><dt class="label">Anno di costruzione</dt><dd class="value">@(declaration.YearOfConstruction?.ToString() ?? "—")</dd></div>
+                    </dl>
+                    <p>è conforme a tutte le disposizioni pertinenti della @declaration.LegalBasisText@(declaration.OtherLegislation is null ? "." : $" e alla seguente normativa: {declaration.OtherLegislation}.")</p>
+                    @if (declaration.Standards is not null)
+                    {
+                        <p><strong>Norme armonizzate e specifiche tecniche applicate</strong></p>
+                        <ul>
+                            @foreach (var line in declaration.Standards.Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+                            {
+                                <li>@line</li>
+                            }
+                        </ul>
+                    }
+                    @if (declaration.NotifiedBody is not null)
+                    {
+                        <p><strong>Organismo notificato</strong><br />@declaration.NotifiedBody</p>
+                    }
+                    <p>@(declaration.Place ?? "—"), @Labels.Date(declaration.IssuedAt ?? DateTime.Today)</p>
+                    <p>@(declaration.SignatoryName ?? "—")@(declaration.SignatoryRole is null ? "" : $", {declaration.SignatoryRole}")<br /><span class="signature-line">Firma</span></p>
+                </div>
+            </div>
+        }
+    </div>
+}
+
+@code {
+    [Parameter] public Guid Id { get; set; }
+
+    private sealed record Confirmation(string Title, string Message, Func<Task> Run);
+
+    private MachineDossier? _dossier;
+    private string _tab = "tests";
+    private string? _loadError;
+    private string? _error;
+    private string? _info;
+    private bool _busy;
+    private Confirmation? _confirm;
+
+    private string? _newSerial;
+    private string? _newLocation;
+
+    private Guid? _testId;
+    private string? _testSerial;
+    private DateTime? _testDate;
+    private string? _testLocation;
+    private string? _testWitness;
+    private string? _testNotes;
+    private List<MachineTestItemForm> _testItems = [];
+
+    private List<TechnicalFileItemForm> _fileItems = [];
+    private MachineDeclarationForm _declaration = new();
+    private bool _withdrawing;
+    private string? _withdrawReason;
+
+    private bool IsOffice => Session.Role is "Admin" or "Management";
+    private bool CanEditFile => IsOffice && _dossier?.Declaration.Status != "Issued";
+    private bool CanEditDeclaration => IsOffice && _dossier?.Declaration.Status != "Issued";
+    private MachineTest? SelectedTest => _dossier?.Tests.FirstOrDefault(t => t.Id == _testId);
+
+    protected override Task OnParametersSetAsync() => LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        _loadError = null;
+        _dossier = null;
+        try
+        {
+            Show(await Api.GetAsync<MachineDossier>($"api/machine-testing/work-orders/{Id}"));
+        }
+        catch (ApiException exception)
+        {
+            _loadError = exception.Message;
+        }
+    }
+
+    /// <summary>Fresh data from the server into the page and its forms (the open test stays open).</summary>
+    private void Show(MachineDossier dossier)
+    {
+        _dossier = dossier;
+        var test = dossier.Tests.FirstOrDefault(t => t.Id == _testId)
+            ?? dossier.Tests.Where(t => t.Status == "Draft").OrderByDescending(t => t.Number).FirstOrDefault();
+        if (test is not null)
+        {
+            SelectTest(test);
+        }
+
+        _fileItems = dossier.TechnicalFile.Select(i => new TechnicalFileItemForm
+        {
+            Code = i.Code, Description = i.Description, Optional = i.Optional, Status = i.Status, Reference = i.Reference,
+        }).ToList();
+        var d = dossier.Declaration;
+        _declaration = new MachineDeclarationForm
+        {
+            MachineName = d.MachineName, Function = d.Function, Model = d.Model, Type = d.Type, SerialNumber = d.SerialNumber,
+            YearOfConstruction = d.YearOfConstruction, OtherLegislation = d.OtherLegislation, Standards = d.Standards, NotifiedBody = d.NotifiedBody,
+            TechnicalFileKeeper = d.TechnicalFileKeeper, Place = d.Place, SignatoryName = d.SignatoryName, SignatoryRole = d.SignatoryRole, Notes = d.Notes,
+        };
+    }
+
+    private void SwitchTab(string tab)
+    {
+        _tab = tab;
+        _error = null;
+        _info = null;
+        _confirm = null;
+    }
+
+    private void SelectTest(MachineTest test)
+    {
+        _testId = test.Id;
+        _testSerial = test.SerialNumber;
+        _testDate = test.TestDate?.Date; // a calendar day (UTC midnight on the server)
+        _testLocation = test.Location;
+        _testWitness = test.CustomerWitness;
+        _testNotes = test.Notes;
+        _testItems = test.Items.OrderBy(i => i.Sequence).Select(i => new MachineTestItemForm
+        {
+            Section = i.Section, Description = i.Description, Expected = i.Expected, Measured = i.Measured, Result = i.Result, Notes = i.Notes,
+        }).ToList();
+    }
+
+    private void AddTestItem() => _testItems.Add(new MachineTestItemForm { Section = "Altre verifiche" });
+
+    private void AddFileItem() => _fileItems.Add(new TechnicalFileItemForm { Optional = true });
+
+    private static string FileStatus(string? status) => status switch
+    {
+        "Present" => "Presente",
+        "NotApplicable" => "Non applicabile",
+        _ => "Manca",
+    };
+
+    private async Task RunAsync(Func<Task<MachineDossier>> action, string? done)
+    {
+        _busy = true;
+        _error = null;
+        _info = null;
+        try
+        {
+            Show(await action());
+            _info = done;
+            _confirm = null;
+        }
+        catch (ApiException exception)
+        {
+            _error = exception.Message;
+            _confirm = null;
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+
+    private async Task CreateTestAsync(string kind)
+    {
+        _testId = null;
+        await RunAsync(() => Api.PostAsync<MachineDossier>($"api/machine-testing/work-orders/{Id}/tests",
+            new { kind, serialNumber = _newSerial, location = _newLocation }), $"Collaudo {kind} aperto.");
+        _newSerial = null;
+        _newLocation = null;
+    }
+
+    private object TestRequest() => new
+    {
+        serialNumber = _testSerial,
+        location = _testLocation,
+        testDate = _testDate?.ToString("yyyy-MM-dd"),
+        customerWitness = _testWitness,
+        notes = _testNotes,
+        items = _testItems.Select(i => new
+        {
+            section = i.Section,
+            description = i.Description,
+            expected = i.Expected,
+            measured = i.Measured,
+            result = string.IsNullOrEmpty(i.Result) ? null : i.Result,
+            notes = i.Notes,
+        }).ToList(),
+    };
+
+    private Task SaveTestAsync() =>
+        RunAsync(() => Api.PutAsync<MachineDossier>($"api/machine-testing/tests/{_testId}", TestRequest()), "Collaudo salvato.");
+
+    private void AskCloseTest() => _confirm = new("Chiudi collaudo",
+        "Il collaudo viene salvato e chiuso: superato se nessuna verifica è fallita, altrimenti non superato. Dopo la chiusura non si modifica più.",
+        () => RunAsync(async () =>
+        {
+            await Api.PutAsync<MachineDossier>($"api/machine-testing/tests/{_testId}", TestRequest());
+            return await Api.PostAsync<MachineDossier>($"api/machine-testing/tests/{_testId}/close");
+        }, "Collaudo chiuso."));
+
+    private void AskReopenTest() => _confirm = new("Riapri",
+        "Il collaudo torna in corso e si può correggere. L'operazione resta nel registro.",
+        () => RunAsync(() => Api.PostAsync<MachineDossier>($"api/machine-testing/tests/{_testId}/reopen"), "Collaudo riaperto."));
+
+    private Task SaveFileAsync() => RunAsync(() => Api.PutAsync<MachineDossier>($"api/machine-testing/work-orders/{Id}/technical-file", new
+    {
+        items = _fileItems.Select(i => new
+        {
+            code = i.Code,
+            description = i.Description,
+            status = string.IsNullOrEmpty(i.Status) ? null : i.Status,
+            reference = i.Reference,
+        }).ToList(),
+    }), "Fascicolo tecnico salvato.");
+
+    private Task SaveDeclarationAsync() =>
+        RunAsync(() => Api.PutAsync<MachineDossier>($"api/machine-testing/work-orders/{Id}/declaration", _declaration), "Dichiarazione salvata.");
+
+    private void AskIssue() => _confirm = new("Emetti la dichiarazione",
+        "La dichiarazione riceve il numero e non si modifica più, insieme al fascicolo tecnico. Salva prima eventuali modifiche ai dati.",
+        () => RunAsync(() => Api.PostAsync<MachineDossier>($"api/machine-testing/work-orders/{Id}/declaration/issue"), "Dichiarazione emessa: ora puoi stamparla."));
+
+    private async Task WithdrawAsync()
+    {
+        await RunAsync(() => Api.PostAsync<MachineDossier>($"api/machine-testing/work-orders/{Id}/declaration/withdraw", new { reason = _withdrawReason }),
+            "Dichiarazione ritirata: torna in bozza con lo stesso numero.");
+        if (_error is null)
+        {
+            _withdrawing = false;
+            _withdrawReason = null;
+        }
+    }
+
+    private async Task PrintAsync() => await Js.InvokeVoidAsync("print");
+}

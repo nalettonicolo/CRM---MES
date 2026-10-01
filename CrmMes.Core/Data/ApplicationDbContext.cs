@@ -58,6 +58,10 @@ public class ApplicationDbContext : DbContext
     public DbSet<SubcontractingReturn> SubcontractingReturns => Set<SubcontractingReturn>();
     public DbSet<PanelVerification> PanelVerifications => Set<PanelVerification>();
     public DbSet<PanelVerificationCheck> PanelVerificationChecks => Set<PanelVerificationCheck>();
+    public DbSet<MachineTest> MachineTests => Set<MachineTest>();
+    public DbSet<MachineTestItem> MachineTestItems => Set<MachineTestItem>();
+    public DbSet<MachineTechnicalFileItem> MachineTechnicalFileItems => Set<MachineTechnicalFileItem>();
+    public DbSet<MachineDeclaration> MachineDeclarations => Set<MachineDeclaration>();
     public DbSet<LogisticUnit> LogisticUnits => Set<LogisticUnit>();
     public DbSet<HaccpControlPoint> HaccpControlPoints => Set<HaccpControlPoint>();
     public DbSet<HaccpReading> HaccpReadings => Set<HaccpReading>();
@@ -410,6 +414,66 @@ public class ApplicationDbContext : DbContext
             entity.Property(v => v.DielectricTestVoltage).HasPrecision(10, 2);
             entity.Property(v => v.Notes).HasMaxLength(2000);
             entity.Property(v => v.VerifiedBy).HasMaxLength(200);
+        });
+
+        modelBuilder.Entity<MachineTest>(entity =>
+        {
+            entity.HasIndex(t => t.Number).IsUnique();
+            entity.HasIndex(t => t.WorkOrderId);
+            entity.HasOne(t => t.WorkOrder).WithMany().HasForeignKey(t => t.WorkOrderId).OnDelete(DeleteBehavior.Cascade);
+            entity.HasMany(t => t.Items).WithOne(i => i.MachineTest).HasForeignKey(i => i.MachineTestId).OnDelete(DeleteBehavior.Cascade);
+            entity.Property(t => t.Kind).HasMaxLength(10);
+            entity.Property(t => t.Status).HasMaxLength(20);
+            entity.Property(t => t.SerialNumber).HasMaxLength(100);
+            entity.Property(t => t.Location).HasMaxLength(200);
+            entity.Property(t => t.CustomerWitness).HasMaxLength(200);
+            entity.Property(t => t.Notes).HasMaxLength(2000);
+            entity.Property(t => t.CreatedBy).HasMaxLength(200);
+            entity.Property(t => t.TestedBy).HasMaxLength(200);
+        });
+
+        modelBuilder.Entity<MachineTestItem>(entity =>
+        {
+            entity.Property(i => i.Section).HasMaxLength(100);
+            entity.Property(i => i.Description).HasMaxLength(300);
+            entity.Property(i => i.Expected).HasMaxLength(200);
+            entity.Property(i => i.Measured).HasMaxLength(200);
+            entity.Property(i => i.Result).HasMaxLength(20);
+            entity.Property(i => i.Notes).HasMaxLength(500);
+        });
+
+        modelBuilder.Entity<MachineTechnicalFileItem>(entity =>
+        {
+            entity.HasIndex(i => new { i.WorkOrderId, i.Code }).IsUnique();
+            entity.HasOne(i => i.WorkOrder).WithMany().HasForeignKey(i => i.WorkOrderId).OnDelete(DeleteBehavior.Cascade);
+            entity.Property(i => i.Code).HasMaxLength(40);
+            entity.Property(i => i.Description).HasMaxLength(300);
+            entity.Property(i => i.Status).HasMaxLength(20);
+            entity.Property(i => i.Reference).HasMaxLength(300);
+            entity.Property(i => i.UpdatedBy).HasMaxLength(200);
+        });
+
+        modelBuilder.Entity<MachineDeclaration>(entity =>
+        {
+            entity.HasIndex(d => d.WorkOrderId).IsUnique();
+            entity.HasIndex(d => d.Number).IsUnique();
+            entity.HasOne(d => d.WorkOrder).WithMany().HasForeignKey(d => d.WorkOrderId).OnDelete(DeleteBehavior.Cascade);
+            entity.Property(d => d.Status).HasMaxLength(20);
+            entity.Property(d => d.LegalBasis).HasMaxLength(20);
+            entity.Property(d => d.MachineName).HasMaxLength(200);
+            entity.Property(d => d.Function).HasMaxLength(500);
+            entity.Property(d => d.Model).HasMaxLength(100);
+            entity.Property(d => d.Type).HasMaxLength(100);
+            entity.Property(d => d.SerialNumber).HasMaxLength(100);
+            entity.Property(d => d.OtherLegislation).HasMaxLength(1000);
+            entity.Property(d => d.Standards).HasMaxLength(2000);
+            entity.Property(d => d.NotifiedBody).HasMaxLength(500);
+            entity.Property(d => d.TechnicalFileKeeper).HasMaxLength(500);
+            entity.Property(d => d.Place).HasMaxLength(100);
+            entity.Property(d => d.SignatoryName).HasMaxLength(200);
+            entity.Property(d => d.SignatoryRole).HasMaxLength(200);
+            entity.Property(d => d.Notes).HasMaxLength(2000);
+            entity.Property(d => d.IssuedBy).HasMaxLength(200);
         });
 
         modelBuilder.Entity<PanelVerificationCheck>(entity =>

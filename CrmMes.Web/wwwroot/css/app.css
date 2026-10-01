@@ -196,3 +196,19 @@ details ul { margin: 8px 0 0; padding-left: 18px; max-height: 240px; overflow-y:
 tr.subrow td { padding-top: 0; border-top: 0; }
 tr.muted td { color: var(--muted); }
 h3 { font-size: 14px; font-weight: 650; margin: 0 0 8px; }
+
+/* Machine testing and CE declaration */
+tr.selected td { background: var(--info-bg); }
+.declaration { max-width: 760px; line-height: 1.5; }
+.declaration h2 { font-size: 18px; margin-bottom: 4px; }
+.declaration dl { margin: 12px 0; }
+.declaration dd { margin: 0; }
+.signature-line { display: inline-block; margin-top: 36px; min-width: 240px; border-top: 1px solid var(--ink); font-size: 12px; color: var(--muted); }
+
+@media print {
+  body * { visibility: hidden; }
+  .printable, .printable * { visibility: visible; }
+  .printable { position: absolute; left: 0; top: 0; width: 100%; border: 0; background: #fff; color: #000; }
+  .printable .no-print { display: none; }
+  .printable * { color: #000 !important; }
+}

@@ -20,6 +20,7 @@ public static class Navigation
         new("invoicing", "Fatture", "fatture", "Documenti", ["Admin", "Sales", "Management"]),
         new("warehouse", "Materiali", "materiali", "Magazzino"),
         new("engineering", "Ufficio tecnico", "ufficio-tecnico", "Produzione"),
+        new("machine-testing", "Collaudo e CE", "collaudi", "Produzione"),
     ];
 
     /// <summary>Area names (from the server) for areas without a web page yet.</summary>

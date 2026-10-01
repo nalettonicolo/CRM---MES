@@ -1,0 +1,95 @@
+@page "/collaudi"
+@inject Api Api
+@inject NavigationManager Nav
+
+<PageTitle>Collaudo e CE · Nicolò MES</PageTitle>
+
+<div class="page-head">
+    <div>
+        <div class="eyebrow">Produzione</div>
+        <h1>Collaudo e CE</h1>
+        <p class="sub">Collaudi FAT in fabbrica e SAT presso il cliente, fascicolo tecnico e dichiarazione di conformità di ogni macchina.</p>
+    </div>
+</div>
+
+<div class="toolbar">
+    <input class="search" type="search" placeholder="Commessa, prodotto o cliente" aria-label="Cerca commessa" @bind="_search" @bind:event="oninput" @onkeydown="SearchOnEnterAsync" />
+    <button class="secondary" @onclick="LoadAsync">Cerca</button>
+</div>
+
+<div class="card">
+    @if (_error is not null)
+    {
+        <div class="state"><strong>Impossibile caricare le commesse</strong>@_error
+            <div class="actions"><button class="secondary small" @onclick="LoadAsync">Riprova</button></div></div>
+    }
+    else if (_rows is null)
+    {
+        <div class="state">Caricamento...</div>
+    }
+    else if (_rows.Count == 0)
+    {
+        <div class="state"><strong>Nessuna commessa</strong>@(string.IsNullOrWhiteSpace(_search) ? "Non ci sono commesse aperte o completate." : $"Nessuna commessa corrisponde a \"{_search}\".")</div>
+    }
+    else
+    {
+        <div class="table-wrap">
+            <table class="cards">
+                <thead><tr><th>Commessa</th><th>Macchina</th><th>Cliente</th><th>Collaudi</th><th>Fascicolo tecnico</th><th>Dichiarazione CE</th></tr></thead>
+                <tbody>
+                    @foreach (var row in _rows)
+                    {
+                        <tr class="link" @onclick="@(() => Nav.NavigateTo($"collaudi/{row.WorkOrderId}"))">
+                            <td data-label="Commessa"><CopyCode Value="@row.WorkOrderCode" /> <StatusBadge Status="@row.WorkOrderStatus" /></td>
+                            <td data-label="Macchina">@row.ProductName <div class="small muted code">@row.ProductCode</div></td>
+                            <td data-label="Cliente">@(row.CustomerName ?? "—")</td>
+                            <td data-label="Collaudi">
+                                @if (row.Tests == 0)
+                                {
+                                    <span class="muted">Nessuno</span>
+                                }
+                                else
+                                {
+                                    <span class="badge @MachineTestingLabels.TestStatusClass(row.LastTestStatus)">@row.LastTestKind @MachineTestingLabels.TestStatus(row.LastTestStatus)</span>
+                                    <div class="small muted">@row.Tests in tutto</div>
+                                }
+                            </td>
+                            <td data-label="Fascicolo tecnico"><span class="badge @(row.FileDone == row.FileTotal ? "ok" : "")">@row.FileDone di @row.FileTotal</span></td>
+                            <td data-label="Dichiarazione CE"><span class="badge @MachineTestingLabels.DeclarationClass(row.DeclarationStatus)">@MachineTestingLabels.Declaration(row.DeclarationStatus, row.DeclarationNumber)</span></td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    }
+</div>
+
+@code {
+    private List<MachineTestingSummary>? _rows;
+    private string? _search;
+    private string? _error;
+
+    protected override Task OnInitializedAsync() => LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        _error = null;
+        _rows = null;
+        try
+        {
+            _rows = await Api.GetAsync<List<MachineTestingSummary>>($"api/machine-testing/work-orders?search={Uri.EscapeDataString(_search?.Trim() ?? string.Empty)}");
+        }
+        catch (ApiException exception)
+        {
+            _error = exception.Message;
+        }
+    }
+
+    private async Task SearchOnEnterAsync(KeyboardEventArgs args)
+    {
+        if (args.Key == "Enter")
+        {
+            await LoadAsync();
+        }
+    }
+}
