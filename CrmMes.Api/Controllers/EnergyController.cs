@@ -102,6 +102,54 @@ public class EnergyController(ApplicationDbContext db) : ControllerBase
         return Ok(byDay.Select(kv => new DailyEnergyResponse(kv.Key, kv.Value)));
     }
 
+    /// <summary>kWh attributed to one work order: the machine (or gateway) reports which job code is running
+    /// in each reading's WorkOrderCode, so the consumption of the interval before a reading is credited to
+    /// that reading's code — the same convention <see cref="Services.MachineStats.Compute"/> uses for time by state.
+    /// A job can span more than one machine (different phases, different equipment): all of them are summed.</summary>
+    [HttpGet("work-orders/{code}/consumption")]
+    public async Task<ActionResult<WorkOrderEnergyResponse>> GetWorkOrderConsumption(string code, CancellationToken cancellationToken = default)
+    {
+        code = code.Trim();
+        if (code.Length == 0)
+        {
+            return BadRequest(new { message = "Indica il codice della commessa." });
+        }
+
+        var equipmentIds = await db.MachineEvents.AsNoTracking()
+            .Where(e => e.WorkOrderCode == code)
+            .Select(e => e.EquipmentId)
+            .Distinct()
+            .ToListAsync(cancellationToken);
+
+        var byEquipment = new List<WorkOrderEnergyByEquipment>();
+        foreach (var equipmentId in equipmentIds)
+        {
+            var readings = await db.MachineEvents.AsNoTracking()
+                .Where(e => e.EquipmentId == equipmentId && e.EnergyKwh != null)
+                .OrderBy(e => e.Timestamp)
+                .Select(e => new { e.EnergyKwh, e.WorkOrderCode })
+                .ToListAsync(cancellationToken);
+
+            decimal total = 0;
+            for (var i = 1; i < readings.Count; i++)
+            {
+                var delta = readings[i].EnergyKwh!.Value - readings[i - 1].EnergyKwh!.Value;
+                if (delta > 0 && string.Equals(readings[i - 1].WorkOrderCode, code, StringComparison.OrdinalIgnoreCase))
+                {
+                    total += delta;
+                }
+            }
+
+            if (total > 0)
+            {
+                var name = await db.Equipment.AsNoTracking().Where(e => e.Id == equipmentId).Select(e => e.Name).SingleOrDefaultAsync(cancellationToken);
+                byEquipment.Add(new WorkOrderEnergyByEquipment(equipmentId, name ?? "?", total));
+            }
+        }
+
+        return Ok(new WorkOrderEnergyResponse(code, byEquipment.Count == 0 ? null : byEquipment.Sum(e => e.Kwh), byEquipment));
+    }
+
     // ---------- Efficiency projects ----------
 
     [HttpGet("projects")]
@@ -251,6 +299,10 @@ public sealed record EnergyConsumptionResult(decimal? TotalKwh, int ReadingCount
 public sealed record EnergyConsumptionResponse(decimal? TotalKwh, int ReadingCount, DateTime From, DateTime To);
 
 public sealed record DailyEnergyResponse(DateTime Day, decimal Kwh);
+
+public sealed record WorkOrderEnergyByEquipment(Guid EquipmentId, string EquipmentName, decimal Kwh);
+
+public sealed record WorkOrderEnergyResponse(string WorkOrderCode, decimal? TotalKwh, IReadOnlyList<WorkOrderEnergyByEquipment> ByEquipment);
 
 public sealed record CreateEnergyProjectRequest(Guid EquipmentId, string? Title, string? Description, DateTime BaselineFrom, DateTime BaselineTo);
 

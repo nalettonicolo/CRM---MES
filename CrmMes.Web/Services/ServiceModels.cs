@@ -57,4 +57,28 @@ public static class ServiceLabels
     };
 
     public static bool UnderWarranty(DateTime? warrantyUntil) => warrantyUntil is { } until && until.Date >= DateTime.Today;
+
+    /// <summary>"ok" (more than 30 days left), "warn" (expiring within 30 days) or "danger" (already expired);
+    /// null when there is no warranty date to judge.</summary>
+    public static string? WarrantyClass(DateTime? warrantyUntil)
+    {
+        if (warrantyUntil is not { } until)
+        {
+            return null;
+        }
+
+        var daysLeft = (until.Date - DateTime.Today).Days;
+        return daysLeft < 0 ? "danger" : daysLeft <= 30 ? "warn" : "ok";
+    }
+
+    public static string WarrantyText(DateTime? warrantyUntil)
+    {
+        if (warrantyUntil is not { } until)
+        {
+            return "—";
+        }
+
+        var daysLeft = (until.Date - DateTime.Today).Days;
+        return daysLeft < 0 ? "scaduta" : daysLeft <= 30 ? $"in scadenza ({daysLeft} gg)" : "in garanzia";
+    }
 }

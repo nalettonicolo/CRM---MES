@@ -1,6 +1,7 @@
 @page "/energia"
 @inject Api Api
 @inject Session Session
+@inject IJSRuntime Js
 
 <PageTitle>Monitoraggio energetico · Nicolò MES</PageTitle>
 
@@ -60,6 +61,7 @@
                                 @if (CanManage)
                                 {
                                     <div class="actions">
+                                        <button class="secondary small" @onclick="() => _reportProject = p">Report</button>
                                         <button class="secondary small" @onclick="() => StartAfterPeriod(p)">@(p.AfterFrom is null ? "Imposta ex post" : "Modifica ex post")</button>
                                         <button class="secondary small" @onclick="() => DeleteAsync(p)" disabled="@_busy">Elimina</button>
                                     </div>
@@ -72,6 +74,30 @@
         </div>
     }
 </div>
+
+@if (_reportProject is { } rp)
+{
+    <div class="card card-pad printable declaration">
+        <div class="actions no-print"><button @onclick="PrintReportAsync">Stampa</button><button class="secondary" @onclick="() => _reportProject = null">Chiudi</button></div>
+        <h2>Report di efficientamento energetico</h2>
+        <p class="muted small">Generato il @Labels.DateTime(DateTime.Now) · @rp.EquipmentName (@rp.EquipmentCode)</p>
+        <dl>
+            <dt>Progetto</dt><dd>@rp.Title</dd>
+            @if (rp.Description is not null) {<dt>Descrizione</dt><dd>@rp.Description</dd>}
+            <dt>Periodo di riferimento (ex ante)</dt><dd>@Labels.Date(rp.BaselineFrom) → @Labels.Date(rp.BaselineTo) — @(rp.BaselineKwh is null ? "nessuna lettura di energia" : $"{Labels.Number(rp.BaselineKwh.Value)} kWh da {rp.BaselineReadingCount} letture")</dd>
+            @if (rp.AfterFrom is not null)
+            {
+                <dt>Periodo successivo (ex post)</dt><dd>@Labels.Date(rp.AfterFrom) → @Labels.Date(rp.AfterTo) — @(rp.AfterKwh is null ? "nessuna lettura di energia" : $"{Labels.Number(rp.AfterKwh.Value)} kWh da {rp.AfterReadingCount} letture")</dd>
+                <dt>Risparmio stimato</dt><dd>@(rp.SavingsPercent is { } percent ? $"{Labels.Number(Math.Abs(percent))}% {(percent >= 0 ? "in meno" : "in più")} rispetto al periodo di riferimento, a parità di giorni" : "non calcolabile")</dd>
+            }
+            else
+            {
+                <dt>Periodo successivo (ex post)</dt><dd>da definire</dd>
+            }
+        </dl>
+        <p class="small muted">I consumi sono calcolati dalle letture di energia inviate dalla macchina (contatore cumulativo kWh): la differenza tra letture consecutive, al netto di eventuali azzeramenti del contatore. Nessun valore è inserito a mano.</p>
+    </div>
+}
 
 @if (_afterPeriodProject is not null)
 {
@@ -143,6 +169,32 @@
     }
 </div>
 
+<div class="card card-pad stack">
+    <h2>Consumo di una commessa</h2>
+    <p class="muted small">Somma i kWh delle macchine che hanno lavorato quella commessa, nei periodi in cui il suo codice era attivo (richiede che la macchina/gateway riporti il codice commessa nelle letture).</p>
+    <div class="form-grid">
+        <label>Codice commessa<input @bind="_workOrderCode" placeholder="es. WO-20261001-080000-a1b2c3" /></label>
+    </div>
+    <div class="actions"><button class="secondary" @onclick="LookupWorkOrderAsync" disabled="@_busy">Calcola consumo</button></div>
+    @if (_workOrderResult is not null)
+    {
+        @if (_workOrderResult.TotalKwh is null)
+        {
+            <p>Nessuna lettura di energia associata a questa commessa.</p>
+        }
+        else
+        {
+            <p><strong>@Labels.Number(_workOrderResult.TotalKwh.Value) kWh</strong> in totale.</p>
+            <ul class="small">
+                @foreach (var e in _workOrderResult.ByEquipment)
+                {
+                    <li>@e.EquipmentName: @Labels.Number(e.Kwh) kWh</li>
+                }
+            </ul>
+        }
+    }
+</div>
+
 @code {
     private List<EnergyProject>? _projects;
     private List<Equipment>? _equipment;
@@ -157,6 +209,7 @@
     private DateTime? _newBaselineTo = DateTime.Today;
 
     private EnergyProject? _afterPeriodProject;
+    private EnergyProject? _reportProject;
     private DateTime? _afterFrom;
     private DateTime? _afterTo;
 
@@ -164,6 +217,9 @@
     private DateTime? _lookupFrom = DateTime.Today.AddDays(-30);
     private DateTime? _lookupTo = DateTime.Today;
     private EnergyConsumption? _lookupResult;
+
+    private string _workOrderCode = string.Empty;
+    private WorkOrderEnergy? _workOrderResult;
 
     private bool CanManage => Session.Role is "Admin" or "Management";
 
@@ -304,6 +360,32 @@
         {
             _lookupResult = await Api.GetAsync<EnergyConsumption>(
                 $"api/energy/equipment/{_lookupEquipmentId}/consumption?from={_lookupFrom:yyyy-MM-dd}&to={_lookupTo:yyyy-MM-dd}");
+        }
+        catch (ApiException exception)
+        {
+            _error = exception.Message;
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+
+    private Task PrintReportAsync() => Js.InvokeVoidAsync("print").AsTask();
+
+    private async Task LookupWorkOrderAsync()
+    {
+        if (string.IsNullOrWhiteSpace(_workOrderCode))
+        {
+            _error = "Scrivi il codice della commessa.";
+            return;
+        }
+
+        _busy = true;
+        _error = null;
+        try
+        {
+            _workOrderResult = await Api.GetAsync<WorkOrderEnergy>($"api/energy/work-orders/{Uri.EscapeDataString(_workOrderCode.Trim())}/consumption");
         }
         catch (ApiException exception)
         {

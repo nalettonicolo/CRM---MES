@@ -8,6 +8,10 @@ public sealed record CreateEnergyProjectRequest(Guid EquipmentId, string? Title,
 
 public sealed record SetAfterPeriodRequest(DateTime? AfterFrom, DateTime? AfterTo);
 
+public sealed record WorkOrderEnergyByEquipment(Guid EquipmentId, string EquipmentName, decimal Kwh);
+
+public sealed record WorkOrderEnergy(string WorkOrderCode, decimal? TotalKwh, List<WorkOrderEnergyByEquipment> ByEquipment);
+
 public sealed record EnergyProject(
     Guid Id, Guid EquipmentId, string EquipmentName, string EquipmentCode, string Title, string? Description,
     DateTime BaselineFrom, DateTime BaselineTo, decimal? BaselineKwh, int BaselineReadingCount,

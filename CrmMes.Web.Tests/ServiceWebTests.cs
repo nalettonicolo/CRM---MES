@@ -49,6 +49,34 @@ public class ServiceWebTests : TestContext
     }
 
     [Fact]
+    public async Task MachineWithWarrantyExpiringSoon_ShowsTheWarningBanner_AndAlreadyExpiredIsFlaggedDifferently()
+    {
+        await LogInAsync("Sales");
+        var soonId = Guid.NewGuid();
+        var expiredId = Guid.NewGuid();
+        _server.OnJson("GET", "/api/service/requests?status=", new List<ServiceRequestRow>());
+        _server.OnJson("GET", "/api/service/machines", new List<InstalledMachine>
+        {
+            new(soonId, _customerId, "Officine Aurora", null, "Pressa 120t", null, "SN-SOON", null, null, DateTime.Today.AddDays(10), "Active", null, 0),
+            new(expiredId, _customerId, "Ferramenta Brianza", null, "Tornio CNC", null, "SN-OLD", null, null, DateTime.Today.AddDays(-5), "Active", null, 0),
+        });
+
+        var page = RenderComponent<Service>();
+        page.WaitForAssertion(() => Assert.Contains("garanzia in scadenza entro 30 giorni", page.Markup));
+        Assert.Contains("Pressa 120t", page.Markup);
+        Assert.DoesNotContain("Tornio CNC (Ferramenta Brianza)", page.Markup); // expired, not "about to expire"
+
+        await SelectMachinesTabAsync(page);
+        Assert.Contains("in scadenza (10 gg)", page.Markup);
+        Assert.Contains("scaduta", page.Markup);
+    }
+
+    private static async Task SelectMachinesTabAsync(IRenderedComponent<Service> page)
+    {
+        await page.InvokeAsync(() => page.FindAll("button.chip").Single(b => b.TextContent == "Macchine installate").Click());
+    }
+
+    [Fact]
     public async Task OpeningARequest_ShowsItsInterventions_AndRecordingOneMovesItInProgress()
     {
         await LogInAsync("Sales");

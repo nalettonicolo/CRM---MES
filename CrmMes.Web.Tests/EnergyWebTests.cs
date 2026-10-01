@@ -65,4 +65,28 @@ public class EnergyWebTests : TestContext
         page.WaitForAssertion(() => Assert.Contains("-40", page.Markup));
         Assert.Contains(_server.Requests, r => r.Request.Method == HttpMethod.Put && r.Request.RequestUri!.AbsolutePath.EndsWith("/after-period"));
     }
+
+    [Fact]
+    public async Task WorkOrderConsumption_ShowsTheBreakdownByMachine()
+    {
+        await LogInAsync("Operator");
+        _server.OnJson("GET", "/api/equipment", new List<Equipment>());
+        _server.OnJson("GET", "/api/energy/projects", new List<EnergyProject>());
+        _server.OnJson("GET", "/api/energy/work-orders/WO-100/consumption", new WorkOrderEnergy("WO-100", 130m,
+        [
+            new WorkOrderEnergyByEquipment(Guid.NewGuid(), "Pressa 120t", 100m),
+            new WorkOrderEnergyByEquipment(Guid.NewGuid(), "Forno", 30m),
+        ]));
+
+        var page = RenderComponent<Energy>();
+        page.WaitForAssertion(() => Assert.Contains("Consumo di una commessa", page.Markup));
+
+        var input = page.Find("input[placeholder^='es. WO-']");
+        input.Change("WO-100");
+        page.FindAll("button").Last(b => b.TextContent == "Calcola consumo").Click();
+
+        page.WaitForAssertion(() => Assert.Contains("130", page.Markup));
+        Assert.Contains("Pressa 120t: 100", page.Markup);
+        Assert.Contains("Forno: 30", page.Markup);
+    }
 }

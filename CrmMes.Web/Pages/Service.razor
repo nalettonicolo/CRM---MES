@@ -1,4 +1,4 @@
-@page "/service"
+﻿@page "/service"
 @inject Api Api
 @inject Session Session
 
@@ -19,6 +19,13 @@
 @if (_info is not null)
 {
     <div class="success" role="status">@_info</div>
+}
+@if (_expiringWarranties is { Count: > 0 } expiring)
+{
+    <div class="notice" role="status">
+        <strong>@expiring.Count @(expiring.Count == 1 ? "macchina ha" : "macchine hanno") la garanzia in scadenza entro 30 giorni:</strong>
+        @string.Join(", ", expiring.Select(m => $"{m.Name} ({m.CustomerName})"))
+    </div>
 }
 
 <div class="chips" role="tablist">
@@ -204,9 +211,9 @@ else
                                 <td data-label="Ubicazione">@(m.Location ?? "—")</td>
                                 <td data-label="Garanzia">
                                     @(m.WarrantyUntil is null ? "—" : Labels.Date(m.WarrantyUntil))
-                                    @if (m.WarrantyUntil is not null)
+                                    @if (ServiceLabels.WarrantyClass(m.WarrantyUntil) is { } warrantyClass)
                                     {
-                                        <span class="badge @(ServiceLabels.UnderWarranty(m.WarrantyUntil) ? "ok" : "")">@(ServiceLabels.UnderWarranty(m.WarrantyUntil) ? "in garanzia" : "scaduta")</span>
+                                        <span class="badge @warrantyClass">@ServiceLabels.WarrantyText(m.WarrantyUntil)</span>
                                     }
                                 </td>
                                 <td data-label="Richieste aperte" class="num">@m.OpenRequestCount</td>
@@ -252,6 +259,7 @@ else
     private string _status = string.Empty;
     private List<ServiceRequestRow>? _requests;
     private List<InstalledMachine>? _machines;
+    private List<InstalledMachine>? _expiringWarranties;
     private List<Customer>? _customers;
     private ServiceRequestDetail? _detail;
     private string? _error;
@@ -289,6 +297,7 @@ else
         try
         {
             _machines = await Api.GetAsync<List<InstalledMachine>>("api/service/machines");
+            _expiringWarranties = _machines.Where(m => ServiceLabels.WarrantyClass(m.WarrantyUntil) == "warn").ToList();
             if (CanManage)
             {
                 _customers = await Api.GetAsync<List<Customer>>("api/customers");
@@ -306,6 +315,7 @@ else
         try
         {
             _machines = await Api.GetAsync<List<InstalledMachine>>("api/service/machines");
+            _expiringWarranties = _machines.Where(m => ServiceLabels.WarrantyClass(m.WarrantyUntil) == "warn").ToList();
         }
         catch (ApiException exception)
         {
@@ -464,6 +474,7 @@ else
             _newMachineInstalledAt = null;
             _newMachineWarrantyUntil = null;
             _machines = await Api.GetAsync<List<InstalledMachine>>("api/service/machines");
+            _expiringWarranties = _machines.Where(m => ServiceLabels.WarrantyClass(m.WarrantyUntil) == "warn").ToList();
         }
         catch (ApiException exception)
         {

@@ -141,6 +141,46 @@ public class EnergyTests : IClassFixture<AdminSeededApiTestFixture>
     }
 
     [Fact]
+    public async Task WorkOrderConsumption_AttributesTheIntervalToTheCodeActiveAtItsStart_AcrossMachines()
+    {
+        var pressa = await EquipmentAsync();
+        var forno = await EquipmentAsync();
+        var code = $"WO-{Guid.NewGuid():N}"[..12];
+        var day = new DateTime(2026, 5, 1, 0, 0, 0, DateTimeKind.Utc);
+
+        using (var scope = _fixture.Factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<CrmMes.Core.Data.ApplicationDbContext>();
+            // Pressa: running WO-code from 0 to 100 kWh (+100 credited to this job), then another job for +20 (not credited).
+            db.MachineEvents.Add(new MachineEvent { EquipmentId = pressa.Id, Timestamp = day.AddHours(1), State = "Running", EnergyKwh = 0, WorkOrderCode = code });
+            db.MachineEvents.Add(new MachineEvent { EquipmentId = pressa.Id, Timestamp = day.AddHours(5), State = "Running", EnergyKwh = 100, WorkOrderCode = "ALTRA-COMMESSA" });
+            db.MachineEvents.Add(new MachineEvent { EquipmentId = pressa.Id, Timestamp = day.AddHours(9), State = "Running", EnergyKwh = 120, WorkOrderCode = null });
+            // Forno: a later phase of the same job, +30 kWh.
+            db.MachineEvents.Add(new MachineEvent { EquipmentId = forno.Id, Timestamp = day.AddHours(2), State = "Running", EnergyKwh = 500, WorkOrderCode = code });
+            db.MachineEvents.Add(new MachineEvent { EquipmentId = forno.Id, Timestamp = day.AddHours(6), State = "Running", EnergyKwh = 530, WorkOrderCode = code });
+            await db.SaveChangesAsync();
+        }
+
+        var response = await _admin.GetFromJsonAsync<WorkOrderEnergyResponse>($"/api/energy/work-orders/{code}/consumption");
+
+        Assert.NotNull(response);
+        Assert.Equal(130m, response!.TotalKwh); // 100 (pressa) + 30 (forno)
+        Assert.Equal(2, response.ByEquipment.Count);
+        Assert.Equal(100m, response.ByEquipment.Single(e => e.EquipmentId == pressa.Id).Kwh);
+        Assert.Equal(30m, response.ByEquipment.Single(e => e.EquipmentId == forno.Id).Kwh);
+    }
+
+    [Fact]
+    public async Task WorkOrderConsumption_WithNoMatchingReadings_IsNull()
+    {
+        var response = await _admin.GetFromJsonAsync<WorkOrderEnergyResponse>($"/api/energy/work-orders/NESSUNA-{Guid.NewGuid():N}/consumption");
+
+        Assert.NotNull(response);
+        Assert.Null(response!.TotalKwh);
+        Assert.Empty(response.ByEquipment);
+    }
+
+    [Fact]
     public async Task DeletingAProject_RemovesItFromTheList()
     {
         var equipment = await EquipmentAsync();

@@ -142,6 +142,51 @@ public class ShipmentsTests : IClassFixture<AdminSeededApiTestFixture>
     }
 
     [Fact]
+    public async Task ShippingAJobForACustomer_RegistersTheInstalledMachine_OnlyOnceAndOnlyWithACustomer()
+    {
+        var carrier = await CreateCarrierAsync();
+        var customer = (await (await _adminClient.PostAsJsonAsync("/api/customers",
+            new SaveCustomerRequest($"Cliente {Guid.NewGuid():N}"[..16], $"CLI-{Guid.NewGuid():N}"[..10], null, null, null, null, null)))
+            .Content.ReadFromJsonAsync<CustomerResponse>())!;
+
+        var suffix = Guid.NewGuid().ToString("N")[..8];
+        var product = (await (await _adminClient.PostAsJsonAsync("/api/products", new CreateProductRequest($"MAC-{suffix}", "Macchina test", null)))
+            .Content.ReadFromJsonAsync<ProductResponse>())!;
+        var order = (await (await _adminClient.PostAsJsonAsync("/api/work-orders",
+            new CreateWorkOrderRequest(product.Id, 1, null, null, null, null, null, null, customer.Id)))
+            .Content.ReadFromJsonAsync<WorkOrderResponse>())!;
+
+        var shipment = (await (await _adminClient.PostAsJsonAsync("/api/shipments",
+            new CreateShipmentRequest("Outbound", carrier.Id, null, null, order.Id, "Cliente Test", null, null, null)))
+            .Content.ReadFromJsonAsync<ShipmentResponse>())!;
+
+        (await _adminClient.PostAsJsonAsync($"/api/shipments/{shipment.Id}/ship", new ShipShipmentRequest(null))).EnsureSuccessStatusCode();
+
+        var machines = await _adminClient.GetFromJsonAsync<List<InstalledMachineResponse>>($"/api/service/machines?customerId={customer.Id}");
+        var machine = Assert.Single(machines!);
+        Assert.Equal(order.Id, machine.WorkOrderId);
+        Assert.Equal(order.ProductLotNumber, machine.SerialNumber);
+        Assert.Equal("Macchina test", machine.Name);
+
+        // A second shipment of the same job never creates a duplicate.
+        var secondShipment = (await (await _adminClient.PostAsJsonAsync("/api/shipments",
+            new CreateShipmentRequest("Outbound", carrier.Id, null, null, order.Id, "Cliente Test", null, null, null)))
+            .Content.ReadFromJsonAsync<ShipmentResponse>())!;
+        (await _adminClient.PostAsJsonAsync($"/api/shipments/{secondShipment.Id}/ship", new ShipShipmentRequest(null))).EnsureSuccessStatusCode();
+        var stillOne = await _adminClient.GetFromJsonAsync<List<InstalledMachineResponse>>($"/api/service/machines?customerId={customer.Id}");
+        Assert.Single(stillOne!);
+
+        // No customer on the job: nothing is registered, and shipping still succeeds.
+        var orderNoCustomer = (await (await _adminClient.PostAsJsonAsync("/api/work-orders", new CreateWorkOrderRequest(product.Id, 1, null, null, null, null, null)))
+            .Content.ReadFromJsonAsync<WorkOrderResponse>())!;
+        var shipmentNoCustomer = (await (await _adminClient.PostAsJsonAsync("/api/shipments",
+            new CreateShipmentRequest("Outbound", carrier.Id, null, null, orderNoCustomer.Id, null, null, null, null)))
+            .Content.ReadFromJsonAsync<ShipmentResponse>())!;
+        var shipNoCustomer = await _adminClient.PostAsJsonAsync($"/api/shipments/{shipmentNoCustomer.Id}/ship", new ShipShipmentRequest(null));
+        Assert.Equal(HttpStatusCode.OK, shipNoCustomer.StatusCode);
+    }
+
+    [Fact]
     public async Task DeliverShipment_WhenStillPreparing_ReturnsConflict()
     {
         var carrier = await CreateCarrierAsync();

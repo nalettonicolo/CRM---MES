@@ -132,7 +132,7 @@ public class ShipmentsController : ControllerBase
         Guid id, ShipShipmentRequest? request, CancellationToken cancellationToken = default)
     {
         var shipment = await _dbContext.Shipments
-            .Include(s => s.Carrier).Include(s => s.PurchaseOrder).Include(s => s.WorkOrder)
+            .Include(s => s.Carrier).Include(s => s.PurchaseOrder).Include(s => s.WorkOrder).ThenInclude(w => w!.Product)
             .SingleOrDefaultAsync(s => s.Id == id, cancellationToken);
         if (shipment is null)
         {
@@ -152,6 +152,26 @@ public class ShipmentsController : ControllerBase
         shipment.Status = "Shipped";
         shipment.ShippedAt = DateTime.UtcNow;
         await _dbContext.SaveChangesAsync(cancellationToken);
+
+        // Service post-vendita: an outbound shipment of a job for a known customer registers the machine
+        // as installed, so Service already has it when the first support call comes in. Best-effort and
+        // silent — a missing customer or an already-registered machine for this job simply skips it.
+        if (shipment.Direction == "Outbound" && shipment.WorkOrder is { CustomerId: Guid customerId } workOrder &&
+            !await _dbContext.InstalledMachines.AnyAsync(m => m.WorkOrderId == workOrder.Id, cancellationToken) &&
+            !await _dbContext.InstalledMachines.AnyAsync(m => m.SerialNumber == workOrder.ProductLotNumber, cancellationToken))
+        {
+            _dbContext.InstalledMachines.Add(new InstalledMachine
+            {
+                CustomerId = customerId,
+                WorkOrderId = workOrder.Id,
+                Name = workOrder.Product.Name,
+                Model = workOrder.Product.Code,
+                SerialNumber = workOrder.ProductLotNumber,
+                InstalledAt = shipment.ShippedAt,
+                Notes = $"Creata automaticamente alla spedizione della commessa {workOrder.Code}.",
+            });
+            await _dbContext.SaveChangesAsync(cancellationToken);
+        }
 
         return Ok(ToResponse(shipment));
     }
