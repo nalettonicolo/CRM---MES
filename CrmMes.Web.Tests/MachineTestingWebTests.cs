@@ -22,7 +22,8 @@ public class MachineTestingWebTests : TestContext
     private Task LogInAsync(string role) => Services.GetRequiredService<Session>().SetAsync(
         new AuthResponse("t", "r", DateTime.UtcNow.AddMinutes(30), Guid.NewGuid(), "Prova", "prova@example.test", role));
 
-    private MachineDossier Dossier(string testStatus, string declarationStatus = "Draft", List<string>? missing = null) => new(
+    private MachineDossier Dossier(string testStatus, string declarationStatus = "Draft", List<string>? missing = null, List<LinkedDocumentOption>? availableDocuments = null,
+        string? signatureImage = null) => new(
         _orderId, "WO-0042", "InProgress", "PI-200", "Pressa idraulica", "B", "Officine Rossi",
         new Manufacturer("Costruzioni Prova srl", "Via Roma 1, 20100 Milano", "01234567890"),
         [new MachineTest(_testId, 3, "FAT", testStatus, "M-77", "Stabilimento", DateTime.UtcNow.Date, null, null, "Prova", DateTime.UtcNow,
@@ -38,8 +39,8 @@ public class MachineTestingWebTests : TestContext
             "Direttiva 2006/42/CE del Parlamento europeo e del Consiglio, del 17 maggio 2006, relativa alle macchine",
             "Pressa idraulica", "Stampaggio", "PI-200", null, "M-77", 2026, "Direttiva 2014/30/UE", "EN ISO 12100:2010\nEN 60204-1:2018", null,
             "Mario Rossi, Milano", "Milano", "Mario Rossi", "Legale rappresentante", null,
-            declarationStatus == "Issued" ? DateTime.UtcNow : null, declarationStatus == "Issued" ? "Prova" : null),
-        missing ?? []);
+            declarationStatus == "Issued" ? DateTime.UtcNow : null, declarationStatus == "Issued" ? "Prova" : null, signatureImage),
+        missing ?? [], availableDocuments ?? []);
 
     [Fact]
     public async Task List_ShowsTestsFileAndDeclarationState()
@@ -116,5 +117,49 @@ public class MachineTestingWebTests : TestContext
         Assert.DoesNotContain("Emetti la dichiarazione", issued.Markup);
         issued.FindAll("button").Single(b => b.TextContent == "Stampa").Click();
         JSInterop.VerifyInvoke("print");
+    }
+
+    [Fact]
+    public async Task LinkingTheProductsDocument_SetsTheStatusAtOnce_AndIsSentToTheServer()
+    {
+        await LogInAsync("Management");
+        var documentId = Guid.NewGuid();
+        _server.OnJson("GET", $"/api/machine-testing/work-orders/{_orderId}", Dossier("Draft", availableDocuments: [new LinkedDocumentOption(documentId, "Quasi-macchine incorporate - schema", "schema.pdf")]));
+        _server.OnJson("PUT", $"/api/machine-testing/work-orders/{_orderId}/technical-file", Dossier("Draft"));
+
+        var page = RenderComponent<MachineTestingPage>(p => p.Add(x => x.Id, _orderId));
+        page.WaitForAssertion(() => Assert.Contains("WO-0042", page.Markup));
+        page.FindAll("button").Single(b => b.TextContent == "Fascicolo tecnico").Click();
+
+        var documentSelect = page.Find("select[aria-label=\"Documento dell'ufficio tecnico\"]");
+        documentSelect.Change(documentId.ToString());
+
+        page.FindAll("button").Single(b => b.TextContent == "Salva fascicolo").Click();
+
+        page.WaitForAssertion(() => Assert.Contains(_server.Requests, r => r.Request.Method == HttpMethod.Put && r.Body.Contains(documentId.ToString())));
+    }
+
+    [Fact]
+    public async Task IssuingWithASignature_SendsTheCapturedImage_AndShowsItOnceIssued()
+    {
+        await LogInAsync("Management");
+        _server.OnJson("GET", $"/api/machine-testing/work-orders/{_orderId}", Dossier("Passed"));
+        const string signature = "data:image/png;base64,abc123";
+        JSInterop.Setup<bool>("nicolomes.signature.isEmpty", _ => true).SetResult(false);
+        JSInterop.Setup<string>("nicolomes.signature.toDataUrl", _ => true).SetResult(signature);
+        _server.OnJson("POST", $"/api/machine-testing/work-orders/{_orderId}/declaration/issue", Dossier("Passed", "Issued", signatureImage: signature));
+
+        var page = RenderComponent<MachineTestingPage>(p => p.Add(x => x.Id, _orderId));
+        page.WaitForAssertion(() => Assert.Contains("WO-0042", page.Markup));
+        page.FindAll("button").Single(b => b.TextContent == "Dichiarazione CE").Click();
+
+        page.FindAll("button").Single(b => b.TextContent == "Emetti la dichiarazione").Click();
+        page.WaitForAssertion(() => Assert.Equal(2, page.FindAll("button").Count(b => b.TextContent == "Emetti la dichiarazione")));
+        page.FindAll("button").First(b => b.TextContent == "Emetti la dichiarazione").Click();
+
+        page.WaitForAssertion(() => Assert.Contains("Dichiarazione n. 5", page.Markup));
+        var issueCall = _server.Requests.Single(r => r.Request.Method == HttpMethod.Post && r.Request.RequestUri!.AbsolutePath.EndsWith("/issue"));
+        Assert.Contains(signature, issueCall.Body);
+        Assert.Contains($"src=\"{signature}\"", page.Markup);
     }
 }

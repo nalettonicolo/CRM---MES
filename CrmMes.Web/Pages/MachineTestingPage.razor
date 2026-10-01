@@ -197,7 +197,7 @@ else
                 <p class="muted small">Elementi dell'Allegato VII della Direttiva 2006/42/CE e dell'Allegato IV del Regolamento (UE) 2023/1230. Per ognuno indica dove si trova (codice del documento, cartella, file). Il fascicolo va conservato per 10 anni dalla messa in servizio.</p>
                 <div class="table-wrap">
                     <table class="cards">
-                        <thead><tr><th>Elemento</th><th>Stato</th><th>Dove si trova</th></tr></thead>
+                        <thead><tr><th>Elemento</th><th>Stato</th><th>Documento dell'ufficio tecnico</th><th>Oppure dove si trova</th></tr></thead>
                         <tbody>
                             @foreach (var item in _fileItems)
                             {
@@ -227,7 +227,32 @@ else
                                             <span class="badge @(item.Status is null ? "warn" : item.Status == "Present" ? "ok" : "")">@FileStatus(item.Status)</span>
                                         }
                                     </td>
-                                    <td data-label="Dove si trova">@if (CanEditFile) {<input @bind="item.Reference" aria-label="Riferimento" placeholder="es. UT/2026/015/rischi.pdf" />} else {<span class="muted">@(item.Reference ?? "—")</span>}</td>
+                                    <td data-label="Documento">
+                                        @if (CanEditFile)
+                                        {
+                                            <select @bind="item.TechnicalDocumentId" @bind:after="() => OnDocumentLinked(item)" aria-label="Documento dell'ufficio tecnico">
+                                                <option value="">— nessuno —</option>
+                                                @foreach (var document in _dossier.AvailableDocuments)
+                                                {
+                                                    <option value="@document.Id">@document.Title</option>
+                                                }
+                                            </select>
+                                        }
+                                        else
+                                        {
+                                            <span class="muted">@(item.TechnicalDocumentId is null ? "—" : _dossier.AvailableDocuments.FirstOrDefault(d => d.Id == item.TechnicalDocumentId)?.Title ?? "documento")</span>
+                                        }
+                                    </td>
+                                    <td data-label="Oppure dove si trova">
+                                        @if (CanEditFile)
+                                        {
+                                            <input @bind="item.Reference" aria-label="Riferimento" placeholder="es. UT/2026/015/rischi.pdf" disabled="@(item.TechnicalDocumentId is not null)" />
+                                        }
+                                        else
+                                        {
+                                            <span class="muted">@(item.Reference ?? "—")</span>
+                                        }
+                                    </td>
                                 </tr>
                             }
                         </tbody>
@@ -287,6 +312,13 @@ else
                     <label>Altre normative UE rispettate<textarea class="textarea" rows="2" @bind="_declaration.OtherLegislation"></textarea></label>
                     <label>Norme armonizzate e specifiche tecniche applicate (una per riga)<textarea class="textarea" rows="4" @bind="_declaration.Standards"></textarea></label>
                     <label>Organismo notificato (solo se previsto)<input @bind="_declaration.NotifiedBody" placeholder="nome, numero e certificato" /></label>
+
+                    <div>
+                        <p class="muted small">Firma di chi emette la dichiarazione (facoltativa): un'immagine della firma apposta a schermo, stampata sulla dichiarazione. <strong>Non è una firma digitale qualificata</strong> e non ha il suo valore legale di non ripudio — è la stessa firma a mano libera già usata sui rapportini di cantiere.</p>
+                        <canvas id="declaration-signature" style="width:100%;max-width:420px;height:140px;border:1px solid var(--line);border-radius:var(--radius-sm);touch-action:none;background:#fff;"></canvas>
+                        <div class="actions"><button class="secondary small" @onclick="ClearSignatureAsync" type="button">Cancella firma</button></div>
+                    </div>
+
                     <div class="actions">
                         <button class="secondary" @onclick="SaveDeclarationAsync" disabled="@_busy">@(_busy ? "Salvataggio..." : "Salva")</button>
                         <button @onclick="AskIssue" disabled="@(_busy || !declaration.IsSaved || _dossier.MissingForDeclaration.Count > 0)">Emetti la dichiarazione</button>
@@ -349,7 +381,14 @@ else
                         <p><strong>Organismo notificato</strong><br />@declaration.NotifiedBody</p>
                     }
                     <p>@(declaration.Place ?? "—"), @Labels.Date(declaration.IssuedAt ?? DateTime.Today)</p>
-                    <p>@(declaration.SignatoryName ?? "—")@(declaration.SignatoryRole is null ? "" : $", {declaration.SignatoryRole}")<br /><span class="signature-line">Firma</span></p>
+                    <p>
+                        @(declaration.SignatoryName ?? "—")@(declaration.SignatoryRole is null ? "" : $", {declaration.SignatoryRole}")<br />
+                        @if (declaration.SignatureImage is not null)
+                        {
+                            <img src="@declaration.SignatureImage" alt="Firma" style="display:block;height:60px;margin-top:6px;" />
+                        }
+                        <span class="signature-line">Firma</span>
+                    </p>
                 </div>
             </div>
         }
@@ -392,6 +431,16 @@ else
 
     protected override Task OnParametersSetAsync() => LoadAsync();
 
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (_tab == "declaration" && CanEditDeclaration && _dossier is { Declaration.Status: not "Issued" })
+        {
+            await Js.InvokeVoidAsync("nicolomes.signature.init", "declaration-signature");
+        }
+    }
+
+    private Task ClearSignatureAsync() => Js.InvokeVoidAsync("nicolomes.signature.reset", "declaration-signature").AsTask();
+
     private async Task LoadAsync()
     {
         _loadError = null;
@@ -420,6 +469,7 @@ else
         _fileItems = dossier.TechnicalFile.Select(i => new TechnicalFileItemForm
         {
             Code = i.Code, Description = i.Description, Optional = i.Optional, Status = i.Status, Reference = i.Reference,
+            TechnicalDocumentId = i.TechnicalDocumentId,
         }).ToList();
         var d = dossier.Declaration;
         _declaration = new MachineDeclarationForm
@@ -455,6 +505,17 @@ else
     private void AddTestItem() => _testItems.Add(new MachineTestItemForm { Section = "Altre verifiche" });
 
     private void AddFileItem() => _fileItems.Add(new TechnicalFileItemForm { Optional = true });
+
+    /// <summary>Linking one of the product's own documents is itself proof the element is there (the server
+    /// enforces this too): reflect it at once instead of making the user also tick "Presente" by hand.</summary>
+    private void OnDocumentLinked(TechnicalFileItemForm item)
+    {
+        if (item.TechnicalDocumentId is not null)
+        {
+            item.Status = "Present";
+            item.Reference = null;
+        }
+    }
 
     private static string FileStatus(string? status) => status switch
     {
@@ -535,6 +596,7 @@ else
             description = i.Description,
             status = string.IsNullOrEmpty(i.Status) ? null : i.Status,
             reference = i.Reference,
+            technicalDocumentId = i.TechnicalDocumentId,
         }).ToList(),
     }), "Fascicolo tecnico salvato.");
 
@@ -543,7 +605,14 @@ else
 
     private void AskIssue() => _confirm = new("Emetti la dichiarazione",
         "La dichiarazione riceve il numero e non si modifica più, insieme al fascicolo tecnico. Salva prima eventuali modifiche ai dati.",
-        () => RunAsync(() => Api.PostAsync<MachineDossier>($"api/machine-testing/work-orders/{Id}/declaration/issue"), "Dichiarazione emessa: ora puoi stamparla."));
+        () => RunAsync(IssueAsync, "Dichiarazione emessa: ora puoi stamparla."));
+
+    private async Task<MachineDossier> IssueAsync()
+    {
+        var empty = await Js.InvokeAsync<bool>("nicolomes.signature.isEmpty", "declaration-signature");
+        var signature = empty ? null : await Js.InvokeAsync<string>("nicolomes.signature.toDataUrl", "declaration-signature");
+        return await Api.PostAsync<MachineDossier>($"api/machine-testing/work-orders/{Id}/declaration/issue", new IssueDeclarationRequest(signature));
+    }
 
     private async Task WithdrawAsync()
     {

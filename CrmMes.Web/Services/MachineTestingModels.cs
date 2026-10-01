@@ -8,18 +8,23 @@ public sealed record MachineTestItem(int Sequence, string Section, string Descri
 public sealed record MachineTest(Guid Id, int Number, string Kind, string Status, string? SerialNumber, string? Location, DateTime? TestDate,
     string? CustomerWitness, string? Notes, string? CreatedBy, DateTime CreatedAt, DateTime? ClosedAt, string? TestedBy, List<MachineTestItem> Items);
 
-public sealed record TechnicalFileItem(string Code, string Description, bool Optional, string? Status, string? Reference, string? UpdatedBy, DateTime? UpdatedAt);
+public sealed record TechnicalFileItem(string Code, string Description, bool Optional, string? Status, string? Reference, string? UpdatedBy, DateTime? UpdatedAt,
+    Guid? TechnicalDocumentId = null, string? TechnicalDocumentTitle = null);
+
+public sealed record LinkedDocumentOption(Guid Id, string Title, string FileName);
 
 public sealed record Manufacturer(string? Name, string? Address, string? VatNumber);
 
 public sealed record MachineDeclaration(bool IsSaved, string Status, int? Number, string LegalBasis, string LegalBasisText,
     string MachineName, string? Function, string? Model, string? Type, string? SerialNumber, int? YearOfConstruction,
     string? OtherLegislation, string? Standards, string? NotifiedBody, string? TechnicalFileKeeper, string? Place,
-    string? SignatoryName, string? SignatoryRole, string? Notes, DateTime? IssuedAt, string? IssuedBy);
+    string? SignatoryName, string? SignatoryRole, string? Notes, DateTime? IssuedAt, string? IssuedBy, string? SignatureImage = null);
 
 public sealed record MachineDossier(Guid WorkOrderId, string WorkOrderCode, string WorkOrderStatus, string ProductCode, string ProductName,
     string? ProductRevision, string? CustomerName, Manufacturer Manufacturer, List<MachineTest> Tests, List<TechnicalFileItem> TechnicalFile,
-    bool TechnicalFileComplete, MachineDeclaration Declaration, List<string> MissingForDeclaration);
+    bool TechnicalFileComplete, MachineDeclaration Declaration, List<string> MissingForDeclaration, List<LinkedDocumentOption> AvailableDocuments);
+
+public sealed record IssueDeclarationRequest(string? SignatureImage);
 
 /// <summary>Editable copy of a test row (records are immutable, the form needs fields).</summary>
 public sealed class MachineTestItemForm
@@ -39,6 +44,7 @@ public sealed class TechnicalFileItemForm
     public bool Optional { get; set; }
     public string? Status { get; set; }
     public string? Reference { get; set; }
+    public Guid? TechnicalDocumentId { get; set; }
 }
 
 public sealed class MachineDeclarationForm

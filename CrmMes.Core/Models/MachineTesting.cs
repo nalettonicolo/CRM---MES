@@ -76,8 +76,15 @@ public class MachineTechnicalFileItem
     /// <summary>null (missing), "Present" or "NotApplicable".</summary>
     public string? Status { get; set; }
 
-    /// <summary>Where it is: document code, archive folder, file name.</summary>
+    /// <summary>Where it is: document code, archive folder, file name — free text, used when the document
+    /// isn't one of the product's own technical documents (e.g. it sits in a paper archive).</summary>
     public string? Reference { get; set; }
+
+    /// <summary>The actual document from the engineering office (<see cref="TechnicalDocument"/>), when the
+    /// element is one of those: always its current version, so this never goes stale if a new one is uploaded.</summary>
+    public Guid? TechnicalDocumentId { get; set; }
+    public TechnicalDocument? TechnicalDocument { get; set; }
+
     public string? UpdatedBy { get; set; }
     public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
 }
@@ -122,6 +129,13 @@ public class MachineDeclaration
     public string? Place { get; set; }
     public string? SignatoryName { get; set; }
     public string? SignatoryRole { get; set; }
+
+    /// <summary>A handwritten signature captured on screen at issuance (PNG as a data URL), printed on the
+    /// declaration. This is an image of a signature, exactly like the customer signature on a site report —
+    /// it is NOT a qualified electronic signature (firma digitale qualificata, CAdES/PAdES via an accredited
+    /// provider) and carries none of its legal non-repudiation. Null when issued without one, or from the
+    /// desktop program, which does not yet offer signature capture.</summary>
+    public string? SignatureImage { get; set; }
     public string? Notes { get; set; }
 
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;

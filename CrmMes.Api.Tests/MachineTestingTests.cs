@@ -186,4 +186,68 @@ public class MachineTestingTests : IClassFixture<AdminSeededApiTestFixture>
         Assert.Equal("Draft", reopened.Tests.Single().Status);
         Assert.Equal(HttpStatusCode.NotFound, (await client.GetAsync($"/api/machine-testing/work-orders/{Guid.NewGuid()}")).StatusCode);
     }
+
+    private async Task<Guid> UploadDocumentAsync(Guid productId, string title)
+    {
+        using var form = new MultipartFormDataContent();
+        var file = new ByteArrayContent([1, 2, 3]);
+        file.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue("application/pdf");
+        form.Add(file, "file", "schema.pdf");
+        form.Add(new StringContent(title), "title");
+        form.Add(new StringContent("schema"), "kind");
+        var response = await _admin.PostAsync($"/api/engineering/products/{productId}/documents", form);
+        response.EnsureSuccessStatusCode();
+        return (await response.Content.ReadFromJsonAsync<TechnicalDocumentResponse>())!.Id;
+    }
+
+    [Fact]
+    public async Task TechnicalFile_CanLinkTheProductsOwnDocument_ButNotAnUnrelatedOne()
+    {
+        var order = await MachineOrderAsync();
+        var baseUrl = $"/api/machine-testing/work-orders/{order.Id}";
+        var documentId = await UploadDocumentAsync(order.ProductId, "Schema elettrico generale");
+        var otherOrder = await MachineOrderAsync();
+        var unrelatedDocumentId = await UploadDocumentAsync(otherOrder.ProductId, "Schema di un'altra macchina");
+
+        var start = (await _admin.GetFromJsonAsync<MachineDossierResponse>(baseUrl))!;
+        Assert.Contains(start.AvailableDocuments, d => d.Id == documentId && d.Title == "Schema elettrico generale");
+        Assert.DoesNotContain(start.AvailableDocuments, d => d.Id == unrelatedDocumentId);
+
+        var linkedItems = CompleteFile().Items!.Select(i => i.Code == MachineTestingController.TechnicalFileElements[0].Code
+            ? i with { Status = null, TechnicalDocumentId = documentId }
+            : i).ToList();
+        var saved = await Send(await _admin.PutAsJsonAsync($"{baseUrl}/technical-file", new SaveTechnicalFileRequest(linkedItems)));
+        var linked = saved.TechnicalFile.Single(f => f.Code == MachineTestingController.TechnicalFileElements[0].Code);
+        Assert.Equal("Present", linked.Status); // auto-set by linking the document, even though we sent null
+        Assert.Equal(documentId, linked.TechnicalDocumentId);
+        Assert.Equal("Schema elettrico generale", linked.TechnicalDocumentTitle);
+
+        var withUnrelated = CompleteFile().Items!.Select(i => i.Code == MachineTestingController.TechnicalFileElements[0].Code
+            ? i with { TechnicalDocumentId = unrelatedDocumentId }
+            : i).ToList();
+        var rejected = await _admin.PutAsJsonAsync($"{baseUrl}/technical-file", new SaveTechnicalFileRequest(withUnrelated));
+        Assert.Equal(HttpStatusCode.BadRequest, rejected.StatusCode);
+    }
+
+    [Fact]
+    public async Task Issuing_CanCaptureASignatureImage_WithdrawingClearsIt_InvalidFormatRejected()
+    {
+        (await _admin.PutAsJsonAsync("/api/company-profile", new SaveCompanyProfileRequest(
+            "Officine Prova srl", "01234567890", "Via Roma 1, 20100 Milano", null, null, "machine-building", null))).EnsureSuccessStatusCode();
+        var order = await MachineOrderAsync();
+        var baseUrl = $"/api/machine-testing/work-orders/{order.Id}";
+        await Send(await _admin.PutAsJsonAsync($"{baseUrl}/declaration", Declaration("M-S1")));
+        await Send(await _admin.PutAsJsonAsync($"{baseUrl}/technical-file", CompleteFile()));
+        await PassedFatAsync(order.Id, "M-S1");
+
+        Assert.Equal(HttpStatusCode.BadRequest, (await _admin.PostAsJsonAsync($"{baseUrl}/declaration/issue",
+            new IssueMachineDeclarationRequest("not-an-image"))).StatusCode);
+
+        const string signature = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUg==";
+        var issued = await Send(await _admin.PostAsJsonAsync($"{baseUrl}/declaration/issue", new IssueMachineDeclarationRequest(signature)));
+        Assert.Equal(signature, issued.Declaration.SignatureImage);
+
+        var withdrawn = await Send(await _admin.PostAsJsonAsync($"{baseUrl}/declaration/withdraw", new WithdrawDeclarationRequest("Prova")));
+        Assert.Null(withdrawn.Declaration.SignatureImage);
+    }
 }

@@ -455,6 +455,7 @@ public class ApplicationDbContext : DbContext
             entity.Property(i => i.Status).HasMaxLength(20);
             entity.Property(i => i.Reference).HasMaxLength(300);
             entity.Property(i => i.UpdatedBy).HasMaxLength(200);
+            entity.HasOne(i => i.TechnicalDocument).WithMany().HasForeignKey(i => i.TechnicalDocumentId).OnDelete(DeleteBehavior.SetNull);
         });
 
         modelBuilder.Entity<MachineDeclaration>(entity =>
@@ -477,6 +478,7 @@ public class ApplicationDbContext : DbContext
             entity.Property(d => d.SignatoryName).HasMaxLength(200);
             entity.Property(d => d.SignatoryRole).HasMaxLength(200);
             entity.Property(d => d.Notes).HasMaxLength(2000);
+            entity.Property(d => d.SignatureImage).HasColumnType("text");
             entity.Property(d => d.IssuedBy).HasMaxLength(200);
         });
 

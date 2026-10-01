@@ -1,4 +1,4 @@
-using System.Security.Claims;
+﻿using System.Security.Claims;
 using CrmMes.Core.Data;
 using CrmMes.Core.Models;
 using Microsoft.AspNetCore.Authorization;
@@ -330,7 +330,8 @@ public class MachineTestingController(ApplicationDbContext db) : ControllerBase
     [HttpPut("work-orders/{workOrderId:guid}/technical-file")]
     public async Task<ActionResult<MachineDossierResponse>> SaveTechnicalFile(Guid workOrderId, SaveTechnicalFileRequest request, CancellationToken cancellationToken = default)
     {
-        if (!await db.WorkOrders.AnyAsync(w => w.Id == workOrderId, cancellationToken))
+        var workOrder = await db.WorkOrders.AsNoTracking().FirstOrDefaultAsync(w => w.Id == workOrderId, cancellationToken);
+        if (workOrder is null)
         {
             return NotFound();
         }
@@ -344,6 +345,19 @@ public class MachineTestingController(ApplicationDbContext db) : ControllerBase
         if (items.Any(item => item.Status is not null && !FileStatuses.Contains(item.Status)))
         {
             return BadRequest(new { message = "Stato non valido: Presente o Non applicabile." });
+        }
+
+        // A document can be attached only if it belongs to this job's own product: prevents linking a
+        // drawing from an unrelated machine just because its id was guessed or copied.
+        var documentIds = items.Where(i => i.TechnicalDocumentId is not null).Select(i => i.TechnicalDocumentId!.Value).Distinct().ToList();
+        if (documentIds.Count > 0)
+        {
+            var validIds = await db.TechnicalDocuments.Where(d => documentIds.Contains(d.Id) && d.ProductId == workOrder.ProductId)
+                .Select(d => d.Id).ToListAsync(cancellationToken);
+            if (validIds.Count != documentIds.Count)
+            {
+                return BadRequest(new { message = "Uno dei documenti indicati non appartiene al prodotto di questa commessa." });
+            }
         }
 
         var standard = TechnicalFileElements.ToDictionary(e => e.Code);
@@ -402,9 +416,12 @@ public class MachineTestingController(ApplicationDbContext db) : ControllerBase
 
         void Apply(MachineTechnicalFileItem entity, int order, string description, bool optional, TechnicalFileItemRequest? sent)
         {
-            var status = sent?.Status;
+            // Linking one of the product's own documents is itself proof the element is there: the status
+            // is set to "Present" automatically, instead of asking the user to also tick it by hand.
+            var status = sent?.TechnicalDocumentId is not null ? "Present" : sent?.Status;
             var reference = Clean(sent?.Reference);
-            if (entity.Status != status || entity.Reference != reference || entity.Sequence != order || entity.Description != description)
+            if (entity.Status != status || entity.Reference != reference || entity.Sequence != order || entity.Description != description
+                || entity.TechnicalDocumentId != sent?.TechnicalDocumentId)
             {
                 entity.UpdatedBy = user;
                 entity.UpdatedAt = now;
@@ -415,6 +432,7 @@ public class MachineTestingController(ApplicationDbContext db) : ControllerBase
             entity.Optional = optional;
             entity.Status = status;
             entity.Reference = reference;
+            entity.TechnicalDocumentId = sent?.TechnicalDocumentId;
         }
     }
 
@@ -474,8 +492,18 @@ public class MachineTestingController(ApplicationDbContext db) : ControllerBase
     /// declaration can't do without, a passed test of that serial number and a complete technical file.</summary>
     [Authorize(Policy = "Engineering")]
     [HttpPost("work-orders/{workOrderId:guid}/declaration/issue")]
-    public async Task<ActionResult<MachineDossierResponse>> IssueDeclaration(Guid workOrderId, CancellationToken cancellationToken = default)
+    public async Task<ActionResult<MachineDossierResponse>> IssueDeclaration(Guid workOrderId, IssueMachineDeclarationRequest? request, CancellationToken cancellationToken = default)
     {
+        if (request?.SignatureImage is { Length: > 0 } signature && !signature.StartsWith("data:image/png;base64,"))
+        {
+            return BadRequest(new { message = "La firma deve essere un'immagine PNG acquisita a schermo." });
+        }
+
+        if (request?.SignatureImage?.Length > 400_000)
+        {
+            return BadRequest(new { message = "L'immagine della firma è troppo grande." });
+        }
+
         var workOrder = await db.WorkOrders.AsNoTracking().FirstOrDefaultAsync(w => w.Id == workOrderId, cancellationToken);
         var declaration = await db.MachineDeclarations.FirstOrDefaultAsync(d => d.WorkOrderId == workOrderId, cancellationToken);
         if (workOrder is null)
@@ -505,6 +533,7 @@ public class MachineTestingController(ApplicationDbContext db) : ControllerBase
         declaration.LegalBasis = LegalBasisOn(now);
         declaration.IssuedAt = now;
         declaration.IssuedBy = User.FindFirstValue(ClaimTypes.Name);
+        declaration.SignatureImage = string.IsNullOrEmpty(request?.SignatureImage) ? null : request.SignatureImage;
         db.AuditLogs.Add(new AuditLog
         {
             Action = "MachineDeclarationIssued",
@@ -544,6 +573,7 @@ public class MachineTestingController(ApplicationDbContext db) : ControllerBase
         declaration.IssuedAt = null;
         declaration.IssuedBy = null;
         declaration.LegalBasis = null;
+        declaration.SignatureImage = null;
         db.AuditLogs.Add(new AuditLog
         {
             Action = "MachineDeclarationWithdrawn",
@@ -635,12 +665,15 @@ public class MachineTestingController(ApplicationDbContext db) : ControllerBase
         var profile = await db.CompanyProfiles.AsNoTracking().FirstOrDefaultAsync(cancellationToken);
         var tests = await db.MachineTests.AsNoTracking().Include(t => t.Items).Where(t => t.WorkOrderId == workOrderId)
             .OrderBy(t => t.Number).ToListAsync(cancellationToken);
-        var file = await db.MachineTechnicalFileItems.AsNoTracking().Where(i => i.WorkOrderId == workOrderId)
+        var file = await db.MachineTechnicalFileItems.AsNoTracking().Include(i => i.TechnicalDocument).Where(i => i.WorkOrderId == workOrderId)
             .OrderBy(i => i.Sequence).ToListAsync(cancellationToken);
         var declaration = await db.MachineDeclarations.AsNoTracking().FirstOrDefaultAsync(d => d.WorkOrderId == workOrderId, cancellationToken);
+        var availableDocuments = await db.TechnicalDocuments.AsNoTracking().Where(d => d.ProductId == workOrder.ProductId && d.IsCurrent)
+            .OrderBy(d => d.Title).Select(d => new LinkedDocumentOption(d.Id, d.Title, d.FileName)).ToListAsync(cancellationToken);
 
         var fileItems = file.Count > 0
-            ? file.Select(i => new TechnicalFileItemResponse(i.Code, i.Description, i.Optional, i.Status, i.Reference, i.UpdatedBy, i.UpdatedAt)).ToList()
+            ? file.Select(i => new TechnicalFileItemResponse(i.Code, i.Description, i.Optional, i.Status, i.Reference, i.UpdatedBy, i.UpdatedAt,
+                i.TechnicalDocumentId, i.TechnicalDocument?.Title)).ToList()
             : TechnicalFileElements.Select(e => new TechnicalFileItemResponse(e.Code, e.Description, e.Optional, null, null, null, null)).ToList();
 
         var manufacturerAddress = profile is null ? null : ManufacturerAddress(profile);
@@ -670,8 +703,9 @@ public class MachineTestingController(ApplicationDbContext db) : ControllerBase
                 declaration is not null, draft.Status, draft.Number, legalBasis, LegalBasisText(legalBasis),
                 draft.MachineName, draft.Function, draft.Model, draft.Type, draft.SerialNumber, draft.YearOfConstruction,
                 draft.OtherLegislation, draft.Standards, draft.NotifiedBody, draft.TechnicalFileKeeper, draft.Place,
-                draft.SignatoryName, draft.SignatoryRole, draft.Notes, draft.IssuedAt, draft.IssuedBy),
-            draft.Status == "Issued" ? [] : await MissingForDeclarationAsync(workOrderId, declaration, cancellationToken));
+                draft.SignatoryName, draft.SignatoryRole, draft.Notes, draft.IssuedAt, draft.IssuedBy, draft.SignatureImage),
+            draft.Status == "Issued" ? [] : await MissingForDeclarationAsync(workOrderId, declaration, cancellationToken),
+            availableDocuments);
     }
 
     private static MachineTestResponse ToResponse(MachineTest test) => new(
@@ -695,7 +729,7 @@ public sealed record MachineTestItemRequest(string? Section, string? Description
 public sealed record SaveMachineTestRequest(
     string? SerialNumber, string? Location, DateTime? TestDate, string? CustomerWitness, string? Notes, List<MachineTestItemRequest>? Items);
 
-public sealed record TechnicalFileItemRequest(string? Code, string? Description, string? Status, string? Reference);
+public sealed record TechnicalFileItemRequest(string? Code, string? Description, string? Status, string? Reference, Guid? TechnicalDocumentId = null);
 
 public sealed record SaveTechnicalFileRequest(List<TechnicalFileItemRequest>? Items);
 
@@ -706,6 +740,10 @@ public sealed record SaveMachineDeclarationRequest(
 
 public sealed record WithdrawDeclarationRequest(string? Reason);
 
+/// <summary>A handwritten signature captured on screen (PNG data URL), optional. It is NOT a qualified
+/// electronic signature: see the remark on MachineDeclaration.SignatureImage.</summary>
+public sealed record IssueMachineDeclarationRequest(string? SignatureImage);
+
 public sealed record MachineTestItemResponse(int Sequence, string Section, string Description, string? Expected, string? Measured, string? Result, string? Notes);
 
 public sealed record MachineTestResponse(
@@ -713,7 +751,10 @@ public sealed record MachineTestResponse(
     string? Notes, string? CreatedBy, DateTime CreatedAt, DateTime? ClosedAt, string? TestedBy, List<MachineTestItemResponse> Items);
 
 public sealed record TechnicalFileItemResponse(
-    string Code, string Description, bool Optional, string? Status, string? Reference, string? UpdatedBy, DateTime? UpdatedAt);
+    string Code, string Description, bool Optional, string? Status, string? Reference, string? UpdatedBy, DateTime? UpdatedAt,
+    Guid? TechnicalDocumentId = null, string? TechnicalDocumentTitle = null);
+
+public sealed record LinkedDocumentOption(Guid Id, string Title, string FileName);
 
 public sealed record ManufacturerResponse(string? Name, string? Address, string? VatNumber);
 
@@ -721,9 +762,10 @@ public sealed record MachineDeclarationResponse(
     bool IsSaved, string Status, int? Number, string LegalBasis, string LegalBasisText,
     string MachineName, string? Function, string? Model, string? Type, string? SerialNumber, int? YearOfConstruction,
     string? OtherLegislation, string? Standards, string? NotifiedBody, string? TechnicalFileKeeper, string? Place,
-    string? SignatoryName, string? SignatoryRole, string? Notes, DateTime? IssuedAt, string? IssuedBy);
+    string? SignatoryName, string? SignatoryRole, string? Notes, DateTime? IssuedAt, string? IssuedBy, string? SignatureImage);
 
 public sealed record MachineDossierResponse(
     Guid WorkOrderId, string WorkOrderCode, string WorkOrderStatus, string ProductCode, string ProductName, string? ProductRevision,
     string? CustomerName, ManufacturerResponse Manufacturer, List<MachineTestResponse> Tests, List<TechnicalFileItemResponse> TechnicalFile,
-    bool TechnicalFileComplete, MachineDeclarationResponse Declaration, List<string> MissingForDeclaration);
+    bool TechnicalFileComplete, MachineDeclarationResponse Declaration, List<string> MissingForDeclaration,
+    List<LinkedDocumentOption> AvailableDocuments);
