@@ -1,0 +1,204 @@
+<Window x:Class="CrmMes.Desktop.MachineTestingWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Collaudo e CE" Icon="Assets/logo.ico" Height="820" Width="1080"
+        WindowStartupLocation="CenterOwner" ResizeMode="CanResize" MinHeight="620" MinWidth="880"
+        Background="{StaticResource BackgroundBrush}">
+    <Grid Margin="24,20,24,20">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
+        <DockPanel Grid.Row="0" Margin="0,0,0,10">
+            <Border DockPanel.Dock="Right" Style="{StaticResource Pill}" VerticalAlignment="Center">
+                <TextBlock x:Name="DeclarationStatusText" Style="{StaticResource PillText}" FontSize="13" />
+            </Border>
+            <StackPanel>
+                <TextBlock Text="C O L L A U D O   E   C E" Style="{StaticResource MicroLabel}" />
+                <TextBlock x:Name="HeaderText" Style="{StaticResource EditorialTitle}" FontSize="22" />
+                <TextBlock x:Name="SubHeaderText" Foreground="{StaticResource TextSecondaryBrush}" FontSize="12.5" TextWrapping="Wrap" />
+            </StackPanel>
+        </DockPanel>
+
+        <TabControl Grid.Row="1" x:Name="Tabs">
+            <TabItem Header="Collaudi">
+                <Grid Margin="0,10,0,0">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="140" />
+                        <RowDefinition Height="*" />
+                        <RowDefinition Height="Auto" />
+                    </Grid.RowDefinitions>
+
+                    <Border Grid.Row="0" Style="{StaticResource CardBorder}" Padding="4">
+                        <ListView x:Name="TestsList" SelectionChanged="TestsList_SelectionChanged">
+                            <ListView.View>
+                                <GridView>
+                                    <GridViewColumn Header="N." DisplayMemberBinding="{Binding NumberLabel}" Width="60" />
+                                    <GridViewColumn Header="Tipo" DisplayMemberBinding="{Binding Kind}" Width="60" />
+                                    <GridViewColumn Header="Matricola" DisplayMemberBinding="{Binding SerialNumber}" Width="140" />
+                                    <GridViewColumn Header="Data" DisplayMemberBinding="{Binding TestDateLabel}" Width="100" />
+                                    <GridViewColumn Header="Stato" DisplayMemberBinding="{Binding StatusLabel}" Width="100" />
+                                    <GridViewColumn Header="Collaudato da" DisplayMemberBinding="{Binding TestedBy}" Width="130" />
+                                </GridView>
+                            </ListView.View>
+                        </ListView>
+                    </Border>
+
+                    <Border Grid.Row="1" Style="{StaticResource CardBorder}" Padding="4" Margin="0,10,0,0">
+                        <ListView x:Name="ChecklistList">
+                            <ListView.View>
+                                <GridView>
+                                    <GridViewColumn Header="Sezione" DisplayMemberBinding="{Binding Section}" Width="170" />
+                                    <GridViewColumn Header="Verifica" DisplayMemberBinding="{Binding Description}" Width="320" />
+                                    <GridViewColumn Header="Atteso" DisplayMemberBinding="{Binding Expected}" Width="140" />
+                                    <GridViewColumn Header="Esito" Width="150">
+                                        <GridViewColumn.CellTemplate>
+                                            <DataTemplate>
+                                                <ComboBox Width="130" Height="28" SelectedValuePath="Tag" SelectedValue="{Binding Result, Mode=TwoWay}" IsEnabled="{Binding IsEditable}">
+                                                    <ComboBoxItem Content="Da eseguire" Tag="" />
+                                                    <ComboBoxItem Content="Superata" Tag="Pass" />
+                                                    <ComboBoxItem Content="Non superata" Tag="Fail" />
+                                                    <ComboBoxItem Content="Non applicabile" Tag="NotApplicable" />
+                                                </ComboBox>
+                                            </DataTemplate>
+                                        </GridViewColumn.CellTemplate>
+                                    </GridViewColumn>
+                                    <GridViewColumn Header="Note" Width="180">
+                                        <GridViewColumn.CellTemplate>
+                                            <DataTemplate>
+                                                <TextBox Width="170" Height="28" Text="{Binding Notes, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" IsEnabled="{Binding IsEditable}" />
+                                            </DataTemplate>
+                                        </GridViewColumn.CellTemplate>
+                                    </GridViewColumn>
+                                </GridView>
+                            </ListView.View>
+                        </ListView>
+                    </Border>
+
+                    <DockPanel Grid.Row="2" Margin="0,10,0,0">
+                        <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
+                            <ComboBox x:Name="NewTestKindCombo" Width="80" Height="32" SelectedIndex="0" Margin="0,0,10,0">
+                                <ComboBoxItem Content="FAT" />
+                                <ComboBoxItem Content="SAT" />
+                            </ComboBox>
+                            <TextBox x:Name="NewTestSerialBox" Width="130" Height="32" Tag="Matricola" Margin="0,0,10,0" />
+                            <Button Content="Nuovo collaudo" Width="130" Height="32" Margin="0,0,16,0" Click="NewTest_Click" />
+                            <Button x:Name="ReopenTestButton" Style="{StaticResource SecondaryButton}" Content="Riapri" Width="90" Height="32" Margin="0,0,10,0" Click="ReopenTest_Click" />
+                            <Button x:Name="SaveTestButton" Style="{StaticResource SecondaryButton}" Content="Salva" Width="90" Height="32" Margin="0,0,10,0" Click="SaveTest_Click" />
+                            <Button x:Name="CloseTestButton" Content="Chiudi collaudo" Width="130" Height="32" Click="CloseTest_Click" />
+                        </StackPanel>
+                    </DockPanel>
+                </Grid>
+            </TabItem>
+
+            <TabItem Header="Fascicolo tecnico">
+                <Grid Margin="0,10,0,0">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="*" />
+                        <RowDefinition Height="Auto" />
+                    </Grid.RowDefinitions>
+                    <Border Grid.Row="0" Style="{StaticResource CardBorder}" Padding="4">
+                        <ListView x:Name="TechnicalFileList">
+                            <ListView.View>
+                                <GridView>
+                                    <GridViewColumn Header="Elemento" DisplayMemberBinding="{Binding Description}" Width="380" />
+                                    <GridViewColumn Header="Facoltativo" DisplayMemberBinding="{Binding OptionalLabel}" Width="90" />
+                                    <GridViewColumn Header="Stato" Width="150">
+                                        <GridViewColumn.CellTemplate>
+                                            <DataTemplate>
+                                                <ComboBox Width="140" Height="28" SelectedValuePath="Tag" SelectedValue="{Binding Status, Mode=TwoWay}">
+                                                    <ComboBoxItem Content="Mancante" Tag="" />
+                                                    <ComboBoxItem Content="Presente" Tag="Present" />
+                                                    <ComboBoxItem Content="Non applicabile" Tag="NotApplicable" />
+                                                </ComboBox>
+                                            </DataTemplate>
+                                        </GridViewColumn.CellTemplate>
+                                    </GridViewColumn>
+                                    <GridViewColumn Header="Riferimento (dove si trova)" Width="220">
+                                        <GridViewColumn.CellTemplate>
+                                            <DataTemplate>
+                                                <TextBox Width="210" Height="28" Text="{Binding Reference, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                                            </DataTemplate>
+                                        </GridViewColumn.CellTemplate>
+                                    </GridViewColumn>
+                                </GridView>
+                            </ListView.View>
+                        </ListView>
+                    </Border>
+                    <DockPanel Grid.Row="1" Margin="0,10,0,0">
+                        <Button x:Name="SaveTechnicalFileButton" DockPanel.Dock="Right" Content="Salva fascicolo" Width="140" Height="32" Click="SaveTechnicalFile_Click" />
+                    </DockPanel>
+                </Grid>
+            </TabItem>
+
+            <TabItem Header="Dichiarazione di conformità">
+                <ScrollViewer Margin="0,10,0,0" VerticalScrollBarVisibility="Auto">
+                <StackPanel>
+                    <TextBlock x:Name="MissingText" Foreground="{StaticResource WarningTextBrush}" TextWrapping="Wrap" Margin="0,0,0,10" />
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="12" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                        </Grid.RowDefinitions>
+
+                        <StackPanel Grid.Row="0" Grid.Column="0">
+                            <TextBlock Text="Nome della macchina *" Foreground="{StaticResource TextSecondaryBrush}" FontSize="12.5" Margin="0,0,0,5" />
+                            <TextBox x:Name="MachineNameBox" />
+                        </StackPanel>
+                        <StackPanel Grid.Row="0" Grid.Column="2">
+                            <TextBlock Text="Funzione" Foreground="{StaticResource TextSecondaryBrush}" FontSize="12.5" Margin="0,0,0,5" />
+                            <TextBox x:Name="FunctionBox" />
+                        </StackPanel>
+
+                        <StackPanel Grid.Row="1" Grid.Column="0" Margin="0,10,0,0">
+                            <TextBlock Text="Modello" Foreground="{StaticResource TextSecondaryBrush}" FontSize="12.5" Margin="0,0,0,5" />
+                            <TextBox x:Name="ModelBox" />
+                        </StackPanel>
+                        <StackPanel Grid.Row="1" Grid.Column="2" Margin="0,10,0,0">
+                            <TextBlock Text="Matricola *" Foreground="{StaticResource TextSecondaryBrush}" FontSize="12.5" Margin="0,0,0,5" />
+                            <TextBox x:Name="DeclarationSerialBox" />
+                        </StackPanel>
+
+                        <StackPanel Grid.Row="2" Grid.Column="0" Margin="0,10,0,0">
+                            <TextBlock Text="Anno di costruzione" Foreground="{StaticResource TextSecondaryBrush}" FontSize="12.5" Margin="0,0,0,5" />
+                            <TextBox x:Name="YearBox" />
+                        </StackPanel>
+                        <StackPanel Grid.Row="2" Grid.Column="2" Margin="0,10,0,0">
+                            <TextBlock Text="Luogo" Foreground="{StaticResource TextSecondaryBrush}" FontSize="12.5" Margin="0,0,0,5" />
+                            <TextBox x:Name="PlaceBox" />
+                        </StackPanel>
+
+                        <StackPanel Grid.Row="3" Grid.Column="0" Margin="0,10,0,0">
+                            <TextBlock Text="Nome del firmatario" Foreground="{StaticResource TextSecondaryBrush}" FontSize="12.5" Margin="0,0,0,5" />
+                            <TextBox x:Name="SignatoryNameBox" />
+                        </StackPanel>
+                        <StackPanel Grid.Row="3" Grid.Column="2" Margin="0,10,0,0">
+                            <TextBlock Text="Ruolo del firmatario" Foreground="{StaticResource TextSecondaryBrush}" FontSize="12.5" Margin="0,0,0,5" />
+                            <TextBox x:Name="SignatoryRoleBox" />
+                        </StackPanel>
+                    </Grid>
+
+                    <TextBlock x:Name="IssuedInfoText" Foreground="{StaticResource TextSecondaryBrush}" FontSize="12.5" Margin="0,14,0,0" TextWrapping="Wrap" />
+
+                    <StackPanel Orientation="Horizontal" Margin="0,14,0,0">
+                        <Button x:Name="SaveDeclarationButton" Style="{StaticResource SecondaryButton}" Content="Salva bozza" Width="120" Height="36" Margin="0,0,10,0" Click="SaveDeclaration_Click" />
+                        <Button x:Name="IssueDeclarationButton" Content="Emetti dichiarazione" Width="160" Height="36" Margin="0,0,10,0" Click="IssueDeclaration_Click" />
+                        <Button x:Name="WithdrawDeclarationButton" Style="{StaticResource DangerButton}" Content="Ritira dichiarazione" Width="160" Height="36" Click="WithdrawDeclaration_Click" />
+                    </StackPanel>
+                </StackPanel>
+                </ScrollViewer>
+            </TabItem>
+        </TabControl>
+
+        <TextBlock Grid.Row="2" x:Name="ErrorText" Foreground="{StaticResource DangerBrush}" TextWrapping="Wrap" Margin="0,10,0,0" />
+    </Grid>
+</Window>

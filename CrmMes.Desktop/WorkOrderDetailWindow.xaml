@@ -124,6 +124,7 @@
             <Button x:Name="PalletButton" Style="{StaticResource SecondaryButton}" Content="Pallet SSCC" Width="110" Height="36" Margin="0,10,10,0" Click="Pallet_Click" Visibility="Collapsed" />
             <Button x:Name="SiteReportButton" Style="{StaticResource SecondaryButton}" Content="Rapportino" Width="110" Height="36" Margin="0,10,10,0" Click="SiteReport_Click" Visibility="Collapsed" />
             <Button x:Name="PanelVerificationButton" Style="{StaticResource SecondaryButton}" Content="Verifica 61439" Width="130" Height="36" Margin="0,10,10,0" Click="PanelVerification_Click" Visibility="Collapsed" />
+            <Button x:Name="MachineTestingButton" Style="{StaticResource SecondaryButton}" Content="Collaudo e CE" Width="120" Height="36" Margin="0,10,10,0" Click="MachineTesting_Click" Visibility="Collapsed" />
             <Button x:Name="LabelButton" Style="{StaticResource SecondaryButton}" Content="Etichetta QR" Width="120" Height="36" Margin="0,10,10,0" Click="Label_Click" />
             <Button x:Name="UnitsButton" Style="{StaticResource SecondaryButton}" Content="Unità prodotte" Width="130" Height="36" Margin="0,10,10,0" Click="Units_Click" />
             <Button x:Name="QualityButton" Style="{StaticResource SecondaryButton}" Content="Controlli qualità" Width="140" Height="36" Margin="0,10,10,0" Click="Quality_Click" />

@@ -1287,6 +1287,132 @@ public sealed class ApiClient
             ?? throw new InvalidOperationException("Risposta di importazione non valida.");
     }
 
+    // ---------- Service post-vendita ----------
+
+    public async Task<List<InstalledMachineDto>> GetInstalledMachinesAsync(CancellationToken cancellationToken = default)
+    {
+        using var response = await _httpClient.GetAsync("api/service/machines", cancellationToken);
+        await EnsureSuccessAsync(response, cancellationToken);
+        return await response.Content.ReadFromJsonAsync<List<InstalledMachineDto>>(cancellationToken: cancellationToken) ?? [];
+    }
+
+    public async Task<InstalledMachineDto> CreateInstalledMachineAsync(
+        Guid customerId, string name, string? model, string serialNumber, string? location, DateTime? installedAt, DateTime? warrantyUntil, CancellationToken cancellationToken = default)
+        => await SendAsync<InstalledMachineDto>(HttpMethod.Post, "api/service/machines",
+            new { customerId, workOrderId = (Guid?)null, name, model, serialNumber, location, installedAt, warrantyUntil, notes = (string?)null }, cancellationToken);
+
+    public async Task<List<ServiceRequestRowDto>> GetServiceRequestsAsync(string? status = null, CancellationToken cancellationToken = default)
+    {
+        using var response = await _httpClient.GetAsync($"api/service/requests?status={status}", cancellationToken);
+        await EnsureSuccessAsync(response, cancellationToken);
+        return await response.Content.ReadFromJsonAsync<List<ServiceRequestRowDto>>(cancellationToken: cancellationToken) ?? [];
+    }
+
+    public async Task<ServiceRequestDetailDto> GetServiceRequestAsync(Guid id, CancellationToken cancellationToken = default)
+    {
+        using var response = await _httpClient.GetAsync($"api/service/requests/{id}", cancellationToken);
+        await EnsureSuccessAsync(response, cancellationToken);
+        return await response.Content.ReadFromJsonAsync<ServiceRequestDetailDto>(cancellationToken: cancellationToken)
+            ?? throw new InvalidOperationException("Richiesta non trovata.");
+    }
+
+    public Task<ServiceRequestDetailDto> CreateServiceRequestAsync(
+        Guid installedMachineId, string subject, string? description, string priority, string channel, string? requestedBy, string? contactInfo, CancellationToken cancellationToken = default)
+        => SendAsync<ServiceRequestDetailDto>(HttpMethod.Post, "api/service/requests",
+            new { installedMachineId, subject, description, priority, channel, requestedBy, contactInfo }, cancellationToken);
+
+    public Task<ServiceRequestDetailDto> CloseServiceRequestAsync(Guid id, CancellationToken cancellationToken = default)
+        => SendAsync<ServiceRequestDetailDto>(HttpMethod.Post, $"api/service/requests/{id}/close", new { }, cancellationToken);
+
+    public Task<ServiceRequestDetailDto> ReopenServiceRequestAsync(Guid id, CancellationToken cancellationToken = default)
+        => SendAsync<ServiceRequestDetailDto>(HttpMethod.Post, $"api/service/requests/{id}/reopen", new { }, cancellationToken);
+
+    public Task<ServiceRequestDetailDto> AddServiceInterventionAsync(
+        Guid requestId, string? technicianName, bool completed, decimal? hours, bool inWarranty, string? description, string? materialsUsed, CancellationToken cancellationToken = default)
+        => SendAsync<ServiceRequestDetailDto>(HttpMethod.Post, $"api/service/requests/{requestId}/interventions",
+            new { technicianName, scheduledAt = (DateTime?)null, completed, hours, inWarranty, description, materialsUsed, notes = (string?)null }, cancellationToken);
+
+    // ---------- Collaudo macchine e CE ----------
+
+    public async Task<MachineDossierDto> GetMachineDossierAsync(Guid workOrderId, CancellationToken cancellationToken = default)
+    {
+        using var response = await _httpClient.GetAsync($"api/machine-testing/work-orders/{workOrderId}", cancellationToken);
+        await EnsureSuccessAsync(response, cancellationToken);
+        return await response.Content.ReadFromJsonAsync<MachineDossierDto>(cancellationToken: cancellationToken)
+            ?? throw new InvalidOperationException("Fascicolo non trovato.");
+    }
+
+    public Task<MachineDossierDto> CreateMachineTestAsync(Guid workOrderId, string kind, string? serialNumber, string? location, CancellationToken cancellationToken = default)
+        => SendAsync<MachineDossierDto>(HttpMethod.Post, $"api/machine-testing/work-orders/{workOrderId}/tests", new { kind, serialNumber, location }, cancellationToken);
+
+    public Task<MachineDossierDto> SaveMachineTestAsync(Guid testId, MachineTestDto test, CancellationToken cancellationToken = default)
+        => SendAsync<MachineDossierDto>(HttpMethod.Put, $"api/machine-testing/tests/{testId}",
+            new
+            {
+                test.SerialNumber,
+                test.Location,
+                test.TestDate,
+                test.CustomerWitness,
+                test.Notes,
+                items = test.Items.Select(i => new { section = i.Section, description = i.Description, expected = i.Expected, measured = i.Measured, result = i.Result, notes = i.Notes }),
+            }, cancellationToken);
+
+    public Task<MachineDossierDto> CloseMachineTestAsync(Guid testId, CancellationToken cancellationToken = default)
+        => SendAsync<MachineDossierDto>(HttpMethod.Post, $"api/machine-testing/tests/{testId}/close", new { }, cancellationToken);
+
+    public Task<MachineDossierDto> ReopenMachineTestAsync(Guid testId, CancellationToken cancellationToken = default)
+        => SendAsync<MachineDossierDto>(HttpMethod.Post, $"api/machine-testing/tests/{testId}/reopen", new { }, cancellationToken);
+
+    public Task<MachineDossierDto> SaveTechnicalFileAsync(Guid workOrderId, IEnumerable<TechnicalFileItemDto> items, CancellationToken cancellationToken = default)
+        => SendAsync<MachineDossierDto>(HttpMethod.Put, $"api/machine-testing/work-orders/{workOrderId}/technical-file",
+            new { items = items.Select(i => new { code = i.Code, description = i.Description, status = i.Status, reference = i.Reference }) }, cancellationToken);
+
+    public Task<MachineDossierDto> SaveMachineDeclarationAsync(Guid workOrderId, SaveMachineDeclarationDto declaration, CancellationToken cancellationToken = default)
+        => SendAsync<MachineDossierDto>(HttpMethod.Put, $"api/machine-testing/work-orders/{workOrderId}/declaration", declaration, cancellationToken);
+
+    public Task<MachineDossierDto> IssueMachineDeclarationAsync(Guid workOrderId, CancellationToken cancellationToken = default)
+        => SendAsync<MachineDossierDto>(HttpMethod.Post, $"api/machine-testing/work-orders/{workOrderId}/declaration/issue", new { }, cancellationToken);
+
+    public Task<MachineDossierDto> WithdrawMachineDeclarationAsync(Guid workOrderId, CancellationToken cancellationToken = default)
+        => SendAsync<MachineDossierDto>(HttpMethod.Post, $"api/machine-testing/work-orders/{workOrderId}/declaration/withdraw", new { reason = (string?)null }, cancellationToken);
+
+    // ---------- Monitoraggio energetico ----------
+
+    public async Task<List<EnergyProjectDto>> GetEnergyProjectsAsync(CancellationToken cancellationToken = default)
+    {
+        using var response = await _httpClient.GetAsync("api/energy/projects", cancellationToken);
+        await EnsureSuccessAsync(response, cancellationToken);
+        return await response.Content.ReadFromJsonAsync<List<EnergyProjectDto>>(cancellationToken: cancellationToken) ?? [];
+    }
+
+    public Task<EnergyProjectDto> CreateEnergyProjectAsync(Guid equipmentId, string title, string? description, DateTime baselineFrom, DateTime baselineTo, CancellationToken cancellationToken = default)
+        => SendAsync<EnergyProjectDto>(HttpMethod.Post, "api/energy/projects", new { equipmentId, title, description, baselineFrom, baselineTo }, cancellationToken);
+
+    public Task<EnergyProjectDto> SetEnergyAfterPeriodAsync(Guid projectId, DateTime? afterFrom, DateTime? afterTo, CancellationToken cancellationToken = default)
+        => SendAsync<EnergyProjectDto>(HttpMethod.Put, $"api/energy/projects/{projectId}/after-period", new { afterFrom, afterTo }, cancellationToken);
+
+    public async Task DeleteEnergyProjectAsync(Guid projectId, CancellationToken cancellationToken = default)
+    {
+        using var response = await _httpClient.DeleteAsync($"api/energy/projects/{projectId}", cancellationToken);
+        await EnsureSuccessAsync(response, cancellationToken);
+    }
+
+    public async Task<EnergyConsumptionDto> GetEquipmentEnergyConsumptionAsync(Guid equipmentId, DateTime from, DateTime to, CancellationToken cancellationToken = default)
+    {
+        using var response = await _httpClient.GetAsync($"api/energy/equipment/{equipmentId}/consumption?from={from:yyyy-MM-dd}&to={to:yyyy-MM-dd}", cancellationToken);
+        await EnsureSuccessAsync(response, cancellationToken);
+        return await response.Content.ReadFromJsonAsync<EnergyConsumptionDto>(cancellationToken: cancellationToken)
+            ?? throw new InvalidOperationException("Risposta non valida.");
+    }
+
+    public async Task<WorkOrderEnergyDto> GetWorkOrderEnergyConsumptionAsync(string workOrderCode, CancellationToken cancellationToken = default)
+    {
+        using var response = await _httpClient.GetAsync($"api/energy/work-orders/{Uri.EscapeDataString(workOrderCode)}/consumption", cancellationToken);
+        await EnsureSuccessAsync(response, cancellationToken);
+        return await response.Content.ReadFromJsonAsync<WorkOrderEnergyDto>(cancellationToken: cancellationToken)
+            ?? throw new InvalidOperationException("Risposta non valida.");
+    }
+
     /// <summary>Best-effort: works only for a PDF whose catalog is a simple text table with a
     /// recognizable header row — see the server-side XML doc on the endpoint for what it can't handle
     /// (scanned PDFs, complex graphic layouts).</summary>
@@ -2791,3 +2917,65 @@ public sealed record MachineDayDto(
     List<MachineAlarmDto> Alarms);
 
 public sealed record MachineOverviewDto(Guid EquipmentId, string Name, string Code, DateTime? LastSeenAt, string LastState, long? LastPieceCounter);
+
+// ---------- Service post-vendita ----------
+
+public sealed record InstalledMachineDto(Guid Id, Guid CustomerId, string CustomerName, Guid? WorkOrderId, string Name, string? Model,
+    string SerialNumber, string? Location, DateTime? InstalledAt, DateTime? WarrantyUntil, string Status, string? Notes, int OpenRequestCount);
+
+public sealed record ServiceRequestRowDto(Guid Id, int Number, Guid InstalledMachineId, string MachineName, string SerialNumber, Guid CustomerId,
+    string CustomerName, string Subject, string? Description, string Priority, string Status, string Channel, string? RequestedBy, string? ContactInfo,
+    DateTime OpenedAt, DateTime? ClosedAt, int InterventionCount);
+
+public sealed record ServiceInterventionDto(Guid Id, string? TechnicianName, DateTime ScheduledAt, DateTime? CompletedAt, decimal? Hours,
+    bool InWarranty, string? Description, string? MaterialsUsed, string? Notes);
+
+public sealed record ServiceRequestDetailDto(Guid Id, int Number, Guid InstalledMachineId, string MachineName, string SerialNumber, Guid CustomerId,
+    string CustomerName, string Subject, string? Description, string Priority, string Status, string Channel, string? RequestedBy, string? ContactInfo,
+    DateTime OpenedAt, DateTime? ClosedAt, List<ServiceInterventionDto> Interventions);
+
+// ---------- Collaudo macchine e CE ----------
+
+public sealed record MachineTestItemDto(int Sequence, string Section, string Description, string? Expected, string? Measured, string? Result, string? Notes)
+{
+    public bool IsEditable { get; init; } = true;
+}
+
+public sealed record MachineTestDto(
+    Guid Id, int Number, string Kind, string Status, string? SerialNumber, string? Location, DateTime? TestDate, string? CustomerWitness,
+    string? Notes, string? CreatedBy, DateTime CreatedAt, DateTime? ClosedAt, string? TestedBy, List<MachineTestItemDto> Items);
+
+public sealed record TechnicalFileItemDto(
+    string Code, string Description, bool Optional, string? Status, string? Reference, string? UpdatedBy, DateTime? UpdatedAt);
+
+public sealed record MachineManufacturerDto(string? Name, string? Address, string? VatNumber);
+
+public sealed record MachineDeclarationDto(
+    bool IsSaved, string Status, int? Number, string LegalBasis, string LegalBasisText,
+    string MachineName, string? Function, string? Model, string? Type, string? SerialNumber, int? YearOfConstruction,
+    string? OtherLegislation, string? Standards, string? NotifiedBody, string? TechnicalFileKeeper, string? Place,
+    string? SignatoryName, string? SignatoryRole, string? Notes, DateTime? IssuedAt, string? IssuedBy);
+
+public sealed record SaveMachineDeclarationDto(
+    string? MachineName, string? Function, string? Model, string? Type, string? SerialNumber, int? YearOfConstruction,
+    string? OtherLegislation, string? Standards, string? NotifiedBody, string? TechnicalFileKeeper, string? Place,
+    string? SignatoryName, string? SignatoryRole, string? Notes);
+
+public sealed record MachineDossierDto(
+    Guid WorkOrderId, string WorkOrderCode, string WorkOrderStatus, string ProductCode, string ProductName, string? ProductRevision,
+    string? CustomerName, MachineManufacturerDto Manufacturer, List<MachineTestDto> Tests, List<TechnicalFileItemDto> TechnicalFile,
+    bool TechnicalFileComplete, MachineDeclarationDto Declaration, List<string> MissingForDeclaration);
+
+// ---------- Monitoraggio energetico ----------
+
+public sealed record EnergyProjectDto(
+    Guid Id, Guid EquipmentId, string EquipmentName, string EquipmentCode, string Title, string? Description,
+    DateTime BaselineFrom, DateTime BaselineTo, decimal? BaselineKwh, int BaselineReadingCount,
+    DateTime? AfterFrom, DateTime? AfterTo, decimal? AfterKwh, int? AfterReadingCount, decimal? SavingsPercent,
+    string? Notes, string? CreatedBy, DateTime CreatedAt);
+
+public sealed record EnergyConsumptionDto(decimal? TotalKwh, int ReadingCount, DateTime From, DateTime To);
+
+public sealed record WorkOrderEnergyByEquipmentDto(Guid EquipmentId, string EquipmentName, decimal Kwh);
+
+public sealed record WorkOrderEnergyDto(string WorkOrderCode, decimal? TotalKwh, List<WorkOrderEnergyByEquipmentDto> ByEquipment);

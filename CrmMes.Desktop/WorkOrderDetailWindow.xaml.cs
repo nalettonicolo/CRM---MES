@@ -22,6 +22,7 @@ public partial class WorkOrderDetailWindow : Window
         TransportDocumentButton.Visibility = apiClient.IsModuleEnabled("shipping") ? Visibility.Visible : Visibility.Collapsed;
         // Panel builders only: the CEI EN 61439 routine verification and declaration.
         PanelVerificationButton.Visibility = apiClient.IsModuleEnabled("panel-verification") ? Visibility.Visible : Visibility.Collapsed;
+        MachineTestingButton.Visibility = apiClient.IsModuleEnabled("machine-testing") ? Visibility.Visible : Visibility.Collapsed;
         FoodLabelButton.Visibility = PalletButton.Visibility = apiClient.IsModuleEnabled("food-labels") ? Visibility.Visible : Visibility.Collapsed;
         SiteReportButton.Visibility = apiClient.IsModuleEnabled("site-work") ? Visibility.Visible : Visibility.Collapsed;
     }
@@ -97,6 +98,9 @@ public partial class WorkOrderDetailWindow : Window
 
     private void PanelVerification_Click(object sender, RoutedEventArgs e) =>
         new PanelVerificationWindow(_apiClient, _workOrderId) { Owner = this }.ShowDialog();
+
+    private void MachineTesting_Click(object sender, RoutedEventArgs e) =>
+        new MachineTestingWindow(_apiClient, _workOrderId) { Owner = this }.ShowDialog();
 
     /// <summary>A DDT draft prefilled with this job's customer, product, lot and quantity.</summary>
     private async void TransportDocument_Click(object sender, RoutedEventArgs e)

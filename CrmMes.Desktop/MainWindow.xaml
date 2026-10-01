@@ -78,6 +78,8 @@
                                 <Button x:Name="UpdateButton" Style="{StaticResource SidebarLinkButton}" Content="Controlla aggiornamenti" Margin="0,10,0,0" Click="UpdateButton_Click" />
                                 <Button x:Name="ChangePasswordButton" Style="{StaticResource SidebarLinkButton}" Content="Cambia password" Margin="0,6,0,0" Click="ChangePasswordButton_Click" />
                                 <Button x:Name="SecurityButton" Style="{StaticResource SidebarLinkButton}" Content="Verifica in due passaggi" Margin="0,6,0,0" Click="SecurityButton_Click" />
+                                <Button x:Name="ServiceButton" Style="{StaticResource SidebarLinkButton}" Content="Service post-vendita" Margin="0,6,0,0" Click="ServiceButton_Click" Visibility="Collapsed" />
+                                <Button x:Name="EnergyButton" Style="{StaticResource SidebarLinkButton}" Content="Monitoraggio energetico" Margin="0,6,0,0" Click="EnergyButton_Click" Visibility="Collapsed" />
                                 <Button x:Name="SupportButton" Style="{StaticResource SidebarLinkButton}" Content="Teleassistenza" Margin="0,6,0,0" Click="SupportButton_Click" />
                                 <Button x:Name="SidebarSettingsButton" Style="{StaticResource SidebarLinkButton}" Content="Impostazioni server" Margin="0,6,0,0" Click="SettingsButton_Click" Visibility="Collapsed" />
                             </StackPanel>
