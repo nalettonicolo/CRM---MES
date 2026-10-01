@@ -1,0 +1,224 @@
+@page "/manutenzione"
+@inject Api Api
+@inject Session Session
+
+<PageTitle>Manutenzione · Nicolò MES</PageTitle>
+
+<div class="page-head">
+    <div>
+        <div class="eyebrow">Produzione</div>
+        <h1>Manutenzione</h1>
+        <p class="sub">Macchine e interventi preventivi e correttivi.</p>
+    </div>
+</div>
+
+@if (_error is not null)
+{
+    <div class="alert" role="alert">@_error</div>
+}
+@if (_info is not null)
+{
+    <div class="success" role="status">@_info</div>
+}
+
+<div class="toolbar">
+    <select aria-label="Stato" @onchange="StatusChangedAsync">
+        <option value="" selected="@(_status == "")">Tutti gli stati</option>
+        <option value="Pending" selected="@(_status == "Pending")">Da fare</option>
+        <option value="Completed" selected="@(_status == "Completed")">Completati</option>
+    </select>
+    <select aria-label="Macchina" @onchange="EquipmentChangedAsync">
+        <option value="">Tutte le macchine</option>
+        @if (_equipment is not null)
+        {
+            @foreach (var e in _equipment)
+            {
+                <option value="@e.Id" selected="@(_equipmentId == e.Id)">@e.Name</option>
+            }
+        }
+    </select>
+</div>
+
+<div class="card">
+    @if (_tasks is null)
+    {
+        <div class="state">Caricamento...</div>
+    }
+    else if (_tasks.Count == 0)
+    {
+        <div class="state"><strong>Nessun intervento</strong>Nessun intervento di manutenzione corrisponde al filtro scelto.</div>
+    }
+    else
+    {
+        <div class="table-wrap">
+            <table class="cards">
+                <thead><tr><th>Macchina</th><th>Intervento</th><th>Tipo</th><th>Scadenza</th><th>Stato</th><th></th></tr></thead>
+                <tbody>
+                    @foreach (var task in _tasks)
+                    {
+                        <tr class="@(MaintenanceLabels.IsOverdue(task) ? "danger" : "")">
+                            <td data-label="Macchina">@task.EquipmentName</td>
+                            <td data-label="Intervento">@task.Title @if (!string.IsNullOrWhiteSpace(task.Description)) {<div class="small muted">@task.Description</div>}</td>
+                            <td data-label="Tipo">@MaintenanceLabels.Type(task.Type)</td>
+                            <td data-label="Scadenza">@(task.DueDate is null ? "—" : Labels.Date(task.DueDate))@(MaintenanceLabels.IsOverdue(task) ? " · in ritardo" : "")</td>
+                            <td data-label="Stato"><span class="badge @MaintenanceLabels.StatusClass(task.Status)">@MaintenanceLabels.Status(task.Status)</span></td>
+                            <td>
+                                @if (task.Status == "Pending" && CanEdit)
+                                {
+                                    <button class="secondary small" @onclick="() => CompleteAsync(task)" disabled="@_busy">Completa</button>
+                                }
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    }
+</div>
+
+@if (CanEdit)
+{
+    <div class="card card-pad stack">
+        <h2>Nuovo intervento</h2>
+        <div class="form-grid">
+            <label>Macchina
+                <select @bind="_newEquipmentId">
+                    <option value="">Scegli...</option>
+                    @if (_equipment is not null)
+                    {
+                        @foreach (var e in _equipment)
+                        {
+                            <option value="@e.Id">@e.Name</option>
+                        }
+                    }
+                </select>
+            </label>
+            <label>Titolo<input @bind="_newTitle" placeholder="es. Controllo cinghie" /></label>
+            <label>Tipo
+                <select @bind="_newType">
+                    <option value="Preventiva">Preventiva</option>
+                    <option value="Correttiva">Correttiva</option>
+                </select>
+            </label>
+            <label>Scadenza<input type="date" @bind="_newDueDate" /></label>
+            @if (_newType == "Preventiva")
+            {
+                <label>Ricorrenza (giorni, opzionale)<input type="number" min="1" @bind="_newRecurrenceDays" /></label>
+            }
+        </div>
+        <div class="actions"><button @onclick="CreateAsync" disabled="@_busy">Crea intervento</button></div>
+    </div>
+}
+
+@code {
+    private List<Equipment>? _equipment;
+    private List<MaintenanceTask>? _tasks;
+    private string _status = "Pending";
+    private Guid? _equipmentId;
+    private string? _error;
+    private string? _info;
+    private bool _busy;
+
+    private Guid? _newEquipmentId;
+    private string _newTitle = string.Empty;
+    private string _newType = "Preventiva";
+    private DateTime? _newDueDate;
+    private int? _newRecurrenceDays;
+
+    private bool CanEdit => Session.Role is "Admin" or "Warehouse";
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            _equipment = await Api.GetAsync<List<Equipment>>("api/equipment");
+        }
+        catch (ApiException exception)
+        {
+            _error = exception.Message;
+        }
+
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        _error = null;
+        try
+        {
+            var query = $"api/maintenance-tasks?status={Uri.EscapeDataString(_status)}";
+            if (_equipmentId is { } id)
+            {
+                query += $"&equipmentId={id}";
+            }
+
+            _tasks = await Api.GetAsync<List<MaintenanceTask>>(query);
+        }
+        catch (ApiException exception)
+        {
+            _error = exception.Message;
+        }
+    }
+
+    private async Task StatusChangedAsync(ChangeEventArgs e)
+    {
+        _status = e.Value?.ToString() ?? string.Empty;
+        await LoadAsync();
+    }
+
+    private async Task EquipmentChangedAsync(ChangeEventArgs e)
+    {
+        _equipmentId = Guid.TryParse(e.Value?.ToString(), out var id) ? id : null;
+        await LoadAsync();
+    }
+
+    private async Task CompleteAsync(MaintenanceTask task)
+    {
+        _busy = true;
+        _error = null;
+        try
+        {
+            await Api.PostAsync<MaintenanceTask>($"api/maintenance-tasks/{task.Id}/complete");
+            _info = task.RecurrenceDays is null ? "Intervento completato." : "Intervento completato: generata la prossima scadenza.";
+            await LoadAsync();
+        }
+        catch (ApiException exception)
+        {
+            _error = exception.Message;
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+
+    private async Task CreateAsync()
+    {
+        if (_newEquipmentId is null || string.IsNullOrWhiteSpace(_newTitle))
+        {
+            _error = "Scegli la macchina e scrivi il titolo dell'intervento.";
+            return;
+        }
+
+        _busy = true;
+        _error = null;
+        try
+        {
+            await Api.PostAsync<MaintenanceTask>("api/maintenance-tasks",
+                new CreateMaintenanceTaskRequest(_newEquipmentId.Value, _newTitle, null, _newType, _newDueDate, _newType == "Preventiva" ? _newRecurrenceDays : null));
+            _info = "Intervento creato.";
+            _newTitle = string.Empty;
+            _newDueDate = null;
+            _newRecurrenceDays = null;
+            await LoadAsync();
+        }
+        catch (ApiException exception)
+        {
+            _error = exception.Message;
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+}
