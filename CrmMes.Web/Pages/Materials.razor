@@ -13,6 +13,10 @@
         <p class="sub">Giacenze attuali e materiali sotto la scorta minima. La ricerca mostra i primi 100 risultati.</p>
     </div>
     <div class="actions">
+        @if (CanManage)
+        {
+            <button class="secondary" @onclick="() => _showCreate = !_showCreate">@(_showCreate ? "Chiudi nuovo materiale" : "Nuovo materiale")</button>
+        }
         @if (CanImport)
         {
             <button class="secondary" @onclick="() => _showImport = !_showImport">@(_showImport ? "Chiudi importazione" : "Importa da Excel")</button>
@@ -20,6 +24,25 @@
         <button class="secondary" @onclick="ExportAsync" disabled="@_exporting">@(_exporting ? "Preparazione..." : "Esporta Excel")</button>
     </div>
 </div>
+
+@if (_createError is not null)
+{
+    <div class="alert" role="alert">@_createError</div>
+}
+@if (_showCreate && CanManage)
+{
+    <div class="card card-pad stack stack-gap">
+        <h2>Nuovo materiale</h2>
+        <div class="form-grid">
+            <label>Codice<input @bind="_newCode" placeholder="es. VIT-M6" autocomplete="off" /></label>
+            <label>Descrizione<input @bind="_newName" placeholder="Descrizione articolo" /></label>
+            <label>Unità di misura<input @bind="_newUnit" placeholder="pz" /></label>
+            <label>Giacenza iniziale<input type="number" step="any" min="0" @bind="_newStock" /></label>
+            <label>Scorta minima<input type="number" step="any" min="0" @bind="_newMinStock" /></label>
+        </div>
+        <div class="actions"><button @onclick="CreateAsync" disabled="@_creating">@(_creating ? "Salvataggio..." : "Crea materiale")</button></div>
+    </div>
+}
 
 @if (_exportError is not null)
 {
@@ -47,7 +70,11 @@
     }
     else if (_materials.Count == 0)
     {
-        <div class="state"><strong>Nessun materiale</strong>@(_belowOnly ? "Nessun materiale sotto scorta." : "Nessun materiale corrisponde alla ricerca.")</div>
+        <div class="state"><strong>Nessun materiale</strong>@(_belowOnly
+            ? "Nessun materiale sotto scorta."
+            : string.IsNullOrWhiteSpace(_search) && CanManage
+                ? "Aggiungi il primo materiale con «Nuovo materiale» o importa da Excel."
+                : "Nessun materiale corrisponde alla ricerca.")</div>
     }
     else
     {
@@ -88,10 +115,19 @@
     private string? _error;
     private CancellationTokenSource? _debounce;
     private bool _showImport;
+    private bool _showCreate;
     private bool _exporting;
+    private bool _creating;
     private string? _exportError;
+    private string? _createError;
+    private string _newCode = string.Empty;
+    private string _newName = string.Empty;
+    private string _newUnit = "pz";
+    private decimal _newStock;
+    private decimal _newMinStock;
 
     private bool CanImport => Session.Role is "Admin" or "Warehouse" or "Purchasing";
+    private bool CanManage => CanImport;
 
     protected override Task OnInitializedAsync() => LoadAsync();
 
@@ -158,6 +194,38 @@
         catch (ApiException exception)
         {
             _error = exception.Message;
+        }
+    }
+
+    private async Task CreateAsync()
+    {
+        _creating = true;
+        _createError = null;
+        try
+        {
+            await Api.PostAsync<Material>("api/materials", new
+            {
+                code = _newCode.Trim(),
+                name = _newName.Trim(),
+                unit = string.IsNullOrWhiteSpace(_newUnit) ? "pz" : _newUnit.Trim(),
+                stock = _newStock,
+                minStock = _newMinStock
+            });
+            _newCode = string.Empty;
+            _newName = string.Empty;
+            _newUnit = "pz";
+            _newStock = 0;
+            _newMinStock = 0;
+            _showCreate = false;
+            await LoadAsync();
+        }
+        catch (ApiException exception)
+        {
+            _createError = exception.Message;
+        }
+        finally
+        {
+            _creating = false;
         }
     }
 

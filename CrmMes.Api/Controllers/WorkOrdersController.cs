@@ -840,24 +840,15 @@ public class WorkOrdersController : ControllerBase
             .Select(op => new { op.WorkCenter, op.PlannedStartAt, op.PlannedEndAt, op.EstimatedMinutes })
             .ToListAsync(cancellationToken);
 
-        var committed = new Dictionary<string, Dictionary<DateOnly, decimal>>(StringComparer.OrdinalIgnoreCase);
+        var committed = FiniteCapacityScheduler.NewCommittedLedger();
         foreach (var scheduled in otherScheduled)
         {
-            var startDay = DateOnly.FromDateTime(scheduled.PlannedStartAt!.Value);
-            var endDay = DateOnly.FromDateTime(scheduled.PlannedEndAt!.Value);
-            var spanDays = endDay.DayNumber - startDay.DayNumber + 1;
-            var perDay = scheduled.EstimatedMinutes / spanDays;
-
-            if (!committed.TryGetValue(scheduled.WorkCenter!, out var byDay))
-            {
-                byDay = new Dictionary<DateOnly, decimal>();
-                committed[scheduled.WorkCenter!] = byDay;
-            }
-
-            for (var day = startDay; day <= endDay; day = day.AddDays(1))
-            {
-                byDay[day] = byDay.GetValueOrDefault(day) + perDay;
-            }
+            FiniteCapacityScheduler.AddSpreadLoad(
+                committed,
+                scheduled.WorkCenter!,
+                scheduled.PlannedStartAt!.Value,
+                scheduled.PlannedEndAt!.Value,
+                scheduled.EstimatedMinutes);
         }
 
         var earliestDay = DateOnly.FromDateTime((startFrom ?? DateTime.UtcNow).Date);
@@ -868,45 +859,12 @@ public class WorkOrdersController : ControllerBase
                 ? match
                 : null;
 
-            DateOnly startDay;
-            DateOnly endDay;
-
-            if (workCenter is null || workCenter.DailyCapacityMinutes <= 0)
-            {
-                startDay = earliestDay;
-                endDay = earliestDay;
-            }
-            else
-            {
-                if (!committed.TryGetValue(workCenter.Name, out var byDay))
-                {
-                    byDay = new Dictionary<DateOnly, decimal>();
-                    committed[workCenter.Name] = byDay;
-                }
-
-                var remaining = operation.EstimatedMinutes;
-                var day = earliestDay;
-                DateOnly? firstDay = null;
-                var lastDay = earliestDay;
-                while (remaining > 0)
-                {
-                    var used = byDay.GetValueOrDefault(day);
-                    var available = workCenter.DailyCapacityMinutes - used;
-                    if (available > 0)
-                    {
-                        firstDay ??= day;
-                        var consumed = Math.Min(available, remaining);
-                        byDay[day] = used + consumed;
-                        remaining -= consumed;
-                        lastDay = day;
-                    }
-
-                    day = day.AddDays(1);
-                }
-
-                startDay = firstDay ?? earliestDay;
-                endDay = lastDay;
-            }
+            var (startDay, endDay) = FiniteCapacityScheduler.PlaceOperation(
+                operation.EstimatedMinutes,
+                workCenter?.Name,
+                workCenter?.DailyCapacityMinutes ?? 0,
+                earliestDay,
+                committed);
 
             operation.PlannedStartAt = DateTime.SpecifyKind(startDay.ToDateTime(TimeOnly.MinValue), DateTimeKind.Utc);
             operation.PlannedEndAt = DateTime.SpecifyKind(endDay.ToDateTime(TimeOnly.MinValue), DateTimeKind.Utc);

@@ -1,5 +1,6 @@
 @page "/pianificazione"
 @inject Api Api
+@inject Session Session
 
 <PageTitle>Pianificazione · Nicolò MES</PageTitle>
 
@@ -7,9 +8,49 @@
     <div>
         <div class="eyebrow">Produzione</div>
         <h1>Pianificazione</h1>
-        <p class="sub">Board settimanale. Il colore delle fasi si dipinge dal programma desktop.</p>
+        <p class="sub">Board settimanale per macchine e progetti in corso.</p>
     </div>
+    @if (CanEdit)
+    {
+        <div class="actions">
+            <button class="secondary" @onclick="() => _showCreate = !_showCreate">@(_showCreate ? "Chiudi nuovo progetto" : "Nuovo progetto")</button>
+        </div>
+    }
 </div>
+
+@if (_actionError is not null)
+{
+    <div class="alert" role="alert">@_actionError</div>
+}
+
+@if (_showCreate && CanEdit)
+{
+    <div class="card card-pad stack stack-gap">
+        <h2>Nuovo progetto</h2>
+        <div class="form-grid">
+            <label>Nome<input @bind="_newProjectName" placeholder="es. Linea confezionamento 3" autocomplete="off" /></label>
+        </div>
+        <div class="actions"><button @onclick="CreateProjectAsync" disabled="@_busy">@(_busy ? "Salvataggio..." : "Crea progetto")</button></div>
+    </div>
+}
+
+@if (_pickProjectId is not null && _pickWeek is not null && CanEdit)
+{
+    <div class="card card-pad stack stack-gap">
+        <h2>Settimana @_pickWeek.Value.ToString("dd/MM/yyyy")</h2>
+        <p class="muted">Scegli la categoria da dipingere sulla cella, oppure svuota tutte le fasi di questa settimana.</p>
+        <div class="actions wrap">
+            @foreach (var category in _categories ?? [])
+            {
+                <button class="secondary small" style="background:@category.ColorHex;color:#fff;border:none" @onclick="() => PaintCellAsync(category.Id)">
+                    @category.Code · @category.Name
+                </button>
+            }
+            <button class="secondary small" @onclick="ClearCellAsync">Svuota cella</button>
+            <button class="ghost small" @onclick="CancelPick">Annulla</button>
+        </div>
+    </div>
+}
 
 @if (_error is not null)
 {
@@ -22,10 +63,14 @@ else if (_projects is null || _categories is null || _cells is null)
 }
 else if (_projects.Count == 0)
 {
-    <div class="card state"><strong>Nessun progetto</strong>Crea le righe della board dal programma desktop.</div>
+    <div class="card state"><strong>Nessun progetto</strong>@(CanEdit ? " Aggiungi la prima riga con «Nuovo progetto»." : " Nessuna riga definita.")</div>
 }
 else
 {
+    @if (!CanEdit)
+    {
+        <p class="muted">Sola lettura: solo un Admin può modificare il planning.</p>
+    }
     <div class="card">
         <div class="table-wrap">
             <table class="cards">
@@ -52,8 +97,22 @@ else
                             </td>
                             @foreach (var week in _weeks)
                             {
-                                var names = CellNames(project.Id, week);
-                                <td data-label="@week.ToString("dd/MM")">@(string.IsNullOrEmpty(names) ? "—" : names)</td>
+                                var cellCategories = CellCategories(project.Id, week);
+                                <td data-label="@week.ToString("dd/MM")"
+                                    class="@(CanEdit ? "link" : "")"
+                                    @onclick="() => OnCellClick(project.Id, week)">
+                                    @if (cellCategories.Count == 0)
+                                    {
+                                        <span class="muted">—</span>
+                                    }
+                                    else
+                                    {
+                                        @foreach (var cat in cellCategories)
+                                        {
+                                            <span class="badge" style="background:@cat.ColorHex;color:#fff;margin-right:4px">@cat.Code</span>
+                                        }
+                                    }
+                                </td>
                             }
                         </tr>
                     }
@@ -69,6 +128,14 @@ else
     private List<PlanningCell>? _cells;
     private List<DateTime> _weeks = [];
     private string? _error;
+    private string? _actionError;
+    private bool _showCreate;
+    private bool _busy;
+    private string _newProjectName = string.Empty;
+    private Guid? _pickProjectId;
+    private DateTime? _pickWeek;
+
+    private bool CanEdit => Session.Role is "Admin";
 
     protected override Task OnInitializedAsync() => LoadAsync();
 
@@ -90,15 +157,119 @@ else
         }
     }
 
-    private string CellNames(Guid projectId, DateTime week)
+    private async Task CreateProjectAsync()
+    {
+        if (!CanEdit)
+        {
+            return;
+        }
+
+        _actionError = null;
+        _busy = true;
+        try
+        {
+            var created = await Api.PostAsync<PlanningProject>("api/planning-board/projects", new { name = _newProjectName.Trim() });
+            _projects ??= [];
+            _projects.Add(created);
+            _newProjectName = string.Empty;
+            _showCreate = false;
+        }
+        catch (ApiException ex)
+        {
+            _actionError = ex.Message;
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+
+    private void OnCellClick(Guid projectId, DateTime week)
+    {
+        if (!CanEdit)
+        {
+            return;
+        }
+
+        _actionError = null;
+        _pickProjectId = projectId;
+        _pickWeek = week;
+    }
+
+    private void CancelPick()
+    {
+        _pickProjectId = null;
+        _pickWeek = null;
+    }
+
+    private async Task PaintCellAsync(Guid categoryId)
+    {
+        if (_pickProjectId is null || _pickWeek is null)
+        {
+            return;
+        }
+
+        _busy = true;
+        _actionError = null;
+        try
+        {
+            await Api.PutNoContentAsync("api/planning-board/cells", new
+            {
+                projectId = _pickProjectId.Value,
+                categoryId,
+                weekStarts = new[] { _pickWeek.Value }
+            });
+            CancelPick();
+            await LoadAsync();
+        }
+        catch (ApiException ex)
+        {
+            _actionError = ex.Message;
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+
+    private async Task ClearCellAsync()
+    {
+        if (_pickProjectId is null || _pickWeek is null)
+        {
+            return;
+        }
+
+        _busy = true;
+        _actionError = null;
+        try
+        {
+            await Api.DeleteWithBodyAsync("api/planning-board/cells", new
+            {
+                projectId = _pickProjectId.Value,
+                weekStarts = new[] { _pickWeek.Value }
+            });
+            CancelPick();
+            await LoadAsync();
+        }
+        catch (ApiException ex)
+        {
+            _actionError = ex.Message;
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+
+    private List<PlanningCategory> CellCategories(Guid projectId, DateTime week)
     {
         if (_cells is null || _categories is null)
         {
-            return "";
+            return [];
         }
 
         var ids = _cells.Where(c => c.ProjectId == projectId && c.WeekStart.Date == week.Date).Select(c => c.CategoryId).ToHashSet();
-        return string.Join(", ", _categories.Where(c => ids.Contains(c.Id)).Select(c => c.Code));
+        return _categories.Where(c => ids.Contains(c.Id)).OrderBy(c => c.SequenceNumber).ToList();
     }
 
     private static DateTime Monday(DateTime utc)

@@ -33,7 +33,7 @@ public class CompanyProfileController : ControllerBase
         var license = await _license.CurrentAsync(cancellationToken);
         var response = profile is null
             ? new CompanyProfileResponse(false, string.Empty, null, null, null, null, "generic",
-                Sectors.Modules.Select(module => module.Key).ToList(), null, ["generic"])
+                Sectors.Modules.Select(module => module.Key).ToList(), null, ["generic"], "it-IT", "EUR")
             : ToResponse(profile);
         // Modules the subscription doesn't include are off, whatever was configured.
         return Ok(response with { EnabledModules = license.Allow(response.EnabledModules).ToList() });
@@ -217,6 +217,16 @@ public class CompanyProfileController : ControllerBase
 
         modules = license.Allow(modules).ToList();
 
+        if (request.Locale is not null && NormalizeLocale(request.Locale) is null)
+        {
+            return BadRequest(new { message = "Locale non valido (es. it-IT, en-US)." });
+        }
+
+        if (request.Currency is not null && NormalizeCurrency(request.Currency) is null)
+        {
+            return BadRequest(new { message = "Valuta non valida: codice ISO 4217 di 3 lettere (es. EUR)." });
+        }
+
         var profile = await _dbContext.CompanyProfiles.FirstOrDefaultAsync(cancellationToken);
         if (profile is null)
         {
@@ -232,6 +242,8 @@ public class CompanyProfileController : ControllerBase
         profile.Sector = sector.Key;
         profile.Activities = string.Join(',', activities.Select(a => a!.Key));
         profile.EnabledModules = string.Join(',', modules);
+        profile.Locale = NormalizeLocale(request.Locale) ?? profile.Locale;
+        profile.Currency = NormalizeCurrency(request.Currency) ?? profile.Currency;
         profile.UpdatedAt = DateTime.UtcNow;
 
         _dbContext.AuditLogs.Add(new AuditLog
@@ -410,9 +422,33 @@ public class CompanyProfileController : ControllerBase
         profile.Sector, Sectors.Parse(profile.EnabledModules).ToList(), profile.Gs1CompanyPrefix,
         string.IsNullOrWhiteSpace(profile.Activities)
             ? [profile.Sector]
-            : profile.Activities.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).ToList());
+            : profile.Activities.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).ToList(),
+        string.IsNullOrWhiteSpace(profile.Locale) ? "it-IT" : profile.Locale,
+        string.IsNullOrWhiteSpace(profile.Currency) ? "EUR" : profile.Currency.ToUpperInvariant());
 
     private static string? Clean(string? value) => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
+
+    private static string? NormalizeLocale(string? locale)
+    {
+        if (string.IsNullOrWhiteSpace(locale))
+        {
+            return null;
+        }
+
+        var trimmed = locale.Trim();
+        return trimmed.Length is > 0 and <= 10 ? trimmed : null;
+    }
+
+    private static string? NormalizeCurrency(string? currency)
+    {
+        if (string.IsNullOrWhiteSpace(currency))
+        {
+            return null;
+        }
+
+        var trimmed = currency.Trim().ToUpperInvariant();
+        return trimmed.Length == 3 && trimmed.All(char.IsAsciiLetter) ? trimmed : null;
+    }
 
     /// <summary>Producer declaration for the software origin (UE/SEE ≥ 50%), used in Transizione 5.0 /
     /// iperammortamento technical reports. Readable by any authenticated user; editable by Admin.</summary>
@@ -499,11 +535,13 @@ public sealed record SaveSoftwareOriginRequest(
 
 public sealed record CompanyProfileResponse(
     bool IsConfigured, string CompanyName, string? VatNumber, string? Address, string? Phone, string? Email,
-    string Sector, List<string> EnabledModules, string? Gs1CompanyPrefix = null, List<string>? Activities = null);
+    string Sector, List<string> EnabledModules, string? Gs1CompanyPrefix = null, List<string>? Activities = null,
+    string Locale = "it-IT", string Currency = "EUR");
 
 public sealed record SaveCompanyProfileRequest(
     string? CompanyName, string? VatNumber, string? Address, string? Phone, string? Email,
-    string? Sector, List<string>? EnabledModules, List<string>? Activities = null);
+    string? Sector, List<string>? EnabledModules, List<string>? Activities = null,
+    string? Locale = null, string? Currency = null);
 
 public sealed record SectorResponse(string Key, string Name, string Description, List<string> Modules, List<string>? Departments = null);
 

@@ -42,9 +42,17 @@ public sealed record MrpWorkOrderDemand(Guid WorkOrderId, string WorkOrderCode, 
 public sealed record MrpSuggestion(
     string MaterialCode, string MaterialName, string Unit,
     decimal GrossRequirement, decimal Stock, decimal OnOrder, decimal NetRequirement, decimal SuggestedQuantity,
-    decimal MinStock, bool UnknownMaterial, List<MrpWorkOrderDemand> WorkOrders);
+    decimal MinStock, bool UnknownMaterial,
+    Guid? PreferredSupplierId, string? SupplierName, decimal? LeadTimeDays, DateTime? SuggestedOrderDate,
+    List<MrpWorkOrderDemand> WorkOrders);
 
 public sealed record MrpRun(DateTime GeneratedAt, int WorkOrdersConsidered, int Materials, int MaterialsToOrder, List<MrpSuggestion> Suggestions);
+
+public sealed record CreateMrpOrdersRequest(List<string>? MaterialCodes);
+
+public sealed record CreatedMrpOrderSummary(Guid Id, string Code, Guid SupplierId, string SupplierName, int ItemCount);
+
+public sealed record CreateMrpOrdersResponse(int OrdersCreated, List<CreatedMrpOrderSummary> Orders, List<string> SkippedMaterialCodes);
 
 public sealed record WithdrawalSlipSummary(
     Guid Id, string Code, Guid AreaId, Guid RequestedByUserId, string Status, DateTime CreatedAt, int ItemCount, int MissingItemCount,

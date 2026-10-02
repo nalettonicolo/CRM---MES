@@ -16,8 +16,9 @@ Sintesi ad alto livello di cosa è stato costruito finora e cosa manca ancora. P
 - **OEE cruscotto dai dati macchina**: se nel periodo ci sono letture `MachineEvents`, disponibilità e qualità usano i dati macchina (fonte `Declared` / `Hybrid` / `Machine`); la performance resta dalle fasi dichiarate. Hint su web e desktop.
 - **Dichiarazione origine UE del software** (perizia / Transizione 5.0 Allegato V): campi su profilo azienda, `GET/PUT api/company-profile/software-origin`, pagina web `/origine-software` stampabile; soglia ≥ 50% UE/SEE. Migrazione `AddSoftwareOriginDeclaration` su Neon; test `SoftwareOriginTests` 3/3.
 - **G10 — MRP base** (gate chiuso con nota): `GET api/procurement/mrp` esplode le distinte delle commesse aperte, sottrae giacenza e residuo ordini fornitore, propone quantità (anche MinStock). Web `/mrp`. Resta: creazione automatica ordini dalle proposte, lead time, esplosione multi-livello.
+- **G9–G15 e contro (02/10 sera, da pubblicare)**: provider HTTP SdI e stati; demo-feed macchine; SSO esterno predisposto; locale/valuta; assistente IA; MRP avanzato; ubicazioni/inventario; capacità finita; pacchetti settore persistiti; planning web, CAPA/taratura, presenze e Swagger; suite completa 623/623.
 - **Analisi di mercato** aggiornata in [ANALISI-MERCATO-MES.md](ANALISI-MERCATO-MES.md) (mercato IT ~120 M€ al 2027, iperammortamento, Made-in-EU).
-- Blocco pubblicato su `main` il 02/10/2026 dopo verifica delle migrazioni Neon; test mirati 14/14 e suite completa 586/586.
+- Blocco G8/OEE/MRP/tema pubblicato su `main` il 02/10/2026; **G9–G15 ancora solo in working tree**.
 
 ### Piattaforma web, canali di accesso, basi per server del cliente e teleassistenza (2026-09-30, da pubblicare)
 - **Piattaforma web** (progetto `CrmMes.Web`, Blazor WebAssembly) servita dall'API su `/app/`: login con canale "web", rinnovo automatico della sessione (una sola volta anche con più richieste insieme), sessione nella scheda del browser (si chiude con la scheda). Pagine: cruscotto, commesse con ricerca per ultime cifre, dettaglio commessa con fasi e lotti, materiali, canali di accesso. Stati di caricamento, vuoto ed errore su ogni pagina; tabelle che diventano schede sul telefono; tema chiaro e scuro; nessuno stile o script in linea.
@@ -188,23 +189,19 @@ Sintesi ad alto livello di cosa è stato costruito finora e cosa manca ancora. P
 
 ## Cosa manca
 
-- **Pubblicazione su `main` / Render** del lavoro del 02/10 (G8, OEE macchina, origine UE, MRP, aspetto grafico e altro già nel working tree): solo dopo conferma esplicita dell'utente.
-- **G9 — Invio automatico allo SdI**: stati di invio + adattatore intermediario (senza contratto reale = stub/configurazione). La fattura XML si genera già; manca il collegamento automatico.
-- **Collegamento macchine in campo**: gateway OPC UA/MQTT e OEE cruscotto sono pronti; serve una macchina pilota reale e il PC gateway.
-- **G11 — Ubicazioni magazzino** e inventario con barcode.
-- **G12 — Capacità finita** in pianificazione.
-- **Web in scrittura** per anagrafiche e documenti (oggi molte aree web sono in sola lettura); poi IA / SSO / multilingua.
-- **MRP avanzato**: creazione automatica ordini fornitore dalle proposte, lead time, distinta multi-livello (il calcolo fabbisogni base c'è).
-- **Listini Metel**: modulo attivabile; import da tracciato ANIE (record A) o file delimitato. Copertura automatica su file sintetici. Un listino produttore reale resta utile per tarare layout insoliti, non per sbloccare il modulo.
-- **Materiali del rapportino e magazzino**: i materiali installati entrano nel costo della commessa ma non scaricano la giacenza; il carico del furgone si fa con una distinta di prelievo.
-- **Il DDT non muove la giacenza**: registra cosa esce, ma il carico e lo scarico restano quelli di prelievi e ricevimenti.
-- **Password dell'account di sviluppo da cambiare**: le credenziali erano nel codice pubblico fino al 2026-09-29 e restano nella storia di Git (vedi "Verifica di sicurezza").
-- **Import PDF cataloghi non validato nel mondo reale**: euristica generica (raggruppamento parole per riga/colonna), testata solo su PDF generati sinteticamente in fase di test — va riverificata al primo catalogo fornitore reale disponibile.
-- **Firma digitale non ancora attiva**: la pipeline di release è pronta a firmare (vedi sopra), ma senza un certificato di firma del codice — a pagamento, da acquistare presso un'autorità come DigiCert o Sectigo (circa 70-400€/anno) — le release restano non firmate.
-- **Grafana Cloud non ancora collegato**: il logging centralizzato è pronto lato codice, ma serve creare l'account gratuito e impostare `LOKI_URL`/`LOKI_USER`/`LOKI_PASSWORD` su Render per attivarlo davvero.
-- **Modalità offline ancora limitata al Terminale di reparto**: ora coperte quattro azioni (avvia/completa fase, apri/chiudi fermo, non conformità); l'intero client d'ufficio resta online-only. L'infrastruttura è pronta per estenderla oltre, ma non è stata estesa oltre lo scope richiesto.
-- **Hosting a pagamento, referenze clienti, Stripe, branch Neon**: decisioni e acquisti del titolare (non codice).
-- **Velocità percepita — limite del piano gratuito, non del codice**: il cold-start di Render (l'API "dorme" e ci mette secondi a ripartire) è già mitigato da un ping automatico ogni 10 minuti (`keep-alive.yml`), ma resta un limite strutturale del piano Free — solo un piano a pagamento lo elimina del tutto. Le singole schermate del client caricano i dati una volta sola per sessione (non ad ogni cambio scheda) e le nuove finestre di dettaglio usano una sola chiamata API invece di più separate, quindi la parte lato codice è già ottimizzata; un rallentamento percepito altrove andrebbe segnalato con un caso specifico (quale schermata, quale azione) per poter essere indagato.
+- **Commit/push G9–G15** (e altro residuo in working tree) su `main` / Render: solo dopo conferma.
+- **G13 pronto**: EPLAN→BOM, DM 37/08, SAL, wire-list, nutrizionale, certificati 3.1 e letture bilance; l’hardware reale resta prova di campo.
+- **G15 pronto nel perimetro attivo**: board planning, capacità, qualità/CAPA, strumenti e presenze sul web; terminale shop-floor resta desktop/tecnici.
+- **MRP avanzato completato**: multi-livello, lead time e creazione ordini fornitore Draft dalle proposte.
+- **Collegamento macchine in campo**: gateway e OEE pronti; serve macchina pilota reale.
+- **Listini Metel**: listino produttore reale utile solo per tarare varianti.
+- **Materiali del rapportino e magazzino** / **DDT e giacenza**: vedi note storiche sotto.
+- **Password account di sviluppo** esposto in passato: da cambiare dal titolare.
+- **Import PDF cataloghi** da validare su catalogo reale.
+- **Firma digitale** e **Grafana Cloud**: pronti in codice, da attivare dal titolare.
+- **Offline** oltre il terminale di reparto.
+- **Hosting a pagamento, referenze, Stripe, branch Neon**: solo titolare (G16).
+- **Velocità piano Free Render**: limite di hosting, non di codice.
 
 ## Riferimento rapido gap di mercato
 
@@ -217,17 +214,20 @@ Dei quattro gap segnalati come "ancora aperti" rispetto ai MES di mercato (Katan
 | Qualità / non conformità (NCM) | ✅ Chiuso, con conteggio reale buone/scartate per singola unità quando la quantità è un numero intero |
 | Barcode/QR e terminale shop floor | ✅ Chiuso (con identificazione operatore via PIN) |
 
-Con la chiusura di Disponibilità e Qualità, il cruscotto calcola l'**OEE completo** (Disponibilità × Performance × Qualità). Dal 02/10, se ci sono letture macchina nel periodo, disponibilità e qualità possono venire dai dati macchina (fonte Declared / Hybrid / Machine).
-
-Altri punti dell'analisi di mercato aggiornati il 02/10:
+Con la chiusura di Disponibilità e Qualità, il cruscotto calcola l'**OEE completo**. Dal 02/10 può usare anche i dati macchina (Declared / Hybrid / Machine).
 
 | Punto | Stato |
 |---|---|
-| G8 Fatture passive + scadenziario | ✅ Chiuso (da pubblicare su main) |
-| G10 MRP sulle distinte (base) | ✅ Chiuso base; resta PO automatico / multi-livello |
-| Dichiarazione origine UE software | ✅ Chiuso (pagina stampabile) |
-| Aspetto grafico personalizzabile | ✅ Chiuso (Admin, azienda-wide) |
-| G9 SdI automatico | ❌ Aperto |
-| G11 Ubicazioni + barcode inventario | ❌ Aperto |
-| G12 Capacità finita | ❌ Aperto |
-| Collegamento campo OPC/MQTT reale | ❌ Aperto (gateway e OEE pronti) |
+| G8–G15, G10 avanzato | ✅ Chiusi in codice + Neon (push da fare) |
+| G13 Pacchetti settore | ✅ Import/apply (hardware bilance = campo) |
+| G15 Web | ✅ Planning scrivibile + capacità + qualità/presenze |
+| CAPA / taratura / presenze / Swagger | ✅ Base |
+| Campo OPC/MQTT reale / SdI intermediario / G16 / SSO-IA-i18n | ❌ Titolare / contratto / campo |
+
+## 02/10/2026 sera — chiusura gap aperti
+
+- MRP: multi-livello, lead time, crea ordini Draft dalle proposte; BOM con sottoassiemi prodotto.
+- G13: persistenza EPLAN/wire/nutrition/DM37/SAL/cert-31/scales (+ migrazione Neon).
+- G15: board planning web write, piano capacità.
+- Qualità: strumenti + tarature + CAPA; presenze/timbrature; Swagger pubblico + pagina docs.
+- Suite **623/623** verdi; Neon `AddQualityCapaAndCalibration`, `AddSectorPackPersistence` e `AddSsoAndLocale` applicate.

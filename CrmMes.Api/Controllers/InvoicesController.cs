@@ -20,10 +20,12 @@ public class InvoicesController : ControllerBase
 {
     private const int MaxNumberingAttempts = 3;
     private readonly ApplicationDbContext _dbContext;
+    private readonly ISdiProvider _sdiProvider;
 
-    public InvoicesController(ApplicationDbContext dbContext)
+    public InvoicesController(ApplicationDbContext dbContext, ISdiProvider sdiProvider)
     {
         _dbContext = dbContext;
+        _sdiProvider = sdiProvider;
     }
 
     [HttpGet]
@@ -39,7 +41,7 @@ public class InvoicesController : ControllerBase
         var invoices = await query.OrderByDescending(i => i.Year).ThenByDescending(i => i.Number).ThenByDescending(i => i.CreatedAt)
             .Take(300).ToListAsync(cancellationToken);
         return Ok(invoices.Select(i => new InvoiceSummaryResponse(
-            i.Id, Code(i), i.Status, i.DocumentType, i.CustomerId, i.Customer.Name, i.IssueDate, FatturaPa.Total(i.Lines), i.CreatedAt)));
+            i.Id, Code(i), i.Status, i.SdiStatus, i.DocumentType, i.CustomerId, i.Customer.Name, i.IssueDate, FatturaPa.Total(i.Lines), i.CreatedAt)));
     }
 
     [HttpGet("{id:guid}")]
@@ -146,7 +148,7 @@ public class InvoicesController : ControllerBase
             return Conflict(new { message = "Uno dei DDT è appena stato fatturato da un altro utente." });
         }
 
-        return CreatedAtAction(nameof(GetInvoice), new { id = invoice.Id }, await ToResponseAsync((await LoadAsync(invoice.Id, false, cancellationToken))!, cancellationToken));
+        return CreatedAtAction(nameof(GetInvoice), routeValues: new { id = invoice.Id }, value: await ToResponseAsync((await LoadAsync(invoice.Id, false, cancellationToken))!, cancellationToken));
     }
 
     [Authorize(Policy = "Sales")]
@@ -166,7 +168,7 @@ public class InvoicesController : ControllerBase
 
         _dbContext.Invoices.Add(invoice);
         await _dbContext.SaveChangesAsync(cancellationToken);
-        return CreatedAtAction(nameof(GetInvoice), new { id = invoice.Id }, await ToResponseAsync((await LoadAsync(invoice.Id, false, cancellationToken))!, cancellationToken));
+        return CreatedAtAction(nameof(GetInvoice), routeValues: new { id = invoice.Id }, value: await ToResponseAsync((await LoadAsync(invoice.Id, false, cancellationToken))!, cancellationToken));
     }
 
     [Authorize(Policy = "Sales")]
@@ -294,6 +296,101 @@ public class InvoicesController : ControllerBase
         var documents = await _dbContext.TransportDocuments.AsNoTracking().Where(d => documentIds.Contains(d.Id)).ToListAsync(cancellationToken);
         var xml = FatturaPa.BuildXml(invoice, company, invoice.Customer, fiscal, documents);
         return File(Encoding.UTF8.GetBytes(xml), "application/xml", FatturaPa.FileName(company, invoice));
+    }
+
+    [Authorize(Policy = "Sales")]
+    [HttpPost("{id:guid}/sdi/submit")]
+    public async Task<ActionResult<InvoiceResponse>> SubmitToSdi(Guid id, CancellationToken cancellationToken = default)
+    {
+        var invoice = await LoadAsync(id, tracking: true, cancellationToken);
+        if (invoice is null)
+        {
+            return NotFound();
+        }
+
+        if (invoice.Status != "Issued")
+        {
+            return Conflict(new { message = "Emetti prima la fattura." });
+        }
+
+        if (!_sdiProvider.IsConfigured)
+        {
+            return Conflict(new { message = "Nessun intermediario SdI è configurato. Scarica l'XML e caricalo manualmente sul portale Fatture e Corrispettivi." });
+        }
+
+        if (invoice.SdiStatus is not (SdiStatuses.NotSent or SdiStatuses.Rejected or SdiStatuses.DeliveryFailed))
+        {
+            return Conflict(new { message = "La fattura è già in trasmissione o ha un esito definitivo." });
+        }
+
+        var company = await _dbContext.CompanyProfiles.AsNoTracking().FirstAsync(cancellationToken);
+        var fiscal = await _dbContext.CustomerFiscalData.AsNoTracking().FirstAsync(f => f.CustomerId == invoice.CustomerId, cancellationToken);
+        var documentIds = invoice.TransportDocuments.Select(t => t.TransportDocumentId).ToList();
+        var documents = await _dbContext.TransportDocuments.AsNoTracking().Where(d => documentIds.Contains(d.Id)).ToListAsync(cancellationToken);
+        var xml = FatturaPa.BuildXml(invoice, company, invoice.Customer, fiscal, documents);
+        var result = await _sdiProvider.SubmitAsync(FatturaPa.FileName(company, invoice), xml, cancellationToken);
+        if (!result.Submitted)
+        {
+            return Problem(statusCode: StatusCodes.Status502BadGateway, title: "Invio SdI non completato", detail: result.Message);
+        }
+
+        RecordSdiStatus(invoice, SdiStatuses.Submitted, result.TransmissionId, result.Message);
+        await _dbContext.SaveChangesAsync(cancellationToken);
+        return Ok(await ToResponseAsync((await LoadAsync(id, false, cancellationToken))!, cancellationToken));
+    }
+
+    [Authorize(Policy = "Sales")]
+    [HttpPost("{id:guid}/sdi/status")]
+    public async Task<ActionResult<InvoiceResponse>> RecordSdiStatus(
+        Guid id, RecordSdiStatusRequest request, CancellationToken cancellationToken = default)
+    {
+        var invoice = await LoadAsync(id, tracking: true, cancellationToken);
+        if (invoice is null)
+        {
+            return NotFound();
+        }
+
+        if (invoice.Status != "Issued")
+        {
+            return Conflict(new { message = "Solo una fattura emessa può avere uno stato SdI." });
+        }
+
+        var status = request.Status?.Trim();
+        if (status is null || !SdiStatuses.All.Contains(status))
+        {
+            return BadRequest(new { message = "Stato SdI non valido." });
+        }
+
+        if (!SdiStatuses.CanTransition(invoice.SdiStatus, status))
+        {
+            return Conflict(new { message = $"Transizione non valida: {invoice.SdiStatus} → {status}." });
+        }
+
+        if (request.TransmissionId?.Length > 100 || request.Message?.Length > 1000)
+        {
+            return BadRequest(new { message = "Identificativo o messaggio SdI troppo lungo." });
+        }
+
+        RecordSdiStatus(invoice, status, request.TransmissionId, request.Message);
+        _dbContext.AuditLogs.Add(new AuditLog
+        {
+            Action = "InvoiceSdiStatusChanged",
+            EntityType = "Invoice",
+            EntityId = invoice.Id,
+            UserName = invoice.SdiUpdatedBy,
+            Details = $"Fattura {Code(invoice)}: {status}."
+        });
+        await _dbContext.SaveChangesAsync(cancellationToken);
+        return Ok(await ToResponseAsync((await LoadAsync(id, false, cancellationToken))!, cancellationToken));
+    }
+
+    private void RecordSdiStatus(Invoice invoice, string status, string? transmissionId, string? message)
+    {
+        invoice.SdiStatus = status;
+        invoice.SdiTransmissionId = string.IsNullOrWhiteSpace(transmissionId) ? null : transmissionId.Trim();
+        invoice.SdiMessage = string.IsNullOrWhiteSpace(message) ? null : message.Trim();
+        invoice.SdiStatusUpdatedAt = DateTime.UtcNow;
+        invoice.SdiUpdatedBy = User.FindFirstValue(ClaimTypes.Name);
     }
 
     private async Task<(decimal Price, decimal Discount)> SuggestPriceAsync(TransportDocument document, TransportDocumentLine line, CancellationToken cancellationToken)
@@ -427,7 +524,9 @@ public class InvoicesController : ControllerBase
                 l.DiscountPercent, l.VatRate, l.VatNature, FatturaPa.LineTotal(l), l.TransportDocumentId)).ToList(),
             documents.OrderBy(d => d.IssuedAt).Select(d => new InvoiceDocumentResponse(d.Id, $"{d.Number}/{d.Year}", d.IssuedAt)).ToList(),
             FatturaPa.Summaries(lines).Select(s => new InvoiceSummaryLineResponse(s.Rate, s.Nature, s.Taxable, s.Tax)).ToList(),
-            FatturaPa.Total(lines), warnings, invoice.IssuedAt, invoice.IssuedBy);
+            FatturaPa.Total(lines), warnings, invoice.IssuedAt, invoice.IssuedBy,
+            invoice.SdiStatus, invoice.SdiTransmissionId, invoice.SdiStatusUpdatedAt, invoice.SdiMessage, invoice.SdiUpdatedBy,
+            _sdiProvider.IsConfigured);
     }
 
     private static string Code(Invoice invoice) => invoice.Number is { } n ? $"{n}/{invoice.Year}" : "Bozza";
@@ -601,7 +700,7 @@ public sealed record SaveInvoiceRequest(
 public sealed record IssueInvoiceRequest(DateTime? IssueDate);
 
 public sealed record InvoiceSummaryResponse(
-    Guid Id, string Code, string Status, string DocumentType, Guid CustomerId, string CustomerName, DateTime? IssueDate,
+    Guid Id, string Code, string Status, string SdiStatus, string DocumentType, Guid CustomerId, string CustomerName, DateTime? IssueDate,
     decimal Total, DateTime CreatedAt);
 
 public sealed record InvoiceLineResponse(
@@ -616,7 +715,11 @@ public sealed record InvoiceResponse(
     Guid Id, string Code, int? Number, int? Year, string Status, string DocumentType, Guid CustomerId, string CustomerName,
     DateTime? IssueDate, string PaymentMethod, DateTime? PaymentDueDate, string? Notes, List<InvoiceLineResponse> Lines,
     List<InvoiceDocumentResponse> TransportDocuments, List<InvoiceSummaryLineResponse> VatSummary, decimal Total,
-    List<string> Warnings, DateTime? IssuedAt, string? IssuedBy);
+    List<string> Warnings, DateTime? IssuedAt, string? IssuedBy,
+    string SdiStatus, string? SdiTransmissionId, DateTime? SdiStatusUpdatedAt, string? SdiMessage, string? SdiUpdatedBy,
+    bool SdiProviderConfigured);
+
+public sealed record RecordSdiStatusRequest(string? Status, string? TransmissionId, string? Message);
 
 public sealed record UninvoicedDocumentResponse(Guid Id, string DocumentCode, DateTime? IssuedAt, Guid CustomerId, string CustomerName, string Reason);
 

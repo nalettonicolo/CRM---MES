@@ -24,7 +24,7 @@ public sealed record TransportDocument(
     List<TransportDocumentLine> Lines);
 
 public sealed record InvoiceSummary(
-    Guid Id, string Code, string Status, string DocumentType, Guid CustomerId, string CustomerName, DateTime? IssueDate,
+    Guid Id, string Code, string Status, string SdiStatus, string DocumentType, Guid CustomerId, string CustomerName, DateTime? IssueDate,
     decimal Total, DateTime CreatedAt);
 
 public sealed record InvoiceLine(
@@ -39,6 +39,8 @@ public sealed record Invoice(
     Guid Id, string Code, int? Number, int? Year, string Status, string DocumentType, Guid CustomerId, string CustomerName,
     DateTime? IssueDate, string PaymentMethod, DateTime? PaymentDueDate, string? Notes, List<InvoiceLine> Lines,
     List<InvoiceDocument> TransportDocuments, List<InvoiceVatLine> VatSummary, decimal Total,
-    List<string> Warnings, DateTime? IssuedAt, string? IssuedBy);
+    List<string> Warnings, DateTime? IssuedAt, string? IssuedBy,
+    string SdiStatus = "NotSent", string? SdiTransmissionId = null, DateTime? SdiStatusUpdatedAt = null,
+    string? SdiMessage = null, string? SdiUpdatedBy = null, bool SdiProviderConfigured = false);
 
 public sealed record DownloadedFile(string FileName, string ContentType, byte[] Content);

@@ -47,7 +47,7 @@ else
         {
             <div class="table-wrap">
                 <table class="cards">
-                    <thead><tr><th>Fattura</th><th>Tipo</th><th>Cliente</th><th>Data</th><th class="num">Totale</th><th>Stato</th></tr></thead>
+                    <thead><tr><th>Fattura</th><th>Tipo</th><th>Cliente</th><th>Data</th><th class="num">Totale</th><th>Stato</th><th>SdI</th></tr></thead>
                     <tbody>
                         @foreach (var invoice in Visible)
                         {
@@ -58,6 +58,7 @@ else
                                 <td data-label="Data">@Labels.Date(invoice.IssueDate)</td>
                                 <td data-label="Totale" class="num">@Labels.Money(invoice.Total)</td>
                                 <td data-label="Stato"><span class="badge @Labels.DocumentStatusClass(invoice.Status)">@(invoice.Status == "Issued" ? "Emessa" : Labels.DocumentStatus(invoice.Status))</span></td>
+                                <td data-label="SdI"><span class="badge @Labels.SdiStatusClass(invoice.SdiStatus)">@Labels.SdiStatus(invoice.SdiStatus)</span></td>
                             </tr>
                         }
                     </tbody>

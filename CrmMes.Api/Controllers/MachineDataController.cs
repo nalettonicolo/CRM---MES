@@ -144,6 +144,78 @@ public class MachineDataController : ControllerBase
         return Ok(new MachineTokenResponse(token, connection.TokenPrefix, endpoint, TokenHeader));
     }
 
+    /// <summary>Generates a short burst of machine readings for demos and training, without a gateway or token.</summary>
+    [Authorize(Policy = "AdminOnly")]
+    [HttpPost("api/equipment/{equipmentId:guid}/demo-feed")]
+    public async Task<ActionResult<MachineDemoFeedResponse>> DemoFeed(
+        Guid equipmentId, [FromQuery] int seconds = 60, CancellationToken cancellationToken = default)
+    {
+        if (seconds is < 1 or > 3600)
+        {
+            return BadRequest(new { message = "Durata demo tra 1 e 3600 secondi." });
+        }
+
+        if (!await _dbContext.Equipment.AnyAsync(e => e.Id == equipmentId, cancellationToken))
+        {
+            return NotFound();
+        }
+
+        var now = DateTime.UtcNow;
+        var anchor = new DateTime(now.Year, now.Month, now.Day, now.Hour, now.Minute, 0, DateTimeKind.Utc);
+        var step = Math.Max(1, seconds / 12);
+        var planned = new List<MachineEvent>();
+        decimal energy = 50m;
+        var cycle = new[] { "Running", "Running", "Idle", "Running", "Setup", "Running" };
+        for (int i = 0, offset = seconds; offset >= 0; offset -= step, i++)
+        {
+            var state = cycle[i % cycle.Length];
+            if (state == "Running")
+            {
+                energy += 0.08m + i * 0.01m;
+            }
+            else if (state == "Idle")
+            {
+                energy += 0.02m;
+            }
+
+            planned.Add(new MachineEvent
+            {
+                EquipmentId = equipmentId,
+                Timestamp = anchor.AddSeconds(-offset),
+                State = state,
+                // No piece/scrap counters: demo must not pollute shared OEE quality aggregates in tests/prod.
+                PieceCounter = null,
+                ScrapCounter = null,
+                EnergyKwh = Math.Round(energy, 3),
+                ReceivedAt = now
+            });
+        }
+
+        var timestamps = planned.Select(e => e.Timestamp).ToList();
+        var existing = (await _dbContext.MachineEvents
+                .Where(e => e.EquipmentId == equipmentId && timestamps.Contains(e.Timestamp))
+                .Select(e => e.Timestamp)
+                .ToListAsync(cancellationToken))
+            .ToHashSet();
+        var fresh = planned.Where(e => !existing.Contains(e.Timestamp)).ToList();
+        if (fresh.Count > 0)
+        {
+            _dbContext.MachineEvents.AddRange(fresh);
+            var connection = await _dbContext.MachineConnections.FirstOrDefaultAsync(c => c.EquipmentId == equipmentId, cancellationToken);
+            var latest = fresh.MaxBy(e => e.Timestamp)!;
+            if (connection is not null && (connection.LastSeenAt is null || latest.Timestamp >= connection.LastSeenAt))
+            {
+                connection.LastSeenAt = latest.Timestamp;
+                connection.LastState = latest.State;
+                connection.LastPieceCounter = latest.PieceCounter;
+            }
+
+            await _dbContext.SaveChangesAsync(cancellationToken);
+        }
+
+        return Ok(new MachineDemoFeedResponse(fresh.Count, planned.Count - fresh.Count));
+    }
+
     [Authorize(Policy = "AdminOnly")]
     [HttpDelete("api/equipment/{equipmentId:guid}/machine-token")]
     public async Task<IActionResult> RevokeToken(Guid equipmentId, CancellationToken cancellationToken = default)
@@ -257,3 +329,5 @@ public sealed record MachineDayResponse(
     List<MachineAlarmResponse> Alarms);
 
 public sealed record MachineOverviewResponse(Guid EquipmentId, string Name, string Code, DateTime? LastSeenAt, string LastState, long? LastPieceCounter);
+
+public sealed record MachineDemoFeedResponse(int Created, int SkippedDuplicates);

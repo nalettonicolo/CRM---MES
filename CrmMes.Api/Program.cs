@@ -147,12 +147,38 @@ builder.Services.AddSingleton<CrmMes.Api.Services.WorkOrderFactory>();
 builder.Services.AddScoped<CrmMes.Api.Services.MaterialPricing>();
 builder.Services.AddScoped<CrmMes.Api.Services.WorkOrderCosting>();
 builder.Services.AddScoped<CrmMes.Api.Services.StockLedger>();
+var sdiProvider = builder.Configuration["Sdi:Provider"]?.Trim().ToLowerInvariant();
+if (sdiProvider == "http")
+{
+    builder.Services.AddHttpClient<CrmMes.Api.Services.ISdiProvider, CrmMes.Api.Services.HttpSdiProvider>(client =>
+        client.Timeout = TimeSpan.FromSeconds(30));
+}
+else if (sdiProvider == "stub")
+{
+    builder.Services.AddSingleton<CrmMes.Api.Services.ISdiProvider, CrmMes.Api.Services.StubSdiProvider>();
+}
+else
+{
+    builder.Services.AddSingleton<CrmMes.Api.Services.ISdiProvider, CrmMes.Api.Services.UnconfiguredSdiProvider>();
+}
 builder.Services.AddHostedService<CrmMes.Api.Services.KeepWarmService>();
 builder.Services.AddSingleton<CrmMes.Api.Services.LicenseState>();
 builder.Services.AddSingleton<CrmMes.Api.Services.LicenseHeartbeatService>();
 builder.Services.AddHostedService(sp => sp.GetRequiredService<CrmMes.Api.Services.LicenseHeartbeatService>());
 builder.Services.AddHttpClient(CrmMes.Api.Services.LicenseHeartbeatService.HttpClientName, client => client.Timeout = TimeSpan.FromSeconds(30));
 builder.Services.AddHttpClient(CrmMes.Api.Services.KeepWarmService.HttpClientName);
+
+var aiProvider = builder.Configuration["Ai:Provider"]?.Trim().ToLowerInvariant() ?? "off";
+if (aiProvider == "openai")
+{
+    builder.Services.AddHttpClient(CrmMes.Api.Services.HttpAiAssistant.HttpClientName,
+        client => client.Timeout = TimeSpan.FromSeconds(60));
+    builder.Services.AddSingleton<CrmMes.Api.Services.IAiAssistant, CrmMes.Api.Services.HttpAiAssistant>();
+}
+else if (aiProvider == "stub")
+{
+    builder.Services.AddSingleton<CrmMes.Api.Services.IAiAssistant, CrmMes.Api.Services.StubAiAssistant>();
+}
 
 var connectionString = Environment.GetEnvironmentVariable("NEON_DATABASE_URL")
     ?? Environment.GetEnvironmentVariable("DATABASE_URL")
@@ -237,12 +263,10 @@ app.UseDefaultFiles(); // /tecnici/ -> /tecnici/index.html
 app.UseBlazorFrameworkFiles("/app"); // the web platform's runtime files (/app/_framework)
 app.UseStaticFiles(); // serves wwwroot/favicon.ico, picked up automatically by the browser and by Swagger UI
 
-if (app.Environment.IsDevelopment())
-{
-    app.UseSwagger();
-    app.UseSwaggerUI();
-}
-else
+app.UseSwagger();
+app.UseSwaggerUI(options => options.RoutePrefix = "swagger");
+
+if (!app.Environment.IsDevelopment())
 {
     app.UseHsts();
 }

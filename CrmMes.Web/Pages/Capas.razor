@@ -1,0 +1,160 @@
+@page "/capa"
+@inject Api Api
+@inject Session Session
+
+<PageTitle>CAPA · Nicolò MES</PageTitle>
+
+<div class="page-head">
+    <div>
+        <div class="eyebrow">Qualità</div>
+        <h1>Azioni correttive (CAPA)</h1>
+        <p class="sub">Gestione non conformità e azioni correttive/preventive.</p>
+    </div>
+</div>
+
+@if (_error is not null)
+{
+    <div class="alert" role="alert">@_error</div>
+}
+
+<div class="card">
+    @if (_capas is null)
+    {
+        <div class="state">@Labels.Loading</div>
+    }
+    else if (_capas.Count == 0)
+    {
+        <div class="state"><strong>Nessuna CAPA</strong>@(CanManage ? " Apri la prima azione correttiva qui sotto." : "")</div>
+    }
+    else
+    {
+        <div class="table-wrap">
+            <table class="cards">
+                <thead><tr><th>Codice</th><th>Titolo</th><th>Stato</th><th>Aperta</th><th>Scadenza</th><th></th></tr></thead>
+                <tbody>
+                    @foreach (var capa in _capas)
+                    {
+                        <tr>
+                            <td data-label="Codice" class="code">@capa.Code</td>
+                            <td data-label="Titolo">@capa.Title</td>
+                            <td data-label="Stato"><span class="badge @StatusClass(capa.Status)">@StatusLabel(capa.Status)</span></td>
+                            <td data-label="Aperta">@Labels.Date(capa.OpenedAt)</td>
+                            <td data-label="Scadenza">@(capa.DueDate is null ? "—" : Labels.Date(capa.DueDate))</td>
+                            <td>
+                                @if (CanManage && capa.Status != "Closed")
+                                {
+                                    @if (capa.Status == "Open")
+                                    {
+                                        <button class="secondary small" @onclick='() => SetStatusAsync(capa.Id, "InProgress")'>Avvia</button>
+                                    }
+                                    <button class="secondary small" @onclick='() => SetStatusAsync(capa.Id, "Closed")'>Chiudi</button>
+                                }
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    }
+</div>
+
+@if (CanManage)
+{
+    <div class="card card-pad stack">
+        <h2>Nuova CAPA</h2>
+        <div class="form-grid">
+            <label>Codice (opzionale)<input @bind="_newCode" placeholder="Auto se vuoto" autocomplete="off" /></label>
+            <label>Titolo<input @bind="_newTitle" /></label>
+            <label>Descrizione<textarea @bind="_newDescription" rows="2"></textarea></label>
+            <label>Scadenza<input type="date" @bind="_newDueDate" /></label>
+        </div>
+        <div class="actions"><button @onclick="CreateAsync" disabled="@_busy">Crea CAPA</button></div>
+    </div>
+}
+
+@code {
+    private List<CapaRow>? _capas;
+    private string? _error;
+    private bool _busy;
+    private string _newCode = string.Empty;
+    private string _newTitle = string.Empty;
+    private string _newDescription = string.Empty;
+    private DateTime? _newDueDate;
+
+    private bool CanManage => Session.Role is "Admin" or "Management";
+
+    protected override Task OnInitializedAsync() => LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        _error = null;
+        try
+        {
+            _capas = await Api.GetAsync<List<CapaRow>>("api/capas");
+        }
+        catch (ApiException ex)
+        {
+            _error = ex.Message;
+        }
+    }
+
+    private async Task CreateAsync()
+    {
+        _busy = true;
+        _error = null;
+        try
+        {
+            await Api.PostAsync<CapaRow>("api/capas", new
+            {
+                code = string.IsNullOrWhiteSpace(_newCode) ? null : _newCode.Trim(),
+                title = _newTitle.Trim(),
+                description = string.IsNullOrWhiteSpace(_newDescription) ? null : _newDescription.Trim(),
+                dueDate = _newDueDate
+            });
+            _newCode = _newTitle = _newDescription = string.Empty;
+            _newDueDate = null;
+            await LoadAsync();
+        }
+        catch (ApiException ex)
+        {
+            _error = ex.Message;
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+
+    private async Task SetStatusAsync(Guid id, string status)
+    {
+        _busy = true;
+        _error = null;
+        try
+        {
+            await Api.PutAsync<CapaRow>($"api/capas/{id}/status", new { status });
+            await LoadAsync();
+        }
+        catch (ApiException ex)
+        {
+            _error = ex.Message;
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+
+    private static string StatusLabel(string status) => status switch
+    {
+        "InProgress" => "In corso",
+        "Closed" => "Chiusa",
+        _ => "Aperta"
+    };
+
+    private static string StatusClass(string status) => status switch
+    {
+        "Closed" => "ok",
+        "InProgress" => "",
+        _ => "warn"
+    };
+}

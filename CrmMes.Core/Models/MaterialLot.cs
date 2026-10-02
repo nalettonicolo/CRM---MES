@@ -21,6 +21,12 @@ public class MaterialLot
     /// consumed first-expiring-first-out; lots without one keep the plain first-in-first-out order.</summary>
     public DateTime? ExpiryDate { get; set; }
     public string? Notes { get; set; }
+
+    /// <summary>Certificazione DM 31 / collaudo materiale (import pacchetto settore).</summary>
+    public string? CertificateNumber { get; set; }
+    public string? CertificateIssuer { get; set; }
+    public DateTime? CertificateIssuedOn { get; set; }
+
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     public ICollection<MaterialLotConsumption> Consumptions { get; set; } = new List<MaterialLotConsumption>();
 }

@@ -1,6 +1,7 @@
 using System.Net;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
+using System.Text;
 using System.Text.Json;
 
 namespace CrmMes.Web.Services;
@@ -55,6 +56,30 @@ public sealed class Api
         await _session.SetAsync(auth);
         return auth;
     }
+
+    public async Task<List<ExternalProviderInfo>> GetExternalProvidersAsync()
+    {
+        using var response = await SendRawAsync(HttpMethod.Get, "api/auth/external/providers", null, authenticated: false);
+        await EnsureSuccessAsync(response);
+        return await response.Content.ReadFromJsonAsync<List<ExternalProviderInfo>>() ?? [];
+    }
+
+    public async Task<AuthResponse> ExternalLoginAsync(string provider, string subject, string email, string name)
+    {
+        using var response = await SendRawAsync(HttpMethod.Post, "api/auth/external",
+            new { provider, subject, email, name, channel = Channel }, authenticated: false);
+        await EnsureSuccessAsync(response);
+        var auth = await response.Content.ReadFromJsonAsync<AuthResponse>() ?? throw new ApiException("Risposta di accesso non valida.");
+        if (string.IsNullOrEmpty(auth.TwoFactorChallenge))
+        {
+            await _session.SetAsync(auth);
+        }
+
+        return auth;
+    }
+
+    public async Task<AiAssistantAnswer> AskAssistantAsync(string question) =>
+        await PostAsync<AiAssistantAnswer>("api/assistant/ask", new { question });
 
     /// <summary>A new pair of tokens now (after two-factor was switched on, to lift the setup limit).</summary>
     public async Task<bool> RenewSessionAsync() => await RefreshAsync();
@@ -118,6 +143,18 @@ public sealed class Api
         await EnsureSuccessAsync(response);
     }
 
+    public async Task PutNoContentAsync(string path, object body)
+    {
+        using var response = await SendAuthenticatedAsync(HttpMethod.Put, path, body);
+        await EnsureSuccessAsync(response);
+    }
+
+    public async Task DeleteWithBodyAsync(string path, object body)
+    {
+        using var response = await SendAuthenticatedAsync(HttpMethod.Delete, path, body);
+        await EnsureSuccessAsync(response);
+    }
+
     public async Task LogoutAsync()
     {
         var refreshToken = _session.Auth?.RefreshToken;
@@ -154,6 +191,55 @@ public sealed class Api
     public Task<T> PutAsync<T>(string path, object body) => SendAsync<T>(HttpMethod.Put, path, body);
 
     public Task<T> PostAsync<T>(string path, object? body = null) => SendAsync<T>(HttpMethod.Post, path, body);
+
+    /// <summary>POST JSON and read a file response (es. generazione documenti settore).</summary>
+    public async Task<DownloadedFile> PostDownloadAsync(string path, object body, string fallbackName)
+    {
+        using var response = await SendAuthenticatedAsync(HttpMethod.Post, path, body);
+        await EnsureSuccessAsync(response);
+        var name = response.Content.Headers.ContentDisposition?.FileNameStar
+            ?? response.Content.Headers.ContentDisposition?.FileName?.Trim('"')
+            ?? fallbackName;
+        var type = response.Content.Headers.ContentType?.MediaType ?? "application/octet-stream";
+        return new DownloadedFile(name, type, await response.Content.ReadAsByteArrayAsync());
+    }
+
+    /// <summary>POST with a plain-text body (anteprime import settore, CSV EPLAN, ecc.).</summary>
+    public async Task<T> PostPlainTextAsync<T>(string path, string text)
+    {
+        async Task<HttpResponseMessage> SendAsync()
+        {
+            using var request = new HttpRequestMessage(HttpMethod.Post, path);
+            request.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
+            if (_session.Auth is { } auth)
+            {
+                request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", auth.Token);
+            }
+
+            request.Content = new StringContent(text, Encoding.UTF8, "text/plain");
+            try
+            {
+                return await _http.SendAsync(request);
+            }
+            catch (HttpRequestException)
+            {
+                throw new ApiException(Labels.Unreachable);
+            }
+        }
+
+        var response = await SendAsync();
+        if (response.StatusCode == HttpStatusCode.Unauthorized && _session.Auth is not null && await RefreshAsync())
+        {
+            response.Dispose();
+            response = await SendAsync();
+        }
+
+        using (response)
+        {
+            await EnsureSuccessAsync(response);
+            return await response.Content.ReadFromJsonAsync<T>() ?? throw new ApiException("Risposta del server vuota.");
+        }
+    }
 
     /// <summary>A file served behind login (the invoice XML): name taken from the server's header.</summary>
     public async Task<DownloadedFile> GetFileAsync(string path, string fallbackName)

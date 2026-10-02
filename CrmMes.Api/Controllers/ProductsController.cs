@@ -222,15 +222,21 @@ public class ProductsController : ControllerBase
         }
 
         var codes = items.Select(item => item.MaterialCode.Trim()).Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
-        var knownCodes = await _dbContext.Materials
+        var knownMaterialCodes = await _dbContext.Materials
             .Where(material => material.IsActive && codes.Contains(material.Code))
             .Select(material => material.Code)
             .ToListAsync(cancellationToken);
-        var knownCodesSet = knownCodes.ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var knownProductCodes = await _dbContext.Products
+            .Where(p => p.IsActive && codes.Contains(p.Code))
+            .Select(p => p.Code)
+            .ToListAsync(cancellationToken);
+        var knownCodesSet = knownMaterialCodes
+            .Concat(knownProductCodes)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
         var unknownCodes = codes.Where(code => !knownCodesSet.Contains(code)).ToArray();
         if (unknownCodes.Length > 0)
         {
-            return BadRequest(new { message = "Codici materiale non trovati o non attivi nel catalogo.", materials = unknownCodes });
+            return BadRequest(new { message = "Codici non trovati come materiale o prodotto attivo (sottoassieme).", materials = unknownCodes });
         }
 
         foreach (var item in product.BillOfMaterial.ToList())

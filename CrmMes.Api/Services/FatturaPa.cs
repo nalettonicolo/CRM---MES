@@ -223,7 +223,7 @@ public static class FatturaPa
         var total = summaries.Sum(s => s.Taxable + s.Tax);
         var documento = new XElement("DatiGeneraliDocumento",
             new XElement("TipoDocumento", invoice.DocumentType),
-            new XElement("Divisa", "EUR"),
+            new XElement("Divisa", string.IsNullOrWhiteSpace(company.Currency) ? "EUR" : company.Currency.Trim().ToUpperInvariant()),
             new XElement("Data", invoice.IssueDate.Value.ToString("yyyy-MM-dd", Invariant)),
             new XElement("Numero", $"{invoice.Number}/{invoice.Year}"),
             new XElement("ImportoTotaleDocumento", Amount2(total)),

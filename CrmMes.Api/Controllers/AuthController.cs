@@ -6,6 +6,7 @@ using CrmMes.Api.Services;
 using CrmMes.Core.Data;
 using CrmMes.Core.Security;
 using CrmMes.Core.Models;
+using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -21,6 +22,11 @@ public class AuthController : ControllerBase
     private static readonly TimeSpan AccessTokenLifetime = TimeSpan.FromMinutes(30);
     private static readonly TimeSpan RefreshTokenLifetime = TimeSpan.FromDays(30);
 
+    private static readonly HashSet<string> AllowedExternalRoles = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "Admin", "Management", "Warehouse", "Purchasing", "Sales", "Operator"
+    };
+
     /// <summary>Wrong passwords in a row before the account is locked, and for how long.</summary>
     public const int MaxFailedLogins = 5;
     public static readonly TimeSpan LockoutDuration = TimeSpan.FromMinutes(15);
@@ -35,19 +41,156 @@ public class AuthController : ControllerBase
     private readonly IPasswordHasher<User> _passwordHasher;
     private readonly TwoFactorChallenges _challenges;
     private readonly SecretProtector _protector;
+    private readonly IWebHostEnvironment _environment;
 
     public AuthController(
         ApplicationDbContext dbContext,
         IConfiguration configuration,
         IPasswordHasher<User> passwordHasher,
         TwoFactorChallenges challenges,
-        SecretProtector protector)
+        SecretProtector protector,
+        IWebHostEnvironment environment)
     {
         _dbContext = dbContext;
         _configuration = configuration;
         _passwordHasher = passwordHasher;
         _challenges = challenges;
         _protector = protector;
+        _environment = environment;
+    }
+
+    private bool ExternalAuthAllowed =>
+        _environment.IsDevelopment() || _configuration.GetValue<bool>("Auth:External:Enabled");
+
+    /// <summary>OIDC/SSO exchange: clients send verified IdP claims after their login flow. In production enable
+    /// only with a trusted token mapper; this endpoint is the server-side plumbing.</summary>
+    [HttpPost("external")]
+    public async Task<ActionResult<AuthResponse>> ExternalLogin(
+        ExternalLoginRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        if (!ExternalAuthAllowed)
+        {
+            return NotFound();
+        }
+
+        var provider = request.Provider?.Trim();
+        var subject = request.Subject?.Trim();
+        if (string.IsNullOrWhiteSpace(provider) || string.IsNullOrWhiteSpace(subject))
+        {
+            return BadRequest(new { message = "Provider e Subject sono obbligatori." });
+        }
+
+        var email = request.Email?.Trim().ToLowerInvariant();
+        var name = request.Name?.Trim();
+        var channel = AccessChannels.NormalizeChannel(request.Channel) ?? AccessChannels.Web;
+
+        var user = await _dbContext.Users.SingleOrDefaultAsync(
+            u => u.ExternalProvider == provider && u.ExternalSubject == subject && u.IsActive, cancellationToken);
+
+        if (user is null && !string.IsNullOrWhiteSpace(email))
+        {
+            user = await _dbContext.Users.SingleOrDefaultAsync(u => u.Email == email && u.IsActive, cancellationToken);
+            if (user is not null)
+            {
+                user.ExternalProvider = provider;
+                user.ExternalSubject = subject;
+                if (!string.IsNullOrWhiteSpace(name))
+                {
+                    user.Name = name;
+                }
+            }
+        }
+
+        if (user is null)
+        {
+            if (!_configuration.GetValue<bool>("Auth:External:AutoProvision"))
+            {
+                return Unauthorized(new { message = "Utente non registrato: chiedi a un Admin di abilitare l'accesso SSO." });
+            }
+
+            if (string.IsNullOrWhiteSpace(email) || string.IsNullOrWhiteSpace(name))
+            {
+                return BadRequest(new { message = "Email e nome sono obbligatori per creare un nuovo utente SSO." });
+            }
+
+            if (await _dbContext.Users.AnyAsync(u => u.Email == email, cancellationToken))
+            {
+                return Conflict(new { message = "Email già registrata con un altro account." });
+            }
+
+            var role = _configuration["Auth:External:DefaultRole"]?.Trim();
+            if (string.IsNullOrWhiteSpace(role))
+            {
+                role = "Operator";
+            }
+
+            if (!AllowedExternalRoles.Contains(role))
+            {
+                return BadRequest(new { message = "Ruolo predefinito SSO non valido." });
+            }
+
+            user = new User
+            {
+                Name = name,
+                Email = email,
+                Role = role,
+                PasswordHash = string.Empty,
+                ExternalProvider = provider,
+                ExternalSubject = subject,
+            };
+            _dbContext.Users.Add(user);
+            await _dbContext.SaveChangesAsync(cancellationToken);
+        }
+
+        var channelRefusal = await ChannelRefusalAsync(user.Role, channel, cancellationToken);
+        if (channelRefusal is not null)
+        {
+            await _dbContext.SaveChangesAsync(cancellationToken);
+            return StatusCode(StatusCodes.Status403Forbidden, new { message = channelRefusal });
+        }
+
+        if (user.TwoFactorEnabled)
+        {
+            await _dbContext.SaveChangesAsync(cancellationToken);
+            return Ok(new AuthResponse(string.Empty, string.Empty, DateTime.UtcNow.Add(TwoFactorChallenges.Lifetime),
+                user.Id, user.Name, user.Email, user.Role, TwoFactorChallenge: _challenges.Issue(user.Id, channel)));
+        }
+
+        return Ok(await CreateResponseAsync(user, cancellationToken, channel: channel));
+    }
+
+    [HttpGet("external/providers")]
+    public ActionResult<List<ExternalProviderResponse>> ExternalProviders()
+    {
+        if (!ExternalAuthAllowed)
+        {
+            return Ok(new List<ExternalProviderResponse>());
+        }
+
+        var list = new List<ExternalProviderResponse>();
+        var section = _configuration.GetSection("Auth:External:Providers");
+        foreach (var child in section.GetChildren())
+        {
+            if (child.Exists() && !string.IsNullOrWhiteSpace(child["Key"]))
+            {
+                list.Add(new ExternalProviderResponse(
+                    child["Key"]!.Trim(),
+                    child["Name"]?.Trim() ?? child["Key"]!.Trim(),
+                    child.GetValue<bool>("Enabled")));
+                continue;
+            }
+
+            if (!string.IsNullOrWhiteSpace(child.Key) && child.Key != "0")
+            {
+                list.Add(new ExternalProviderResponse(
+                    child.Key,
+                    child["Name"]?.Trim() ?? child.Key,
+                    child.GetValue("Enabled", true)));
+            }
+        }
+
+        return Ok(list);
     }
 
     [HttpPost("register")]
@@ -438,3 +581,7 @@ public sealed record AuthResponse(
     bool TwoFactorSetupRequired = false);
 
 public sealed record TwoFactorLoginRequest(string? Challenge, string? Code);
+
+public sealed record ExternalLoginRequest(string? Provider, string? Subject, string? Email, string? Name, string? Channel = null);
+
+public sealed record ExternalProviderResponse(string Key, string Name, bool Enabled);

@@ -153,4 +153,29 @@ public class MachineDataTests : IClassFixture<AdminSeededApiTestFixture>
         // 300 pieces, 5 scrap → quality 300/305
         Assert.Equal(Math.Round(300m / 305m, 4), dashboard.MachineQualityRatio);
     }
+
+    [Fact]
+    public async Task DemoFeed_CreatesEvents_AndDashboardSeesMachineSource()
+    {
+        var equipment = (await (await _admin.PostAsJsonAsync("/api/equipment", new CreateEquipmentRequest($"Demo {Guid.NewGuid():N}"[..12], $"DM-{Guid.NewGuid():N}"[..10], null)))
+            .Content.ReadFromJsonAsync<EquipmentResponse>())!;
+
+        var feed = await _admin.PostAsync($"/api/equipment/{equipment.Id}/demo-feed?seconds=60", null);
+        feed.EnsureSuccessStatusCode();
+        var created = (await feed.Content.ReadFromJsonAsync<MachineDemoFeedResponse>())!;
+        Assert.True(created.Created >= 10);
+
+        var repeat = await (await _admin.PostAsync($"/api/equipment/{equipment.Id}/demo-feed?seconds=60", null)).Content
+            .ReadFromJsonAsync<MachineDemoFeedResponse>();
+        Assert.Equal(0, repeat!.Created);
+        Assert.True(repeat.SkippedDuplicates >= 10);
+
+        var dashboard = (await _admin.GetFromJsonAsync<WorkOrderDashboardResponse>("/api/work-orders/dashboard?days=1"))!;
+        Assert.True(dashboard.MachinesReportingInPeriod >= 1);
+        Assert.True(dashboard.OeeSource is "Machine" or "Hybrid");
+
+        var operatorAuth = await TestAuth.CreateUserWithRoleAsync(_fixture.Factory, _fixture.Admin.Token, "Operator", "demo-op");
+        Assert.Equal(HttpStatusCode.Forbidden,
+            (await _fixture.Factory.AuthenticatedClient(operatorAuth.Token).PostAsync($"/api/equipment/{equipment.Id}/demo-feed", null)).StatusCode);
+    }
 }

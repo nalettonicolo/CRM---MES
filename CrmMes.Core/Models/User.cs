@@ -28,5 +28,10 @@ public class User
     public long TwoFactorLastStep { get; set; }
     public bool IsActive { get; set; } = true;
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+
+    /// <summary>External identity provider key (OIDC/SSO exchange), e.g. "azure". Paired with <see cref="ExternalSubject"/>.</summary>
+    public string? ExternalProvider { get; set; }
+    public string? ExternalSubject { get; set; }
+
     public ICollection<Area> Areas { get; set; } = new List<Area>();
 }

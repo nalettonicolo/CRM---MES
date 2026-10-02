@@ -1,0 +1,88 @@
+@page "/piano-capacita"
+@inject Api Api
+
+<PageTitle>Piano capacità · Nicolò MES</PageTitle>
+
+<div class="page-head">
+    <div>
+        <div class="eyebrow">Produzione</div>
+        <h1>Piano capacità</h1>
+        <p class="sub">Carico giornaliero sui centri di lavoro (capacità finita).</p>
+    </div>
+    <div class="actions">
+        <button class="secondary" @onclick="LoadAsync">Aggiorna</button>
+    </div>
+</div>
+
+<div class="toolbar">
+    <label>Dal<input type="date" @bind="_fromDate" @bind:after="LoadAsync" /></label>
+    <label>Giorni<input type="number" min="1" max="31" @bind="_days" @bind:after="LoadAsync" /></label>
+</div>
+
+@if (_error is not null)
+{
+    <div class="card state"><strong>@Labels.LoadFailed("il piano capacità")</strong>@_error
+        <div class="actions"><button class="secondary small" @onclick="LoadAsync">@Labels.Retry</button></div></div>
+}
+else if (_rows is null)
+{
+    <div class="card state">@Labels.Loading</div>
+}
+else if (_rows.Count == 0)
+{
+    <div class="card state"><strong>Nessun dato</strong>Non ci sono centri di lavoro attivi o operazioni pianificate nel periodo.</div>
+}
+else
+{
+    <div class="card">
+        <div class="table-wrap">
+            <table class="cards">
+                <thead>
+                    <tr>
+                        <th>Centro</th>
+                        <th>Giorno</th>
+                        <th>Capacità (min)</th>
+                        <th>Impegnato (min)</th>
+                        <th>Libero (min)</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var row in _rows)
+                    {
+                        var overloaded = row.FreeMinutes < 0;
+                        <tr class="@(overloaded ? "danger" : "")">
+                            <td data-label="Centro">@row.WorkCenterName <div class="small muted">@row.WorkCenterCode</div></td>
+                            <td data-label="Giorno">@row.Day.ToString("dd/MM/yyyy")</td>
+                            <td data-label="Capacità">@Labels.Number(row.CapacityMinutes)</td>
+                            <td data-label="Impegnato">@Labels.Number(row.CommittedMinutes)</td>
+                            <td data-label="Libero">@Labels.Number(row.FreeMinutes)</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+}
+
+@code {
+    private List<WorkCenterCapacityPlanRow>? _rows;
+    private string? _error;
+    private DateTime _fromDate = DateTime.UtcNow.Date;
+    private int _days = 7;
+
+    protected override Task OnInitializedAsync() => LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        _error = null;
+        try
+        {
+            var from = _fromDate.ToString("yyyy-MM-dd");
+            _rows = await Api.GetAsync<List<WorkCenterCapacityPlanRow>>($"api/work-centers/capacity-plan?from={from}&days={_days}");
+        }
+        catch (ApiException exception)
+        {
+            _error = exception.Message;
+        }
+    }
+}

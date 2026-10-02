@@ -1,0 +1,139 @@
+@page "/presenze"
+@inject Api Api
+@inject Session Session
+
+<PageTitle>Presenze · Nicolò MES</PageTitle>
+
+<div class="page-head">
+    <div>
+        <div class="eyebrow">Amministrazione</div>
+        <h1>Presenze</h1>
+        <p class="sub">Timbratura entrata e uscita.</p>
+    </div>
+</div>
+
+@if (_error is not null)
+{
+    <div class="alert" role="alert">@_error</div>
+}
+@if (_info is not null)
+{
+    <div class="success" role="status">@_info</div>
+}
+
+<div class="card card-pad stack">
+    <h2>Timbratura</h2>
+    <div class="actions">
+        <button @onclick='() => PunchAsync("In")' disabled="@_busy">Timbratura entrata</button>
+        <button class="secondary" @onclick='() => PunchAsync("Out")' disabled="@_busy">Timbratura uscita</button>
+    </div>
+</div>
+
+<div class="card">
+    <div class="section-head"><h2>Oggi (@Labels.Date(DateTime.UtcNow))</h2></div>
+    @if (_today is null)
+    {
+        <div class="state">@Labels.Loading</div>
+    }
+    else if (_today.Count == 0)
+    {
+        <div class="state muted">Nessuna timbratura registrata oggi.</div>
+    }
+    else
+    {
+        <div class="table-wrap">
+            <table class="cards">
+                <thead><tr><th>Ora</th><th>Tipo</th><th>Note</th></tr></thead>
+                <tbody>
+                    @foreach (var punch in _today)
+                    {
+                        <tr>
+                            <td data-label="Ora">@Labels.DateTime(punch.PunchedAt)</td>
+                            <td data-label="Tipo">@(punch.Kind == "In" ? "Entrata" : "Uscita")</td>
+                            <td data-label="Note" class="muted">@(punch.Notes ?? "—")</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    }
+</div>
+
+@if (Session.IsAdmin && _adminRange is not null)
+{
+    <div class="card">
+        <div class="section-head"><h2>Ultimi 7 giorni (tutti gli utenti)</h2></div>
+        @if (_adminRange.Count == 0)
+        {
+            <div class="state muted">Nessuna timbratura nel periodo.</div>
+        }
+        else
+        {
+            <div class="table-wrap">
+                <table class="cards">
+                    <thead><tr><th>Ora</th><th>Utente</th><th>Tipo</th></tr></thead>
+                    <tbody>
+                        @foreach (var punch in _adminRange)
+                        {
+                            <tr>
+                                <td data-label="Ora">@Labels.DateTime(punch.PunchedAt)</td>
+                                <td data-label="Utente">@punch.UserName</td>
+                                <td data-label="Tipo">@(punch.Kind == "In" ? "Entrata" : "Uscita")</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        }
+    </div>
+}
+
+@code {
+    private List<AttendancePunchRow>? _today;
+    private List<AttendancePunchRow>? _adminRange;
+    private string? _error;
+    private string? _info;
+    private bool _busy;
+
+    protected override Task OnInitializedAsync() => LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        _error = null;
+        try
+        {
+            _today = await Api.GetAsync<List<AttendancePunchRow>>("api/attendance/today/me");
+            if (Session.IsAdmin)
+            {
+                var from = DateTime.UtcNow.Date.AddDays(-7).ToString("yyyy-MM-dd");
+                var to = DateTime.UtcNow.Date.AddDays(1).ToString("yyyy-MM-dd");
+                _adminRange = await Api.GetAsync<List<AttendancePunchRow>>($"api/attendance?from={from}&to={to}");
+            }
+        }
+        catch (ApiException ex)
+        {
+            _error = ex.Message;
+        }
+    }
+
+    private async Task PunchAsync(string kind)
+    {
+        _busy = true;
+        _error = null;
+        _info = null;
+        try
+        {
+            await Api.PostAsync<AttendancePunchRow>("api/attendance/punch", new { kind });
+            _info = kind == "In" ? "Entrata registrata." : "Uscita registrata.";
+            await LoadAsync();
+        }
+        catch (ApiException ex)
+        {
+            _error = ex.Message;
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+}

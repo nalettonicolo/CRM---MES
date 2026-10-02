@@ -1,5 +1,6 @@
 @page "/fatture/{Id:guid}"
 @inject Api Api
+@inject Session Session
 @inject IJSRuntime Js
 
 <PageTitle>@(_invoice?.Code ?? "Fattura") · Nicolò MES</PageTitle>
@@ -63,6 +64,21 @@ else
                     </div>
                 </div>
                 <div class="fact"><div class="label">Totale documento</div><div class="value">@Labels.Money(_invoice.Total)</div></div>
+                @if (_invoice.Status == "Issued")
+                {
+                    <div class="fact"><div class="label">Stato SdI</div>
+                        <div class="value"><span class="badge @Labels.SdiStatusClass(_invoice.SdiStatus)">@Labels.SdiStatus(_invoice.SdiStatus)</span>
+                            @if (!string.IsNullOrWhiteSpace(_invoice.SdiTransmissionId))
+                            {
+                                <div class="small muted code">@_invoice.SdiTransmissionId</div>
+                            }
+                            @if (!string.IsNullOrWhiteSpace(_invoice.SdiMessage))
+                            {
+                                <div class="small muted">@_invoice.SdiMessage</div>
+                            }
+                        </div>
+                    </div>
+                }
             </div>
         </div>
 
@@ -112,10 +128,37 @@ else
         {
             <div class="alert" role="alert">@_downloadError</div>
         }
+        @if (_sdiError is not null)
+        {
+            <div class="alert" role="alert">@_sdiError</div>
+        }
+        @if (_invoice.Status == "Issued" && !_invoice.SdiProviderConfigured)
+        {
+            <div class="notice">Invio automatico non configurato. Scarica l'XML, caricalo sul portale Fatture e Corrispettivi e registra qui l'esito.</div>
+        }
         @if (_invoice.Status == "Issued")
         {
             <div class="actions">
                 <button @onclick="DownloadXmlAsync" disabled="@_downloading">@(_downloading ? "Preparazione..." : "Scarica XML FatturaPA")</button>
+                @if (CanManageSdi)
+                {
+                    @if (CanSubmitSdi)
+                    {
+                        <button class="secondary" @onclick="SubmitSdiAsync" disabled="@_sdiBusy">@(_sdiBusy ? "Invio..." : "Invia a SdI")</button>
+                    }
+                    @if (CanRecordManualSubmission)
+                    {
+                        <input class="search" type="text" maxlength="100" placeholder="Protocollo portale (facoltativo)" aria-label="Identificativo SdI" @bind="_manualSdiTransmissionId" />
+                        <input class="search" type="text" maxlength="1000" placeholder="Nota esito (facoltativa)" aria-label="Nota esito SdI" @bind="_manualSdiMessage" />
+                        <button class="secondary" @onclick='() => RecordSdiAsync("Submitted")' disabled="@_sdiBusy">Registra invio manuale</button>
+                    }
+                    @if (_invoice.SdiStatus == "Submitted")
+                    {
+                        <button class="secondary" @onclick='() => RecordSdiAsync("Accepted")' disabled="@_sdiBusy">Segna accettata</button>
+                        <button class="secondary" @onclick='() => RecordSdiAsync("Rejected")' disabled="@_sdiBusy">Segna scartata</button>
+                        <button class="secondary" @onclick='() => RecordSdiAsync("DeliveryFailed")' disabled="@_sdiBusy">Segna mancata consegna</button>
+                    }
+                }
             </div>
         }
     </div>
@@ -127,7 +170,17 @@ else
     private Invoice? _invoice;
     private string? _error;
     private string? _downloadError;
+    private string? _sdiError;
+    private string? _manualSdiTransmissionId;
+    private string? _manualSdiMessage;
     private bool _downloading;
+    private bool _sdiBusy;
+
+    private bool CanManageSdi => Session.Role is "Admin" or "Sales";
+
+    private bool CanSubmitSdi => _invoice is { SdiProviderConfigured: true } invoice
+        && invoice.SdiStatus is "NotSent" or "Rejected" or "DeliveryFailed";
+    private bool CanRecordManualSubmission => _invoice?.SdiStatus is "NotSent" or "Rejected" or "DeliveryFailed";
 
     protected override async Task OnParametersSetAsync()
     {
@@ -165,6 +218,49 @@ else
         finally
         {
             _downloading = false;
+        }
+    }
+
+    private async Task SubmitSdiAsync()
+    {
+        _sdiBusy = true;
+        _sdiError = null;
+        try
+        {
+            _invoice = await Api.PostAsync<Invoice>($"api/invoices/{Id}/sdi/submit");
+        }
+        catch (ApiException exception)
+        {
+            _sdiError = exception.Message;
+        }
+        finally
+        {
+            _sdiBusy = false;
+        }
+    }
+
+    private async Task RecordSdiAsync(string status)
+    {
+        _sdiBusy = true;
+        _sdiError = null;
+        try
+        {
+            _invoice = await Api.PostAsync<Invoice>($"api/invoices/{Id}/sdi/status", new
+            {
+                status,
+                transmissionId = string.IsNullOrWhiteSpace(_manualSdiTransmissionId) ? _invoice!.SdiTransmissionId : _manualSdiTransmissionId.Trim(),
+                message = string.IsNullOrWhiteSpace(_manualSdiMessage) ? _invoice!.SdiMessage : _manualSdiMessage.Trim()
+            });
+            _manualSdiTransmissionId = _invoice.SdiTransmissionId;
+            _manualSdiMessage = _invoice.SdiMessage;
+        }
+        catch (ApiException exception)
+        {
+            _sdiError = exception.Message;
+        }
+        finally
+        {
+            _sdiBusy = false;
         }
     }
 }

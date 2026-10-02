@@ -5,6 +5,7 @@ using System.Xml.Linq;
 using System.Xml.Schema;
 using CrmMes.Api.Controllers;
 using CrmMes.Api.Services;
+using CrmMes.Core.Models;
 
 namespace CrmMes.Api.Tests;
 
@@ -151,6 +152,56 @@ public class InvoicesTests : IClassFixture<AdminSeededApiTestFixture>
         Assert.Equal(first.DocumentCode, doc.Descendants("DatiDDT").First().Element("NumeroDDT")!.Value);
         Assert.Equal("IT60X0542811101000000123456", Value("IBAN"));
         Assert.Equal("TO", Value("Ufficio"));
+    }
+
+    [Fact]
+    public async Task IssueInvoice_XmlUsesCompanyCurrency()
+    {
+        await _admin.PutAsJsonAsync("/api/company-profile", new SaveCompanyProfileRequest(
+            "Impianti Rossi srl", "IT01234567890", "Via Po 1, Torino", null, null, "installations", null, null, "it-IT", "CHF"));
+        (await _admin.PutAsJsonAsync("/api/company-profile/fiscal", new CompanyFiscalResponse(
+            "01234567890", "RF01", "Via Po 1", "10123", "Torino", "TO", "IT", "TO", "123456", "IT60 X054 2811 1010 0000 0123 456"))).EnsureSuccessStatusCode();
+
+        var customer = await CreateCustomerAsync(withFiscal: true);
+        var ddt = await IssuedDdtForSoldJobAsync(customer.Id, 1, 100m);
+        var draft = (await (await _admin.PostAsJsonAsync("/api/invoices/from-transport-documents", new CreateInvoiceFromDocumentsRequest([ddt.Id])))
+            .Content.ReadFromJsonAsync<InvoiceResponse>())!;
+        (await _admin.PostAsJsonAsync($"/api/invoices/{draft.Id}/issue", new IssueInvoiceRequest(null))).EnsureSuccessStatusCode();
+
+        var xml = await (await _admin.GetAsync($"/api/invoices/{draft.Id}/xml")).Content.ReadAsStringAsync();
+        Assert.Equal("CHF", XDocument.Parse(xml).Descendants("Divisa").First().Value);
+    }
+
+    [Fact]
+    public async Task SdiStatus_TracksProviderAndManualPortalFlow_AndRejectsInvalidTransitions()
+    {
+        await ConfigureCompanyAsync();
+        var customer = await CreateCustomerAsync(withFiscal: true);
+        var draft = (await (await _admin.PostAsJsonAsync("/api/invoices", new SaveInvoiceRequest(
+            customer.Id, "MP05", null, null, [new InvoiceLineRequest(null, "Quadro elettrico", 1, "pz", 100, 0, 22, null, null)])))
+            .Content.ReadFromJsonAsync<InvoiceResponse>())!;
+        (await _admin.PostAsJsonAsync($"/api/invoices/{draft.Id}/issue", new IssueInvoiceRequest(null))).EnsureSuccessStatusCode();
+
+        var issued = (await _admin.GetFromJsonAsync<InvoiceResponse>($"/api/invoices/{draft.Id}"))!;
+        Assert.Equal(SdiStatuses.NotSent, issued.SdiStatus);
+        var submit = await _admin.PostAsync($"/api/invoices/{draft.Id}/sdi/submit", null);
+        submit.EnsureSuccessStatusCode();
+        var inTransit = (await submit.Content.ReadFromJsonAsync<InvoiceResponse>())!;
+        Assert.Equal(SdiStatuses.Submitted, inTransit.SdiStatus);
+        Assert.StartsWith("STUB-", inTransit.SdiTransmissionId);
+        Assert.Contains("simulato", inTransit.SdiMessage);
+
+        var operatorAuth = await TestAuth.CreateUserWithRoleAsync(_fixture.Factory, _fixture.Admin.Token, "Operator", "sdi-op");
+        var operatorClient = _fixture.Factory.AuthenticatedClient(operatorAuth.Token);
+        Assert.Equal(HttpStatusCode.Forbidden, (await operatorClient.PostAsJsonAsync($"/api/invoices/{draft.Id}/sdi/status",
+            new RecordSdiStatusRequest(SdiStatuses.Accepted, inTransit.SdiTransmissionId, "Ricevuta"))).StatusCode);
+
+        var accepted = await _admin.PostAsJsonAsync($"/api/invoices/{draft.Id}/sdi/status",
+            new RecordSdiStatusRequest(SdiStatuses.Accepted, inTransit.SdiTransmissionId, "Consegnata"));
+        accepted.EnsureSuccessStatusCode();
+        Assert.Equal(SdiStatuses.Accepted, (await accepted.Content.ReadFromJsonAsync<InvoiceResponse>())!.SdiStatus);
+        Assert.Equal(HttpStatusCode.Conflict, (await _admin.PostAsJsonAsync($"/api/invoices/{draft.Id}/sdi/status",
+            new RecordSdiStatusRequest(SdiStatuses.Rejected, "PORTALE-123", "Esito già definitivo"))).StatusCode);
     }
 
     [Fact]

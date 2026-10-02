@@ -73,6 +73,34 @@ namespace CrmMes.Api.Migrations
                     b.ToTable("Areas");
                 });
 
+            modelBuilder.Entity("CrmMes.Core.Models.AttendancePunch", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Kind")
+                        .IsRequired()
+                        .HasMaxLength(10)
+                        .HasColumnType("character varying(10)");
+
+                    b.Property<string>("Notes")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<DateTime>("PunchedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("UserId", "PunchedAt");
+
+                    b.ToTable("AttendancePunches");
+                });
+
             modelBuilder.Entity("CrmMes.Core.Models.AuditLog", b =>
                 {
                     b.Property<Guid>("Id")
@@ -211,6 +239,11 @@ namespace CrmMes.Api.Migrations
                         .HasMaxLength(2)
                         .HasColumnType("character varying(2)");
 
+                    b.Property<string>("Currency")
+                        .IsRequired()
+                        .HasMaxLength(3)
+                        .HasColumnType("character varying(3)");
+
                     b.Property<string>("Email")
                         .HasMaxLength(200)
                         .HasColumnType("character varying(200)");
@@ -243,6 +276,11 @@ namespace CrmMes.Api.Migrations
 
                     b.Property<string>("LicenseToken")
                         .HasColumnType("text");
+
+                    b.Property<string>("Locale")
+                        .IsRequired()
+                        .HasMaxLength(10)
+                        .HasColumnType("character varying(10)");
 
                     b.Property<string>("Phone")
                         .HasMaxLength(50)
@@ -309,6 +347,65 @@ namespace CrmMes.Api.Migrations
                     b.HasKey("Id");
 
                     b.ToTable("CompanyProfiles");
+                });
+
+            modelBuilder.Entity("CrmMes.Core.Models.CorrectiveAction", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime?>("ClosedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Code")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
+
+                    b.Property<string>("CorrectiveActionText")
+                        .HasMaxLength(4000)
+                        .HasColumnType("character varying(4000)");
+
+                    b.Property<string>("Description")
+                        .HasMaxLength(4000)
+                        .HasColumnType("character varying(4000)");
+
+                    b.Property<DateTime?>("DueDate")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("NonConformityId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("OpenedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("PreventiveActionText")
+                        .HasMaxLength(4000)
+                        .HasColumnType("character varying(4000)");
+
+                    b.Property<string>("RootCause")
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<string>("Title")
+                        .IsRequired()
+                        .HasMaxLength(300)
+                        .HasColumnType("character varying(300)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Code")
+                        .IsUnique();
+
+                    b.HasIndex("NonConformityId");
+
+                    b.ToTable("CorrectiveActions");
                 });
 
             modelBuilder.Entity("CrmMes.Core.Models.Customer", b =>
@@ -712,6 +809,117 @@ namespace CrmMes.Api.Migrations
                     b.ToTable("InstalledMachines");
                 });
 
+            modelBuilder.Entity("CrmMes.Core.Models.InstrumentCalibration", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CalibratedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("CertificateNumber")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<Guid>("InstrumentId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("NextDue")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Notes")
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)");
+
+                    b.Property<string>("PerformedBy")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<string>("Result")
+                        .IsRequired()
+                        .HasMaxLength(10)
+                        .HasColumnType("character varying(10)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("InstrumentId");
+
+                    b.ToTable("InstrumentCalibrations");
+                });
+
+            modelBuilder.Entity("CrmMes.Core.Models.InventoryLine", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<decimal?>("CountedQuantity")
+                        .HasColumnType("numeric");
+
+                    b.Property<Guid>("LocationId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("MaterialId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("SessionId")
+                        .HasColumnType("uuid");
+
+                    b.Property<decimal>("SystemQuantity")
+                        .HasColumnType("numeric");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("LocationId");
+
+                    b.HasIndex("MaterialId");
+
+                    b.HasIndex("SessionId", "LocationId", "MaterialId")
+                        .IsUnique();
+
+                    b.ToTable("InventoryLines");
+                });
+
+            modelBuilder.Entity("CrmMes.Core.Models.InventorySession", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime?>("ClosedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Code")
+                        .IsRequired()
+                        .HasMaxLength(80)
+                        .HasColumnType("character varying(80)");
+
+                    b.Property<Guid?>("CreatedBy")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Notes")
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)");
+
+                    b.Property<DateTime>("StartedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Code")
+                        .IsUnique();
+
+                    b.HasIndex("CreatedBy");
+
+                    b.ToTable("InventorySessions");
+                });
+
             modelBuilder.Entity("CrmMes.Core.Models.Invoice", b =>
                 {
                     b.Property<Guid>("Id")
@@ -757,6 +965,28 @@ namespace CrmMes.Api.Migrations
                         .IsRequired()
                         .HasMaxLength(4)
                         .HasColumnType("character varying(4)");
+
+                    b.Property<string>("SdiMessage")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)");
+
+                    b.Property<string>("SdiStatus")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(24)
+                        .HasColumnType("character varying(24)")
+                        .HasDefaultValue("NotSent");
+
+                    b.Property<DateTime?>("SdiStatusUpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("SdiTransmissionId")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<string>("SdiUpdatedBy")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
 
                     b.Property<string>("Status")
                         .IsRequired()
@@ -898,6 +1128,31 @@ namespace CrmMes.Api.Migrations
                     b.HasIndex("WorkOrderOperationId");
 
                     b.ToTable("LaborEntries");
+                });
+
+            modelBuilder.Entity("CrmMes.Core.Models.LocationStock", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("LocationId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("MaterialId")
+                        .HasColumnType("uuid");
+
+                    b.Property<decimal>("Quantity")
+                        .HasColumnType("numeric");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("MaterialId");
+
+                    b.HasIndex("LocationId", "MaterialId")
+                        .IsUnique();
+
+                    b.ToTable("LocationStocks");
                 });
 
             modelBuilder.Entity("CrmMes.Core.Models.LogisticUnit", b =>
@@ -1433,6 +1688,17 @@ namespace CrmMes.Api.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid");
 
+                    b.Property<DateTime?>("CertificateIssuedOn")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("CertificateIssuer")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<string>("CertificateNumber")
+                        .HasMaxLength(120)
+                        .HasColumnType("character varying(120)");
+
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("timestamp with time zone");
 
@@ -1535,6 +1801,50 @@ namespace CrmMes.Api.Migrations
                     b.HasIndex("SupplierId");
 
                     b.ToTable("MaterialSuppliers");
+                });
+
+            modelBuilder.Entity("CrmMes.Core.Models.MeasuringInstrument", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("CalibrationIntervalDays")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Code")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("boolean");
+
+                    b.Property<DateTime?>("LastCalibrationAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<DateTime?>("NextCalibrationDue")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Notes")
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)");
+
+                    b.Property<string>("SerialNumber")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Code")
+                        .IsUnique();
+
+                    b.ToTable("MeasuringInstruments");
                 });
 
             modelBuilder.Entity("CrmMes.Core.Models.MissingMaterial", b =>
@@ -2066,6 +2376,35 @@ namespace CrmMes.Api.Migrations
                     b.ToTable("ProductRevisions");
                 });
 
+            modelBuilder.Entity("CrmMes.Core.Models.ProgressCertificate", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<decimal>("Amount")
+                        .HasColumnType("numeric");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Notes")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)");
+
+                    b.Property<decimal>("PercentComplete")
+                        .HasColumnType("numeric");
+
+                    b.Property<Guid>("WorkOrderId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("WorkOrderId");
+
+                    b.ToTable("ProgressCertificates");
+                });
+
             modelBuilder.Entity("CrmMes.Core.Models.PurchaseInvoice", b =>
                 {
                     b.Property<Guid>("Id")
@@ -2520,6 +2859,42 @@ namespace CrmMes.Api.Migrations
                     b.HasIndex("ProductId");
 
                     b.ToTable("RoutingSteps");
+                });
+
+            modelBuilder.Entity("CrmMes.Core.Models.ScaleReading", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("MaterialCode")
+                        .IsRequired()
+                        .HasMaxLength(120)
+                        .HasColumnType("character varying(120)");
+
+                    b.Property<string>("Notes")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<DateTime>("RecordedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Unit")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<decimal>("WeightKg")
+                        .HasColumnType("numeric");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("RecordedAt");
+
+                    b.ToTable("ScaleReadings");
                 });
 
             modelBuilder.Entity("CrmMes.Core.Models.ServiceIntervention", b =>
@@ -3214,6 +3589,14 @@ namespace CrmMes.Api.Migrations
                         .HasMaxLength(200)
                         .HasColumnType("character varying(200)");
 
+                    b.Property<string>("ExternalProvider")
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
+
+                    b.Property<string>("ExternalSubject")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
                     b.Property<int>("FailedLoginCount")
                         .HasColumnType("integer");
 
@@ -3263,7 +3646,44 @@ namespace CrmMes.Api.Migrations
                     b.HasIndex("Email")
                         .IsUnique();
 
+                    b.HasIndex("ExternalProvider", "ExternalSubject");
+
                     b.ToTable("Users");
+                });
+
+            modelBuilder.Entity("CrmMes.Core.Models.WarehouseLocation", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Code")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("boolean");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<Guid?>("SiteId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Code")
+                        .IsUnique();
+
+                    b.HasIndex("SiteId");
+
+                    b.ToTable("WarehouseLocations");
                 });
 
             modelBuilder.Entity("CrmMes.Core.Models.WithdrawalItem", b =>
@@ -3679,6 +4099,17 @@ namespace CrmMes.Api.Migrations
                     b.Navigation("Site");
                 });
 
+            modelBuilder.Entity("CrmMes.Core.Models.AttendancePunch", b =>
+                {
+                    b.HasOne("CrmMes.Core.Models.User", "User")
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("User");
+                });
+
             modelBuilder.Entity("CrmMes.Core.Models.BillOfMaterialItem", b =>
                 {
                     b.HasOne("CrmMes.Core.Models.Product", "Product")
@@ -3688,6 +4119,16 @@ namespace CrmMes.Api.Migrations
                         .IsRequired();
 
                     b.Navigation("Product");
+                });
+
+            modelBuilder.Entity("CrmMes.Core.Models.CorrectiveAction", b =>
+                {
+                    b.HasOne("CrmMes.Core.Models.NonConformity", "NonConformity")
+                        .WithMany()
+                        .HasForeignKey("NonConformityId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.Navigation("NonConformity");
                 });
 
             modelBuilder.Entity("CrmMes.Core.Models.CustomerFiscalData", b =>
@@ -3762,6 +4203,54 @@ namespace CrmMes.Api.Migrations
                     b.Navigation("WorkOrder");
                 });
 
+            modelBuilder.Entity("CrmMes.Core.Models.InstrumentCalibration", b =>
+                {
+                    b.HasOne("CrmMes.Core.Models.MeasuringInstrument", "Instrument")
+                        .WithMany("Calibrations")
+                        .HasForeignKey("InstrumentId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Instrument");
+                });
+
+            modelBuilder.Entity("CrmMes.Core.Models.InventoryLine", b =>
+                {
+                    b.HasOne("CrmMes.Core.Models.WarehouseLocation", "Location")
+                        .WithMany()
+                        .HasForeignKey("LocationId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("CrmMes.Core.Models.Material", "Material")
+                        .WithMany()
+                        .HasForeignKey("MaterialId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("CrmMes.Core.Models.InventorySession", "Session")
+                        .WithMany("Lines")
+                        .HasForeignKey("SessionId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Location");
+
+                    b.Navigation("Material");
+
+                    b.Navigation("Session");
+                });
+
+            modelBuilder.Entity("CrmMes.Core.Models.InventorySession", b =>
+                {
+                    b.HasOne("CrmMes.Core.Models.User", "CreatedByUser")
+                        .WithMany()
+                        .HasForeignKey("CreatedBy")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.Navigation("CreatedByUser");
+                });
+
             modelBuilder.Entity("CrmMes.Core.Models.Invoice", b =>
                 {
                     b.HasOne("CrmMes.Core.Models.Customer", "Customer")
@@ -3833,6 +4322,25 @@ namespace CrmMes.Api.Migrations
                     b.Navigation("WorkCenter");
 
                     b.Navigation("WorkOrder");
+                });
+
+            modelBuilder.Entity("CrmMes.Core.Models.LocationStock", b =>
+                {
+                    b.HasOne("CrmMes.Core.Models.WarehouseLocation", "Location")
+                        .WithMany("StockItems")
+                        .HasForeignKey("LocationId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("CrmMes.Core.Models.Material", "Material")
+                        .WithMany()
+                        .HasForeignKey("MaterialId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Location");
+
+                    b.Navigation("Material");
                 });
 
             modelBuilder.Entity("CrmMes.Core.Models.LogisticUnit", b =>
@@ -4129,6 +4637,17 @@ namespace CrmMes.Api.Migrations
                         .WithMany()
                         .HasForeignKey("WorkOrderId")
                         .OnDelete(DeleteBehavior.SetNull);
+
+                    b.Navigation("WorkOrder");
+                });
+
+            modelBuilder.Entity("CrmMes.Core.Models.ProgressCertificate", b =>
+                {
+                    b.HasOne("CrmMes.Core.Models.WorkOrder", "WorkOrder")
+                        .WithMany()
+                        .HasForeignKey("WorkOrderId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
 
                     b.Navigation("WorkOrder");
                 });
@@ -4452,6 +4971,16 @@ namespace CrmMes.Api.Migrations
                     b.Navigation("TransportDocument");
                 });
 
+            modelBuilder.Entity("CrmMes.Core.Models.WarehouseLocation", b =>
+                {
+                    b.HasOne("CrmMes.Core.Models.Site", "Site")
+                        .WithMany()
+                        .HasForeignKey("SiteId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.Navigation("Site");
+                });
+
             modelBuilder.Entity("CrmMes.Core.Models.WithdrawalItem", b =>
                 {
                     b.HasOne("CrmMes.Core.Models.WithdrawalSlip", "WithdrawalSlip")
@@ -4622,6 +5151,11 @@ namespace CrmMes.Api.Migrations
                     b.Navigation("Requests");
                 });
 
+            modelBuilder.Entity("CrmMes.Core.Models.InventorySession", b =>
+                {
+                    b.Navigation("Lines");
+                });
+
             modelBuilder.Entity("CrmMes.Core.Models.Invoice", b =>
                 {
                     b.Navigation("Lines");
@@ -4642,6 +5176,11 @@ namespace CrmMes.Api.Migrations
             modelBuilder.Entity("CrmMes.Core.Models.MaterialLot", b =>
                 {
                     b.Navigation("Consumptions");
+                });
+
+            modelBuilder.Entity("CrmMes.Core.Models.MeasuringInstrument", b =>
+                {
+                    b.Navigation("Calibrations");
                 });
 
             modelBuilder.Entity("CrmMes.Core.Models.PanelVerification", b =>
@@ -4708,6 +5247,11 @@ namespace CrmMes.Api.Migrations
             modelBuilder.Entity("CrmMes.Core.Models.TransportDocumentLine", b =>
                 {
                     b.Navigation("Returns");
+                });
+
+            modelBuilder.Entity("CrmMes.Core.Models.WarehouseLocation", b =>
+                {
+                    b.Navigation("StockItems");
                 });
 
             modelBuilder.Entity("CrmMes.Core.Models.WithdrawalSlip", b =>

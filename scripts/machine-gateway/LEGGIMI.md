@@ -13,6 +13,17 @@ Serve per l'interconnessione richiesta da Industria 4.0 e Transizione 5.0: la ma
 
 Il gateway invia un dato a ogni cambio di stato più un segnale ogni minuto. Se la rete cade, tiene le letture in `pending-readings.json` e le rispedisce appena può.
 
+## Demo senza macchina reale
+Per una dimostrazione o una prova in ufficio, senza OPC UA/MQTT:
+
+1. **Dal gestionale (Admin):** crea la macchina, **Collega macchina** (token) oppure usa **Demo feed** dall’API `POST /api/equipment/{id}/demo-feed?seconds=60` per generare un minuto di letture fittizie direttamente nel database.
+2. **Simulatore Python:** con `config.json` compilato come per il gateway (`api_url`, `equipment_id`, `token`), avvia:
+   ```text
+   pip install requests
+   python demo_simulator.py config.json
+   ```
+   Il simulatore alterna stati Running/Idle/Setup, incrementa contapezzi ed energia (kWh) e invia le letture come farebbe il gateway. Opzionale: `demo_interval_seconds` (default 10) e `demo_cycles` (0 = loop infinito).
+
 ## Cosa si vede nel gestionale
 Per ogni macchina e per ogni giornata: minuti in marcia, ferma, in allarme, in attrezzaggio; pezzi prodotti (calcolati dal contapezzi, anche se si azzera); disponibilità; ultimi allarmi. Un silenzio di oltre 15 minuti conta come "nessun dato", mai come marcia.
 

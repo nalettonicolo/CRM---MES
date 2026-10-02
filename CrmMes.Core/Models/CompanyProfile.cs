@@ -66,6 +66,12 @@ public class CompanyProfile
     /// See UiTheme in CrmMes.Api.</summary>
     public string UiTheme { get; set; } = string.Empty;
 
+    /// <summary>BCP 47 locale for UI and formats (default Italian).</summary>
+    public string Locale { get; set; } = "it-IT";
+
+    /// <summary>ISO 4217 currency for documents and amounts (default EUR).</summary>
+    public string Currency { get; set; } = "EUR";
+
     public DateTime ConfiguredAt { get; set; } = DateTime.UtcNow;
     public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
 }

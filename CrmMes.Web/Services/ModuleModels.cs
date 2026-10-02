@@ -110,3 +110,19 @@ public sealed record FoodLabel(
 public sealed record LogisticUnit(
     Guid Id, string Sscc, Guid? WorkOrderId, Guid? TransportDocumentId, string? ProductCode, string? ProductName,
     string? LotNumber, decimal? Quantity, DateTime? BestBefore, DateTime CreatedAt);
+
+public sealed record WorkCenterCapacityPlanRow(
+    string WorkCenterCode, string WorkCenterName, DateOnly Day,
+    decimal CapacityMinutes, decimal CommittedMinutes, decimal FreeMinutes);
+
+public sealed record MeasuringInstrumentRow(
+    Guid Id, string Code, string Name, string? SerialNumber, DateTime? NextCalibrationDue,
+    DateTime? LastCalibrationAt, int CalibrationIntervalDays, bool IsActive, string? Notes);
+
+public sealed record CapaRow(
+    Guid Id, string Code, Guid? NonConformityId, string Title, string? Description, string Status,
+    DateTime OpenedAt, DateTime? DueDate, DateTime? ClosedAt, string? RootCause,
+    string? CorrectiveActionText, string? PreventiveActionText);
+
+public sealed record AttendancePunchRow(
+    Guid Id, Guid UserId, string UserName, DateTime PunchedAt, string Kind, string? Notes);

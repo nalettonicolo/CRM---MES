@@ -1801,6 +1801,7 @@
                                                 <GridViewColumn Header="Cliente" DisplayMemberBinding="{Binding CustomerName}" Width="260" />
                                                 <GridViewColumn Header="Tipo" DisplayMemberBinding="{Binding TypeLabel}" Width="130" />
                                                 <GridViewColumn Header="Totale €" DisplayMemberBinding="{Binding Total, StringFormat=N2}" Width="120" />
+                                                <GridViewColumn Header="SdI" DisplayMemberBinding="{Binding SdiStatusLabel}" Width="120" />
                                                 <GridViewColumn Header="Stato" Width="110">
                                                     <GridViewColumn.CellTemplate>
                                                         <DataTemplate>

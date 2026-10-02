@@ -1,0 +1,781 @@
+@page "/pacchetti-settore"
+
+@inject Api Api
+
+@inject Session Session
+
+@inject IJSRuntime Js
+
+
+
+<PageTitle>Pacchetti settore · Nicolò MES</PageTitle>
+
+
+
+<div class="page-head">
+
+    <div>
+
+        <div class="eyebrow">Amministrazione</div>
+
+        <h1>Pacchetti settore</h1>
+
+        <p class="sub">Catalogo moduli verticali, anteprima e import verso anagrafica e documenti tecnici.</p>
+
+    </div>
+
+</div>
+
+
+
+@if (_error is not null)
+
+{
+
+    <div class="alert" role="alert">@_error</div>
+
+}
+
+
+
+<div class="card">
+
+    @if (_packs is null)
+
+    {
+
+        <div class="state">Caricamento...</div>
+
+    }
+
+    else if (_packs.Count == 0)
+
+    {
+
+        <div class="state"><strong>Nessun pacchetto</strong>Il catalogo settore non ha voci disponibili.</div>
+
+    }
+
+    else
+
+    {
+
+        <div class="table-wrap">
+
+            <table class="cards">
+
+                <thead><tr><th>Chiave</th><th>Nome</th><th>Settore</th><th>Stato</th></tr></thead>
+
+                <tbody>
+
+                    @foreach (var pack in _packs)
+
+                    {
+
+                        <tr>
+
+                            <td data-label="Chiave" class="code">@pack.Key</td>
+
+                            <td data-label="Nome">
+
+                                @pack.Name
+
+                                @if (!string.IsNullOrWhiteSpace(pack.Description))
+
+                                {
+
+                                    <div class="small muted">@pack.Description</div>
+
+                                }
+
+                            </td>
+
+                            <td data-label="Settore">@pack.Sector</td>
+
+                            <td data-label="Stato">
+
+                                @if (pack.Available)
+
+                                {
+
+                                    <span class="badge ok">Disponibile</span>
+
+                                }
+
+                                else
+
+                                {
+
+                                    <span class="badge">Non attivo</span>
+
+                                }
+
+                            </td>
+
+                        </tr>
+
+                    }
+
+                </tbody>
+
+            </table>
+
+        </div>
+
+    }
+
+</div>
+
+
+
+@if (CanEngineering)
+
+{
+
+    <div class="card card-pad stack">
+
+        <h2>Prodotto di destinazione (import)</h2>
+
+        <p class="muted small">Guid del prodotto per distinta EPLAN, lista cavi e tabella nutrizionale.</p>
+
+        <label>ProductId
+
+            <input class="input" type="text" @bind="_productIdText" placeholder="00000000-0000-0000-0000-000000000000" />
+
+        </label>
+
+    </div>
+
+
+
+    <div class="card card-pad stack">
+
+        <h2>Distinta EPLAN (CSV)</h2>
+
+        @RenderStatus(_eplanStatus)
+
+        <label>Contenuto file
+
+            <textarea class="textarea" rows="6" @bind="_eplanText" placeholder="PartNumber;Quantity;Description&#10;REL-01;2;Relè interfaccia"></textarea>
+
+        </label>
+
+        <div class="actions">
+
+            <button @onclick="PreviewEplanAsync" disabled="@_busy">Anteprima</button>
+
+            <button @onclick="ImportEplanAsync" disabled="@_busy || !HasProductId">Importa distinta</button>
+
+        </div>
+
+        @if (_eplanPreview is not null && _eplanPreview.Samples.Count > 0)
+        {
+            <div class="table-wrap">
+                <table class="cards">
+                    <thead><tr><th>#</th><th>Codice</th><th class="num">Quantità</th><th>Descrizione</th></tr></thead>
+                    <tbody>
+                        @foreach (var row in _eplanPreview.Samples)
+                        {
+                            <tr>
+                                <td class="muted">@row.Row</td>
+                                <td class="code">@row.PartNumber</td>
+                                <td class="num">@Labels.Number(row.Quantity)</td>
+                                <td>@row.Description</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        }
+
+    </div>
+
+
+
+    <div class="card card-pad stack">
+
+        <h2>Lista cavi</h2>
+
+        @RenderStatus(_wireStatus)
+
+        <textarea class="textarea" rows="5" @bind="_wireText" placeholder="From;To;Section;Color"></textarea>
+
+        <div class="actions">
+
+            <button @onclick="PreviewWireAsync" disabled="@_busy">Anteprima</button>
+
+            <button @onclick="ImportWireAsync" disabled="@_busy || !HasProductId">Importa su documento tecnico</button>
+
+        </div>
+
+    </div>
+
+
+
+    <div class="card card-pad stack">
+
+        <h2>Tabella nutrizionale</h2>
+
+        @RenderStatus(_nutritionStatus)
+
+        <textarea class="textarea" rows="5" @bind="_nutritionText" placeholder="Nutrient;Per100g"></textarea>
+
+        <div class="actions">
+
+            <button @onclick="PreviewNutritionAsync" disabled="@_busy">Anteprima</button>
+
+            <button @onclick="ImportNutritionAsync" disabled="@_busy || !HasProductId">Importa JSON su documento</button>
+
+        </div>
+
+    </div>
+
+
+
+    <div class="card card-pad stack">
+
+        <h2>DM 37/08 — dichiarazione</h2>
+
+        @RenderStatus(_dmStatus)
+
+        <div class="grid-2">
+
+            <label>Codice impianto<input class="input" @bind="_dmPlantCode" /></label>
+
+            <label>Potenza kW<input class="input" type="number" step="0.01" @bind="_dmPowerKw" /></label>
+
+            <label class="span-2">Indirizzo<input class="input" @bind="_dmAddress" /></label>
+
+            <label class="span-2">Committente<input class="input" @bind="_dmClient" /></label>
+
+            <label class="span-2">Note<textarea class="textarea" rows="2" @bind="_dmNotes"></textarea></label>
+
+        </div>
+
+        <div class="actions">
+
+            <button @onclick="GenerateDm3708Async" disabled="@_busy">Genera testo scaricabile</button>
+
+        </div>
+
+    </div>
+
+}
+
+
+
+@if (CanSales)
+
+{
+
+    <div class="card card-pad stack">
+
+        <h2>SAL cantiere</h2>
+
+        @RenderStatus(_salStatus)
+
+        <textarea class="textarea" rows="4" @bind="_salText" placeholder="WorkOrderCode;PercentComplete;Amount;Notes"></textarea>
+
+        <div class="actions">
+
+            <button @onclick="PreviewSalAsync" disabled="@_busy">Anteprima</button>
+
+            <button @onclick="ApplySalAsync" disabled="@_busy">Applica certificati SAL</button>
+
+        </div>
+
+    </div>
+
+}
+
+
+
+@if (CanWarehouse)
+
+{
+
+    <div class="card card-pad stack">
+
+        <h2>Certificazione DM 31 (lotti)</h2>
+
+        @RenderStatus(_certStatus)
+
+        <textarea class="textarea" rows="4" @bind="_certText" placeholder="LotNumber;MaterialCode;CertificateNumber;Issuer;IssuedOn"></textarea>
+
+        <div class="actions">
+
+            <button @onclick="PreviewCertAsync" disabled="@_busy">Anteprima</button>
+
+            <button @onclick="ApplyCertAsync" disabled="@_busy">Applica su lotti</button>
+
+        </div>
+
+    </div>
+
+
+
+    <div class="card card-pad stack">
+
+        <h2>Bilance — lettura singola</h2>
+
+        @RenderStatus(_scaleStatus)
+
+        <div class="grid-2">
+
+            <label>Codice materiale<input class="input" @bind="_scaleMaterial" /></label>
+
+            <label>Peso (kg)<input class="input" type="number" step="0.001" @bind="_scaleWeight" /></label>
+
+        </div>
+
+        <div class="actions">
+
+            <button @onclick="SubmitScaleReadingAsync" disabled="@_busy">Registra pesata</button>
+
+        </div>
+
+    </div>
+
+}
+
+
+
+@code {
+
+    private List<SectorPackSummary>? _packs;
+
+    private string? _error;
+
+    private bool _busy;
+
+
+
+    private string _productIdText = string.Empty;
+
+    private string _eplanText = string.Empty;
+
+    private string _wireText = string.Empty;
+
+    private string _nutritionText = string.Empty;
+
+    private string _salText = string.Empty;
+
+    private string _certText = string.Empty;
+
+
+
+    private string _dmPlantCode = string.Empty;
+
+    private string _dmAddress = string.Empty;
+
+    private string _dmClient = string.Empty;
+
+    private decimal _dmPowerKw = 6;
+
+    private string _dmNotes = string.Empty;
+
+
+
+    private string _scaleMaterial = string.Empty;
+
+    private decimal _scaleWeight;
+
+
+
+    private string? _eplanStatus;
+
+    private string? _wireStatus;
+
+    private string? _nutritionStatus;
+
+    private string? _dmStatus;
+
+    private string? _salStatus;
+
+    private string? _certStatus;
+
+    private string? _scaleStatus;
+
+
+
+    private SectorPackPreview<EplanBomPreviewRow>? _eplanPreview;
+
+
+
+    private bool CanEngineering => Session.Role is "Admin" or "Management";
+
+    private bool CanSales => Session.Role is "Admin" or "Sales";
+
+    private bool CanWarehouse => Session.Role is "Admin" or "Warehouse";
+
+    private bool HasProductId => Guid.TryParse(_productIdText.Trim(), out _);
+
+
+
+    protected override async Task OnInitializedAsync()
+
+    {
+
+        try
+
+        {
+
+            _packs = await Api.GetAsync<List<SectorPackSummary>>("api/sector-packs");
+
+        }
+
+        catch (ApiException exception)
+
+        {
+
+            _error = exception.Message;
+
+        }
+
+    }
+
+
+
+    private async Task PreviewEplanAsync() => await RunPlainPreviewAsync<EplanBomPreviewRow>(
+
+        "api/sector-packs/eplan-bom/preview", _eplanText, r => _eplanPreview = r,
+
+        status => _eplanStatus = status);
+
+
+
+    private async Task ImportEplanAsync()
+
+    {
+
+        if (!Guid.TryParse(_productIdText.Trim(), out var productId))
+
+        {
+
+            _eplanStatus = "ProductId non valido.";
+
+            return;
+
+        }
+
+
+
+        await RunPlainImportAsync($"api/sector-packs/eplan-bom/import?productId={productId}", _eplanText, s => _eplanStatus = s);
+
+    }
+
+
+
+    private async Task PreviewWireAsync() =>
+
+        await RunPlainPreviewAsync<WireListPreviewRow>("api/sector-packs/wire-list/preview", _wireText, _ => { }, s => _wireStatus = s);
+
+
+
+    private async Task ImportWireAsync()
+
+    {
+
+        if (!Guid.TryParse(_productIdText.Trim(), out var productId))
+
+        {
+
+            _wireStatus = "ProductId non valido.";
+
+            return;
+
+        }
+
+
+
+        await RunPlainImportAsync($"api/sector-packs/wire-list/import?productId={productId}", _wireText, s => _wireStatus = s);
+
+    }
+
+
+
+    private async Task PreviewNutritionAsync() =>
+
+        await RunPlainPreviewAsync<NutritionPreviewRow>("api/sector-packs/nutrition-table/preview", _nutritionText, _ => { }, s => _nutritionStatus = s);
+
+
+
+    private async Task ImportNutritionAsync()
+
+    {
+
+        if (!Guid.TryParse(_productIdText.Trim(), out var productId))
+
+        {
+
+            _nutritionStatus = "ProductId non valido.";
+
+            return;
+
+        }
+
+
+
+        await RunPlainImportAsync($"api/sector-packs/nutrition-table/import?productId={productId}", _nutritionText, s => _nutritionStatus = s);
+
+    }
+
+
+
+    private async Task GenerateDm3708Async()
+
+    {
+
+        _busy = true;
+
+        _dmStatus = null;
+
+        try
+
+        {
+
+            var file = await Api.PostDownloadAsync(
+
+                "api/sector-packs/dm3708/generate",
+
+                new Dm3708GenerateRequest(_dmPlantCode, _dmAddress, _dmClient, _dmPowerKw, _dmNotes),
+
+                "Dichiarazione-conformita-DM-37-08.txt");
+
+            await Js.InvokeVoidAsync("nicolomes.saveFile", file.FileName, file.ContentType, Convert.ToBase64String(file.Content));
+
+            _dmStatus = "Documento generato.";
+
+        }
+
+        catch (ApiException exception)
+
+        {
+
+            _dmStatus = exception.Message;
+
+        }
+
+        finally
+
+        {
+
+            _busy = false;
+
+        }
+
+    }
+
+
+
+    private async Task PreviewSalAsync() =>
+
+        await RunPlainPreviewAsync<SalPreviewRow>("api/sector-packs/sal/preview", _salText, _ => { }, s => _salStatus = s);
+
+
+
+    private async Task ApplySalAsync() =>
+
+        await RunPlainApplyAsync("api/sector-packs/sal/apply", _salText, s => _salStatus = s);
+
+
+
+    private async Task PreviewCertAsync() =>
+
+        await RunPlainPreviewAsync<Cert31PreviewRow>("api/sector-packs/cert-31/preview", _certText, _ => { }, s => _certStatus = s);
+
+
+
+    private async Task ApplyCertAsync() =>
+
+        await RunPlainApplyAsync("api/sector-packs/cert-31/apply", _certText, s => _certStatus = s);
+
+
+
+    private async Task SubmitScaleReadingAsync()
+
+    {
+
+        _busy = true;
+
+        _scaleStatus = null;
+
+        try
+
+        {
+
+            var result = await Api.PostAsync<ScaleReadingResult>(
+
+                "api/sector-packs/scales/reading",
+
+                new ScaleReadingSubmitRequest(_scaleMaterial, _scaleWeight, "kg", DateTime.UtcNow, null));
+
+            _scaleStatus = $"Registrata pesata {result.WeightKg} kg per {result.MaterialCode}.";
+
+        }
+
+        catch (ApiException exception)
+
+        {
+
+            _scaleStatus = exception.Message;
+
+        }
+
+        finally
+
+        {
+
+            _busy = false;
+
+        }
+
+    }
+
+
+
+    private async Task RunPlainPreviewAsync<T>(
+
+        string path,
+
+        string text,
+
+        Action<SectorPackPreview<T>> assign,
+
+        Action<string?> setStatus)
+
+    {
+
+        _busy = true;
+
+        setStatus(null);
+
+        try
+
+        {
+
+            var preview = await Api.PostPlainTextAsync<SectorPackPreview<T>>(path, text);
+
+            assign(preview);
+
+            setStatus($"{preview.RowCount} righe · {preview.ErrorCount} errori.");
+
+        }
+
+        catch (ApiException exception)
+
+        {
+
+            setStatus(exception.Message);
+
+        }
+
+        finally
+
+        {
+
+            _busy = false;
+
+        }
+
+    }
+
+
+
+    private async Task RunPlainImportAsync(string path, string text, Action<string?> setStatus)
+
+    {
+
+        _busy = true;
+
+        setStatus(null);
+
+        try
+
+        {
+
+            var result = await Api.PostPlainTextAsync<SectorPackImportResult>(path, text);
+
+            setStatus($"Importate {result.ImportedCount} righe · creati {result.MaterialsCreated} materiali · {result.ErrorCount} errori.");
+
+        }
+
+        catch (ApiException exception)
+
+        {
+
+            setStatus(exception.Message);
+
+        }
+
+        finally
+
+        {
+
+            _busy = false;
+
+        }
+
+    }
+
+
+
+    private async Task RunPlainApplyAsync(string path, string text, Action<string?> setStatus)
+
+    {
+
+        _busy = true;
+
+        setStatus(null);
+
+        try
+
+        {
+
+            var result = await Api.PostPlainTextAsync<SectorPackApplyResult>(path, text);
+
+            setStatus($"Applicate {result.AppliedCount} righe · saltate {result.SkippedCount} · {result.ErrorCount} segnalazioni.");
+
+        }
+
+        catch (ApiException exception)
+
+        {
+
+            setStatus(exception.Message);
+
+        }
+
+        finally
+
+        {
+
+            _busy = false;
+
+        }
+
+    }
+
+
+
+    private RenderFragment RenderStatus(string? message) => builder =>
+
+    {
+
+        if (message is not null)
+
+        {
+
+            builder.OpenElement(0, "p");
+
+            builder.AddContent(1, message);
+
+            builder.CloseElement();
+
+        }
+
+    };
+
+
+
+}

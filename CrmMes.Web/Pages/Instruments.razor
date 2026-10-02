@@ -1,0 +1,177 @@
+@page "/strumenti"
+@inject Api Api
+@inject Session Session
+
+<PageTitle>Strumenti di misura · Nicolò MES</PageTitle>
+
+<div class="page-head">
+    <div>
+        <div class="eyebrow">Qualità</div>
+        <h1>Strumenti di misura</h1>
+        <p class="sub">Anagrafica strumenti e scadenze calibrazione.</p>
+    </div>
+</div>
+
+@if (_error is not null)
+{
+    <div class="alert" role="alert">@_error</div>
+}
+
+<div class="card">
+    @if (_instruments is null)
+    {
+        <div class="state">@Labels.Loading</div>
+    }
+    else if (_instruments.Count == 0)
+    {
+        <div class="state"><strong>Nessuno strumento</strong>@(CanManage ? " Aggiungi il primo strumento qui sotto." : "")</div>
+    }
+    else
+    {
+        <div class="table-wrap">
+            <table class="cards">
+                <thead><tr><th>Codice</th><th>Nome</th><th>Seriale</th><th>Prossima calibrazione</th><th>Ultima</th></tr></thead>
+                <tbody>
+                    @foreach (var item in _instruments)
+                    {
+                        var overdue = item.NextCalibrationDue is { } due && due.Date < DateTime.UtcNow.Date;
+                        <tr class="@(overdue ? "danger" : "")">
+                            <td data-label="Codice" class="code">@item.Code</td>
+                            <td data-label="Nome">@item.Name</td>
+                            <td data-label="Seriale" class="muted">@(item.SerialNumber ?? "—")</td>
+                            <td data-label="Prossima">@(item.NextCalibrationDue is null ? "—" : Labels.Date(item.NextCalibrationDue))</td>
+                            <td data-label="Ultima" class="muted">@(item.LastCalibrationAt is null ? "—" : Labels.Date(item.LastCalibrationAt))</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    }
+</div>
+
+@if (CanManage)
+{
+    <div class="card card-pad stack">
+        <h2>Nuovo strumento</h2>
+        <div class="form-grid">
+            <label>Codice<input @bind="_newCode" autocomplete="off" /></label>
+            <label>Nome<input @bind="_newName" /></label>
+            <label>Numero di serie<input @bind="_newSerial" /></label>
+            <label>Intervallo calibrazione (giorni)<input type="number" min="1" @bind="_newInterval" /></label>
+        </div>
+        <div class="actions"><button @onclick="CreateAsync" disabled="@_busy">Crea strumento</button></div>
+    </div>
+
+    @if (_instruments is { Count: > 0 })
+    {
+        <div class="card card-pad stack">
+            <h2>Registra calibrazione</h2>
+            <div class="form-grid">
+                <label>Strumento
+                    <select @bind="_calInstrumentId">
+                        <option value="">Scegli...</option>
+                        @foreach (var item in _instruments)
+                        {
+                            <option value="@item.Id">@item.Code · @item.Name</option>
+                        }
+                    </select>
+                </label>
+                <label>Esito
+                    <select @bind="_calResult">
+                        <option value="Pass">Conforme (Pass)</option>
+                        <option value="Fail">Non conforme (Fail)</option>
+                    </select>
+                </label>
+                <label>N. certificato<input @bind="_calCertificate" /></label>
+            </div>
+            <div class="actions"><button @onclick="RecordCalibrationAsync" disabled="@_busy">Salva calibrazione</button></div>
+        </div>
+    }
+}
+
+@code {
+    private List<MeasuringInstrumentRow>? _instruments;
+    private string? _error;
+    private bool _busy;
+    private string _newCode = string.Empty;
+    private string _newName = string.Empty;
+    private string _newSerial = string.Empty;
+    private int _newInterval = 365;
+    private Guid _calInstrumentId;
+    private string _calResult = "Pass";
+    private string _calCertificate = string.Empty;
+
+    private bool CanManage => Session.Role is "Admin" or "Management";
+
+    protected override Task OnInitializedAsync() => LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        _error = null;
+        try
+        {
+            _instruments = await Api.GetAsync<List<MeasuringInstrumentRow>>("api/instruments");
+        }
+        catch (ApiException ex)
+        {
+            _error = ex.Message;
+        }
+    }
+
+    private async Task CreateAsync()
+    {
+        _busy = true;
+        _error = null;
+        try
+        {
+            await Api.PostAsync<MeasuringInstrumentRow>("api/instruments", new
+            {
+                code = _newCode.Trim(),
+                name = _newName.Trim(),
+                serialNumber = string.IsNullOrWhiteSpace(_newSerial) ? null : _newSerial.Trim(),
+                calibrationIntervalDays = _newInterval
+            });
+            _newCode = _newName = _newSerial = string.Empty;
+            _newInterval = 365;
+            await LoadAsync();
+        }
+        catch (ApiException ex)
+        {
+            _error = ex.Message;
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+
+    private async Task RecordCalibrationAsync()
+    {
+        if (_calInstrumentId == Guid.Empty)
+        {
+            _error = "Seleziona uno strumento.";
+            return;
+        }
+
+        _busy = true;
+        _error = null;
+        try
+        {
+            await Api.PostAsync<object>($"api/instruments/{_calInstrumentId}/calibrations", new
+            {
+                result = _calResult,
+                certificateNumber = string.IsNullOrWhiteSpace(_calCertificate) ? null : _calCertificate.Trim()
+            });
+            _calCertificate = string.Empty;
+            await LoadAsync();
+        }
+        catch (ApiException ex)
+        {
+            _error = ex.Message;
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+}

@@ -20,6 +20,9 @@ public sealed class CustomWebApplicationFactory : WebApplicationFactory<Program>
     /// <summary>Set before first use to test the production rate limits instead of the relaxed ones.</summary>
     public (int Auth, int Pin)? RateLimitOverride { get; init; }
 
+    /// <summary>Overrides Auth:External:AutoProvision for this factory instance.</summary>
+    public bool? ExternalAutoProvision { get; init; }
+
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
         builder.UseEnvironment("Development");
@@ -32,6 +35,12 @@ public sealed class CustomWebApplicationFactory : WebApplicationFactory<Program>
         // SecurityTests with their own factory.
         builder.UseSetting("RateLimits:AuthPerMinute", RateLimitOverride?.Auth.ToString() ?? "100000");
         builder.UseSetting("RateLimits:PinPerMinute", RateLimitOverride?.Pin.ToString() ?? "100000");
+        builder.UseSetting("Sdi:Provider", "stub");
+        builder.UseSetting("Ai:Provider", "stub");
+        builder.UseSetting("Auth:External:AutoProvision", (ExternalAutoProvision ?? true).ToString().ToLowerInvariant());
+        builder.UseSetting("Auth:External:Providers:0:Key", "dev");
+        builder.UseSetting("Auth:External:Providers:0:Name", "Sviluppo");
+        builder.UseSetting("Auth:External:Providers:0:Enabled", "true");
 
         builder.ConfigureServices(services =>
         {

@@ -81,6 +81,16 @@ public class ApplicationDbContext : DbContext
     public DbSet<MachineConnection> MachineConnections => Set<MachineConnection>();
     public DbSet<MachineEvent> MachineEvents => Set<MachineEvent>();
     public DbSet<EnergyProject> EnergyProjects => Set<EnergyProject>();
+    public DbSet<WarehouseLocation> WarehouseLocations => Set<WarehouseLocation>();
+    public DbSet<LocationStock> LocationStocks => Set<LocationStock>();
+    public DbSet<InventorySession> InventorySessions => Set<InventorySession>();
+    public DbSet<InventoryLine> InventoryLines => Set<InventoryLine>();
+    public DbSet<ProgressCertificate> ProgressCertificates => Set<ProgressCertificate>();
+    public DbSet<ScaleReading> ScaleReadings => Set<ScaleReading>();
+    public DbSet<MeasuringInstrument> MeasuringInstruments => Set<MeasuringInstrument>();
+    public DbSet<InstrumentCalibration> InstrumentCalibrations => Set<InstrumentCalibration>();
+    public DbSet<CorrectiveAction> CorrectiveActions => Set<CorrectiveAction>();
+    public DbSet<AttendancePunch> AttendancePunches => Set<AttendancePunch>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -94,6 +104,9 @@ public class ApplicationDbContext : DbContext
             entity.Property(u => u.Role).HasMaxLength(50);
             entity.Property(u => u.PasswordHash).HasMaxLength(500);
             entity.Property(u => u.PinHash).HasMaxLength(500);
+            entity.Property(u => u.ExternalProvider).HasMaxLength(50);
+            entity.Property(u => u.ExternalSubject).HasMaxLength(200);
+            entity.HasIndex(u => new { u.ExternalProvider, u.ExternalSubject });
         });
 
         modelBuilder.Entity<Area>(entity =>
@@ -604,6 +617,10 @@ public class ApplicationDbContext : DbContext
             entity.Property(i => i.Notes).HasMaxLength(2000);
             entity.Property(i => i.CreatedBy).HasMaxLength(200);
             entity.Property(i => i.IssuedBy).HasMaxLength(200);
+            entity.Property(i => i.SdiStatus).HasMaxLength(24).HasDefaultValue(SdiStatuses.NotSent);
+            entity.Property(i => i.SdiTransmissionId).HasMaxLength(100);
+            entity.Property(i => i.SdiMessage).HasMaxLength(1000);
+            entity.Property(i => i.SdiUpdatedBy).HasMaxLength(200);
             entity.HasOne(i => i.Customer).WithMany().HasForeignKey(i => i.CustomerId).OnDelete(DeleteBehavior.Restrict);
             entity.HasMany(i => i.Lines).WithOne(l => l.Invoice).HasForeignKey(l => l.InvoiceId).OnDelete(DeleteBehavior.Cascade);
             entity.HasMany(i => i.TransportDocuments).WithOne(t => t.Invoice).HasForeignKey(t => t.InvoiceId).OnDelete(DeleteBehavior.Cascade);
@@ -740,6 +757,8 @@ public class ApplicationDbContext : DbContext
             entity.Property(c => c.ReaOffice).HasMaxLength(2);
             entity.Property(c => c.ReaNumber).HasMaxLength(20);
             entity.Property(c => c.Iban).HasMaxLength(34);
+            entity.Property(c => c.Locale).HasMaxLength(10);
+            entity.Property(c => c.Currency).HasMaxLength(3);
         });
 
         modelBuilder.Entity<LaborEntry>(entity =>
@@ -879,6 +898,8 @@ public class ApplicationDbContext : DbContext
             entity.Property(l => l.MaterialCode).HasMaxLength(120);
             entity.Property(l => l.LotNumber).HasMaxLength(120);
             entity.Property(l => l.Notes).HasMaxLength(500);
+            entity.Property(l => l.CertificateNumber).HasMaxLength(120);
+            entity.Property(l => l.CertificateIssuer).HasMaxLength(200);
             entity.HasIndex(l => new { l.MaterialCode, l.LotNumber }).IsUnique();
             entity.HasOne(l => l.Supplier)
                 .WithMany()
@@ -1005,6 +1026,124 @@ public class ApplicationDbContext : DbContext
             entity.HasOne(c => c.Category)
                 .WithMany()
                 .HasForeignKey(c => c.PlanningCategoryId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<WarehouseLocation>(entity =>
+        {
+            entity.Property(l => l.Code).HasMaxLength(50);
+            entity.Property(l => l.Name).HasMaxLength(200);
+            entity.HasIndex(l => l.Code).IsUnique();
+            entity.HasOne(l => l.Site)
+                .WithMany()
+                .HasForeignKey(l => l.SiteId)
+                .OnDelete(DeleteBehavior.SetNull);
+        });
+
+        modelBuilder.Entity<LocationStock>(entity =>
+        {
+            entity.HasIndex(s => new { s.LocationId, s.MaterialId }).IsUnique();
+            entity.HasOne(s => s.Location)
+                .WithMany(l => l.StockItems)
+                .HasForeignKey(s => s.LocationId)
+                .OnDelete(DeleteBehavior.Cascade);
+            entity.HasOne(s => s.Material)
+                .WithMany()
+                .HasForeignKey(s => s.MaterialId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<InventorySession>(entity =>
+        {
+            entity.Property(s => s.Code).HasMaxLength(80);
+            entity.Property(s => s.Status).HasMaxLength(20);
+            entity.Property(s => s.Notes).HasMaxLength(2000);
+            entity.HasIndex(s => s.Code).IsUnique();
+            entity.HasOne(s => s.CreatedByUser)
+                .WithMany()
+                .HasForeignKey(s => s.CreatedBy)
+                .OnDelete(DeleteBehavior.SetNull);
+        });
+
+        modelBuilder.Entity<InventoryLine>(entity =>
+        {
+            entity.HasIndex(l => new { l.SessionId, l.LocationId, l.MaterialId }).IsUnique();
+            entity.HasOne(l => l.Session)
+                .WithMany(s => s.Lines)
+                .HasForeignKey(l => l.SessionId)
+                .OnDelete(DeleteBehavior.Cascade);
+            entity.HasOne(l => l.Location)
+                .WithMany()
+                .HasForeignKey(l => l.LocationId)
+                .OnDelete(DeleteBehavior.Cascade);
+            entity.HasOne(l => l.Material)
+                .WithMany()
+                .HasForeignKey(l => l.MaterialId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<ProgressCertificate>(entity =>
+        {
+            entity.Property(c => c.Notes).HasMaxLength(1000);
+            entity.HasOne(c => c.WorkOrder)
+                .WithMany()
+                .HasForeignKey(c => c.WorkOrderId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<ScaleReading>(entity =>
+        {
+            entity.Property(r => r.MaterialCode).HasMaxLength(120);
+            entity.Property(r => r.Unit).HasMaxLength(20);
+            entity.Property(r => r.Notes).HasMaxLength(500);
+            entity.HasIndex(r => r.RecordedAt);
+        });
+
+        modelBuilder.Entity<MeasuringInstrument>(entity =>
+        {
+            entity.Property(i => i.Code).HasMaxLength(50);
+            entity.Property(i => i.Name).HasMaxLength(200);
+            entity.Property(i => i.SerialNumber).HasMaxLength(100);
+            entity.Property(i => i.Notes).HasMaxLength(2000);
+            entity.HasIndex(i => i.Code).IsUnique();
+        });
+
+        modelBuilder.Entity<InstrumentCalibration>(entity =>
+        {
+            entity.Property(c => c.Result).HasMaxLength(10);
+            entity.Property(c => c.CertificateNumber).HasMaxLength(100);
+            entity.Property(c => c.Notes).HasMaxLength(2000);
+            entity.Property(c => c.PerformedBy).HasMaxLength(200);
+            entity.HasOne(c => c.Instrument)
+                .WithMany(i => i.Calibrations)
+                .HasForeignKey(c => c.InstrumentId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<CorrectiveAction>(entity =>
+        {
+            entity.Property(c => c.Code).HasMaxLength(50);
+            entity.Property(c => c.Title).HasMaxLength(300);
+            entity.Property(c => c.Description).HasMaxLength(4000);
+            entity.Property(c => c.Status).HasMaxLength(20);
+            entity.Property(c => c.RootCause).HasMaxLength(2000);
+            entity.Property(c => c.CorrectiveActionText).HasMaxLength(4000);
+            entity.Property(c => c.PreventiveActionText).HasMaxLength(4000);
+            entity.HasIndex(c => c.Code).IsUnique();
+            entity.HasOne(c => c.NonConformity)
+                .WithMany()
+                .HasForeignKey(c => c.NonConformityId)
+                .OnDelete(DeleteBehavior.SetNull);
+        });
+
+        modelBuilder.Entity<AttendancePunch>(entity =>
+        {
+            entity.Property(p => p.Kind).HasMaxLength(10);
+            entity.Property(p => p.Notes).HasMaxLength(500);
+            entity.HasIndex(p => new { p.UserId, p.PunchedAt });
+            entity.HasOne(p => p.User)
+                .WithMany()
+                .HasForeignKey(p => p.UserId)
                 .OnDelete(DeleteBehavior.Cascade);
         });
 

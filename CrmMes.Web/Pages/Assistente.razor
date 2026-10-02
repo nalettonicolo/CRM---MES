@@ -1,0 +1,71 @@
+@page "/assistente"
+
+@inject Api Api
+@inject Session Session
+
+<PageTitle>Assistente IA · Nicolò MES</PageTitle>
+
+<div class="page-head">
+    <div>
+        <div class="eyebrow">Amministrazione</div>
+        <h1>Assistente IA</h1>
+        <p class="sub">Domande rapide su moduli MES (fatture, OEE, MRP, magazzino).</p>
+    </div>
+</div>
+
+<div class="card">
+    <label>
+        Domanda
+        <textarea rows="4" @bind="_question" disabled="@_busy" placeholder="Es. Come emetto una fattura elettronica?"></textarea>
+    </label>
+    @if (_error is not null)
+    {
+        <div class="alert" role="alert">@_error</div>
+    }
+    <div class="actions">
+        <button type="button" disabled="@_busy || string.IsNullOrWhiteSpace(_question)" @onclick="AskAsync">
+            @(_busy ? I18n.Loading(Session) : "Chiedi")
+        </button>
+    </div>
+    @if (_answer is not null)
+    {
+        <div class="state answer-block">
+            <strong>Risposta</strong>
+            @if (!string.IsNullOrWhiteSpace(_provider))
+            {
+                <span class="muted">(@_provider)</span>
+            }
+            <p>@_answer</p>
+        </div>
+    }
+</div>
+
+@code {
+    private string _question = string.Empty;
+    private string? _answer;
+    private string? _provider;
+    private string? _error;
+    private bool _busy;
+
+    private async Task AskAsync()
+    {
+        _busy = true;
+        _error = null;
+        _answer = null;
+        _provider = null;
+        try
+        {
+            var result = await Api.AskAssistantAsync(_question.Trim());
+            _answer = result.Answer;
+            _provider = result.Provider;
+        }
+        catch (ApiException ex)
+        {
+            _error = ex.Message;
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+}

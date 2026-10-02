@@ -42,7 +42,41 @@
         {
             <button type="button" class="ghost" @onclick="BackToPassword">Torna a email e password</button>
         }
+        @if (_ssoVisible && _challenge is null && !_ssoOpen)
+        {
+            <button type="button" class="ghost sso-link" @onclick="OpenSso">Accesso aziendale (SSO)</button>
+        }
     </form>
+
+    @if (_ssoOpen)
+    {
+        <form class="login-card sso-card" @onsubmit="SubmitSsoAsync" @onsubmit:preventDefault>
+            <h2>Accesso aziendale (SSO)</h2>
+            <p class="sub">Solo sviluppo: scambio server-side con provider e subject verificati dal client OIDC.</p>
+            <label>
+                Provider
+                <input required @bind="_ssoProvider" disabled="@_busy" placeholder="es. azure" />
+            </label>
+            <label>
+                Subject (IdP)
+                <input required @bind="_ssoSubject" disabled="@_busy" />
+            </label>
+            <label>
+                Email
+                <input type="email" required @bind="_ssoEmail" disabled="@_busy" />
+            </label>
+            <label>
+                Nome
+                <input required @bind="_ssoName" disabled="@_busy" />
+            </label>
+            @if (_error is not null)
+            {
+                <div class="alert" role="alert">@_error</div>
+            }
+            <button type="submit" disabled="@_busy">@(_busy ? "Accesso in corso..." : "Accedi con SSO")</button>
+            <button type="button" class="ghost" @onclick="CloseSso">Annulla</button>
+        </form>
+    }
 </div>
 
 @code {
@@ -53,6 +87,48 @@
     private string? _error;
     private bool _busy;
     private bool _waking;
+    private bool _ssoVisible;
+    private bool _ssoOpen;
+    private string _ssoProvider = "dev";
+    private string _ssoSubject = string.Empty;
+    private string _ssoEmail = string.Empty;
+    private string _ssoName = string.Empty;
+
+    protected override void OnInitialized()
+    {
+        // SSO link is always available; providers are loaded only when the user opens the form
+        // (avoids a network call on every login page render).
+        _ssoVisible = true;
+    }
+
+    private async Task OpenSso()
+    {
+        _error = null;
+        try
+        {
+            var providers = await Api.GetExternalProvidersAsync();
+            if (providers.Count == 0 || providers.All(p => !p.Enabled))
+            {
+                _error = "Accesso aziendale non configurato. Chiedi all'amministratore di abilitare Auth:External.";
+                _ssoOpen = false;
+                return;
+            }
+        }
+        catch (ApiException ex)
+        {
+            _error = ex.Message;
+            _ssoOpen = false;
+            return;
+        }
+
+        _ssoOpen = true;
+    }
+
+    private void CloseSso()
+    {
+        _ssoOpen = false;
+        _error = null;
+    }
 
     private void BackToPassword()
     {
@@ -118,6 +194,29 @@
             {
                 _challenge = null;
             }
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+
+    private async Task SubmitSsoAsync()
+    {
+        _busy = true;
+        _error = null;
+        try
+        {
+            var auth = await Api.ExternalLoginAsync(_ssoProvider.Trim(), _ssoSubject.Trim(), _ssoEmail.Trim(), _ssoName.Trim());
+            _challenge = auth.TwoFactorChallenge;
+            if (_challenge is null)
+            {
+                _ssoOpen = false;
+            }
+        }
+        catch (ApiException exception)
+        {
+            _error = exception.Message;
         }
         finally
         {

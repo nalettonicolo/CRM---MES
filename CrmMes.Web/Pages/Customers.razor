@@ -1,6 +1,7 @@
 @page "/clienti"
 @implements IDisposable
 @inject Api Api
+@inject Session Session
 @inject NavigationManager Nav
 
 <PageTitle>Clienti · Nicolò MES</PageTitle>
@@ -11,7 +12,30 @@
         <h1>Clienti</h1>
         <p class="sub">Anagrafica clienti con i loro preventivi e le commesse.</p>
     </div>
+    @if (CanCreate)
+    {
+        <div class="actions">
+            <button class="secondary" @onclick="() => _showCreate = !_showCreate">@(_showCreate ? "Chiudi nuovo cliente" : "Nuovo cliente")</button>
+        </div>
+    }
 </div>
+
+@if (_createError is not null)
+{
+    <div class="alert" role="alert">@_createError</div>
+}
+@if (_showCreate && CanCreate)
+{
+    <div class="card card-pad stack stack-gap">
+        <h2>Nuovo cliente</h2>
+        <div class="form-grid">
+            <label>Codice<input @bind="_newCode" placeholder="es. CLI-001" autocomplete="off" /></label>
+            <label>Ragione sociale<input @bind="_newName" placeholder="Nome o ragione sociale" /></label>
+            <label>Partita IVA (opzionale)<input @bind="_newVat" placeholder="IT12345678901" /></label>
+        </div>
+        <div class="actions"><button @onclick="CreateAsync" disabled="@_creating">@(_creating ? "Salvataggio..." : "Crea cliente")</button></div>
+    </div>
+}
 
 <div class="toolbar">
     <input class="search" type="search" placeholder="Nome, codice o partita IVA" aria-label="Cerca cliente" value="@_search" @oninput="OnSearchInput" />
@@ -29,7 +53,9 @@
     }
     else if (_customers.Count == 0)
     {
-        <div class="state"><strong>Nessun cliente</strong>@(string.IsNullOrWhiteSpace(_search) ? "I clienti si aggiungono dal programma desktop." : $"Nessun cliente corrisponde a \"{_search}\".")</div>
+        <div class="state"><strong>Nessun cliente</strong>@(string.IsNullOrWhiteSpace(_search)
+            ? CanCreate ? "Aggiungi il primo cliente con il pulsante «Nuovo cliente»." : "Nessun cliente in anagrafica."
+            : $"Nessun cliente corrisponde a \"{_search}\".")</div>
     }
     else
     {
@@ -57,7 +83,15 @@
     private string _search = string.Empty;
     private List<Customer>? _customers;
     private string? _error;
+    private string? _createError;
     private CancellationTokenSource? _debounce;
+    private bool _showCreate;
+    private bool _creating;
+    private string _newCode = string.Empty;
+    private string _newName = string.Empty;
+    private string _newVat = string.Empty;
+
+    private bool CanCreate => Session.Role is "Admin" or "Sales";
 
     protected override Task OnInitializedAsync() => LoadAsync();
 
@@ -90,6 +124,38 @@
         catch (ApiException exception)
         {
             _error = exception.Message;
+        }
+    }
+
+    private async Task CreateAsync()
+    {
+        _creating = true;
+        _createError = null;
+        try
+        {
+            var created = await Api.PostAsync<Customer>("api/customers", new
+            {
+                code = _newCode.Trim(),
+                name = _newName.Trim(),
+                vatNumber = string.IsNullOrWhiteSpace(_newVat) ? null : _newVat.Trim(),
+                email = (string?)null,
+                phone = (string?)null,
+                address = (string?)null,
+                notes = (string?)null
+            });
+            _newCode = string.Empty;
+            _newName = string.Empty;
+            _newVat = string.Empty;
+            _showCreate = false;
+            Nav.NavigateTo(created.DetailHref());
+        }
+        catch (ApiException exception)
+        {
+            _createError = exception.Message;
+        }
+        finally
+        {
+            _creating = false;
         }
     }
 

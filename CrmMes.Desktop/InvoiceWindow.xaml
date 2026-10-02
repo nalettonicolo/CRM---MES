@@ -51,6 +51,37 @@
             </StackPanel>
         </Grid>
 
+        <Border DockPanel.Dock="Top" x:Name="SdiPanel" Style="{StaticResource CardBorder}" Padding="12" Margin="0,0,0,12" Visibility="Collapsed">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="180" />
+                    <ColumnDefinition Width="10" />
+                    <ColumnDefinition Width="220" />
+                    <ColumnDefinition Width="10" />
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="10" />
+                    <ColumnDefinition Width="150" />
+                </Grid.ColumnDefinitions>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="8" />
+                    <RowDefinition Height="36" />
+                    <RowDefinition Height="Auto" />
+                </Grid.RowDefinitions>
+                <TextBlock x:Name="SdiStatusText" Grid.Row="0" Grid.Column="0" VerticalAlignment="Center" FontWeight="SemiBold" />
+                <TextBlock x:Name="SdiStatusUpdatedText" Grid.Row="0" Grid.Column="2" Grid.ColumnSpan="3" VerticalAlignment="Center" Foreground="{StaticResource TextSecondaryBrush}" TextTrimming="CharacterEllipsis" />
+                <ComboBox x:Name="SdiNextStatusCombo" Grid.Row="2" Grid.Column="0" Height="34" />
+                <TextBox x:Name="SdiTransmissionIdBox" Grid.Row="2" Grid.Column="2" Height="34" MaxLength="100" ToolTip="Protocollo o identificativo dell'invio" />
+                <TextBox x:Name="SdiMessageBox" Grid.Row="2" Grid.Column="4" Height="34" MaxLength="1000" ToolTip="Nota dell'intermediario o del portale" />
+                <StackPanel Grid.Row="2" Grid.Column="6" Orientation="Horizontal">
+                    <Button x:Name="SubmitSdiButton" Content="Invia a SdI" Width="88" Height="34" Margin="0,0,6,0" Click="SubmitSdi_Click" />
+                    <Button x:Name="RecordSdiStatusButton" Style="{StaticResource SecondaryButton}" Content="Registra" Width="56" Height="34" Click="RecordSdiStatus_Click" />
+                </StackPanel>
+                <TextBlock Grid.Row="3" Grid.Column="0" Grid.ColumnSpan="7" Margin="0,6,0,0" Foreground="{StaticResource TextMutedBrush}" FontSize="11.5"
+                           Text="Senza intermediario configurato, carica l'XML sul portale Fatture e Corrispettivi e registra qui l'esito." />
+            </Grid>
+        </Border>
+
         <DockPanel DockPanel.Dock="Bottom" Margin="0,12,0,0">
             <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Bottom">
                 <Button x:Name="DeleteButton" Style="{StaticResource DangerButton}" Content="Elimina bozza" Width="130" Height="36" Margin="0,0,10,0" Click="Delete_Click" />

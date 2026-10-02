@@ -1,0 +1,198 @@
+@page "/ubicazioni"
+@inject Api Api
+@inject Session Session
+
+<PageTitle>Ubicazioni · Nicolò MES</PageTitle>
+
+<div class="page-head">
+    <div>
+        <div class="eyebrow">Magazzino</div>
+        <h1>Ubicazioni</h1>
+        <p class="sub">Scaffali e aree di stoccaggio con giacenza per ubicazione.</p>
+    </div>
+</div>
+
+@if (_actionError is not null)
+{
+    <div class="alert" role="alert">@_actionError</div>
+}
+
+@if (CanManage)
+{
+    <div class="card card-pad stack stack-gap">
+        <h2>Nuova ubicazione</h2>
+        <div class="form-grid">
+            <label>Codice<input @bind="_newCode" placeholder="es. A1-01" autocomplete="off" /></label>
+            <label>Nome<input @bind="_newName" placeholder="es. Scaffale A1" /></label>
+        </div>
+        <div class="actions"><button @onclick="CreateAsync" disabled="@_busy">@(_busy ? "Salvataggio..." : "Crea ubicazione")</button></div>
+    </div>
+}
+
+<div class="card">
+    @if (_error is not null)
+    {
+        <div class="state"><strong>Impossibile caricare le ubicazioni</strong>@_error
+            <div class="actions"><button class="secondary small" @onclick="LoadAsync">Riprova</button></div></div>
+    }
+    else if (_locations is null)
+    {
+        <div class="state">Caricamento...</div>
+    }
+    else if (_locations.Count == 0)
+    {
+        <div class="state"><strong>Nessuna ubicazione</strong>@(CanManage ? "Crea la prima ubicazione con il modulo sopra." : "Nessuna ubicazione configurata.")</div>
+    }
+    else
+    {
+        <div class="table-wrap">
+            <table class="cards">
+                <thead><tr><th>Codice</th><th>Nome</th><th>Stato</th><th></th></tr></thead>
+                <tbody>
+                    @foreach (var location in _locations)
+                    {
+                        <tr>
+                            <td data-label="Codice" class="code">@location.Code</td>
+                            <td data-label="Nome">@location.Name</td>
+                            <td data-label="Stato">
+                                @if (location.IsActive)
+                                {
+                                    <span class="badge ok">Attiva</span>
+                                }
+                                else
+                                {
+                                    <span class="badge">Disattiva</span>
+                                }
+                            </td>
+                            <td>
+                                <button class="secondary small" @onclick="() => ToggleStockAsync(location.Id)" disabled="@_stockLoading">
+                                    @(_expandedId == location.Id ? "Nascondi giacenza" : "Giacenza")
+                                </button>
+                            </td>
+                        </tr>
+                        @if (_expandedId == location.Id)
+                        {
+                            <tr>
+                                <td colspan="4">
+                                    @if (_stockError is not null)
+                                    {
+                                        <div class="small muted">@_stockError</div>
+                                    }
+                                    else if (_stock is null)
+                                    {
+                                        <div class="small muted">Caricamento giacenza...</div>
+                                    }
+                                    else if (_stock.Count == 0)
+                                    {
+                                        <div class="small muted">Nessuna giacenza in questa ubicazione.</div>
+                                    }
+                                    else
+                                    {
+                                        <div class="table-wrap">
+                                            <table class="cards">
+                                                <thead><tr><th>Materiale</th><th class="num">Quantità</th></tr></thead>
+                                                <tbody>
+                                                    @foreach (var row in _stock)
+                                                    {
+                                                        <tr>
+                                                            <td><span class="code">@row.MaterialCode</span> @row.MaterialName</td>
+                                                            <td class="num">@Labels.Number(row.Quantity) @row.Unit</td>
+                                                        </tr>
+                                                    }
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    }
+                                </td>
+                            </tr>
+                        }
+                    }
+                </tbody>
+            </table>
+        </div>
+    }
+</div>
+
+@code {
+    private List<WarehouseLocation>? _locations;
+    private List<LocationStockRow>? _stock;
+    private Guid? _expandedId;
+    private string? _error;
+    private string? _actionError;
+    private string? _stockError;
+    private bool _busy;
+    private bool _stockLoading;
+    private string _newCode = string.Empty;
+    private string _newName = string.Empty;
+
+    private bool CanManage => Session.Role is "Admin" or "Warehouse";
+
+    protected override Task OnInitializedAsync() => LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        _error = null;
+        _locations = null;
+        try
+        {
+            _locations = await Api.GetAsync<List<WarehouseLocation>>("api/locations");
+        }
+        catch (ApiException exception)
+        {
+            _error = exception.Message;
+        }
+    }
+
+    private async Task CreateAsync()
+    {
+        _busy = true;
+        _actionError = null;
+        try
+        {
+            await Api.PostAsync<WarehouseLocation>("api/locations", new
+            {
+                name = _newName.Trim(),
+                code = _newCode.Trim()
+            });
+            _newCode = string.Empty;
+            _newName = string.Empty;
+            await LoadAsync();
+        }
+        catch (ApiException exception)
+        {
+            _actionError = exception.Message;
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+
+    private async Task ToggleStockAsync(Guid locationId)
+    {
+        if (_expandedId == locationId)
+        {
+            _expandedId = null;
+            _stock = null;
+            _stockError = null;
+            return;
+        }
+
+        _expandedId = locationId;
+        _stock = null;
+        _stockError = null;
+        _stockLoading = true;
+        try
+        {
+            _stock = await Api.GetAsync<List<LocationStockRow>>($"api/locations/{locationId}/stock");
+        }
+        catch (ApiException exception)
+        {
+            _stockError = exception.Message;
+        }
+        finally
+        {
+            _stockLoading = false;
+        }
+    }
+}

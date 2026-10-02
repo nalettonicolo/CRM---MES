@@ -1,5 +1,27 @@
 namespace CrmMes.Core.Models;
 
+public static class SdiStatuses
+{
+    public const string NotSent = "NotSent";
+    public const string Submitted = "Submitted";
+    public const string Accepted = "Accepted";
+    public const string Rejected = "Rejected";
+    public const string DeliveryFailed = "DeliveryFailed";
+
+    public static readonly IReadOnlySet<string> All = new HashSet<string>(StringComparer.Ordinal)
+    {
+        NotSent, Submitted, Accepted, Rejected, DeliveryFailed
+    };
+
+    public static bool CanTransition(string current, string next) => (current, next) switch
+    {
+        (NotSent, Submitted) => true,
+        (Submitted, Accepted or Rejected or DeliveryFailed) => true,
+        (Rejected or DeliveryFailed, Submitted) => true,
+        _ => false
+    };
+}
+
 /// <summary>Sales invoice issued as an Italian electronic invoice (FatturaPA, FPR12). Usually a deferred
 /// invoice (TD24) grouping the issued transport documents of a customer, or an immediate one (TD01).
 ///
@@ -32,6 +54,12 @@ public class Invoice
     public string? CreatedBy { get; set; }
     public DateTime? IssuedAt { get; set; }
     public string? IssuedBy { get; set; }
+
+    public string SdiStatus { get; set; } = SdiStatuses.NotSent;
+    public string? SdiTransmissionId { get; set; }
+    public DateTime? SdiStatusUpdatedAt { get; set; }
+    public string? SdiMessage { get; set; }
+    public string? SdiUpdatedBy { get; set; }
 
     public ICollection<InvoiceLine> Lines { get; set; } = new List<InvoiceLine>();
     public ICollection<InvoiceTransportDocument> TransportDocuments { get; set; } = new List<InvoiceTransportDocument>();

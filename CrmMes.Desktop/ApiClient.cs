@@ -959,6 +959,14 @@ public sealed class ApiClient
         => SendAsync<InvoiceDto>(HttpMethod.Post, $"api/invoices/{id}/issue",
             new { issueDate = issueDate.HasValue ? DateTime.SpecifyKind(issueDate.Value.Date, DateTimeKind.Utc) : (DateTime?)null }, cancellationToken);
 
+    public Task<InvoiceDto> SubmitInvoiceToSdiAsync(Guid id, CancellationToken cancellationToken = default)
+        => SendAsync<InvoiceDto>(HttpMethod.Post, $"api/invoices/{id}/sdi/submit", null, cancellationToken);
+
+    public Task<InvoiceDto> RecordInvoiceSdiStatusAsync(
+        Guid id, string status, string? transmissionId, string? message, CancellationToken cancellationToken = default)
+        => SendAsync<InvoiceDto>(HttpMethod.Post, $"api/invoices/{id}/sdi/status",
+            new { status, transmissionId, message }, cancellationToken);
+
     /// <summary>The FatturaPA XML and the file name the Exchange System expects.</summary>
     public async Task<(string FileName, byte[] Content)> DownloadInvoiceXmlAsync(Guid id, CancellationToken cancellationToken = default)
     {
@@ -2989,12 +2997,20 @@ public sealed record WorkOrderLookupDto(
 }
 
 public sealed record InvoiceSummaryDto(
-    Guid Id, string Code, string Status, string DocumentType, Guid CustomerId, string CustomerName, DateTime? IssueDate,
+    Guid Id, string Code, string Status, string SdiStatus, string DocumentType, Guid CustomerId, string CustomerName, DateTime? IssueDate,
     decimal Total, DateTime CreatedAt)
 {
     public string StatusLabel => Status == "Issued" ? "Emessa" : "Bozza";
     public string BrushStatus => Status == "Issued" ? "Completed" : "Draft";
     public string TypeLabel => DocumentType == "TD24" ? "Differita (DDT)" : "Immediata";
+    public string SdiStatusLabel => SdiStatus switch
+    {
+        "Submitted" => "Inviata",
+        "Accepted" => "Accettata",
+        "Rejected" => "Scartata",
+        "DeliveryFailed" => "Consegna fallita",
+        _ => "Non inviata"
+    };
 }
 
 public sealed record InvoiceLineDto(
@@ -3009,7 +3025,9 @@ public sealed record InvoiceDto(
     Guid Id, string Code, int? Number, int? Year, string Status, string DocumentType, Guid CustomerId, string CustomerName,
     DateTime? IssueDate, string PaymentMethod, DateTime? PaymentDueDate, string? Notes, List<InvoiceLineDto> Lines,
     List<InvoiceDocumentDto> TransportDocuments, List<InvoiceVatSummaryDto> VatSummary, decimal Total,
-    List<string> Warnings, DateTime? IssuedAt, string? IssuedBy)
+    List<string> Warnings, DateTime? IssuedAt, string? IssuedBy,
+    string SdiStatus = "NotSent", string? SdiTransmissionId = null, DateTime? SdiStatusUpdatedAt = null,
+    string? SdiMessage = null, string? SdiUpdatedBy = null, bool SdiProviderConfigured = false)
 {
     public bool IsDraft => Status == "Draft";
 }

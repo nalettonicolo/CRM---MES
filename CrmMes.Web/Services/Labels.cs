@@ -121,6 +121,24 @@ public static class Labels
         _ => documentType,
     };
 
+    public static string SdiStatus(string status) => status switch
+    {
+        "NotSent" => "Non inviata",
+        "Submitted" => "Inviata",
+        "Accepted" => "Accettata",
+        "Rejected" => "Scartata",
+        "DeliveryFailed" => "Consegna fallita",
+        _ => status,
+    };
+
+    public static string SdiStatusClass(string status) => status switch
+    {
+        "Submitted" => "info",
+        "Accepted" => "ok",
+        "Rejected" or "DeliveryFailed" => "danger",
+        _ => string.Empty,
+    };
+
     public static string TransportBy(string transportBy) => transportBy switch
     {
         "Sender" => "Mittente",

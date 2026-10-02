@@ -35,7 +35,12 @@ public sealed record ServerDiagnostics(
 
 public sealed record CompanyProfile(
     bool IsConfigured, string CompanyName, string? VatNumber, string? Address, string? Phone, string? Email,
-    string Sector, List<string> EnabledModules, string? Gs1CompanyPrefix = null);
+    string Sector, List<string> EnabledModules, string? Gs1CompanyPrefix = null,
+    string Locale = "it-IT", string Currency = "EUR");
+
+public sealed record ExternalProviderInfo(string Key, string Name, bool Enabled);
+
+public sealed record AiAssistantAnswer(string Answer, string Provider);
 
 public sealed record AccessArea(string Key, string Name, string? Module);
 

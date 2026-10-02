@@ -261,6 +261,53 @@ public class WorkCentersController : ControllerBase
 
         return Ok(results.OrderByDescending(r => r.PendingMinutes));
     }
+
+    /// <summary>Piano capacità finita giornaliera: per ogni centro di lavoro attivo e ogni giorno nel
+    /// periodo, confronta la capacità registrata con i minuti già impegnati da operazioni aperte che
+    /// hanno date pianificate (stessa ripartizione uniforme usata dallo scheduler commesse).</summary>
+    [HttpGet("capacity-plan")]
+    public async Task<ActionResult<IEnumerable<WorkCenterCapacityPlanRow>>> GetCapacityPlan(
+        [FromQuery] DateTime? from = null,
+        [FromQuery] int days = 14,
+        [FromQuery] Guid? siteId = null,
+        CancellationToken cancellationToken = default)
+    {
+        if (days is < 1 or > 366)
+        {
+            return BadRequest(new { message = "Il numero di giorni deve essere compreso tra 1 e 366." });
+        }
+
+        var fromDay = DateOnly.FromDateTime((from ?? DateTime.UtcNow).Date);
+
+        var workCenters = await _dbContext.WorkCenters
+            .AsNoTracking()
+            .Where(w => w.IsActive && (siteId == null || w.SiteId == siteId))
+            .OrderBy(w => w.Name)
+            .Select(w => new { w.Code, w.Name, w.DailyCapacityMinutes })
+            .ToListAsync(cancellationToken);
+
+        var scheduledOpen = await _dbContext.WorkOrderOperations
+            .AsNoTracking()
+            .Where(op => op.Status != "Done" &&
+                         op.PlannedStartAt != null && op.PlannedEndAt != null &&
+                         op.WorkCenter != null && op.WorkCenter != "")
+            .Select(op => new
+            {
+                op.WorkCenter,
+                PlannedStartAt = op.PlannedStartAt!.Value,
+                PlannedEndAt = op.PlannedEndAt!.Value,
+                op.EstimatedMinutes
+            })
+            .ToListAsync(cancellationToken);
+
+        var plan = FiniteCapacityScheduler.BuildCapacityPlan(
+            workCenters.Select(w => (w.Code, w.Name, w.DailyCapacityMinutes)),
+            scheduledOpen.Select(op => (op.WorkCenter!, op.PlannedStartAt, op.PlannedEndAt, op.EstimatedMinutes)),
+            fromDay,
+            days);
+
+        return Ok(plan);
+    }
 }
 
 public sealed record CreateWorkCenterRequest(string Code, string Name, string? Description, decimal DailyCapacityMinutes, Guid? SiteId = null);

@@ -132,6 +132,7 @@ else
         try
         {
             Session.Company = await Api.GetAsync<CompanyProfile>("api/company-profile");
+            ApplyUiCulture(Session.Company.Locale);
             Session.WebAreas = await Api.GetAsync<List<string>>("api/company-profile/areas?channel=web");
             try
             {
@@ -191,6 +192,24 @@ else
         _loadedFor = null;
         await Api.LogoutAsync();
         Nav.NavigateTo("", replace: true);
+    }
+
+    private static void ApplyUiCulture(string? locale)
+    {
+        if (string.IsNullOrWhiteSpace(locale))
+        {
+            return;
+        }
+
+        try
+        {
+            var culture = CultureInfo.GetCultureInfo(locale);
+            CultureInfo.CurrentCulture = culture;
+            CultureInfo.CurrentUICulture = culture;
+        }
+        catch (CultureNotFoundException)
+        {
+        }
     }
 
     public void Dispose() => Session.Changed -= OnSessionChanged;

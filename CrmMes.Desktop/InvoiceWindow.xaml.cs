@@ -87,6 +87,29 @@ public partial class InvoiceWindow : Window
         };
         StatusText.Text = draft ? "BOZZA" : "EMESSA";
         StatusText.Foreground = (Brush)new StatusToBrushConverter().Convert(draft ? "Draft" : "Completed", typeof(Brush), "Foreground", Italian);
+        SdiPanel.Visibility = draft ? Visibility.Collapsed : Visibility.Visible;
+        if (_invoice is not null && !draft)
+        {
+            SdiStatusText.Text = $"Stato SdI: {SdiStatusLabel(_invoice.SdiStatus)}";
+            SdiStatusUpdatedText.Text = _invoice.SdiStatusUpdatedAt is { } updatedAt
+                ? $"Aggiornato {updatedAt.ToLocalTime():dd/MM/yyyy HH:mm} · {_invoice.SdiUpdatedBy ?? ""} · {_invoice.SdiMessage ?? ""}"
+                : "Invio tramite portale o intermediario";
+            SdiTransmissionIdBox.Text = _invoice.SdiTransmissionId ?? string.Empty;
+            SdiMessageBox.Text = _invoice.SdiMessage ?? string.Empty;
+            SubmitSdiButton.Visibility = _invoice.SdiProviderConfigured && _invoice.SdiStatus is "NotSent" or "Rejected" or "DeliveryFailed"
+                ? Visibility.Visible : Visibility.Collapsed;
+            SdiNextStatusCombo.Items.Clear();
+            foreach (var status in new[] { "Submitted", "Accepted", "Rejected", "DeliveryFailed" })
+            {
+                if (CanTransitionSdi(_invoice.SdiStatus, status))
+                {
+                    SdiNextStatusCombo.Items.Add(new ComboBoxItem { Content = SdiStatusLabel(status), Tag = status });
+                }
+            }
+
+            SdiNextStatusCombo.SelectedIndex = SdiNextStatusCombo.Items.Count > 0 ? 0 : -1;
+        }
+
         HeaderPanel.IsEnabled = draft;
         CustomerCombo.IsEnabled = _invoice is null;
         LineTools.Visibility = draft ? Visibility.Visible : Visibility.Collapsed;
@@ -96,6 +119,50 @@ public partial class InvoiceWindow : Window
         XmlButton.ToolTip = draft ? "Disponibile dopo l'emissione" : "File da caricare sul portale Fatture e Corrispettivi o da dare al commercialista";
         PdfButton.IsEnabled = _invoice is not null;
         UpdateTotals();
+    }
+
+    private static string SdiStatusLabel(string status) => status switch
+    {
+        "Submitted" => "Inviata",
+        "Accepted" => "Accettata",
+        "Rejected" => "Scartata",
+        "DeliveryFailed" => "Consegna fallita",
+        _ => "Non inviata"
+    };
+
+    private static bool CanTransitionSdi(string current, string next) => (current, next) switch
+    {
+        ("NotSent", "Submitted") => true,
+        ("Submitted", "Accepted" or "Rejected" or "DeliveryFailed") => true,
+        ("Rejected" or "DeliveryFailed", "Submitted") => true,
+        _ => false
+    };
+
+    private async void SubmitSdi_Click(object sender, RoutedEventArgs e)
+    {
+        await RunAsync(async () =>
+        {
+            Show(await _apiClient.SubmitInvoiceToSdiAsync(_invoiceId!.Value));
+            Changed = true;
+            return true;
+        });
+    }
+
+    private async void RecordSdiStatus_Click(object sender, RoutedEventArgs e)
+    {
+        if (SdiNextStatusCombo.SelectedItem is not ComboBoxItem { Tag: string status })
+        {
+            ErrorText.Text = "Non ci sono transizioni SdI disponibili.";
+            return;
+        }
+
+        await RunAsync(async () =>
+        {
+            Show(await _apiClient.RecordInvoiceSdiStatusAsync(
+                _invoiceId!.Value, status, SdiTransmissionIdBox.Text, SdiMessageBox.Text));
+            Changed = true;
+            return true;
+        });
     }
 
     private void UpdateTotals()

@@ -12,6 +12,7 @@
     </div>
     <div class="actions">
         <button class="primary" @onclick="LoadAsync">Ricalcola</button>
+        <button class="secondary" disabled="@(_creatingOrders || _run is null)" @onclick="CreateOrdersAsync">Crea ordini dalle proposte</button>
     </div>
 </div>
 
@@ -29,6 +30,10 @@ else if (_run is null)
 }
 else
 {
+    @if (_orderMessage is not null)
+    {
+        <div class="card state"><strong>Ordini creati</strong> @_orderMessage</div>
+    }
     <div class="kpis">
         <div class="card kpi"><div class="label">Commesse considerate</div><div class="value">@_run.WorkOrdersConsidered</div></div>
         <div class="card kpi"><div class="label">Materiali in distinta</div><div class="value">@_run.Materials</div></div>
@@ -52,6 +57,9 @@ else
                             <th class="num">In ordine</th>
                             <th class="num">Netto</th>
                             <th class="num">Proposta</th>
+                            <th>Fornitore</th>
+                            <th class="num">Lead time (gg)</th>
+                            <th>Ordine entro</th>
                             <th>Commesse</th>
                         </tr>
                     </thead>
@@ -65,6 +73,9 @@ else
                                 <td data-label="In ordine" class="num">@s.OnOrder.ToString("N2", Labels.Italian)</td>
                                 <td data-label="Netto" class="num">@s.NetRequirement.ToString("N2", Labels.Italian)</td>
                                 <td data-label="Proposta" class="num"><strong>@s.SuggestedQuantity.ToString("N2", Labels.Italian)</strong></td>
+                                <td data-label="Fornitore" class="muted">@(s.SupplierName ?? "—")</td>
+                                <td data-label="Lead time" class="num">@(s.LeadTimeDays?.ToString("N0", Labels.Italian) ?? "—")</td>
+                                <td data-label="Ordine entro" class="muted">@(s.SuggestedOrderDate?.ToLocalTime().ToString("d", Labels.Italian) ?? "—")</td>
                                 <td data-label="Commesse" class="muted">@string.Join(", ", s.WorkOrders.Select(w => w.WorkOrderCode).Distinct().Take(5))</td>
                             </tr>
                         }
@@ -79,7 +90,9 @@ else
 @code {
     private MrpRun? _run;
     private string? _error;
+    private string? _orderMessage;
     private bool _onlyShortage = true;
+    private bool _creatingOrders;
 
     protected override Task OnInitializedAsync() =>
         Session.Role is "Admin" or "Purchasing" or "Management" ? LoadAsync() : Task.CompletedTask;
@@ -87,6 +100,7 @@ else
     private async Task LoadAsync()
     {
         _error = null;
+        _orderMessage = null;
         _run = null;
         try
         {
@@ -95,6 +109,38 @@ else
         catch (Exception ex)
         {
             _error = ex.Message;
+        }
+    }
+
+    private async Task CreateOrdersAsync()
+    {
+        _error = null;
+        _orderMessage = null;
+        _creatingOrders = true;
+        try
+        {
+            var result = await Api.PostAsync<CreateMrpOrdersResponse>(
+                "api/procurement/mrp/create-orders",
+                new CreateMrpOrdersRequest(null));
+            var summary = result.OrdersCreated == 0
+                ? "Nessun ordine creato."
+                : $"{result.OrdersCreated} ordini in bozza: {string.Join(", ", result.Orders.Select(o => o.Code))}.";
+            if (result.SkippedMaterialCodes.Count > 0)
+            {
+                summary += $" Saltati (senza fornitore o materiale sconosciuto): {string.Join(", ", result.SkippedMaterialCodes.Take(8))}"
+                    + (result.SkippedMaterialCodes.Count > 8 ? "…" : ".");
+            }
+
+            await LoadAsync();
+            _orderMessage = summary;
+        }
+        catch (Exception ex)
+        {
+            _error = ex.Message;
+        }
+        finally
+        {
+            _creatingOrders = false;
         }
     }
 }

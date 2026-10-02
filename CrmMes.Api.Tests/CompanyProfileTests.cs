@@ -71,6 +71,19 @@ public class CompanyProfileTests : IClassFixture<AdminSeededApiTestFixture>
     }
 
     [Fact]
+    public async Task LocaleAndCurrency_RoundTripOnSave()
+    {
+        var saved = await SaveAsync(new SaveCompanyProfileRequest(
+            "Locale Test srl", null, null, null, null, "generic", ["sales"], null, "en-US", "USD"));
+        Assert.Equal("en-US", saved.Locale);
+        Assert.Equal("USD", saved.Currency);
+
+        var reloaded = await _adminClient.GetFromJsonAsync<CompanyProfileResponse>("/api/company-profile");
+        Assert.Equal("en-US", reloaded!.Locale);
+        Assert.Equal("USD", reloaded.Currency);
+    }
+
+    [Fact]
     public async Task Catalog_EverySectorPresetUsesKnownModules()
     {
         var catalog = await _adminClient.GetFromJsonAsync<CompanyCatalogResponse>("/api/company-profile/catalog");

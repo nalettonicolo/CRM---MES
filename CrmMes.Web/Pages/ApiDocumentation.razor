@@ -1,0 +1,40 @@
+@page "/documentazione-api"
+@inject Session Session
+@inject NavigationManager Nav
+
+<PageTitle>Documentazione API · Nicolò MES</PageTitle>
+
+<div class="page-head">
+    <div>
+        <div class="eyebrow">Amministrazione</div>
+        <h1>Documentazione API REST</h1>
+        <p class="sub">Endpoint OpenAPI (Swagger) del server Nicolò MES.</p>
+    </div>
+</div>
+
+@if (!Session.IsAdmin)
+{
+    <div class="card state"><strong>Accesso riservato</strong>Solo gli Admin possono aprire la documentazione API.</div>
+}
+else
+{
+    <div class="card card-pad stack">
+        <p>
+            L'API è protetta da autenticazione <strong>JWT Bearer</strong>: dopo il login da
+            <code>POST /api/auth/login</code> (o refresh) usa l'header
+            <code>Authorization: Bearer &lt;token&gt;</code> su ogni richiesta.
+        </p>
+        <p>
+            I ruoli e le policy (Admin, Warehouse, Sales, …) determinano quali endpoint rispondono;
+            un 403 indica permessi insufficienti per l'operazione richiesta.
+        </p>
+        <div class="actions">
+            <a class="button primary" href="@SwaggerHref" target="_blank" rel="noopener">Apri Swagger UI</a>
+        </div>
+        <p class="muted small">Swagger è servito dallo stesso host dell'applicazione (<code>/swagger</code>).</p>
+    </div>
+}
+
+@code {
+    private string SwaggerHref => new Uri(new Uri(Nav.BaseUri), "../swagger/index.html").ToString();
+}
