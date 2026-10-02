@@ -75,6 +75,9 @@ public class ApplicationDbContext : DbContext
     public DbSet<InvoiceLine> InvoiceLines => Set<InvoiceLine>();
     public DbSet<InvoiceTransportDocument> InvoiceTransportDocuments => Set<InvoiceTransportDocument>();
     public DbSet<CustomerFiscalData> CustomerFiscalData => Set<CustomerFiscalData>();
+    public DbSet<PurchaseInvoice> PurchaseInvoices => Set<PurchaseInvoice>();
+    public DbSet<PurchaseInvoiceLine> PurchaseInvoiceLines => Set<PurchaseInvoiceLine>();
+    public DbSet<PaymentScheduleEntry> PaymentScheduleEntries => Set<PaymentScheduleEntry>();
     public DbSet<MachineConnection> MachineConnections => Set<MachineConnection>();
     public DbSet<MachineEvent> MachineEvents => Set<MachineEvent>();
     public DbSet<EnergyProject> EnergyProjects => Set<EnergyProject>();
@@ -638,6 +641,52 @@ public class ApplicationDbContext : DbContext
             entity.Property(f => f.City).HasMaxLength(60);
             entity.Property(f => f.Province).HasMaxLength(2);
             entity.Property(f => f.Country).HasMaxLength(2);
+        });
+
+        modelBuilder.Entity<PurchaseInvoice>(entity =>
+        {
+            entity.HasIndex(i => i.ContentHash).IsUnique();
+            entity.HasIndex(i => new { i.SupplierVat, i.DocumentNumber, i.DocumentDate });
+            entity.Property(i => i.DocumentNumber).HasMaxLength(50);
+            entity.Property(i => i.DocumentType).HasMaxLength(4);
+            entity.Property(i => i.SupplierName).HasMaxLength(200);
+            entity.Property(i => i.SupplierVat).HasMaxLength(20);
+            entity.Property(i => i.PaymentMethod).HasMaxLength(4);
+            entity.Property(i => i.Currency).HasMaxLength(3);
+            entity.Property(i => i.Notes).HasMaxLength(2000);
+            entity.Property(i => i.ContentHash).HasMaxLength(64);
+            entity.Property(i => i.OriginalFileName).HasMaxLength(260);
+            entity.Property(i => i.ImportedBy).HasMaxLength(200);
+            entity.HasOne(i => i.Supplier).WithMany().HasForeignKey(i => i.SupplierId).OnDelete(DeleteBehavior.SetNull);
+            entity.HasMany(i => i.Lines).WithOne(l => l.PurchaseInvoice).HasForeignKey(l => l.PurchaseInvoiceId).OnDelete(DeleteBehavior.Cascade);
+            entity.HasMany(i => i.Schedule).WithOne(s => s.PurchaseInvoice).HasForeignKey(s => s.PurchaseInvoiceId).OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<PurchaseInvoiceLine>(entity =>
+        {
+            entity.Property(l => l.Code).HasMaxLength(100);
+            entity.Property(l => l.Description).HasMaxLength(1000);
+            entity.Property(l => l.Quantity).HasPrecision(18, 3);
+            entity.Property(l => l.Unit).HasMaxLength(10);
+            entity.Property(l => l.UnitPrice).HasPrecision(18, 4);
+            entity.Property(l => l.DiscountPercent).HasPrecision(6, 2);
+            entity.Property(l => l.VatRate).HasPrecision(6, 2);
+            entity.Property(l => l.VatNature).HasMaxLength(5);
+        });
+
+        modelBuilder.Entity<PaymentScheduleEntry>(entity =>
+        {
+            entity.HasIndex(e => new { e.Direction, e.Status, e.DueDate });
+            entity.HasIndex(e => e.InvoiceId);
+            entity.Property(e => e.Direction).HasMaxLength(20);
+            entity.Property(e => e.Status).HasMaxLength(20);
+            entity.Property(e => e.Amount).HasPrecision(18, 2);
+            entity.Property(e => e.Currency).HasMaxLength(3);
+            entity.Property(e => e.CounterpartyName).HasMaxLength(200);
+            entity.Property(e => e.Description).HasMaxLength(500);
+            entity.Property(e => e.PaidBy).HasMaxLength(200);
+            entity.Property(e => e.ReminderNote).HasMaxLength(500);
+            entity.HasOne(e => e.Invoice).WithMany().HasForeignKey(e => e.InvoiceId).OnDelete(DeleteBehavior.Cascade);
         });
 
         modelBuilder.Entity<MachineConnection>(entity =>

@@ -1,0 +1,63 @@
+@page "/spedizioni"
+@inject Api Api
+@inject NavigationManager Nav
+
+<PageTitle>Spedizioni · Nicolò MES</PageTitle>
+
+<div class="page-head">
+    <div>
+        <div class="eyebrow">Spedizioni</div>
+        <h1>Spedizioni</h1>
+        <p class="sub">Ingressi e uscite con corriere, distinti dai DDT. Creazione e avanzamento dal programma desktop.</p>
+    </div>
+</div>
+
+<div class="card">
+    @if (_error is not null)
+    {
+        <div class="state"><strong>@Labels.LoadFailed("le spedizioni")</strong>@_error
+            <div class="actions"><button class="secondary small" @onclick="LoadAsync">@Labels.Retry</button></div></div>
+    }
+    else if (_rows is null)
+    {
+        <div class="state">@Labels.Loading</div>
+    }
+    else if (_rows.Count == 0)
+    {
+        <div class="state">Nessuna spedizione.</div>
+    }
+    else
+    {
+        <div class="table-wrap">
+            <table class="cards">
+                <thead><tr><th>Codice</th><th>Direzione</th><th>Corriere</th><th>Tracking</th><th>Stato</th></tr></thead>
+                <tbody>
+                    @foreach (var row in _rows)
+                    {
+                        <tr class="link" @onclick="@(() => Nav.NavigateTo($"spedizioni/{row.Id}"))">
+                            <td data-label="Codice" class="code">@row.Code</td>
+                            <td data-label="Direzione">@Labels.ShipmentDirection(row.Direction)</td>
+                            <td data-label="Corriere">@row.CarrierName</td>
+                            <td data-label="Tracking">@(row.TrackingNumber ?? "—")</td>
+                            <td data-label="Stato"><span class="badge @Labels.ShipmentStatusClass(row.Status)">@Labels.ShipmentStatus(row.Status)</span></td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    }
+</div>
+
+@code {
+    private List<ShipmentSummary>? _rows;
+    private string? _error;
+
+    protected override Task OnInitializedAsync() => LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        _error = null;
+        try { _rows = await Api.GetAsync<List<ShipmentSummary>>("api/shipments"); }
+        catch (ApiException exception) { _error = exception.Message; }
+    }
+}

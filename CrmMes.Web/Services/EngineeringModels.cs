@@ -3,6 +3,8 @@ namespace CrmMes.Web.Services;
 public sealed record TechnicalDocument(Guid Id, Guid ProductId, int? StepSequence, string Kind, string KindName, string Title, string FileName,
     string ContentType, long SizeBytes, int Version, string? VersionNote, bool IsCurrent, string? UploadedBy, DateTime UploadedAt);
 
+public sealed record WorkOrderPhaseDocuments(Guid OperationId, List<TechnicalDocument> Documents);
+
 public sealed record ProductListItem(Guid Id, string Code, string Name, bool IsActive, int BomItemCount, int RoutingStepCount);
 
 public sealed record ProductBomItem(Guid Id, string MaterialCode, decimal Quantity, string? Notes);

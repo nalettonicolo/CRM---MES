@@ -194,6 +194,29 @@ public class TransportDocumentsTests : IClassFixture<AdminSeededApiTestFixture>
     }
 
     [Fact]
+    public async Task Issue_WithCatalogMaterial_DeductsStock_AndCancelRestoresIt()
+    {
+        var code = $"MAT-{Guid.NewGuid():N}"[..12];
+        var created = await _adminClient.PostAsJsonAsync("/api/materials", new CreateMaterialRequest(code, $"Staffa {code}", "pz", 40, 0));
+        created.EnsureSuccessStatusCode();
+        var material = (await created.Content.ReadFromJsonAsync<MaterialResponse>())!;
+
+        var draft = await CreateAsync(SaleRequest(
+            new SaveTransportDocumentLineRequest(material.Id, null, material.Code, material.Name, 12, "pz", null, null)));
+        var issued = await IssueAsync(draft.Id);
+        Assert.Equal("Issued", issued.Status);
+
+        var afterIssue = (await _adminClient.GetFromJsonAsync<MaterialResponse>($"/api/materials/{material.Id}"))!;
+        Assert.Equal(28, afterIssue.Stock);
+
+        var cancel = await _adminClient.PostAsJsonAsync($"/api/transport-documents/{issued.Id}/cancel",
+            new CancelTransportDocumentRequest("sbagliato destinatario"));
+        cancel.EnsureSuccessStatusCode();
+        var afterCancel = (await _adminClient.GetFromJsonAsync<MaterialResponse>($"/api/materials/{material.Id}"))!;
+        Assert.Equal(40, afterCancel.Stock);
+    }
+
+    [Fact]
     public async Task Operator_CanReadButNotWriteTransportDocuments()
     {
         var auth = await TestAuth.CreateUserWithRoleAsync(_fixture.Factory, _fixture.Admin.Token, "Operator", "ddt-op");

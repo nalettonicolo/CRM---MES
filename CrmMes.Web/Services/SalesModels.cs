@@ -23,7 +23,8 @@ public sealed record QuoteItem(
 public sealed record Quote(
     Guid Id, string Code, Guid CustomerId, string CustomerName, string CustomerCode, string Status,
     DateTime? ValidUntil, string? Notes, DateTime CreatedAt, DateTime? SentAt, DateTime? AcceptedAt,
-    DateTime? RejectedAt, DateTime? ConvertedAt, decimal Total, List<QuoteItem> Items);
+    DateTime? RejectedAt, DateTime? ConvertedAt, decimal Total, List<QuoteItem> Items,
+    List<ConvertedWorkOrder>? WorkOrders = null);
 
 public sealed record ConvertedWorkOrder(Guid Id, string Code, string ProductCode, decimal Quantity);
 

@@ -105,6 +105,65 @@ public class SupplierCatalogImportTests : IClassFixture<AdminSeededApiTestFixtur
     }
 
     [Fact]
+    public async Task ImportMetel_CreatesMaterialsFromADelimitedListino()
+    {
+        var suffix = Guid.NewGuid().ToString("N")[..6].ToUpperInvariant();
+        var csv = "Marca;Codice;Descrizione;UM;Prezzo;EAN\n" +
+                  $"ABB;1S-{suffix};Interruttore {suffix};PZ;8,40;8012345678901\n";
+        using var content = BuildFileContent(Encoding.UTF8.GetBytes(csv), "listino.txt", "text/plain");
+        content.Add(new StringContent($"SUP-{suffix}"), "supplierCode");
+        content.Add(new StringContent("Elettroforniture spa"), "supplierName");
+
+        var response = await _adminClient.PostAsync("/api/supplier-catalog/import-metel", content);
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var summary = await response.Content.ReadFromJsonAsync<ImportSummary>();
+        Assert.Equal(1, summary!.Imported);
+        Assert.Equal(1, summary.CreatedMaterials);
+
+        var found = await _adminClient.GetFromJsonAsync<List<CatalogSearchResultResponse>>(
+            $"/api/supplier-catalog/search?q=1S-{suffix}");
+        var row = Assert.Single(found!);
+        Assert.Equal($"SUP-{suffix}", row.SupplierCode);
+        Assert.Equal($"1S-{suffix}", row.PartNumber);
+        Assert.Equal(8.40m, row.UnitPrice);
+    }
+
+    [Fact]
+    public async Task ImportMetel_WhenTheModuleIsOff_IsRejected()
+    {
+        var previous = await _adminClient.GetFromJsonAsync<CompanyProfileResponse>("/api/company-profile");
+        try
+        {
+            var save = await _adminClient.PutAsJsonAsync("/api/company-profile", new SaveCompanyProfileRequest(
+                "Officina Test Metel", null, null, null, null, "mechanical", ["purchasing"]));
+            save.EnsureSuccessStatusCode();
+
+            var csv = "Marca;Codice;Descrizione;UM;Prezzo\nABB;X1;Interruttore;PZ;1\n";
+            using var content = BuildFileContent(Encoding.UTF8.GetBytes(csv), "listino.txt", "text/plain");
+            var response = await _adminClient.PostAsync("/api/supplier-catalog/import-metel", content);
+            Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+            Assert.Contains("Listini Metel", await response.Content.ReadAsStringAsync());
+        }
+        finally
+        {
+            if (previous is not null)
+            {
+                await _adminClient.PutAsJsonAsync("/api/company-profile", new SaveCompanyProfileRequest(
+                    string.IsNullOrWhiteSpace(previous.CompanyName) ? "Azienda test" : previous.CompanyName,
+                    previous.VatNumber, previous.Address, previous.Phone, previous.Email, previous.Sector, previous.EnabledModules));
+            }
+        }
+    }
+
+    [Fact]
+    public async Task ImportMetel_EmptyFile_ReturnsBadRequest()
+    {
+        using var content = BuildFileContent(Encoding.UTF8.GetBytes("\n"), "listino.txt", "text/plain");
+        var response = await _adminClient.PostAsync("/api/supplier-catalog/import-metel", content);
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+    }
+
+    [Fact]
     public async Task ImportExcel_MissingRequiredColumns_ReturnsBadRequest()
     {
         using var workbook = new XLWorkbook();

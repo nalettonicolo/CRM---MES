@@ -3,6 +3,8 @@ using System.Net.Http.Json;
 using CrmMes.Api.Controllers;
 using CrmMes.Api.Services;
 using CrmMes.Core.Models;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace CrmMes.Api.Tests;
 
@@ -344,6 +346,33 @@ public class SiteReportTests : FoodAndSiteTestBase
         Assert.Contains(costing.Materials, m => m.MaterialCode == cable.Code && m.Quantity == 35);
         Assert.Contains(costing.Materials, m => m.MaterialCode == "Tasselli 8 mm" && m.UnpricedQuantity == 20);
         Assert.DoesNotContain(costing.Warnings, w => w.Contains("Nessuna distinta di prelievo"));
+    }
+
+    [Fact]
+    public async Task SignedReport_DeductsWarehouseStock_WhenNotAlreadyPicked()
+    {
+        var suffix = Suffix();
+        var cable = await CreateMaterialAsync($"CAV-{suffix}", "Cavo FG16 3x2,5", "m");
+        using (var scope = Fixture.Factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<CrmMes.Core.Data.ApplicationDbContext>();
+            var material = await db.Materials.SingleAsync(m => m.Id == cable.Id);
+            material.Stock = 80;
+            await db.SaveChangesAsync();
+        }
+
+        var product = await CreateProductAsync($"IMP-{suffix}");
+        var customer = await CreateCustomerAsync($"Condominio {suffix}");
+        var order = await CreateWorkOrderAsync(product.Id, 1, customer.Id);
+        var draft = (await (await Admin.PostAsJsonAsync("/api/site-reports", new SaveSiteReportRequest(
+            order.Id, DateTime.UtcNow.Date, null, "Posa cavo", null,
+            [new SiteReportHoursRequest("Luca Bassi", null, 60)],
+            [new SiteReportMaterialRequest(cable.Code, null, 35, null)]))).Content.ReadFromJsonAsync<SiteReportResponse>())!;
+        (await Admin.PostAsJsonAsync($"/api/site-reports/{draft.Id}/sign", new SignSiteReportRequest("Mario Rossi", BigSignature())))
+            .EnsureSuccessStatusCode();
+
+        var after = (await Admin.GetFromJsonAsync<MaterialResponse>($"/api/materials/{cable.Id}"))!;
+        Assert.Equal(45, after.Stock);
     }
 
     [Fact]

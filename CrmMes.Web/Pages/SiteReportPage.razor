@@ -1,0 +1,103 @@
+@page "/cantiere/{Id:guid}"
+@inject Api Api
+
+<PageTitle>@(_report?.Code ?? "Rapportino") · Nicolò MES</PageTitle>
+
+<div class="page-head">
+    <div>
+        <div class="eyebrow"><a href="cantiere">Rapportini cantiere</a></div>
+        <h1>@(_report is null ? "Rapportino" : $"Rapportino {_report.Code}")</h1>
+        @if (_report is not null)
+        {
+            <p class="sub"><a href="commesse/@_report.WorkOrderId" class="code">@_report.WorkOrderCode</a> · @(_report.CustomerName ?? "—")</p>
+        }
+    </div>
+    @if (_report is not null)
+    {
+        <span class="badge @Labels.SiteReportStatusClass(_report.Status)">@Labels.SiteReportStatus(_report.Status)</span>
+    }
+</div>
+
+@if (_error is not null)
+{
+    <div class="card state"><strong>Impossibile aprire il rapportino</strong>@_error</div>
+}
+else if (_report is null)
+{
+    <div class="card state">@Labels.Loading</div>
+}
+else
+{
+    <div class="stack">
+        <div class="card card-pad">
+            <div class="facts">
+                <div class="fact"><div class="label">Data</div><div class="value">@Labels.Date(_report.WorkDate)</div></div>
+                <div class="fact"><div class="label">Cantiere</div><div class="value">@(_report.SiteAddress ?? "—")</div></div>
+                <div class="fact"><div class="label">Firmato da</div><div class="value">@(_report.SignedByName ?? "—")</div></div>
+                <div class="fact"><div class="label">Firma</div><div class="value">@Labels.DateTime(_report.SignedAt)</div></div>
+            </div>
+            <p>@_report.Description</p>
+            @if (!string.IsNullOrWhiteSpace(_report.Notes))
+            {
+                <p class="muted small">@_report.Notes</p>
+            }
+        </div>
+        <div class="card">
+            <div class="section-head"><h2>Ore</h2></div>
+            <div class="table-wrap">
+                <table class="cards">
+                    <thead><tr><th>Tecnico</th><th>Centro</th><th class="num">Minuti</th></tr></thead>
+                    <tbody>
+                        @foreach (var hours in _report.Hours)
+                        {
+                            <tr>
+                                <td data-label="Tecnico">@hours.TechnicianName</td>
+                                <td data-label="Centro">@(hours.WorkCenterName ?? "—")</td>
+                                <td data-label="Minuti" class="num">@Labels.Number(hours.Minutes)</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        <div class="card">
+            <div class="section-head"><h2>Materiali</h2></div>
+            @if (_report.Materials.Count == 0)
+            {
+                <div class="state">Nessun materiale.</div>
+            }
+            else
+            {
+                <div class="table-wrap">
+                    <table class="cards">
+                        <thead><tr><th>Codice</th><th>Descrizione</th><th class="num">Quantità</th></tr></thead>
+                        <tbody>
+                            @foreach (var line in _report.Materials)
+                            {
+                                <tr>
+                                    <td data-label="Codice" class="code">@(line.MaterialCode ?? "—")</td>
+                                    <td data-label="Descrizione">@line.Description</td>
+                                    <td data-label="Quantità" class="num">@Labels.Number(line.Quantity) @line.Unit</td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            }
+        </div>
+    </div>
+}
+
+@code {
+    [Parameter] public Guid Id { get; set; }
+    private SiteReportDetail? _report;
+    private string? _error;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        _report = null;
+        _error = null;
+        try { _report = await Api.GetAsync<SiteReportDetail>($"api/site-reports/{Id}"); }
+        catch (ApiException exception) { _error = exception.Message; }
+    }
+}

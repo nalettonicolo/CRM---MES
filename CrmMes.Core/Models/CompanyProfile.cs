@@ -55,6 +55,17 @@ public class CompanyProfile
     public string? LicensePublicKey { get; set; }
     public DateTime? LicenseCheckedAt { get; set; }
 
+    /// <summary>Declaration for Transizione 5.0 / iperammortamento perizie: share of substantial software
+    /// development attributable to EU/EEA (percent), places of development, and who signs for the producer.</summary>
+    public decimal SoftwareEuDevelopmentPercent { get; set; } = 100m;
+    public string SoftwareDevelopmentPlaces { get; set; } = "Italia";
+    public string? SoftwareOriginSignatory { get; set; }
+    public DateTime? SoftwareOriginUpdatedAt { get; set; }
+
+    /// <summary>Company visual theme as JSON (colours, radius, density). Empty = Officina defaults.
+    /// See UiTheme in CrmMes.Api.</summary>
+    public string UiTheme { get; set; } = string.Empty;
+
     public DateTime ConfiguredAt { get; set; } = DateTime.UtcNow;
     public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
 }

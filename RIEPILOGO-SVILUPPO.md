@@ -1,10 +1,23 @@
 ﻿# Riepilogo sviluppi e stato del progetto
 
-Aggiornato: 2026-09-29
+Aggiornato: 2026-10-02
 
-Sintesi ad alto livello di cosa è stato costruito finora e cosa manca ancora. Per il dettaglio fase-per-fase con motivazioni tecniche vedi [DEVELOPMENT-PLAN.md](DEVELOPMENT-PLAN.md); per la mappa di file e architettura vedi [PROJECT-MAP.md](PROJECT-MAP.md).
+Sintesi ad alto livello di cosa è stato costruito finora e cosa manca ancora. Per il dettaglio fase-per-fase con motivazioni tecniche vedi [DEVELOPMENT-PLAN.md](DEVELOPMENT-PLAN.md); per la mappa di file e architettura vedi [PROJECT-MAP.md](PROJECT-MAP.md). Per la sessione in corso e i passi successivi vedi [HANDOFF-CLAUDE.md](HANDOFF-CLAUDE.md) e [STATO-PROGETTO.md](STATO-PROGETTO.md).
 
 ## Cosa è stato fatto
+
+### Aspetto grafico azienda e chiusura contro di mercato (2026-10-02, pubblicato su main)
+- **Aspetto grafico**: strumento Admin per personalizzare colori, angoli, densità dei campi e sfondo di tutta l'azienda (web e desktop). Cinque palette di partenza (Officina, Carbone, Carta, Blu tecnico, Verde officina); poi ogni colore e la forma dei campi si regolano a mano. Anteprima immediata; Salva scrive su `CompanyProfile.UiTheme` (JSON). Migrazione `AddUiTheme` applicata su Neon produzione.
+  - API: `GET/PUT api/company-profile/theme` (scrittura solo Admin).
+  - Web: `/aspetto`; variabili CSS applicate al login (`nicolomes.applyTheme`); il tema salvato vince sul tema scuro automatico del sistema.
+  - Desktop: finestra «Aspetto grafico» in Amministrazione; `ThemeApplier` aggiorna i brush a runtime (stili su DynamicResource).
+  - Test: `UiThemeTests` 5/5.
+- **G8 — Fatture passive e scadenziario** (gate chiuso): import XML FatturaPA, scadenziario incassi/pagamenti con solleciti; migrazione `AddPayables` su Neon; test `PayablesTests` 5/5. UI desktop: «Fatture passive», «Scadenziario».
+- **OEE cruscotto dai dati macchina**: se nel periodo ci sono letture `MachineEvents`, disponibilità e qualità usano i dati macchina (fonte `Declared` / `Hybrid` / `Machine`); la performance resta dalle fasi dichiarate. Hint su web e desktop.
+- **Dichiarazione origine UE del software** (perizia / Transizione 5.0 Allegato V): campi su profilo azienda, `GET/PUT api/company-profile/software-origin`, pagina web `/origine-software` stampabile; soglia ≥ 50% UE/SEE. Migrazione `AddSoftwareOriginDeclaration` su Neon; test `SoftwareOriginTests` 3/3.
+- **G10 — MRP base** (gate chiuso con nota): `GET api/procurement/mrp` esplode le distinte delle commesse aperte, sottrae giacenza e residuo ordini fornitore, propone quantità (anche MinStock). Web `/mrp`. Resta: creazione automatica ordini dalle proposte, lead time, esplosione multi-livello.
+- **Analisi di mercato** aggiornata in [ANALISI-MERCATO-MES.md](ANALISI-MERCATO-MES.md) (mercato IT ~120 M€ al 2027, iperammortamento, Made-in-EU).
+- Blocco pubblicato su `main` il 02/10/2026 dopo verifica delle migrazioni Neon; test mirati 14/14 e suite completa 586/586.
 
 ### Piattaforma web, canali di accesso, basi per server del cliente e teleassistenza (2026-09-30, da pubblicare)
 - **Piattaforma web** (progetto `CrmMes.Web`, Blazor WebAssembly) servita dall'API su `/app/`: login con canale "web", rinnovo automatico della sessione (una sola volta anche con più richieste insieme), sessione nella scheda del browser (si chiude con la scheda). Pagine: cruscotto, commesse con ricerca per ultime cifre, dettaglio commessa con fasi e lotti, materiali, canali di accesso. Stati di caricamento, vuoto ed errore su ogni pagina; tabelle che diventano schede sul telefono; tema chiaro e scuro; nessuno stile o script in linea.
@@ -49,7 +62,7 @@ Sintesi ad alto livello di cosa è stato costruito finora e cosa manca ancora. P
 
 ### Multi-settore: configurazione iniziale e moduli (2026-09-29)
 - **Configurazione azienda al primo accesso dell'Admin** (rimandabile, poi da Amministrazione > "Azienda e settore"): ragione sociale, partita IVA, indirizzo e contatti (stampati su DDT e dichiarazioni), **settore** e **moduli attivi**. I settori sono cinque: Quadri elettrici e automazione, Meccanica e carpenteria, Alimentare, Impiantistica e installazioni, Manifattura generica. Il settore è un punto di partenza: attiva i moduli tipici, poi ogni modulo si accende o spegne singolarmente. Spegnere un modulo nasconde menu e pulsanti, non cancella dati; i ruoli restano verificati dall'API.
-- **Moduli comuni**: Vendite, Acquisti, Pianificazione, Terminale di reparto, Qualità, Manutenzione, Spedizioni e DDT, Conto lavoro, Costi e margini. **Moduli di settore**: Verifica quadri CEI EN 61439 (quadristi), Scadenze lotti (alimentare), Listini Metel e Lavori in cantiere (annunciati come "in arrivo", non ancora selezionabili).
+- **Moduli comuni**: Vendite, Acquisti, Pianificazione, Terminale di reparto, Qualità, Manutenzione, Spedizioni e DDT, Conto lavoro, Costi e margini. **Moduli di settore**: Verifica quadri CEI EN 61439, Scadenze lotti, Listini Metel (import ANIE/METEL), Lavori in cantiere, ufficio tecnico, collaudo CE, service, energia.
 - Un'installazione già esistente e non ancora configurata continua a mostrare tutto come prima.
 
 ### Documenti di trasporto (DDT) e conto lavoro (2026-09-29, per tutti i settori)
@@ -175,7 +188,14 @@ Sintesi ad alto livello di cosa è stato costruito finora e cosa manca ancora. P
 
 ## Cosa manca
 
-- **Listini Metel**: serve un file Metel reale di un produttore per costruire e verificare l'importazione; fino ad allora il modulo è "in arrivo".
+- **Pubblicazione su `main` / Render** del lavoro del 02/10 (G8, OEE macchina, origine UE, MRP, aspetto grafico e altro già nel working tree): solo dopo conferma esplicita dell'utente.
+- **G9 — Invio automatico allo SdI**: stati di invio + adattatore intermediario (senza contratto reale = stub/configurazione). La fattura XML si genera già; manca il collegamento automatico.
+- **Collegamento macchine in campo**: gateway OPC UA/MQTT e OEE cruscotto sono pronti; serve una macchina pilota reale e il PC gateway.
+- **G11 — Ubicazioni magazzino** e inventario con barcode.
+- **G12 — Capacità finita** in pianificazione.
+- **Web in scrittura** per anagrafiche e documenti (oggi molte aree web sono in sola lettura); poi IA / SSO / multilingua.
+- **MRP avanzato**: creazione automatica ordini fornitore dalle proposte, lead time, distinta multi-livello (il calcolo fabbisogni base c'è).
+- **Listini Metel**: modulo attivabile; import da tracciato ANIE (record A) o file delimitato. Copertura automatica su file sintetici. Un listino produttore reale resta utile per tarare layout insoliti, non per sbloccare il modulo.
 - **Materiali del rapportino e magazzino**: i materiali installati entrano nel costo della commessa ma non scaricano la giacenza; il carico del furgone si fa con una distinta di prelievo.
 - **Il DDT non muove la giacenza**: registra cosa esce, ma il carico e lo scarico restano quelli di prelievi e ricevimenti.
 - **Password dell'account di sviluppo da cambiare**: le credenziali erano nel codice pubblico fino al 2026-09-29 e restano nella storia di Git (vedi "Verifica di sicurezza").
@@ -183,7 +203,7 @@ Sintesi ad alto livello di cosa è stato costruito finora e cosa manca ancora. P
 - **Firma digitale non ancora attiva**: la pipeline di release è pronta a firmare (vedi sopra), ma senza un certificato di firma del codice — a pagamento, da acquistare presso un'autorità come DigiCert o Sectigo (circa 70-400€/anno) — le release restano non firmate.
 - **Grafana Cloud non ancora collegato**: il logging centralizzato è pronto lato codice, ma serve creare l'account gratuito e impostare `LOKI_URL`/`LOKI_USER`/`LOKI_PASSWORD` su Render per attivarlo davvero.
 - **Modalità offline ancora limitata al Terminale di reparto**: ora coperte quattro azioni (avvia/completa fase, apri/chiudi fermo, non conformità); l'intero client d'ufficio resta online-only. L'infrastruttura è pronta per estenderla oltre, ma non è stata estesa oltre lo scope richiesto.
-- **Pianificazione senza assegnazione automatica delle giacenze**: la board aggrega e mostra le scadenze già esistenti, ma non assegna automaticamente le giacenze in arrivo alla commessa/ordine in attesa né invia notifiche al reparto di riferimento — è un'evoluzione futura separata, più vicina a un motore di allocazione/MRP che a una board di pianificazione.
+- **Hosting a pagamento, referenze clienti, Stripe, branch Neon**: decisioni e acquisti del titolare (non codice).
 - **Velocità percepita — limite del piano gratuito, non del codice**: il cold-start di Render (l'API "dorme" e ci mette secondi a ripartire) è già mitigato da un ping automatico ogni 10 minuti (`keep-alive.yml`), ma resta un limite strutturale del piano Free — solo un piano a pagamento lo elimina del tutto. Le singole schermate del client caricano i dati una volta sola per sessione (non ad ogni cambio scheda) e le nuove finestre di dettaglio usano una sola chiamata API invece di più separate, quindi la parte lato codice è già ottimizzata; un rallentamento percepito altrove andrebbe segnalato con un caso specifico (quale schermata, quale azione) per poter essere indagato.
 
 ## Riferimento rapido gap di mercato
@@ -197,4 +217,17 @@ Dei quattro gap segnalati come "ancora aperti" rispetto ai MES di mercato (Katan
 | Qualità / non conformità (NCM) | ✅ Chiuso, con conteggio reale buone/scartate per singola unità quando la quantità è un numero intero |
 | Barcode/QR e terminale shop floor | ✅ Chiuso (con identificazione operatore via PIN) |
 
-Con la chiusura di Disponibilità e Qualità, il cruscotto ora calcola anche l'**OEE completo** (Disponibilità × Performance × Qualità), non solo la sua componente Performance.
+Con la chiusura di Disponibilità e Qualità, il cruscotto calcola l'**OEE completo** (Disponibilità × Performance × Qualità). Dal 02/10, se ci sono letture macchina nel periodo, disponibilità e qualità possono venire dai dati macchina (fonte Declared / Hybrid / Machine).
+
+Altri punti dell'analisi di mercato aggiornati il 02/10:
+
+| Punto | Stato |
+|---|---|
+| G8 Fatture passive + scadenziario | ✅ Chiuso (da pubblicare su main) |
+| G10 MRP sulle distinte (base) | ✅ Chiuso base; resta PO automatico / multi-livello |
+| Dichiarazione origine UE software | ✅ Chiuso (pagina stampabile) |
+| Aspetto grafico personalizzabile | ✅ Chiuso (Admin, azienda-wide) |
+| G9 SdI automatico | ❌ Aperto |
+| G11 Ubicazioni + barcode inventario | ❌ Aperto |
+| G12 Capacità finita | ❌ Aperto |
+| Collegamento campo OPC/MQTT reale | ❌ Aperto (gateway e OEE pronti) |

@@ -32,6 +32,6 @@ public static class DepartmentFilter
         var workCenterNames = await db.WorkCenters.Where(w => w.AreaId != null && areaIds.Contains(w.AreaId.Value))
             .Select(w => w.Name).ToListAsync(cancellationToken);
         return query.Where(order => (order.AreaId != null && areaIds.Contains(order.AreaId.Value))
-            || order.Operations.Any(op => op.Status != "Completed" && op.WorkCenter != null && workCenterNames.Contains(op.WorkCenter)));
+            || order.Operations.Any(op => op.Status != "Done" && op.WorkCenter != null && workCenterNames.Contains(op.WorkCenter)));
     }
 }

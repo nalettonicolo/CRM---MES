@@ -85,7 +85,21 @@ else
             }
         </div>
 
-        @if (_converted is { Count: > 0 })
+        @if ((_quote.WorkOrders?.Count ?? 0) > 0)
+        {
+            <div class="card">
+                <div class="section-head"><h2>Commesse da questo preventivo</h2></div>
+                <div class="chips">
+                    @foreach (var order in _quote.WorkOrders!)
+                    {
+                        <a href="commesse/@order.Id" class="code">@order.Code</a>
+                    }
+                </div>
+                <p class="small muted">Apri ogni commessa, assegna l'area se manca, poi genera la distinta di prelievo.</p>
+            </div>
+        }
+
+        @if (_converted is { Count: > 0 } && (_quote.WorkOrders is null || _quote.WorkOrders.Count == 0))
         {
             <div class="success" role="status">
                 Commesse create:
@@ -105,6 +119,31 @@ else
             <div class="card card-pad">
                 <h2>@_confirm.Title</h2>
                 <p class="muted">@_confirm.Message</p>
+                @if (_confirm.IsConvert)
+                {
+                    <div class="facts">
+                        <div class="fact">
+                            <div class="label">Area di produzione</div>
+                            <div class="value">
+                                <select @bind="_convertAreaId">
+                                    <option value="">Scegli area (consigliato)</option>
+                                    @foreach (var area in _areas ?? [])
+                                    {
+                                        <option value="@area.Id">@area.Name (@area.Code)</option>
+                                    }
+                                </select>
+                            </div>
+                        </div>
+                        <div class="fact">
+                            <div class="label">Consegna prevista</div>
+                            <div class="value"><input type="date" @bind="_convertDueDate" /></div>
+                        </div>
+                    </div>
+                    @if (_areas is { Count: 0 })
+                    {
+                        <p class="small muted">Nessuna area attiva: le commesse nascono senza area; potrai assegnarla dopo.</p>
+                    }
+                }
                 <div class="actions">
                     <button class="secondary" @onclick="() => _confirm = null" disabled="@_busy">Annulla</button>
                     <button @onclick="_confirm.Run" disabled="@_busy">@(_busy ? "Attendere..." : _confirm.Title)</button>
@@ -128,7 +167,7 @@ else
                 }
                 @if (QuoteRules.CanTurnIntoWorkOrders(_quote, Role))
                 {
-                    <button @onclick="AskConvert">Crea le commesse</button>
+                    <button @onclick="AskConvertAsync">Crea le commesse</button>
                 }
             </div>
         }
@@ -138,13 +177,16 @@ else
 @code {
     [Parameter] public Guid Id { get; set; }
 
-    private sealed record Confirmation(string Title, string Message, Func<Task> Run);
+    private sealed record Confirmation(string Title, string Message, Func<Task> Run, bool IsConvert = false);
 
     private Quote? _quote;
     private string? _error;
     private string? _actionError;
     private Confirmation? _confirm;
     private List<ConvertedWorkOrder>? _converted;
+    private List<AreaRow>? _areas;
+    private string _convertAreaId = "";
+    private DateTime? _convertDueDate;
     private bool _busy;
 
     private string Role => Session.Role;
@@ -177,14 +219,35 @@ else
         "Il preventivo resta in archivio come rifiutato e non si potrà più accettare.",
         () => RunAsync(async () => _quote = await Api.PostAsync<Quote>($"api/quotes/{Id}/reject")));
 
-    private void AskConvert() => _confirm = new("Crea le commesse",
-        $"Viene creata una commessa in bozza per ogni riga con un prodotto ({_quote!.Items.Count(i => i.ProductId is not null)}). Le righe descrittive (trasporto, posa...) restano solo nel preventivo.",
-        () => RunAsync(async () =>
+    private async Task AskConvertAsync()
+    {
+        _actionError = null;
+        try
         {
-            var result = await Api.PostAsync<ConvertQuoteResult>($"api/quotes/{Id}/convert", new { dueDate = (DateTime?)null, areaId = (Guid?)null });
-            _converted = result.WorkOrders;
-            _quote = await Api.GetAsync<Quote>($"api/quotes/{Id}");
-        }));
+            _areas ??= await Api.GetAsync<List<AreaRow>>("api/areas");
+            if (string.IsNullOrEmpty(_convertAreaId) && _areas is { Count: 1 })
+            {
+                _convertAreaId = _areas[0].Id.ToString();
+            }
+        }
+        catch (ApiException exception)
+        {
+            _actionError = exception.Message;
+            return;
+        }
+
+        _confirm = new("Crea le commesse",
+            $"Viene creata una commessa in bozza per ogni riga con un prodotto ({_quote!.Items.Count(i => i.ProductId is not null)}). L'area consente subito la distinta di prelievo. Le righe descrittive restano solo nel preventivo.",
+            () => RunAsync(async () =>
+            {
+                Guid? areaId = Guid.TryParse(_convertAreaId, out var parsed) ? parsed : null;
+                var result = await Api.PostAsync<ConvertQuoteResult>($"api/quotes/{Id}/convert",
+                    new { dueDate = _convertDueDate, areaId });
+                _converted = result.WorkOrders;
+                _quote = await Api.GetAsync<Quote>($"api/quotes/{Id}");
+            }),
+            IsConvert: true);
+    }
 
     private async Task RunAsync(Func<Task> action)
     {

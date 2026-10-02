@@ -117,4 +117,40 @@ public class MachineDataTests : IClassFixture<AdminSeededApiTestFixture>
         Assert.Equal(HttpStatusCode.NoContent, (await _admin.DeleteAsync($"/api/equipment/{equipment.Id}/machine-token")).StatusCode);
         Assert.Equal(HttpStatusCode.Unauthorized, (await anonymous.SendAsync(Push(second.Token, Reading(28, "Running")))).StatusCode);
     }
+
+    [Fact]
+    public async Task Dashboard_UsesMachineAvailability_WhenReadingsExistInPeriod()
+    {
+        var equipment = (await (await _admin.PostAsJsonAsync("/api/equipment", new CreateEquipmentRequest($"Tornio {Guid.NewGuid():N}"[..14], $"TN-{Guid.NewGuid():N}"[..10], null)))
+            .Content.ReadFromJsonAsync<EquipmentResponse>())!;
+        var token = (await (await _admin.PostAsync($"/api/equipment/{equipment.Id}/machine-token", null))
+            .Content.ReadFromJsonAsync<MachineTokenResponse>())!;
+
+        var anonymous = _fixture.Factory.CreateClient();
+        var now = DateTime.UtcNow;
+        var start = now.AddMinutes(-40);
+        MachineReadingRequest Reading(int minute, string state, long? pieces = null, long? scrap = null) =>
+            new(start.AddMinutes(minute), state, pieces, scrap, null, null, null);
+
+        var push = new HttpRequestMessage(HttpMethod.Post, $"/api/machine-data/{equipment.Id}")
+        {
+            Content = JsonContent.Create(new List<MachineReadingRequest>
+            {
+                Reading(0, "Running", 1000, 10),
+                Reading(20, "Idle", 1200, 10),
+                Reading(30, "Running", 1300, 15),
+            }),
+        };
+        push.Headers.Add(MachineDataController.TokenHeader, token.Token);
+        (await anonymous.SendAsync(push)).EnsureSuccessStatusCode();
+
+        var dashboard = (await _admin.GetFromJsonAsync<WorkOrderDashboardResponse>("/api/work-orders/dashboard?days=1"))!;
+        Assert.True(dashboard.MachinesReportingInPeriod >= 1);
+        Assert.NotNull(dashboard.MachineAvailabilityRatio);
+        Assert.True(dashboard.OeeSource is "Machine" or "Hybrid");
+        Assert.Equal(dashboard.MachineAvailabilityRatio, dashboard.AvailabilityRatio);
+        Assert.NotNull(dashboard.MachineQualityRatio);
+        // 300 pieces, 5 scrap → quality 300/305
+        Assert.Equal(Math.Round(300m / 305m, 4), dashboard.MachineQualityRatio);
+    }
 }

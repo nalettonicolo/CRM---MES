@@ -112,6 +112,7 @@ builder.Services.AddAuthorization(options =>
     options.AddPolicy("Warehouse", policy => policy.RequireRole("Admin", "Warehouse"));
     options.AddPolicy("Purchasing", policy => policy.RequireRole("Admin", "Purchasing"));
     options.AddPolicy("PurchasingOrWarehouse", policy => policy.RequireRole("Admin", "Purchasing", "Warehouse"));
+    options.AddPolicy("PurchasingOrSales", policy => policy.RequireRole("Admin", "Purchasing", "Sales", "Management"));
     // Commercial office: customers and quotes. Converting an accepted quote creates work orders, which
     // warehouse/production staff may also do, hence the combined policy for that one action.
     options.AddPolicy("Sales", policy => policy.RequireRole("Admin", "Sales"));
@@ -145,6 +146,7 @@ builder.Services.AddScoped<CrmMes.Api.Services.WithdrawalItemBuilder>();
 builder.Services.AddSingleton<CrmMes.Api.Services.WorkOrderFactory>();
 builder.Services.AddScoped<CrmMes.Api.Services.MaterialPricing>();
 builder.Services.AddScoped<CrmMes.Api.Services.WorkOrderCosting>();
+builder.Services.AddScoped<CrmMes.Api.Services.StockLedger>();
 builder.Services.AddHostedService<CrmMes.Api.Services.KeepWarmService>();
 builder.Services.AddSingleton<CrmMes.Api.Services.LicenseState>();
 builder.Services.AddSingleton<CrmMes.Api.Services.LicenseHeartbeatService>();

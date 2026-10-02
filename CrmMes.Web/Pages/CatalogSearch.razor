@@ -1,0 +1,187 @@
+@page "/catalogo"
+@implements IDisposable
+@inject Api Api
+@inject Session Session
+
+<PageTitle>Ricerca catalogo · Nicolò MES</PageTitle>
+
+<div class="page-head">
+    <div>
+        <div class="eyebrow">Acquisti</div>
+        <h1>Ricerca catalogo</h1>
+        <p class="sub">Part number, descrizione o codice materiale nei listini collegati ai fornitori.</p>
+    </div>
+</div>
+
+<div class="toolbar">
+    <input class="search" type="search" placeholder="Codice, part number o descrizione" aria-label="Cerca nel catalogo"
+           value="@_query" @oninput="OnSearchInput" />
+</div>
+
+<div class="stack">
+<div class="card">
+    @if (_error is not null)
+    {
+        <div class="state"><strong>@Labels.LoadFailed("il catalogo")</strong>@_error
+            <div class="actions"><button class="secondary small" @onclick="() => SearchAsync()">@Labels.Retry</button></div></div>
+    }
+    else if (_results is null)
+    {
+        <div class="state"><strong>Cerca nel catalogo</strong>Scrivi almeno due caratteri. Stessi risultati del programma desktop.</div>
+    }
+    else if (_busy)
+    {
+        <div class="state">@Labels.Loading</div>
+    }
+    else if (_results.Count == 0)
+    {
+        <div class="state"><strong>Nessun risultato</strong>Nessuna voce corrisponde a "@_query".</div>
+    }
+    else
+    {
+        <div class="table-wrap">
+            <table class="cards">
+                <thead><tr><th>Materiale</th><th>Fornitore</th><th>Part number</th><th class="num">Prezzo</th><th class="num">Lead time</th></tr></thead>
+                <tbody>
+                    @foreach (var row in _results)
+                    {
+                        <tr>
+                            <td data-label="Materiale">@row.MaterialName <div class="small muted code">@row.MaterialCode</div></td>
+                            <td data-label="Fornitore"><a href="fornitori/@row.SupplierId">@row.SupplierName</a> <div class="small muted">@row.SupplierCode</div></td>
+                            <td data-label="Part number"><CopyCode Value="@row.PartNumber" /></td>
+                            <td data-label="Prezzo" class="num">@Labels.Money(row.UnitPrice)</td>
+                            <td data-label="Lead time" class="num muted">@(row.LeadTimeDays == 0 ? "—" : Labels.Number(row.LeadTimeDays) + " gg")</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    }
+</div>
+
+@if (Session.HasModule("metel") && PurchasingRules.CanSeeOrders(Session.Role))
+{
+    <div class="card card-pad stack">
+        <div>
+            <h2>Importa listino Metel</h2>
+            <p class="muted small">File ANIE/METEL (.txt o .csv): record fissi tipo A oppure colonne marca, codice, descrizione, UM, prezzo. Se indichi un fornitore, tutto il listino gli viene collegato; altrimenti si usa la marca di ogni riga.</p>
+        </div>
+        <label>Codice fornitore (opzionale)<input @bind="_supplierCode" /></label>
+        <label>Nome fornitore (opzionale)<input @bind="_supplierName" /></label>
+        <InputFile OnChange="PickMetelAsync" accept=".txt,.csv,.met" />
+        @if (_importBusy)
+        {
+            <div class="notice" role="status">@Labels.Loading</div>
+        }
+        @if (_importError is not null)
+        {
+            <div class="alert" role="alert">@_importError</div>
+        }
+        @if (_importOk is not null)
+        {
+            <div class="success" role="status">@_importOk</div>
+        }
+    </div>
+}
+</div>
+
+@code {
+    private string _query = "";
+    private List<CatalogSearchResult>? _results;
+    private bool _busy;
+    private string? _error;
+    private CancellationTokenSource? _wait;
+    private string _supplierCode = "";
+    private string _supplierName = "";
+    private bool _importBusy;
+    private string? _importError;
+    private string? _importOk;
+
+    private async Task OnSearchInput(ChangeEventArgs args)
+    {
+        _query = args.Value as string ?? "";
+        _wait?.Cancel();
+        if (_query.Trim().Length < 2)
+        {
+            _results = null;
+            _error = null;
+            return;
+        }
+
+        _wait = new CancellationTokenSource();
+        var token = _wait.Token;
+        try
+        {
+            await Task.Delay(250, token);
+            await SearchAsync(token);
+        }
+        catch (TaskCanceledException)
+        {
+        }
+    }
+
+    private async Task SearchAsync(CancellationToken cancellationToken = default)
+    {
+        if (_query.Trim().Length < 2)
+        {
+            return;
+        }
+
+        _error = null;
+        _busy = true;
+        try
+        {
+            var found = await Api.GetAsync<List<CatalogSearchResult>>("api/supplier-catalog/search?q=" + Uri.EscapeDataString(_query.Trim()));
+            if (cancellationToken.IsCancellationRequested)
+            {
+                return;
+            }
+
+            _results = found;
+        }
+        catch (ApiException exception)
+        {
+            _error = exception.Message;
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+
+    public void Dispose() => _wait?.Cancel();
+
+    private async Task PickMetelAsync(InputFileChangeEventArgs e)
+    {
+        _importError = null;
+        _importOk = null;
+        var file = e.File;
+        if (file is null)
+        {
+            return;
+        }
+
+        _importBusy = true;
+        try
+        {
+            await using var stream = file.OpenReadStream(25_000_000);
+            using var memory = new MemoryStream();
+            await stream.CopyToAsync(memory);
+            var fields = new Dictionary<string, string?>
+            {
+                ["supplierCode"] = string.IsNullOrWhiteSpace(_supplierCode) ? null : _supplierCode.Trim(),
+                ["supplierName"] = string.IsNullOrWhiteSpace(_supplierName) ? null : _supplierName.Trim(),
+            };
+            var summary = await Api.PostFileAsync<CatalogImportSummary>("api/supplier-catalog/import-metel", memory.ToArray(), file.Name, fields);
+            _importOk = $"Righe importate: {summary.Imported}. Materiali creati: {summary.CreatedMaterials}. Collegamenti catalogo: {summary.CreatedLinks}.";
+        }
+        catch (ApiException exception)
+        {
+            _importError = exception.Message;
+        }
+        finally
+        {
+            _importBusy = false;
+        }
+    }
+}

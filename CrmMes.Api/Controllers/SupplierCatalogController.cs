@@ -2,6 +2,7 @@ using System.Globalization;
 using System.Runtime.CompilerServices;
 using System.Text.RegularExpressions;
 using ClosedXML.Excel;
+using CrmMes.Api.Services;
 using CrmMes.Core.Data;
 using CrmMes.Core.Models;
 using Microsoft.AspNetCore.Authorization;
@@ -192,6 +193,86 @@ public class SupplierCatalogController : ControllerBase
         return Ok(summary);
     }
 
+    /// <summary>ANIE/METEL manufacturer price list. Articles become materials (code = manufacturer code)
+    /// linked to a supplier: either the one sent with the file, or the brand (marca) in each row.</summary>
+    [Authorize(Policy = "PurchasingOrWarehouse")]
+    [HttpPost("import-metel")]
+    [RequestSizeLimit(25_000_000)]
+    public async Task<IActionResult> ImportMetel(
+        IFormFile file,
+        [FromForm] string? supplierCode,
+        [FromForm] string? supplierName,
+        CancellationToken cancellationToken = default)
+    {
+        if (file is null || file.Length == 0)
+        {
+            return BadRequest(new { message = "Selezionare un file Metel non vuoto (.txt, .csv)." });
+        }
+
+        if (!await ModuleIsOnAsync("metel", cancellationToken))
+        {
+            return BadRequest(new { message = "Il modulo Listini Metel non è attivo per questa azienda." });
+        }
+
+        await using var buffer = new MemoryStream();
+        await file.CopyToAsync(buffer, cancellationToken);
+        var parsed = MetelList.Parse(buffer.ToArray());
+        if (parsed.Lines.Count == 0)
+        {
+            return BadRequest(new { message = parsed.Errors.Count > 0 ? parsed.Errors[0] : "Nessun articolo nel file." });
+        }
+
+        var fixedSupplierCode = supplierCode?.Trim();
+        var fixedSupplierName = string.IsNullOrWhiteSpace(supplierName) ? fixedSupplierCode : supplierName.Trim();
+        await using var transaction = await _dbContext.Database.BeginTransactionAsync(cancellationToken);
+        var rows = ToCatalogRows(parsed.Lines, fixedSupplierCode, fixedSupplierName);
+        var summary = await ImportRowsAsync(rows, cancellationToken);
+        await transaction.CommitAsync(cancellationToken);
+        return Ok(summary with { Warnings = parsed.Errors.Count == 0 ? null : parsed.Errors });
+    }
+
+    private async Task<bool> ModuleIsOnAsync(string key, CancellationToken cancellationToken)
+    {
+        var profile = await _dbContext.CompanyProfiles.AsNoTracking().FirstOrDefaultAsync(cancellationToken);
+        if (profile is null)
+        {
+            return true;
+        }
+
+        return Sectors.Parse(profile.EnabledModules).Contains(key, StringComparer.OrdinalIgnoreCase);
+    }
+
+    private static async IAsyncEnumerable<IReadOnlyDictionary<string, string>> ToCatalogRows(
+        IReadOnlyList<MetelList.Line> lines,
+        string? supplierCode,
+        string? supplierName)
+    {
+        foreach (var line in lines)
+        {
+            var code = string.IsNullOrWhiteSpace(supplierCode) ? line.Brand : supplierCode;
+            var name = string.IsNullOrWhiteSpace(supplierName) ? (line.Brand.Length == 0 ? code : line.Brand) : supplierName;
+            if (string.IsNullOrWhiteSpace(code))
+            {
+                code = "METEL";
+                name = string.IsNullOrWhiteSpace(name) ? "Listino Metel" : name;
+            }
+
+            yield return new Dictionary<string, string>
+            {
+                ["suppliercode"] = code,
+                ["suppliername"] = name,
+                ["code"] = line.Code,
+                ["name"] = line.Name,
+                ["partnumber"] = line.Code,
+                ["unit"] = line.Unit,
+                ["description"] = line.Ean is null ? line.Name : $"{line.Name} EAN {line.Ean}",
+                ["unitprice"] = line.ListPrice?.ToString(CultureInfo.InvariantCulture) ?? "",
+            };
+        }
+
+        await Task.CompletedTask;
+    }
+
     /// <summary>Reconstructs text lines from a PDF's words, grouping by vertical position (same row) and
     /// ordering by horizontal position within a row, inserting extra spacing where a visual gap between
     /// words is wide enough to likely be a column boundary rather than a word boundary.</summary>
@@ -285,11 +366,11 @@ public class SupplierCatalogController : ControllerBase
 
         await foreach (var row in rows.WithCancellation(cancellationToken))
         {
-            var supplierCode = row.GetValueOrDefault("suppliercode", "").Trim();
-            var supplierName = row.GetValueOrDefault("suppliername", "").Trim();
-            var materialCode = row.GetValueOrDefault("code", "").Trim();
-            var materialName = row.GetValueOrDefault("name", "").Trim();
-            var partNumber = row.GetValueOrDefault("partnumber", "").Trim();
+            var materialCode = Truncate(row.GetValueOrDefault("code", "").Trim(), 100);
+            var materialName = Truncate(row.GetValueOrDefault("name", "").Trim(), 250);
+            var partNumber = Truncate(row.GetValueOrDefault("partnumber", "").Trim(), 200);
+            var supplierCode = Truncate(row.GetValueOrDefault("suppliercode", "").Trim(), 80);
+            var supplierName = Truncate(row.GetValueOrDefault("suppliername", "").Trim(), 200);
 
             if (string.IsNullOrWhiteSpace(supplierCode) || string.IsNullOrWhiteSpace(supplierName) ||
                 string.IsNullOrWhiteSpace(materialCode) || string.IsNullOrWhiteSpace(materialName) ||
@@ -312,7 +393,7 @@ public class SupplierCatalogController : ControllerBase
                 {
                     Code = materialCode,
                     Name = materialName,
-                    Unit = ValueOrDefault(row, "unit", "pz").Trim(),
+                    Unit = Truncate(ValueOrDefault(row, "unit", "pz").Trim(), 50),
                     Stock = DecimalValue(row, "stock"),
                     MinStock = DecimalValue(row, "minstock")
                 };
@@ -322,6 +403,12 @@ public class SupplierCatalogController : ControllerBase
             else
             {
                 material.Name = materialName;
+            }
+
+            var listPrice = DecimalValue(row, "unitprice");
+            if (listPrice > 0)
+            {
+                material.ListPrice = listPrice;
             }
 
             await _dbContext.SaveChangesAsync(cancellationToken);
@@ -334,7 +421,7 @@ public class SupplierCatalogController : ControllerBase
             }
 
             link.PartNumber = partNumber;
-            link.Description = row.GetValueOrDefault("description");
+            link.Description = Truncate(row.GetValueOrDefault("description"), 500);
             link.UnitPrice = DecimalValue(row, "unitprice");
             link.LeadTimeDays = DecimalValue(row, "leadtimedays");
             imported++;
@@ -420,9 +507,15 @@ public class SupplierCatalogController : ControllerBase
         values.Add(current.ToString());
         return values;
     }
+
+    private static string Truncate(string? value, int max)
+    {
+        var text = value ?? "";
+        return text.Length <= max ? text : text[..max];
+    }
 }
 
-public sealed record ImportSummary(int Imported, int CreatedMaterials, int CreatedLinks);
+public sealed record ImportSummary(int Imported, int CreatedMaterials, int CreatedLinks, IReadOnlyList<string>? Warnings = null);
 
 public sealed record CatalogSearchResultResponse(
     string MaterialCode,

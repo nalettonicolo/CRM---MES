@@ -1,0 +1,315 @@
+@page "/aspetto"
+@inject Api Api
+@inject Session Session
+@inject IJSRuntime Js
+
+<PageTitle>Aspetto grafico · Nicolò MES</PageTitle>
+
+<div class="page-head">
+    <div>
+        <div class="eyebrow">Amministrazione</div>
+        <h1>Aspetto grafico</h1>
+        <p class="sub">Colori, angoli, densità dei campi e sfondo per tutta l'azienda (web e desktop). Le modifiche si vedono subito in anteprima.</p>
+    </div>
+    <div class="actions">
+        <button class="secondary" disabled="@_busy" @onclick="LoadAsync">Ricarica</button>
+        @if (Session.IsAdmin)
+        {
+            <button class="primary" disabled="@_busy" @onclick="SaveAsync">Salva per l'azienda</button>
+        }
+    </div>
+</div>
+
+@if (!Session.IsAdmin)
+{
+    <div class="card state">Solo l'amministratore può cambiare l'aspetto. Puoi comunque vedere il tema attivo.</div>
+}
+else if (_error is not null)
+{
+    <div class="card state"><strong>Errore</strong> @_error</div>
+}
+else if (_theme is null)
+{
+    <div class="card state">Caricamento...</div>
+}
+else
+{
+    @if (_saveOk is not null) { <p class="muted">@_saveOk</p> }
+
+    <div class="card card-pad">
+        <h2 class="section-title">Palette predefinite</h2>
+        <div class="preset-grid">
+            @foreach (var preset in _theme.Presets)
+            {
+                <button type="button" class="preset-card @(_draft.Preset == preset.Key ? "selected" : null)"
+                        disabled="@_busy" @onclick="() => ApplyPresetAsync(preset.Key)">
+                    <span class="preset-swatches">
+                        <span style="background:@preset.Background"></span>
+                        <span style="background:@preset.Accent"></span>
+                    </span>
+                    <strong>@preset.Name</strong>
+                    <span class="muted small">@preset.Description</span>
+                </button>
+            }
+        </div>
+    </div>
+
+    <div class="card card-pad">
+        <h2 class="section-title">Colori</h2>
+        <div class="form-grid theme-colors">
+            <label>Sfondo pagina <input type="color" @bind="_draft.Background" @bind:after="PreviewAsync" /></label>
+            <label>Superficie (schede) <input type="color" @bind="_draft.Surface" @bind:after="PreviewAsync" /></label>
+            <label>Superficie sollevata <input type="color" @bind="_draft.SurfaceRaised" @bind:after="PreviewAsync" /></label>
+            <label>Testo <input type="color" @bind="_draft.Ink" @bind:after="PreviewAsync" /></label>
+            <label>Testo secondario <input type="color" @bind="_draft.Muted" @bind:after="PreviewAsync" /></label>
+            <label>Bordi <input type="color" @bind="_draft.Line" @bind:after="PreviewAsync" /></label>
+            <label>Accento (azioni) <input type="color" @bind="_draft.Accent" @bind:after="PreviewAsync" /></label>
+            <label>Accento hover <input type="color" @bind="_draft.AccentHover" @bind:after="PreviewAsync" /></label>
+            <label>Accento soft <input type="color" @bind="_draft.AccentSoft" @bind:after="PreviewAsync" /></label>
+            <label>Testo su accento <input type="color" @bind="_draft.OnAccent" @bind:after="PreviewAsync" /></label>
+            <label>Menu laterale <input type="color" @bind="_draft.Sidebar" @bind:after="PreviewAsync" /></label>
+            <label>Testo menu <input type="color" @bind="_draft.SidebarText" @bind:after="PreviewAsync" /></label>
+            <label>OK / successo <input type="color" @bind="_draft.Ok" @bind:after="PreviewAsync" /></label>
+            <label>Avviso <input type="color" @bind="_draft.Warn" @bind:after="PreviewAsync" /></label>
+        </div>
+    </div>
+
+    <div class="card card-pad">
+        <h2 class="section-title">Forma e campi</h2>
+        <div class="form-grid">
+            <label>Raggio angoli (0–16 px)
+                <input type="range" min="0" max="16" @bind="_draft.Radius" @bind:event="oninput" @bind:after="PreviewAsync" />
+                <span class="muted">@_draft.Radius px</span>
+            </label>
+            <label>Altezza campi (30–48 px)
+                <input type="range" min="30" max="48" @bind="_draft.FieldHeight" @bind:event="oninput" @bind:after="PreviewAsync" />
+                <span class="muted">@_draft.FieldHeight px</span>
+            </label>
+            <label>Spessore bordo campo
+                <select @bind="_draft.FieldBorder" @bind:after="PreviewAsync">
+                    <option value="1">1 px</option>
+                    <option value="2">2 px</option>
+                </select>
+            </label>
+            <label>Densità
+                <select @bind="_draft.Density" @bind:after="PreviewAsync">
+                    <option value="compact">Compatta</option>
+                    <option value="comfortable">Comoda</option>
+                    <option value="airy">Ariosa</option>
+                </select>
+            </label>
+            <label>Sfondo pagina
+                <select @bind="_draft.BackgroundStyle" @bind:after="PreviewAsync">
+                    <option value="solid">Tinta unita</option>
+                    <option value="grid">Griglia</option>
+                    <option value="grain">Grain sottile</option>
+                </select>
+            </label>
+        </div>
+        <div class="theme-preview" style="margin-top:16px">
+            <div class="eyebrow">Anteprima controlli</div>
+            <div class="actions" style="margin-top:8px">
+                <button type="button" class="primary">Azione principale</button>
+                <button type="button" class="secondary">Secondaria</button>
+            </div>
+            <div class="form-grid" style="margin-top:12px;max-width:420px">
+                <label>Campo di esempio <input value="Commessa WO-1042" readonly /></label>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    private UiThemeDto? _theme;
+    private ThemeDraft _draft = new();
+    private string? _error;
+    private string? _saveOk;
+    private bool _busy;
+
+    protected override Task OnInitializedAsync() => LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        _error = null;
+        _saveOk = null;
+        try
+        {
+            _theme = await Api.GetAsync<UiThemeDto>("api/company-profile/theme");
+            _draft = ThemeDraft.From(_theme);
+            await PreviewAsync();
+        }
+        catch (Exception ex)
+        {
+            _error = ex.Message;
+        }
+    }
+
+    private async Task ApplyPresetAsync(string key)
+    {
+        if (_theme is null) return;
+        var preset = _theme.Presets.FirstOrDefault(p => p.Key == key);
+        if (preset is null) return;
+        _draft = ThemeDraft.FromPreset(preset);
+        _saveOk = $"Palette «{preset.Name}» caricata in anteprima — premi Salva per applicarla all'azienda.";
+        await PreviewAsync();
+    }
+
+    private async Task PreviewAsync()
+    {
+        var vars = BuildCssVariables(_draft);
+        await Js.InvokeVoidAsync("nicolomes.applyTheme", vars, _draft.BackgroundStyle);
+    }
+
+    private async Task SaveAsync()
+    {
+        _busy = true;
+        _error = null;
+        _saveOk = null;
+        try
+        {
+            _theme = await Api.PutAsync<UiThemeDto>("api/company-profile/theme", _draft.ToRequest());
+            _draft = ThemeDraft.From(_theme);
+            _saveOk = "Aspetto salvato per tutta l'azienda.";
+            await PreviewAsync();
+        }
+        catch (Exception ex)
+        {
+            _error = ex.Message;
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+
+    private static Dictionary<string, string> BuildCssVariables(ThemeDraft d)
+    {
+        var densityPad = d.Density switch { "compact" => "10px", "airy" => "22px", _ => "16px" };
+        var densityGap = d.Density switch { "compact" => "8px", "airy" => "18px", _ => "12px" };
+        var radius = Math.Clamp(d.Radius, 0, 16);
+        return new Dictionary<string, string>
+        {
+            ["--bg"] = d.Background,
+            ["--surface"] = d.Surface,
+            ["--surface-2"] = d.SurfaceRaised,
+            ["--ink"] = d.Ink,
+            ["--muted"] = d.Muted,
+            ["--faint"] = d.Muted,
+            ["--line"] = d.Line,
+            ["--line-strong"] = d.Line,
+            ["--accent"] = d.Accent,
+            ["--accent-hover"] = d.AccentHover,
+            ["--accent-soft"] = d.AccentSoft,
+            ["--on-accent"] = d.OnAccent,
+            ["--ok"] = d.Ok,
+            ["--warn"] = d.Warn,
+            ["--danger"] = d.Accent,
+            ["--danger-bg"] = d.AccentSoft,
+            ["--radius"] = $"{radius}px",
+            ["--radius-sm"] = $"{Math.Max(0, radius / 2)}px",
+            ["--field-border"] = $"{Math.Clamp(d.FieldBorder, 1, 2)}px",
+            ["--field-height"] = $"{Math.Clamp(d.FieldHeight, 30, 48)}px",
+            ["--density-pad"] = densityPad,
+            ["--density-gap"] = densityGap,
+            ["--bg-style"] = d.BackgroundStyle,
+            ["--sidebar-bg"] = d.Sidebar,
+            ["--sidebar-text"] = d.SidebarText,
+        };
+    }
+
+    private sealed class ThemeDraft
+    {
+        public string Preset { get; set; } = "officina";
+        public string Background { get; set; } = "#E6E6E1";
+        public string Surface { get; set; } = "#F5F5F1";
+        public string SurfaceRaised { get; set; } = "#ECECE7";
+        public string Ink { get; set; } = "#141414";
+        public string Muted { get; set; } = "#555550";
+        public string Line { get; set; } = "#C2C2BA";
+        public string Accent { get; set; } = "#CF2A1F";
+        public string AccentHover { get; set; } = "#B0241A";
+        public string AccentSoft { get; set; } = "#F5E4E2";
+        public string OnAccent { get; set; } = "#FFF8F7";
+        public string Sidebar { get; set; } = "#161616";
+        public string SidebarText { get; set; } = "#A3A39C";
+        public string Ok { get; set; } = "#2B5A36";
+        public string Warn { get; set; } = "#8F5A10";
+        public int Radius { get; set; }
+        public string Density { get; set; } = "comfortable";
+        public string BackgroundStyle { get; set; } = "solid";
+        public int FieldBorder { get; set; } = 1;
+        public int FieldHeight { get; set; } = 38;
+
+        public static ThemeDraft From(UiThemeDto t) => new()
+        {
+            Preset = t.Preset,
+            Background = t.Background,
+            Surface = t.Surface,
+            SurfaceRaised = t.SurfaceRaised,
+            Ink = t.Ink,
+            Muted = t.Muted,
+            Line = t.Line,
+            Accent = t.Accent,
+            AccentHover = t.AccentHover,
+            AccentSoft = t.AccentSoft,
+            OnAccent = t.OnAccent,
+            Sidebar = t.Sidebar,
+            SidebarText = t.SidebarText,
+            Ok = t.Ok,
+            Warn = t.Warn,
+            Radius = t.Radius,
+            Density = t.Density,
+            BackgroundStyle = t.BackgroundStyle,
+            FieldBorder = t.FieldBorder,
+            FieldHeight = t.FieldHeight,
+        };
+
+        public static ThemeDraft FromPreset(UiThemePreset p) => new()
+        {
+            Preset = p.Key,
+            Background = p.Background,
+            Surface = p.Surface,
+            SurfaceRaised = p.SurfaceRaised,
+            Ink = p.Ink,
+            Muted = p.Muted,
+            Line = p.Line,
+            Accent = p.Accent,
+            AccentHover = p.AccentHover,
+            AccentSoft = p.AccentSoft,
+            OnAccent = p.OnAccent,
+            Sidebar = p.Sidebar,
+            SidebarText = p.SidebarText,
+            Ok = p.Ok,
+            Warn = p.Warn,
+            Radius = p.Radius,
+            Density = p.Density,
+            BackgroundStyle = p.BackgroundStyle,
+            FieldBorder = p.FieldBorder,
+            FieldHeight = p.FieldHeight,
+        };
+
+        public object ToRequest() => new
+        {
+            preset = Preset,
+            background = Background,
+            surface = Surface,
+            surfaceRaised = SurfaceRaised,
+            ink = Ink,
+            muted = Muted,
+            line = Line,
+            accent = Accent,
+            accentHover = AccentHover,
+            accentSoft = AccentSoft,
+            onAccent = OnAccent,
+            sidebar = Sidebar,
+            sidebarText = SidebarText,
+            ok = Ok,
+            warn = Warn,
+            radius = Radius,
+            density = Density,
+            backgroundStyle = BackgroundStyle,
+            fieldBorder = FieldBorder,
+            fieldHeight = FieldHeight,
+        };
+    }
+}

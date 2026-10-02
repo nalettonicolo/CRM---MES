@@ -96,17 +96,20 @@ public class QuotePageTests : TestContext
     public async Task Conversion_ShowsLinksToTheNewWorkOrders()
     {
         var workOrderId = Guid.NewGuid();
+        var areaId = Guid.NewGuid();
+        _server.OnJson("GET", "/api/areas", new[] { new AreaRow(areaId, "Quadri", "QDR", true) });
         _server.OnJson("POST", $"/api/quotes/{_id}/convert",
             new ConvertQuoteResult(_id, "PR-2026-0012", [new ConvertedWorkOrder(workOrderId, "WO-0042", "QE-GEN", 2)]));
         var page = await OpenAsync("Warehouse", Make("Accepted"));
 
         page.FindAll("button").Single(b => b.TextContent == "Crea le commesse").Click();
-        Assert.Contains("una commessa in bozza per ogni riga con un prodotto (1)", page.Markup);
+        page.WaitForAssertion(() => Assert.Contains("L'area consente subito la distinta di prelievo", page.Markup));
         _server.OnJson("GET", $"/api/quotes/{_id}", Make("Accepted", DateTime.UtcNow));
         page.FindAll("button").Last(b => b.TextContent == "Crea le commesse").Click();
 
         page.WaitForAssertion(() => Assert.Contains($"commesse/{workOrderId}", page.Markup));
         Assert.Contains("Convertito", page.Markup);
+        Assert.Contains(_server.Requests, r => r.Request.Method == HttpMethod.Post && r.Body.Contains(areaId.ToString()));
     }
 
     [Fact]

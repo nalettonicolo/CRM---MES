@@ -62,6 +62,7 @@ public partial class PlanningBoardWindow : Window
     public PlanningBoardWindow(ApiClient apiClient, bool isAdmin)
     {
         InitializeComponent();
+        MaximizeToWorkArea.Attach(this);
         _apiClient = apiClient;
         _isAdmin = isAdmin;
         SubtitleText.Text = _isAdmin

@@ -12,3 +12,9 @@ installer-output/
 publish/
 publish-server/
 server/docker/backup/
+
+# Snapshot locali di build (exe/dll): le versioni ufficiali restano i tag GitHub
+installer/archive/*/
+!installer/archive/VERSIONI-GIT.txt
+!installer/archive/**/README.md
+# Gli snapshot binari di build restano locali.

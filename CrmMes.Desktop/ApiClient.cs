@@ -746,6 +746,12 @@ public sealed class ApiClient
     public Task<AccessChannelsDto> SaveAccessChannelsAsync(SaveAccessChannelsDto settings, CancellationToken cancellationToken = default)
         => SendAsync<AccessChannelsDto>(HttpMethod.Put, "api/company-profile/access", settings, cancellationToken);
 
+    public Task<UiThemeDto> GetUiThemeAsync(CancellationToken cancellationToken = default)
+        => GetOneAsync<UiThemeDto>("api/company-profile/theme", cancellationToken);
+
+    public Task<UiThemeDto> SaveUiThemeAsync(SaveUiThemeDto theme, CancellationToken cancellationToken = default)
+        => SendAsync<UiThemeDto>(HttpMethod.Put, "api/company-profile/theme", theme, cancellationToken);
+
     public async Task<CompanyCatalogDto> GetCompanyCatalogAsync(CancellationToken cancellationToken = default)
     {
         using var response = await _httpClient.GetAsync("api/company-profile/catalog", cancellationToken);
@@ -961,6 +967,49 @@ public sealed class ApiClient
         var name = response.Content.Headers.ContentDisposition?.FileNameStar ?? response.Content.Headers.ContentDisposition?.FileName ?? "fattura.xml";
         return (name.Trim('"'), await response.Content.ReadAsByteArrayAsync(cancellationToken));
     }
+
+    // ---------- Passive invoices and payment schedule
+
+    public Task<IReadOnlyList<PurchaseInvoiceSummaryDto>> GetPurchaseInvoicesAsync(CancellationToken cancellationToken = default)
+        => GetAsync<PurchaseInvoiceSummaryDto>("api/payables/purchase-invoices", cancellationToken);
+
+    public Task<PurchaseInvoiceDetailDto> GetPurchaseInvoiceAsync(Guid id, CancellationToken cancellationToken = default)
+        => GetOneAsync<PurchaseInvoiceDetailDto>($"api/payables/purchase-invoices/{id}", cancellationToken);
+
+    public async Task<PurchaseInvoiceDetailDto> ImportPurchaseInvoiceXmlAsync(string filePath, CancellationToken cancellationToken = default)
+    {
+        await using var stream = File.OpenRead(filePath);
+        using var content = new MultipartFormDataContent();
+        var file = new StreamContent(stream);
+        file.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue("application/xml");
+        content.Add(file, "file", Path.GetFileName(filePath));
+        using var response = await _httpClient.PostAsync("api/payables/purchase-invoices/import", content, cancellationToken);
+        await EnsureSuccessAsync(response, cancellationToken);
+        return (await response.Content.ReadFromJsonAsync<PurchaseInvoiceDetailDto>(cancellationToken: cancellationToken))!;
+    }
+
+    public Task<IReadOnlyList<PaymentScheduleEntryDto>> GetPaymentScheduleAsync(string? direction = null, string? status = null, CancellationToken cancellationToken = default)
+    {
+        var query = new List<string>();
+        if (!string.IsNullOrWhiteSpace(direction))
+        {
+            query.Add($"direction={Uri.EscapeDataString(direction)}");
+        }
+
+        if (!string.IsNullOrWhiteSpace(status))
+        {
+            query.Add($"status={Uri.EscapeDataString(status)}");
+        }
+
+        var path = query.Count == 0 ? "api/payables/schedule" : $"api/payables/schedule?{string.Join("&", query)}";
+        return GetAsync<PaymentScheduleEntryDto>(path, cancellationToken);
+    }
+
+    public Task<PaymentScheduleEntryDto> MarkScheduleEntryPaidAsync(Guid id, CancellationToken cancellationToken = default)
+        => SendAsync<PaymentScheduleEntryDto>(HttpMethod.Post, $"api/payables/schedule/{id}/mark-paid", null, cancellationToken);
+
+    public Task<PaymentScheduleEntryDto> RemindScheduleEntryAsync(Guid id, string? note = null, CancellationToken cancellationToken = default)
+        => SendAsync<PaymentScheduleEntryDto>(HttpMethod.Post, $"api/payables/schedule/{id}/remind", new { note }, cancellationToken);
 
     public Task<CustomerFiscalDto> GetCustomerFiscalAsync(Guid customerId, CancellationToken cancellationToken = default)
         => GetOneAsync<CustomerFiscalDto>($"api/customers/{customerId}/fiscal", cancellationToken);
@@ -1425,6 +1474,30 @@ public sealed class ApiClient
         content.Add(fileContent, "file", Path.GetFileName(filePath));
 
         using var response = await _httpClient.PostAsync("api/supplier-catalog/import-pdf", content, cancellationToken);
+        await EnsureSuccessAsync(response, cancellationToken);
+        return await response.Content.ReadFromJsonAsync<ImportSummaryDto>(cancellationToken: cancellationToken)
+            ?? throw new InvalidOperationException("Risposta di importazione non valida.");
+    }
+
+    public async Task<ImportSummaryDto> ImportMetelAsync(
+        string filePath, string? supplierCode, string? supplierName, CancellationToken cancellationToken = default)
+    {
+        using var content = new MultipartFormDataContent();
+        await using var stream = File.OpenRead(filePath);
+        using var fileContent = new StreamContent(stream);
+        fileContent.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue("text/plain");
+        content.Add(fileContent, "file", Path.GetFileName(filePath));
+        if (!string.IsNullOrWhiteSpace(supplierCode))
+        {
+            content.Add(new StringContent(supplierCode), "supplierCode");
+        }
+
+        if (!string.IsNullOrWhiteSpace(supplierName))
+        {
+            content.Add(new StringContent(supplierName), "supplierName");
+        }
+
+        using var response = await _httpClient.PostAsync("api/supplier-catalog/import-metel", content, cancellationToken);
         await EnsureSuccessAsync(response, cancellationToken);
         return await response.Content.ReadFromJsonAsync<ImportSummaryDto>(cancellationToken: cancellationToken)
             ?? throw new InvalidOperationException("Risposta di importazione non valida.");
@@ -2140,7 +2213,9 @@ public sealed record WithdrawalSlipSummaryDto(
     string Status,
     DateTime CreatedAt,
     int ItemCount,
-    int MissingItemCount);
+    int MissingItemCount,
+    Guid? WorkOrderId = null,
+    string? WorkOrderCode = null);
 
 public sealed record WithdrawalSlipDetailDto(
     Guid Id,
@@ -2150,7 +2225,9 @@ public sealed record WithdrawalSlipDetailDto(
     string Status,
     string? Notes,
     DateTime CreatedAt,
-    List<WithdrawalSlipItemDto> Items);
+    List<WithdrawalSlipItemDto> Items,
+    Guid? WorkOrderId = null,
+    string? WorkOrderCode = null);
 
 public sealed record WithdrawalSlipItemDto(
     Guid Id,
@@ -2313,7 +2390,8 @@ public sealed record QuoteItemDto(
 public sealed record QuoteDto(
     Guid Id, string Code, Guid CustomerId, string CustomerName, string CustomerCode, string Status,
     DateTime? ValidUntil, string? Notes, DateTime CreatedAt, DateTime? SentAt, DateTime? AcceptedAt,
-    DateTime? RejectedAt, DateTime? ConvertedAt, decimal Total, List<QuoteItemDto> Items);
+    DateTime? RejectedAt, DateTime? ConvertedAt, decimal Total, List<QuoteItemDto> Items,
+    List<ConvertedWorkOrderDto>? WorkOrders = null);
 
 public sealed record SaveQuoteItemDto(Guid? ProductId, string Description, decimal Quantity, decimal UnitPrice, decimal DiscountPercent);
 
@@ -2481,7 +2559,13 @@ public sealed record WorkOrderDetailDto(
     DateTime CreatedAt,
     DateTime? ReleasedAt,
     DateTime? CompletedAt,
-    List<WorkOrderOperationDto> Operations);
+    List<WorkOrderOperationDto> Operations,
+    Guid? CustomerId = null,
+    Guid? QuoteId = null,
+    string? ProductRevision = null,
+    string? CustomerName = null,
+    string? QuoteCode = null,
+    decimal? SalePrice = null);
 
 public sealed record WorkOrderOperationDto(
     Guid Id,
@@ -2565,7 +2649,11 @@ public sealed record WorkOrderDashboardDto(
     decimal? AvailabilityRatio,
     decimal TotalScrapQuantity,
     decimal? QualityRatio,
-    decimal? OeeRatio);
+    decimal? OeeRatio,
+    string OeeSource = "Declared",
+    decimal? MachineAvailabilityRatio = null,
+    decimal? MachineQualityRatio = null,
+    int MachinesReportingInPeriod = 0);
 
 public sealed record MaterialLotSummaryDto(
     Guid Id,
@@ -2641,6 +2729,41 @@ public sealed record SaveAccessChannelsDto(
     List<string> Channels,
     Dictionary<string, List<string>> Roles,
     Dictionary<string, List<string>> Areas);
+
+public sealed record UiThemePresetDto(
+    string Key, string Name, string Description,
+    string Background, string Surface, string SurfaceRaised, string Ink, string Muted, string Line,
+    string Accent, string AccentHover, string AccentSoft, string OnAccent, string Sidebar, string SidebarText,
+    string Ok, string Warn, int Radius, string Density, string BackgroundStyle, int FieldBorder, int FieldHeight);
+
+public sealed record UiThemeDto(
+    string Preset, string Background, string Surface, string SurfaceRaised, string Ink, string Muted, string Line,
+    string Accent, string AccentHover, string AccentSoft, string OnAccent, string Sidebar, string SidebarText,
+    string Ok, string Warn, int Radius, string Density, string BackgroundStyle, int FieldBorder, int FieldHeight,
+    Dictionary<string, string> CssVariables, List<UiThemePresetDto> Presets);
+
+public sealed record SaveUiThemeDto(
+    string? ApplyPreset = null,
+    string? Preset = null,
+    string? Background = null,
+    string? Surface = null,
+    string? SurfaceRaised = null,
+    string? Ink = null,
+    string? Muted = null,
+    string? Line = null,
+    string? Accent = null,
+    string? AccentHover = null,
+    string? AccentSoft = null,
+    string? OnAccent = null,
+    string? Sidebar = null,
+    string? SidebarText = null,
+    string? Ok = null,
+    string? Warn = null,
+    int? Radius = null,
+    string? Density = null,
+    string? BackgroundStyle = null,
+    int? FieldBorder = null,
+    int? FieldHeight = null);
 
 public sealed record TransportReasonDto(string Key, string Label);
 
@@ -2979,3 +3102,30 @@ public sealed record EnergyConsumptionDto(decimal? TotalKwh, int ReadingCount, D
 public sealed record WorkOrderEnergyByEquipmentDto(Guid EquipmentId, string EquipmentName, decimal Kwh);
 
 public sealed record WorkOrderEnergyDto(string WorkOrderCode, decimal? TotalKwh, List<WorkOrderEnergyByEquipmentDto> ByEquipment);
+
+// ---------- Fatture passive e scadenziario ----------
+
+public sealed record PurchaseInvoiceSummaryDto(
+    Guid Id, string DocumentNumber, DateTime DocumentDate, string DocumentType,
+    string SupplierName, string? SupplierVat, Guid? SupplierId, decimal TaxableTotal,
+    DateTime ImportedAt, int OpenInstallments, int PaidInstallments);
+
+public sealed record PurchaseInvoiceDetailDto(
+    Guid Id, string DocumentNumber, DateTime DocumentDate, string DocumentType,
+    string SupplierName, string? SupplierVat, Guid? SupplierId, string? PaymentMethod,
+    string? Currency, string? OriginalFileName, DateTime ImportedAt, string? ImportedBy,
+    List<PurchaseInvoiceLineDto> Lines, List<PaymentScheduleEntryDto> Schedule);
+
+public sealed record PurchaseInvoiceLineDto(
+    int LineNumber, string? Code, string Description, decimal Quantity, string Unit,
+    decimal UnitPrice, decimal DiscountPercent, decimal VatRate, string? VatNature);
+
+public sealed record PaymentScheduleEntryDto(
+    Guid Id, string Direction, string Status, DateTime DueDate, decimal Amount, string Currency,
+    string? CounterpartyName, string? Description, Guid? PurchaseInvoiceId, Guid? InvoiceId,
+    DateTime? PaidAt, DateTime? RemindedAt, int ReminderCount, bool Overdue)
+{
+    public string DirectionLabel => Direction == "Payable" ? "Pagamento" : "Incasso";
+    public string StatusLabel => Status == "Paid" ? "Pagata" : "Aperta";
+    public string BrushStatus => Status == "Paid" ? "Completed" : Overdue ? "Cancelled" : "Draft";
+}

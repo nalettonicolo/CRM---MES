@@ -1,0 +1,21 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "build-api",
+      "command": "dotnet",
+      "type": "process",
+      "args": ["build", "${workspaceFolder}/CrmMes.Api/CrmMes.Api.csproj", "-v", "q"],
+      "problemMatcher": "$msCompile",
+      "group": "build"
+    },
+    {
+      "label": "build-desktop",
+      "command": "dotnet",
+      "type": "process",
+      "args": ["build", "${workspaceFolder}/CrmMes.Desktop/CrmMes.Desktop.csproj", "-v", "q"],
+      "problemMatcher": "$msCompile",
+      "group": "build"
+    }
+  ]
+}

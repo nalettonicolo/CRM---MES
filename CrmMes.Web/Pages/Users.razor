@@ -1,0 +1,63 @@
+@page "/utenti"
+@inject Api Api
+@inject Session Session
+
+<PageTitle>Utenti · Nicolò MES</PageTitle>
+
+<div class="page-head">
+    <div>
+        <div class="eyebrow">Amministrazione</div>
+        <h1>Utenti</h1>
+        <p class="sub">Elenco account. Creazione, PIN e disattivazione restano nel programma desktop.</p>
+    </div>
+</div>
+
+@if (!Session.IsAdmin)
+{
+    <div class="card state"><strong>@Labels.ForbiddenTitle</strong>Solo l'amministratore vede gli utenti.</div>
+}
+else if (_error is not null)
+{
+    <div class="card state"><strong>@Labels.LoadFailed("gli utenti")</strong>@_error</div>
+}
+else if (_rows is null)
+{
+    <div class="card state">@Labels.Loading</div>
+}
+else
+{
+    <div class="card">
+        <div class="table-wrap">
+            <table class="cards">
+                <thead><tr><th>Nome</th><th>Email</th><th>Ruolo</th><th>Stato</th></tr></thead>
+                <tbody>
+                    @foreach (var user in _rows)
+                    {
+                        <tr>
+                            <td data-label="Nome">@user.Name</td>
+                            <td data-label="Email">@user.Email</td>
+                            <td data-label="Ruolo">@Labels.Role(user.Role)</td>
+                            <td data-label="Stato">@(user.IsActive ? "Attivo" : "Disattivato")</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+}
+
+@code {
+    private List<UserRow>? _rows;
+    private string? _error;
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (!Session.IsAdmin)
+        {
+            return;
+        }
+
+        try { _rows = await Api.GetAsync<List<UserRow>>("api/users"); }
+        catch (ApiException exception) { _error = exception.Message; }
+    }
+}

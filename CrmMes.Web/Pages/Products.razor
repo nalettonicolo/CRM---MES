@@ -1,0 +1,78 @@
+@page "/prodotti"
+@inject Api Api
+@inject NavigationManager Nav
+
+<PageTitle>Prodotti · Nicolò MES</PageTitle>
+
+<div class="page-head">
+    <div>
+        <div class="eyebrow">Produzione</div>
+        <h1>Prodotti</h1>
+        <p class="sub">Distinta base e ciclo di lavoro. Le modifiche si fanno dall'ufficio tecnico o dal programma desktop.</p>
+    </div>
+</div>
+
+<div class="toolbar">
+    <input class="search" type="search" placeholder="Codice o nome" aria-label="Cerca prodotto" @bind="_search" @bind:event="oninput" @onkeydown="OnEnter" />
+    <button class="secondary" @onclick="LoadAsync">Cerca</button>
+</div>
+
+<div class="card">
+    @if (_error is not null)
+    {
+        <div class="state"><strong>@Labels.LoadFailed("i prodotti")</strong>@_error
+            <div class="actions"><button class="secondary small" @onclick="LoadAsync">@Labels.Retry</button></div></div>
+    }
+    else if (_rows is null)
+    {
+        <div class="state">@Labels.Loading</div>
+    }
+    else if (_rows.Count == 0)
+    {
+        <div class="state"><strong>Nessun prodotto</strong>Nessun prodotto corrisponde alla ricerca.</div>
+    }
+    else
+    {
+        <div class="table-wrap">
+            <table class="cards">
+                <thead><tr><th>Codice</th><th>Nome</th><th class="num">Distinta</th><th class="num">Fasi</th><th>Stato</th></tr></thead>
+                <tbody>
+                    @foreach (var product in _rows)
+                    {
+                        <tr class="link" @onclick="@(() => Nav.NavigateTo($"ufficio-tecnico"))">
+                            <td data-label="Codice" class="code">@product.Code</td>
+                            <td data-label="Nome">@product.Name</td>
+                            <td data-label="Distinta" class="num">@product.BomItemCount</td>
+                            <td data-label="Fasi" class="num">@product.RoutingStepCount</td>
+                            <td data-label="Stato">@(product.IsActive ? "Attivo" : "Non attivo")</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    }
+</div>
+
+@code {
+    private string _search = "";
+    private List<ProductListItem>? _rows;
+    private string? _error;
+
+    protected override Task OnInitializedAsync() => LoadAsync();
+
+    private Task OnEnter(KeyboardEventArgs e) => e.Key == "Enter" ? LoadAsync() : Task.CompletedTask;
+
+    private async Task LoadAsync()
+    {
+        _error = null;
+        try
+        {
+            var q = string.IsNullOrWhiteSpace(_search) ? "" : "?q=" + Uri.EscapeDataString(_search.Trim());
+            _rows = await Api.GetAsync<List<ProductListItem>>("api/products" + q);
+        }
+        catch (ApiException exception)
+        {
+            _error = exception.Message;
+        }
+    }
+}

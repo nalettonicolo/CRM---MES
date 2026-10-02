@@ -1,0 +1,73 @@
+@page "/conto-lavoro"
+@inject Api Api
+@inject NavigationManager Nav
+
+<PageTitle>Conto lavoro · Nicolò MES</PageTitle>
+
+<div class="page-head">
+    <div>
+        <div class="eyebrow">Spedizioni</div>
+        <h1>Conto lavoro</h1>
+        <p class="sub">Merce ancora dal terzista. I rientri si registrano sul DDT dal programma desktop.</p>
+    </div>
+</div>
+
+<div class="card">
+    @if (_error is not null)
+    {
+        <div class="state"><strong>@Labels.LoadFailed("il conto lavoro")</strong>@_error
+            <div class="actions"><button class="secondary small" @onclick="LoadAsync">@Labels.Retry</button></div></div>
+    }
+    else if (_rows is null)
+    {
+        <div class="state">@Labels.Loading</div>
+    }
+    else if (_rows.Count == 0)
+    {
+        <div class="state"><strong>Niente fuori</strong>Nessuna riga ancora dal terzista.</div>
+    }
+    else
+    {
+        <div class="table-wrap">
+            <table class="cards">
+                <thead><tr><th>DDT</th><th>Terzista</th><th>Merce</th><th class="num">Inviato</th><th class="num">Da rientrare</th><th>Previsto</th></tr></thead>
+                <tbody>
+                    @foreach (var row in _rows)
+                    {
+                        <tr class="link" @onclick="@(() => Nav.NavigateTo($"ddt/{row.DocumentId}"))">
+                            <td data-label="DDT" class="code">@row.DocumentCode</td>
+                            <td data-label="Terzista">@row.SupplierName</td>
+                            <td data-label="Merce">@row.Description <div class="small muted code">@(row.Code ?? "")</div></td>
+                            <td data-label="Inviato" class="num">@Labels.Number(row.SentQuantity) @row.Unit</td>
+                            <td data-label="Da rientrare" class="num">
+                                @if (row.IsOverdue)
+                                {
+                                    <span class="badge danger">@Labels.Number(row.OutstandingQuantity)</span>
+                                }
+                                else
+                                {
+                                    @Labels.Number(row.OutstandingQuantity)
+                                }
+                            </td>
+                            <td data-label="Previsto">@Labels.Date(row.ExpectedReturnAt)</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    }
+</div>
+
+@code {
+    private List<SubcontractingOpenLine>? _rows;
+    private string? _error;
+
+    protected override Task OnInitializedAsync() => LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        _error = null;
+        try { _rows = await Api.GetAsync<List<SubcontractingOpenLine>>("api/subcontracting/open"); }
+        catch (ApiException exception) { _error = exception.Message; }
+    }
+}

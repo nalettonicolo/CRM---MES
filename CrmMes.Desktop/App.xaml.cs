@@ -43,6 +43,18 @@ public partial class App : Application
         };
         ClientLog.Info($"Avvio versione {SupportPackage.ClientVersion}");
 
+        // Dialogs taller than the work area (taskbar / DPI) hid their footer buttons — clamp every window.
+        EventManager.RegisterClassHandler(
+            typeof(Window),
+            FrameworkElement.LoadedEvent,
+            new RoutedEventHandler((_, args) =>
+            {
+                if (args.Source is Window window)
+                {
+                    FitDialogToWorkArea.Ensure(window);
+                }
+            }));
+
         base.OnStartup(e);
     }
 }

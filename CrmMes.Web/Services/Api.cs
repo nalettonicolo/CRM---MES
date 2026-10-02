@@ -88,7 +88,7 @@ public sealed class Api
             }
             catch (HttpRequestException)
             {
-                throw new ApiException("Server non raggiungibile. Controlla la connessione e riprova.");
+            throw new ApiException(Labels.Unreachable);
             }
         }
 
@@ -253,7 +253,7 @@ public sealed class Api
         }
         catch (HttpRequestException exception)
         {
-            throw new ApiException("Server non raggiungibile. Controlla la connessione e riprova.", null) { Source = exception.Source };
+            throw new ApiException(Labels.Unreachable, null) { Source = exception.Source };
         }
     }
 
@@ -271,7 +271,7 @@ public sealed class Api
 
     internal static string DefaultMessage(HttpStatusCode status) => status switch
     {
-        HttpStatusCode.Forbidden => "Il tuo ruolo non ha i permessi per questa operazione.",
+        HttpStatusCode.Forbidden => Labels.Forbidden,
         HttpStatusCode.PaymentRequired => "Abbonamento sospeso: è disponibile solo la consultazione generale.",
         HttpStatusCode.NotFound => "Elemento non trovato: potrebbe essere stato eliminato.",
         HttpStatusCode.TooManyRequests => "Troppe richieste ravvicinate: attendi un minuto e riprova.",

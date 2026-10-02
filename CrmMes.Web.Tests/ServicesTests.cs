@@ -33,6 +33,12 @@ public class LabelsTests
     {
         Assert.Equal("1.234,50", Labels.Number(1234.5m));
         Assert.Equal("12", Labels.Number(12m));
+        Assert.Equal(Labels.ForbiddenTitle, "Non disponibile per il tuo ruolo");
+        Assert.Equal("Pronta", Labels.SlipStatus("Ready"));
+        Assert.Equal("Completata", Labels.OperationStatus("Done"));
+        Assert.Equal("ok", Labels.OperationStatusClass("Done"));
+        Assert.Equal("In produzione", Labels.PlanningStatus("InProduzione"));
+        Assert.Equal("Confermata", Labels.PlanningStatus("Confermata"));
         Assert.Equal("85%", Labels.Percent(0.85m));
         Assert.Equal("—", Labels.Date(null));
     }
@@ -55,8 +61,39 @@ public class NavigationTests
     {
         var entries = Navigation.Visible(["production", "haccp"], "Sales");
 
-        Assert.Equal(["Commesse"], entries.Select(e => e.Title));
-        Assert.Equal(["haccp"], Navigation.DesktopOnly(["production", "haccp"]));
+        Assert.Equal(["Commesse", "Prodotti", "HACCP"], entries.Select(e => e.Title));
+        Assert.Equal(["shopfloor"], Navigation.DesktopOnly(["production", "shopfloor"]));
+    }
+
+    [Fact]
+    public void MenuTitles_MatchTheDesktopProgram()
+    {
+        var titles = Navigation.WebPages.Select(page => page.Title).ToList();
+        Assert.Contains("Distinte di prelievo", titles);
+        Assert.Contains("Lotti materiali", titles);
+        Assert.Contains("Ricerca catalogo", titles);
+        Assert.Contains("Qualità", titles);
+        Assert.Contains("Pianificazione", titles);
+        Assert.Contains("Rapportini cantiere", titles);
+        Assert.Contains("Conto lavoro", titles);
+        Assert.Contains("Margini", titles);
+        Assert.Contains("Etichette alimentari", titles);
+        Assert.Contains("Scadenze lotti", titles);
+        Assert.Contains("Listini Metel", titles);
+        Assert.Equal("Vendite", Navigation.WebPages.Single(page => page.Title == "Fatture").Group);
+        Assert.Equal("Spedizioni", Navigation.WebPages.Single(page => page.Title == "Documenti di trasporto").Group);
+        Assert.Equal("Magazzino", Navigation.WebPages.Single(page => page.Title == "Distinte di prelievo").Group);
+    }
+
+    [Fact]
+    public void HasModule_FollowsTheCompanyList_LikeTheDesktopClient()
+    {
+        var session = new Session(null!);
+        Assert.True(session.HasModule("metel")); // not loaded yet: show everything
+
+        session.Company = new CompanyProfile(true, "Officina", null, null, null, null, "mechanical", ["purchasing"]);
+        Assert.False(session.HasModule("metel"));
+        Assert.True(session.HasModule("purchasing"));
     }
 
     [Fact]

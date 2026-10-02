@@ -1,0 +1,134 @@
+@page "/lotti"
+@implements IDisposable
+@inject Api Api
+@inject Session Session
+
+<PageTitle>Lotti materiali · Nicolò MES</PageTitle>
+
+<div class="page-head">
+    <div>
+        <div class="eyebrow">Magazzino</div>
+        <h1>Lotti materiali</h1>
+        <p class="sub">Giacenze in ingresso e quantità residua. Il carico si registra dal programma desktop o dalla ricezione ordine.</p>
+    </div>
+</div>
+
+<div class="toolbar">
+    <input class="search" type="search" placeholder="Codice materiale" aria-label="Filtra per codice materiale"
+           value="@_code" @oninput="OnCodeInput" />
+    <label class="check"><input type="checkbox" checked="@_onlyStock" @onchange="ToggleStockAsync" /> Solo con giacenza</label>
+</div>
+
+<div class="card">
+    @if (_error is not null)
+    {
+        <div class="state"><strong>@Labels.LoadFailed("i lotti materiali")</strong>@_error
+            <div class="actions"><button class="secondary small" @onclick="LoadAsync">@Labels.Retry</button></div></div>
+    }
+    else if (_rows is null)
+    {
+        <div class="state">@Labels.Loading</div>
+    }
+    else if (_rows.Count == 0)
+    {
+        <div class="state"><strong>Nessun lotto</strong>@(_onlyStock ? "Nessun lotto con giacenza." : "Nessun lotto corrisponde al filtro.")</div>
+    }
+    else
+    {
+        <div class="table-wrap">
+            <table class="cards">
+                <thead><tr><th>Lotto</th><th>Materiale</th><th class="num">Residuo</th><th class="num">Iniziale</th><th>Entrato</th><th>Scadenza</th><th>Ordine</th></tr></thead>
+                <tbody>
+                    @foreach (var lot in _rows)
+                    {
+                        <tr>
+                            <td data-label="Lotto"><CopyCode Value="@lot.LotNumber" /></td>
+                            <td data-label="Materiale" class="code">@lot.MaterialCode</td>
+                            <td data-label="Residuo" class="num">@Labels.Number(lot.Quantity)</td>
+                            <td data-label="Iniziale" class="num muted">@Labels.Number(lot.InitialQuantity)</td>
+                            <td data-label="Entrato">@Labels.Date(lot.ReceivedAt)</td>
+                            <td data-label="Scadenza">
+                                @if (lot.ExpiryDate is null)
+                                {
+                                    <span class="muted">—</span>
+                                }
+                                else if (Session.HasModule("lot-expiry") && lot.ExpiryDate.Value.ToLocalTime().Date < DateTime.Now.Date && lot.Quantity > 0)
+                                {
+                                    <span class="badge danger">@Labels.Date(lot.ExpiryDate)</span>
+                                }
+                                else
+                                {
+                                    @Labels.Date(lot.ExpiryDate)
+                                }
+                            </td>
+                            <td data-label="Ordine">
+                                @if (lot.PurchaseOrderId is { } orderId)
+                                {
+                                    <a href="ordini-fornitore/@orderId">Ricezione</a>
+                                }
+                                else
+                                {
+                                    <span class="muted">—</span>
+                                }
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    }
+</div>
+
+@code {
+    private string _code = "";
+    private bool _onlyStock;
+    private List<MaterialLotSummary>? _rows;
+    private string? _error;
+    private CancellationTokenSource? _searchWait;
+
+    protected override Task OnInitializedAsync() => LoadAsync();
+
+    public void Dispose() => _searchWait?.Cancel();
+
+    private async Task OnCodeInput(ChangeEventArgs args)
+    {
+        _code = args.Value as string ?? "";
+        _searchWait?.Cancel();
+        _searchWait = new CancellationTokenSource();
+        var token = _searchWait.Token;
+        try
+        {
+            await Task.Delay(250, token);
+            await LoadAsync();
+        }
+        catch (TaskCanceledException)
+        {
+        }
+    }
+
+    private Task ToggleStockAsync(ChangeEventArgs args)
+    {
+        _onlyStock = args.Value is true;
+        _rows = null;
+        return LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        _error = null;
+        try
+        {
+            var query = "api/material-lots?onlyWithStock=" + (_onlyStock ? "true" : "false");
+            if (!string.IsNullOrWhiteSpace(_code))
+            {
+                query += "&materialCode=" + Uri.EscapeDataString(_code.Trim());
+            }
+
+            _rows = await Api.GetAsync<List<MaterialLotSummary>>(query);
+        }
+        catch (ApiException exception)
+        {
+            _error = exception.Message;
+        }
+    }
+}

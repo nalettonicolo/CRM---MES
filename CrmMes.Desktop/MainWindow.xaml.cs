@@ -5,6 +5,7 @@ using System.Windows.Controls;
 using System.Windows.Data;
 using System.Windows.Input;
 using System.Windows.Media;
+using System.Windows.Shell;
 using System.Windows.Threading;
 
 namespace CrmMes.Desktop;
@@ -59,6 +60,8 @@ public partial class MainWindow : Window
     private bool _haccpLoaded;
     private bool _siteReportsLoaded;
     private bool _invoicesLoaded;
+    private bool _paymentScheduleLoaded;
+    private bool _purchaseInvoicesLoaded;
 
     private static readonly Dictionary<int, string> PageTitles = new()
     {
@@ -90,6 +93,8 @@ public partial class MainWindow : Window
         [25] = "Registri HACCP",
         [26] = "Rapportini di cantiere",
         [27] = "Fatture",
+        [28] = "Scadenziario",
+        [29] = "Fatture passive",
     };
 
     private static readonly Dictionary<int, string> PageEyebrows = new()
@@ -122,11 +127,15 @@ public partial class MainWindow : Window
         [25] = "P R O D U Z I O N E",
         [26] = "P R O D U Z I O N E",
         [27] = "V E N D I T E",
+        [28] = "A M M I N I S T R A Z I O N E",
+        [29] = "A C Q U I S T I",
     };
 
     private static readonly Dictionary<int, string> PageHelpTexts = new()
     {
         [27] = "Fatture elettroniche (FatturaPA). \"Fattura da DDT\" crea la fattura differita dai DDT emessi di un cliente, già con i prezzi venduti (prezzo della commessa o riga del preventivo): controlla IVA e prezzi, poi \"Emetti\". Il file XML si carica gratis sul portale Fatture e Corrispettivi dell'Agenzia delle Entrate o si consegna al commercialista. Servono i dati fiscali dell'azienda (Amministrazione) e del cliente (Clienti > Dati fiscali).",
+        [28] = "Scadenze da pagare (fatture passive importate) e da incassare (fatture emesse con data di pagamento). Segna pagato o registra un sollecito: non invia email automatiche.",
+        [29] = "Fatture elettroniche ricevute dai fornitori: importa il file XML FatturaPA. Il fornitore viene collegato o creato in anagrafica; le scadenze di pagamento compaiono nello Scadenziario.",
         [25] = "Piano HACCP: i punti di controllo critici con i loro limiti e le letture registrate. Una lettura fuori limite richiede l'azione correttiva; le letture non si modificano né si cancellano, perché il registro vale come prova per i controlli. \"Registro\" esporta il periodo per l'ispezione.",
         [26] = "Rapportini di intervento presso il cliente: lavori eseguiti, ore per tecnico, materiali installati e firma del cliente. La firma si raccoglie sul posto dalla pagina web dei tecnici (telefono o tablet). Firmato, il rapportino si blocca, le ore entrano nella commessa e i materiali nel suo costo reale.",
         [23] = "Documenti di trasporto (DDT) per qualsiasi causale: vendita, conto lavorazione, riparazione, reso, conto visione. Una bozza si modifica liberamente e non ha numero; \"Emetti\" assegna il numero progressivo dell'anno e la blocca. Un DDT emesso non si modifica né si cancella: si annulla (resta in archivio con il suo numero). Da una commessa, \"Crea DDT\" prepara la bozza con cliente, prodotto, lotto e quantità.",
@@ -236,8 +245,13 @@ public partial class MainWindow : Window
 
     private void Window_StateChanged(object sender, EventArgs e)
     {
-        MaximizeButton.Content = WindowState == WindowState.Maximized ? "" : "";
-        // Maximize is bounded to the monitor work area (MaximizeToWorkArea), so no border compensation is needed.
+        MaximizeButton.Content = WindowState == WindowState.Maximized ? "\uE923" : "\uE922";
+        // Drop the resize grip when maximized so WindowChrome does not push content past the work area.
+        if (WindowChrome.GetWindowChrome(this) is { } chrome)
+        {
+            chrome.ResizeBorderThickness = WindowState == WindowState.Maximized ? new Thickness(0) : new Thickness(6);
+        }
+
         RootGrid.Margin = new Thickness(0);
     }
 
@@ -535,6 +549,15 @@ public partial class MainWindow : Window
             _apiClient.DesktopAreas = null;
         }
 
+        try
+        {
+            ThemeApplier.Apply(await _apiClient.GetUiThemeAsync());
+        }
+        catch (InvalidOperationException)
+        {
+            // Server without theme endpoint: keep Officina brushes.
+        }
+
         ApplyEnabledModules();
         if (offerSetup && _apiClient.CompanyProfile is { IsConfigured: false })
         {
@@ -557,9 +580,13 @@ public partial class MainWindow : Window
         NavShippingSection.Visibility = Show(_apiClient.IsModuleEnabled("shipping"));
         NavSubcontracting.Visibility = Show(_apiClient.IsModuleEnabled("subcontracting"));
         NavInvoices.Visibility = Show(_apiClient.IsModuleEnabled("invoicing") && _apiClient.CurrentRole is "Admin" or "Sales" or "Management");
+        var scheduleRole = _apiClient.CurrentRole is "Admin" or "Sales" or "Management" or "Purchasing";
+        NavPaymentSchedule.Visibility = Show((_apiClient.IsModuleEnabled("invoicing") || _apiClient.IsModuleEnabled("purchasing")) && scheduleRole);
+        NavPurchaseInvoices.Visibility = Show(_apiClient.IsModuleEnabled("purchasing") && _apiClient.CurrentRole is "Admin" or "Purchasing");
         CompanyFiscalButton.Visibility = Show(_apiClient.IsModuleEnabled("invoicing") && _apiClient.CurrentRole == "Admin");
         NavHaccp.Visibility = Show(_apiClient.IsModuleEnabled("haccp"));
         NavSiteReports.Visibility = Show(_apiClient.IsModuleEnabled("site-work"));
+        ImportMetelButton.Visibility = Show(_apiClient.IsModuleEnabled("metel"));
         MaterialFoodButton.Visibility = Show(_apiClient.IsModuleEnabled("food-labels"));
         ProductFoodButton.Visibility = Show(_apiClient.IsModuleEnabled("food-labels"));
         var lotExpiry = _apiClient.IsModuleEnabled("lot-expiry");
@@ -587,6 +614,7 @@ public partial class MainWindow : Window
         NavDashboard.Visibility = Show(_apiClient.IsAreaShown("dashboard"));
         NavUsers.Visibility = Show(_apiClient.IsAreaShown("users"));
         AccessChannelsButton.Visibility = Show(_apiClient.CurrentRole == "Admin");
+        AppearanceButton.Visibility = Show(_apiClient.CurrentRole == "Admin");
         ServiceButton.Visibility = Show(_apiClient.IsModuleEnabled("service"));
         EnergyButton.Visibility = Show(_apiClient.IsModuleEnabled("energy-monitoring"));
 
@@ -604,7 +632,7 @@ public partial class MainWindow : Window
 
     private RadioButton[] AllNavItems() =>
         [NavMaterials, NavLowStock, NavMissing, NavSlips, NavMaterialLots, NavProducts, NavWorkOrders, NavWorkCenters,
-         NavDashboard, NavCustomers, NavQuotes, NavInvoices, NavOrders, NavSuppliers, NavCatalogSearch, NavSubcontracting,
+         NavDashboard, NavCustomers, NavQuotes, NavInvoices, NavPaymentSchedule, NavOrders, NavSuppliers, NavCatalogSearch, NavPurchaseInvoices, NavSubcontracting,
          NavPlanning, NavHaccp, NavSiteReports, NavEquipment, NavMaintenance, NavCarriers, NavShipments,
          NavTransportDocuments, NavMargins, NavAreas, NavUsers, NavSites];
 
@@ -618,6 +646,12 @@ public partial class MainWindow : Window
         {
             _ = LoadCompanyProfileAsync(offerSetup: false);
         }
+    }
+
+    private void AppearanceButton_Click(object sender, RoutedEventArgs e)
+    {
+        var window = new AppearanceWindow(_apiClient) { Owner = this };
+        window.ShowDialog();
     }
 
     // ---------- Documenti di trasporto
@@ -787,6 +821,105 @@ public partial class MainWindow : Window
     {
         new InvoiceWindow(_apiClient, id) { Owner = this }.ShowDialog();
         await LoadInvoicesAsync();
+    }
+
+    // ---------- Scadenziario e fatture passive
+
+    private Task LoadPaymentScheduleAsync() => RunBusyAsync(string.Empty, async () =>
+    {
+        var direction = (PaymentScheduleDirectionFilter.SelectedItem as ComboBoxItem)?.Tag as string;
+        var status = (PaymentScheduleStatusFilter.SelectedItem as ComboBoxItem)?.Tag as string;
+        var entries = await _apiClient.GetPaymentScheduleAsync(
+            string.IsNullOrEmpty(direction) ? null : direction,
+            string.IsNullOrEmpty(status) ? null : status);
+        PaymentScheduleList.ItemsSource = entries;
+        var open = entries.Where(e => e.Status == "Open").ToList();
+        PaymentScheduleInfoText.Text = open.Count == 0
+            ? "Nessuna scadenza aperta con i filtri scelti."
+            : $"{open.Count} scadenze aperte per {open.Sum(e => e.Amount):N2} €.";
+        _paymentScheduleLoaded = true;
+    });
+
+    private async void RefreshPaymentSchedule_Click(object sender, RoutedEventArgs e) => await LoadPaymentScheduleAsync();
+
+    private async void PaymentScheduleFilter_Changed(object sender, SelectionChangedEventArgs e)
+    {
+        if (_isAuthenticated && IsLoaded && _paymentScheduleLoaded)
+        {
+            await LoadPaymentScheduleAsync();
+        }
+    }
+
+    private async void MarkScheduleEntryPaid_Click(object sender, RoutedEventArgs e)
+    {
+        if (PaymentScheduleList.SelectedItem is not PaymentScheduleEntryDto entry)
+        {
+            MessageBox.Show("Seleziona una scadenza.", "Scadenziario", MessageBoxButton.OK, MessageBoxImage.Information);
+            return;
+        }
+
+        if (entry.Status == "Paid")
+        {
+            return;
+        }
+
+        await RunBusyAsync("Registrazione pagamento...", async () =>
+        {
+            await _apiClient.MarkScheduleEntryPaidAsync(entry.Id);
+            await LoadPaymentScheduleAsync();
+        });
+    }
+
+    private async void RemindScheduleEntry_Click(object sender, RoutedEventArgs e)
+    {
+        if (PaymentScheduleList.SelectedItem is not PaymentScheduleEntryDto entry)
+        {
+            MessageBox.Show("Seleziona una scadenza.", "Scadenziario", MessageBoxButton.OK, MessageBoxImage.Information);
+            return;
+        }
+
+        await RunBusyAsync("Registrazione sollecito...", async () =>
+        {
+            await _apiClient.RemindScheduleEntryAsync(entry.Id);
+            await LoadPaymentScheduleAsync();
+        });
+    }
+
+    private Task LoadPurchaseInvoicesAsync() => RunBusyAsync(string.Empty, async () =>
+    {
+        var invoices = await _apiClient.GetPurchaseInvoicesAsync();
+        PurchaseInvoicesList.ItemsSource = invoices;
+        PurchaseInvoicesInfoText.Text = invoices.Count == 0
+            ? "Importa un file XML FatturaPA ricevuto dal fornitore."
+            : $"{invoices.Count} fatture passive importate.";
+        _purchaseInvoicesLoaded = true;
+    });
+
+    private async void RefreshPurchaseInvoices_Click(object sender, RoutedEventArgs e) => await LoadPurchaseInvoicesAsync();
+
+    private async void ImportPurchaseInvoice_Click(object sender, RoutedEventArgs e)
+    {
+        var dialog = new Microsoft.Win32.OpenFileDialog
+        {
+            Filter = "FatturaPA XML (*.xml)|*.xml|Tutti i file|*.*",
+            Title = "Importa fattura passive",
+        };
+        if (dialog.ShowDialog(this) != true)
+        {
+            return;
+        }
+
+        await RunBusyAsync("Import fattura passive...", async () =>
+        {
+            var detail = await _apiClient.ImportPurchaseInvoiceXmlAsync(dialog.FileName);
+            MessageBox.Show(
+                $"Importata fattura {detail.DocumentNumber} di {detail.SupplierName} ({detail.Schedule.Count} scadenze).",
+                "Fatture passive",
+                MessageBoxButton.OK,
+                MessageBoxImage.Information);
+            _paymentScheduleLoaded = false;
+            await LoadPurchaseInvoicesAsync();
+        });
     }
 
     private void CustomerFiscalButton_Click(object sender, RoutedEventArgs e)
@@ -1177,6 +1310,12 @@ public partial class MainWindow : Window
             case "Fatture" when !_invoicesLoaded:
                 await LoadInvoicesAsync();
                 break;
+            case "Scadenziario" when !_paymentScheduleLoaded:
+                await LoadPaymentScheduleAsync();
+                break;
+            case "Fatture passive" when !_purchaseInvoicesLoaded:
+                await LoadPurchaseInvoicesAsync();
+                break;
         }
     }
 
@@ -1282,6 +1421,39 @@ public partial class MainWindow : Window
         await RunBusyAsync("Importazione catalogo PDF in corso...", async () =>
         {
             var summary = await _apiClient.ImportCatalogPdfAsync(dialog.FileName);
+            MessageBox.Show(
+                $"Righe importate: {summary.Imported}\nMateriali creati: {summary.CreatedMaterials}\nCollegamenti catalogo creati: {summary.CreatedLinks}",
+                "Importazione completata", MessageBoxButton.OK, MessageBoxImage.Information);
+            await SearchMaterialsAsync();
+        });
+    }
+
+    private async void ImportMetelButton_Click(object sender, RoutedEventArgs e)
+    {
+        var dialog = new Microsoft.Win32.OpenFileDialog
+        {
+            Filter = "Listino Metel (*.txt;*.csv)|*.txt;*.csv|Tutti i file (*.*)|*.*",
+            Title = "Importa listino Metel"
+        };
+        if (dialog.ShowDialog(this) != true)
+        {
+            return;
+        }
+
+        var supplier = new TextPromptWindow("Fornitore del listino",
+            "Codice fornitore a cui collegare gli articoli. Lascia vuoto per usare la marca (sigla produttore) di ogni riga.")
+        {
+            Owner = this,
+            AllowEmpty = true
+        };
+        if (supplier.ShowDialog() != true)
+        {
+            return;
+        }
+
+        await RunBusyAsync("Importazione listino Metel...", async () =>
+        {
+            var summary = await _apiClient.ImportMetelAsync(dialog.FileName, supplier.Value, null);
             MessageBox.Show(
                 $"Righe importate: {summary.Imported}\nMateriali creati: {summary.CreatedMaterials}\nCollegamenti catalogo creati: {summary.CreatedLinks}",
                 "Importazione completata", MessageBoxButton.OK, MessageBoxImage.Information);
@@ -3038,6 +3210,9 @@ public partial class MainWindow : Window
             : "-";
         OeeText.Text = dashboard.OeeRatio.HasValue
             ? dashboard.OeeRatio.Value.ToString("P0")
+                + (dashboard.OeeSource == "Machine" ? " (macchine)"
+                    : dashboard.OeeSource == "Hybrid" ? " (misto)"
+                    : " (dichiarato)")
             : "-";
     });
 

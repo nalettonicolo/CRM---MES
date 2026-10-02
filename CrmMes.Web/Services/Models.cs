@@ -68,10 +68,13 @@ public sealed record WorkOrderDetail(
     Guid Id, string Code, string ProductLotNumber, Guid ProductId, decimal Quantity, Guid? AreaId,
     string? CustomerReference, string Status, DateTime? DueDate, string? Notes, DateTime CreatedAt,
     DateTime? ReleasedAt, DateTime? CompletedAt, List<WorkOrderOperation> Operations,
-    Guid? CustomerId = null, Guid? QuoteId = null, string? ProductRevision = null);
+    Guid? CustomerId = null, Guid? QuoteId = null, string? ProductRevision = null,
+    string? CustomerName = null, string? QuoteCode = null, decimal? SalePrice = null);
 
 public sealed record WorkOrderMaterialLot(
     Guid MaterialLotId, string MaterialCode, string LotNumber, decimal QuantityConsumed, Guid WithdrawalSlipId, string WithdrawalSlipCode);
+
+public sealed record WorkOrderWithdrawalSlip(Guid WithdrawalSlipId, string WithdrawalSlipCode);
 
 public sealed record WorkOrderDashboard(
     int PeriodDays,
@@ -84,7 +87,28 @@ public sealed record WorkOrderDashboard(
     decimal? AvailabilityRatio,
     decimal TotalScrapQuantity,
     decimal? QualityRatio,
-    decimal? OeeRatio);
+    decimal? OeeRatio,
+    string OeeSource = "Declared",
+    decimal? MachineAvailabilityRatio = null,
+    decimal? MachineQualityRatio = null,
+    int MachinesReportingInPeriod = 0);
+
+public sealed record SoftwareOriginDeclaration(
+    string ProductName, string ProductVersion, string ProducerName, string? ProducerVat,
+    decimal EuDevelopmentPercent, string DevelopmentPlaces, string? Signatory, DateTime? UpdatedAt,
+    bool MeetsEuThreshold, string DeclarationText, DateTime IssuedOn);
+
+public sealed record UiThemePreset(
+    string Key, string Name, string Description,
+    string Background, string Surface, string SurfaceRaised, string Ink, string Muted, string Line,
+    string Accent, string AccentHover, string AccentSoft, string OnAccent, string Sidebar, string SidebarText,
+    string Ok, string Warn, int Radius, string Density, string BackgroundStyle, int FieldBorder, int FieldHeight);
+
+public sealed record UiThemeDto(
+    string Preset, string Background, string Surface, string SurfaceRaised, string Ink, string Muted, string Line,
+    string Accent, string AccentHover, string AccentSoft, string OnAccent, string Sidebar, string SidebarText,
+    string Ok, string Warn, int Radius, string Density, string BackgroundStyle, int FieldBorder, int FieldHeight,
+    Dictionary<string, string> CssVariables, List<UiThemePreset> Presets);
 
 public sealed record Material(
     Guid Id, string Code, string Name, string Unit, decimal Stock, decimal MinStock, bool IsActive, bool BelowMinimum,

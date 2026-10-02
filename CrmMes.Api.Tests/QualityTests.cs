@@ -43,7 +43,7 @@ public class QualityTests : IClassFixture<AdminSeededApiTestFixture>
         var checkpoint = (await createResponse.Content.ReadFromJsonAsync<QualityCheckpointResponse>())!;
 
         var listResponse = await _adminClient.GetFromJsonAsync<List<QualityCheckpointResponse>>($"/api/quality-checkpoints?productId={product.Id}");
-        Assert.Contains(listResponse!, c => c.Id == checkpoint.Id);
+        Assert.Contains(listResponse!, c => c.Id == checkpoint.Id && c.ProductCode == product.Code);
     }
 
     [Fact]
@@ -115,5 +115,14 @@ public class QualityTests : IClassFixture<AdminSeededApiTestFixture>
             new CreateQualityMeasurementRequest(checkpoint.Id, workOrder.Id, null, 1m, null, null));
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task NonConformities_EmptyList_ReturnsOk()
+    {
+        var response = await _adminClient.GetAsync("/api/quality-measurements/non-conformities");
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var rows = await response.Content.ReadFromJsonAsync<List<QualityNonConformityResponse>>();
+        Assert.NotNull(rows);
     }
 }

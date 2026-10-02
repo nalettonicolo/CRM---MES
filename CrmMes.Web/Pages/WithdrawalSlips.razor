@@ -1,0 +1,110 @@
+@page "/distinte"
+@inject Api Api
+
+<PageTitle>Distinte di prelievo · Nicolò MES</PageTitle>
+
+<div class="page-head">
+    <div>
+        <div class="eyebrow">Magazzino</div>
+        <h1>Distinte di prelievo</h1>
+        <p class="sub">Prelievi aperti e chiusi. Creazione e chiusura restano nel programma desktop.</p>
+    </div>
+</div>
+
+<div class="toolbar">
+    <div class="chips" role="group" aria-label="Stato">
+        @foreach (var (key, label) in Filters)
+        {
+            <button class="chip @(_status == key ? "active" : "")" aria-pressed="@(_status == key)" @onclick="() => ChangeStatusAsync(key)">@label</button>
+        }
+    </div>
+</div>
+
+<div class="card">
+    @if (_error is not null)
+    {
+        <div class="state"><strong>@Labels.LoadFailed("le distinte di prelievo")</strong>@_error
+            <div class="actions"><button class="secondary small" @onclick="LoadAsync">@Labels.Retry</button></div></div>
+    }
+    else if (_rows is null)
+    {
+        <div class="state">@Labels.Loading</div>
+    }
+    else if (_rows.Count == 0)
+    {
+        <div class="state"><strong>Nessuna distinta</strong>Nessuna distinta in questo stato.</div>
+    }
+    else
+    {
+        <div class="table-wrap">
+            <table class="cards">
+                <thead><tr><th>Codice</th><th>Commessa</th><th>Stato</th><th class="num">Righe</th><th class="num">Mancanti</th><th>Creata</th></tr></thead>
+                <tbody>
+                    @foreach (var slip in _rows)
+                    {
+                        <tr>
+                            <td data-label="Codice"><a href="distinte/@slip.Id" class="code">@slip.Code</a></td>
+                            <td data-label="Commessa">
+                                @if (slip.WorkOrderId is { } workOrderId)
+                                {
+                                    <a href="commesse/@workOrderId" class="code">@(slip.WorkOrderCode ?? "Commessa")</a>
+                                }
+                                else
+                                {
+                                    <span class="muted">—</span>
+                                }
+                            </td>
+                            <td data-label="Stato"><span class="badge @Labels.SlipStatusClass(slip.Status)">@Labels.SlipStatus(slip.Status)</span></td>
+                            <td data-label="Righe" class="num">@slip.ItemCount</td>
+                            <td data-label="Mancanti" class="num">
+                                @if (slip.MissingItemCount > 0)
+                                {
+                                    <span class="badge warn">@slip.MissingItemCount</span>
+                                }
+                                else
+                                {
+                                    <span>0</span>
+                                }
+                            </td>
+                            <td data-label="Creata">@Labels.Date(slip.CreatedAt)</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    }
+</div>
+
+@code {
+    private static readonly (string Key, string Label)[] Filters =
+    [
+        ("", "Tutte"), ("Draft", "Bozza"), ("Ready", "Pronte"), ("Closed", "Chiuse"), ("Cancelled", "Annullate")
+    ];
+
+    private string _status = "";
+    private List<WithdrawalSlipSummary>? _rows;
+    private string? _error;
+
+    protected override Task OnInitializedAsync() => LoadAsync();
+
+    private Task ChangeStatusAsync(string status)
+    {
+        _status = status;
+        _rows = null;
+        return LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        _error = null;
+        try
+        {
+            var query = string.IsNullOrEmpty(_status) ? "api/withdrawal-slips" : $"api/withdrawal-slips?status={_status}";
+            _rows = await Api.GetAsync<List<WithdrawalSlipSummary>>(query);
+        }
+        catch (ApiException exception)
+        {
+            _error = exception.Message;
+        }
+    }
+}

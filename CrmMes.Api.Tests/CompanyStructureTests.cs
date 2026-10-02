@@ -41,7 +41,7 @@ public class CompanyStructureTests : IClassFixture<AdminSeededApiTestFixture>
         Assert.Contains("site-work", modules);            // from the activity and the service department
         Assert.Contains("panel-verification", modules);   // from the panel builders department
         Assert.DoesNotContain("haccp", modules);
-        Assert.DoesNotContain("metel", modules);          // announced, not available yet
+        Assert.Contains("metel", modules);             // listini ANIE/METEL: attività impianti + reparto quadristi
     }
 
     [Fact]
@@ -157,6 +157,34 @@ public class CompanyStructureTests : IClassFixture<AdminSeededApiTestFixture>
         var newcomerView = await _fixture.Factory.AuthenticatedClient(newcomer.Token)
             .GetFromJsonAsync<List<WorkOrderLookupResponse>>("/api/work-orders/lookup?department=mine");
         Assert.Contains(newcomerView!, o => o.Id == testJob);
+    }
+
+    [Fact]
+    public async Task DepartmentFilter_FinishedPhasesDoNotKeepTheJobInMine()
+    {
+        var suffix = Guid.NewGuid().ToString("N")[..6];
+        await _admin.PutAsJsonAsync("/api/company-profile/structure", new SaveStructureRequest(
+            [new SaveDepartmentRequest("panels", $"Cablaggio {suffix}", null)]));
+        var structure = await _admin.GetFromJsonAsync<List<DepartmentResponse>>("/api/company-profile/structure");
+        var panels = structure!.Single(d => d.Name == $"Cablaggio {suffix}");
+        var workCenters = await _admin.GetFromJsonAsync<List<WorkCenter>>("/api/work-centers");
+        var bench = workCenters!.First(w => w.AreaId == panels.Id).Name;
+        var jobId = await ReleasedJobAsync($"F{suffix}", bench);
+
+        var wirer = await TestAuth.CreateUserWithRoleAsync(_fixture.Factory, _fixture.Admin.Token, "Operator");
+        (await _admin.PostAsync($"/api/areas/{panels.Id}/users/{wirer.UserId}", null)).EnsureSuccessStatusCode();
+        var wirerClient = _fixture.Factory.AuthenticatedClient(wirer.Token);
+
+        var before = await wirerClient.GetFromJsonAsync<List<WorkOrderLookupResponse>>("/api/work-orders/lookup?department=mine");
+        Assert.Contains(before!, o => o.Id == jobId);
+
+        var detail = await _admin.GetFromJsonAsync<WorkOrderResponse>($"/api/work-orders/{jobId}");
+        var operationId = detail!.Operations.Single().Id;
+        (await _admin.PostAsync($"/api/work-orders/{jobId}/operations/{operationId}/start", null)).EnsureSuccessStatusCode();
+        (await _admin.PostAsync($"/api/work-orders/{jobId}/operations/{operationId}/complete", null)).EnsureSuccessStatusCode();
+
+        var after = await wirerClient.GetFromJsonAsync<List<WorkOrderLookupResponse>>("/api/work-orders/lookup?department=mine");
+        Assert.DoesNotContain(after!, o => o.Id == jobId);
     }
 
     private async Task<Guid> ReleasedJobAsync(string code, string workCenter)

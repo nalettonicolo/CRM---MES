@@ -82,7 +82,7 @@
         <h2>Nuovo intervento</h2>
         <div class="form-grid">
             <label>Macchina
-                <select @bind="_newEquipmentId">
+                <select @bind="_newEquipmentId" aria-label="Macchina per il nuovo intervento">
                     <option value="">Scegli...</option>
                     @if (_equipment is not null)
                     {

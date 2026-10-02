@@ -1,0 +1,71 @@
+@page "/verifica-quadri"
+@inject Api Api
+@inject NavigationManager Nav
+
+<PageTitle>Verifica quadri · Nicolò MES</PageTitle>
+
+<div class="page-head">
+    <div>
+        <div class="eyebrow">Produzione</div>
+        <h1>Verifica quadri CEI EN 61439</h1>
+        <p class="sub">Apri una commessa per consultare o completare la verifica individuale.</p>
+    </div>
+</div>
+
+<div class="toolbar">
+    <input class="search" type="search" placeholder="Codice commessa" aria-label="Cerca commessa" @bind="_search" @bind:event="oninput" />
+    <button class="secondary" @onclick="LoadAsync">Cerca</button>
+</div>
+
+<div class="card">
+    @if (_error is not null)
+    {
+        <div class="state"><strong>@Labels.LoadFailed("le commesse")</strong>@_error</div>
+    }
+    else if (_rows is null)
+    {
+        <div class="state">@Labels.Loading</div>
+    }
+    else if (_rows.Count == 0)
+    {
+        <div class="state">Nessuna commessa aperta.</div>
+    }
+    else
+    {
+        <div class="table-wrap">
+            <table class="cards">
+                <thead><tr><th>Commessa</th><th>Prodotto</th><th>Stato</th></tr></thead>
+                <tbody>
+                    @foreach (var row in Visible)
+                    {
+                        <tr class="link" @onclick="@(() => Nav.NavigateTo($"commesse/{row.Id}/verifica-quadro"))">
+                            <td data-label="Commessa" class="code">@row.Code</td>
+                            <td data-label="Prodotto">@row.ProductName</td>
+                            <td data-label="Stato"><StatusBadge Status="@row.Status" /></td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    }
+</div>
+
+@code {
+    private string _search = "";
+    private List<WorkOrderSummary>? _rows;
+    private string? _error;
+
+    private IEnumerable<WorkOrderSummary> Visible => string.IsNullOrWhiteSpace(_search)
+        ? _rows ?? []
+        : (_rows ?? []).Where(r => r.Code.Contains(_search.Trim(), StringComparison.OrdinalIgnoreCase)
+            || r.ProductName.Contains(_search.Trim(), StringComparison.OrdinalIgnoreCase));
+
+    protected override Task OnInitializedAsync() => LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        _error = null;
+        try { _rows = await Api.GetAsync<List<WorkOrderSummary>>("api/work-orders?status=Open"); }
+        catch (ApiException exception) { _error = exception.Message; }
+    }
+}

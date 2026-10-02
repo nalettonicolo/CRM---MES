@@ -3,6 +3,7 @@
 @inject Session Session
 @inject Api Api
 @inject NavigationManager Nav
+@inject IJSRuntime Js
 
 @if (!_restored)
 {
@@ -60,13 +61,14 @@ else
                 <div class="nav-group">
                     <div class="nav-title">Amministrazione</div>
                     <NavLink class="nav-link" href="amministrazione/canali" @onclick="CloseMenu">Canali di accesso</NavLink>
+                    <NavLink class="nav-link" href="aspetto" @onclick="CloseMenu">Aspetto grafico</NavLink>
                 </div>
             }
 
             @if (DesktopOnlyNames is { Count: > 0 } desktopOnly)
             {
                 <div class="nav-note">
-                    Nel programma desktop: @string.Join(", ", desktopOnly). Arriveranno anche qui.
+                    Nel programma desktop: @string.Join(", ", desktopOnly). Il terminale di reparto è anche in /tecnici.
                 </div>
             }
 
@@ -142,6 +144,16 @@ else
 
             var access = await Api.GetAsync<AccessChannels>("api/company-profile/access");
             _areaNames = access.KnownAreas.ToDictionary(area => area.Key, area => area.Name);
+
+            try
+            {
+                var theme = await Api.GetAsync<UiThemeDto>("api/company-profile/theme");
+                await Js.InvokeVoidAsync("nicolomes.applyTheme", theme.CssVariables, theme.BackgroundStyle);
+            }
+            catch (ApiException)
+            {
+                // Older server without theme endpoint: keep CSS defaults.
+            }
 
             if (Nav.ToBaseRelativePath(Nav.Uri).Length == 0)
             {

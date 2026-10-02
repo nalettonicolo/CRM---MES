@@ -1,5 +1,7 @@
 @page "/ddt/{Id:guid}"
 @inject Api Api
+@inject Session Session
+@inject NavigationManager Nav
 
 <PageTitle>@(_document?.DocumentCode ?? "Documento di trasporto") · Nicolò MES</PageTitle>
 
@@ -29,18 +31,52 @@ else if (_document is null)
 else
 {
     <div class="stack">
+        @if (_actionError is not null)
+        {
+            <div class="alert" role="alert">@_actionError</div>
+        }
         @if (_document.Status == "Cancelled")
         {
             <div class="alert">Annullato il @Labels.DateTime(_document.CancelledAt)@(string.IsNullOrWhiteSpace(_document.CancellationReason) ? "." : $": {_document.CancellationReason}")</div>
         }
         else if (_document.Status == "Draft")
         {
-            <div class="notice">Bozza: il numero si assegna all'emissione, dal programma desktop.</div>
+            <div class="notice">Bozza: all'emissione si assegna il numero e, sulle righe materiale, si scarica lo stock.</div>
+        }
+        else if (_document.Status == "Issued" && CanInvoice)
+        {
+            <div class="notice">Documento emesso: puoi creare la bozza di fattura differita (TD24).</div>
+        }
+
+        @if (CanIssue || (CanInvoice && _document.Status == "Issued"))
+        {
+            <div class="actions">
+                @if (CanIssue)
+                {
+                    <button @onclick="IssueAsync" disabled="@_busy">Emetti DDT</button>
+                }
+                @if (CanInvoice && _document.Status == "Issued" && _document.CustomerId is not null)
+                {
+                    <button class="secondary" @onclick="CreateInvoiceAsync" disabled="@_busy">Crea bozza fattura</button>
+                }
+            </div>
         }
 
         <div class="card card-pad">
             <div class="facts">
-                <div class="fact"><div class="label">Destinatario</div><div class="value">@_document.RecipientName</div></div>
+                <div class="fact">
+                    <div class="label">Destinatario</div>
+                    <div class="value">
+                        @if (_document.CustomerId is { } customerId)
+                        {
+                            <a href="clienti/@customerId">@_document.RecipientName</a>
+                        }
+                        else
+                        {
+                            @_document.RecipientName
+                        }
+                    </div>
+                </div>
                 <div class="fact"><div class="label">Indirizzo</div><div class="value">@(_document.RecipientAddress ?? "—")</div></div>
                 <div class="fact"><div class="label">Partita IVA</div><div class="value">@(_document.RecipientVatNumber ?? "—")</div></div>
                 <div class="fact"><div class="label">Destinazione</div><div class="value">@(_document.DestinationAddress ?? "Come destinatario")</div></div>
@@ -121,6 +157,14 @@ else
 
     private TransportDocument? _document;
     private string? _error;
+    private string? _actionError;
+    private bool _busy;
+
+    private bool CanIssue => _document?.Status == "Draft"
+        && Session.HasModule("shipping")
+        && Session.Role is "Admin" or "Sales" or "Warehouse" or "Purchasing";
+
+    private bool CanInvoice => Session.HasModule("invoicing") && QuoteRules.CanSell(Session.Role);
 
     protected override async Task OnParametersSetAsync()
     {
@@ -133,6 +177,44 @@ else
         catch (ApiException exception)
         {
             _error = exception.Message;
+        }
+    }
+
+    private async Task IssueAsync()
+    {
+        _busy = true;
+        _actionError = null;
+        try
+        {
+            _document = await Api.PostAsync<TransportDocument>($"api/transport-documents/{Id}/issue", new { transportStartAt = (DateTime?)null });
+        }
+        catch (ApiException exception)
+        {
+            _actionError = exception.Message;
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+
+    private async Task CreateInvoiceAsync()
+    {
+        _busy = true;
+        _actionError = null;
+        try
+        {
+            var invoice = await Api.PostAsync<Invoice>("api/invoices/from-transport-documents",
+                new { transportDocumentIds = new[] { Id } });
+            Nav.NavigateTo($"fatture/{invoice.Id}");
+        }
+        catch (ApiException exception)
+        {
+            _actionError = exception.Message;
+        }
+        finally
+        {
+            _busy = false;
         }
     }
 }

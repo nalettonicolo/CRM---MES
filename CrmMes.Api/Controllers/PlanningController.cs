@@ -39,77 +39,71 @@ public class PlanningController : ControllerBase
             : types.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).ToHashSet(StringComparer.OrdinalIgnoreCase);
         bool WantsType(string type) => requestedTypes is null || requestedTypes.Contains(type);
 
-        var entries = new List<PlanningEntryResponse>();
-
-        if (WantsType("WorkOrder"))
-        {
-            var workOrders = await _dbContext.WorkOrders
-                .AsNoTracking()
-                .Include(o => o.Product)
-                .Where(o => o.DueDate != null && o.Status != "Completed" && o.Status != "Cancelled" &&
-                    (siteId == null || (o.Area != null && o.Area.SiteId == siteId)))
-                .ToListAsync(cancellationToken);
-
-            entries.AddRange(workOrders.Select(o => new PlanningEntryResponse(
-                "WorkOrder", o.Id, o.Code, o.Status, o.DueDate!.Value, o.Product.Name, "Consegna cliente")));
-        }
-
-        if (WantsType("PurchaseOrder"))
-        {
-            var purchaseOrders = await _dbContext.PurchaseOrders
-                .AsNoTracking()
-                .Include(order => order.Supplier)
-                .Where(order => order.ExpectedDeliveryDate != null && order.Status != "Received" && order.Status != "Cancelled")
-                .ToListAsync(cancellationToken);
-
-            entries.AddRange(purchaseOrders.Select(order => new PlanningEntryResponse(
-                "PurchaseOrder", order.Id, order.Code, order.Status, order.ExpectedDeliveryDate!.Value, order.Supplier.Name, "Consegna prevista")));
-        }
-
-        if (WantsType("Shipment"))
-        {
-            var shipments = await _dbContext.Shipments
-                .AsNoTracking()
-                .Include(s => s.Carrier)
-                .Where(s => s.ExpectedAt != null && s.Status != "Delivered" && s.Status != "Cancelled")
-                .ToListAsync(cancellationToken);
-
-            entries.AddRange(shipments.Select(s => new PlanningEntryResponse(
-                "Shipment", s.Id, s.Code, s.Status, s.ExpectedAt!.Value, s.Carrier.Name,
-                s.Direction == "Inbound" ? "Spedizione in ingresso" : "Spedizione in uscita")));
-        }
-
-        if (WantsType("MaintenanceTask"))
-        {
-            var maintenanceTasks = await _dbContext.MaintenanceTasks
-                .AsNoTracking()
-                .Include(t => t.Equipment).ThenInclude(equipment => equipment!.WorkCenter)
-                .Where(t => t.DueDate != null && t.Status == "Pending" &&
-                    (siteId == null || (t.Equipment.WorkCenter != null && t.Equipment.WorkCenter.SiteId == siteId)))
-                .ToListAsync(cancellationToken);
-
-            entries.AddRange(maintenanceTasks.Select(t => new PlanningEntryResponse(
-                "MaintenanceTask", t.Id, t.Title, t.Status, t.DueDate!.Value, t.Equipment.Name, "Manutenzione")));
-        }
-
         var today = DateTime.UtcNow.Date;
         var thisWeekStart = StartOfWeek(today);
         var nextWeekStart = thisWeekStart.AddDays(7);
         var nextWeekEnd = nextWeekStart.AddDays(7);
+        var allDueDates = new List<DateTime>();
+        var entries = new List<PlanningEntryResponse>();
+
+        if (WantsType("WorkOrder"))
+        {
+            var open = _dbContext.WorkOrders.AsNoTracking()
+                .Where(o => o.DueDate != null && o.Status != "Completed" && o.Status != "Cancelled" &&
+                    (siteId == null || (o.Area != null && o.Area.SiteId == siteId)));
+            allDueDates.AddRange(await open.Select(o => o.DueDate!.Value).ToListAsync(cancellationToken));
+            entries.AddRange(await open
+                .Where(o => o.DueDate >= rangeStart && o.DueDate < rangeEnd)
+                .Select(o => new PlanningEntryResponse(
+                    "WorkOrder", o.Id, o.Code, o.Status, o.DueDate!.Value, o.Product.Name, "Consegna cliente"))
+                .ToListAsync(cancellationToken));
+        }
+
+        if (WantsType("PurchaseOrder"))
+        {
+            var open = _dbContext.PurchaseOrders.AsNoTracking()
+                .Where(order => order.ExpectedDeliveryDate != null && order.Status != "Received" && order.Status != "Cancelled");
+            allDueDates.AddRange(await open.Select(order => order.ExpectedDeliveryDate!.Value).ToListAsync(cancellationToken));
+            entries.AddRange(await open
+                .Where(order => order.ExpectedDeliveryDate >= rangeStart && order.ExpectedDeliveryDate < rangeEnd)
+                .Select(order => new PlanningEntryResponse(
+                    "PurchaseOrder", order.Id, order.Code, order.Status, order.ExpectedDeliveryDate!.Value, order.Supplier.Name, "Consegna prevista"))
+                .ToListAsync(cancellationToken));
+        }
+
+        if (WantsType("Shipment"))
+        {
+            var open = _dbContext.Shipments.AsNoTracking()
+                .Where(s => s.ExpectedAt != null && s.Status != "Delivered" && s.Status != "Cancelled");
+            allDueDates.AddRange(await open.Select(s => s.ExpectedAt!.Value).ToListAsync(cancellationToken));
+            entries.AddRange(await open
+                .Where(s => s.ExpectedAt >= rangeStart && s.ExpectedAt < rangeEnd)
+                .Select(s => new PlanningEntryResponse(
+                    "Shipment", s.Id, s.Code, s.Status, s.ExpectedAt!.Value, s.Carrier.Name,
+                    s.Direction == "Inbound" ? "Spedizione in ingresso" : "Spedizione in uscita"))
+                .ToListAsync(cancellationToken));
+        }
+
+        if (WantsType("MaintenanceTask"))
+        {
+            var open = _dbContext.MaintenanceTasks.AsNoTracking()
+                .Where(t => t.DueDate != null && t.Status == "Pending" &&
+                    (siteId == null || (t.Equipment.WorkCenter != null && t.Equipment.WorkCenter.SiteId == siteId)));
+            allDueDates.AddRange(await open.Select(t => t.DueDate!.Value).ToListAsync(cancellationToken));
+            entries.AddRange(await open
+                .Where(t => t.DueDate >= rangeStart && t.DueDate < rangeEnd)
+                .Select(t => new PlanningEntryResponse(
+                    "MaintenanceTask", t.Id, t.Title, t.Status, t.DueDate!.Value, t.Equipment.Name, "Manutenzione"))
+                .ToListAsync(cancellationToken));
+        }
 
         // Overdue/ThisWeek/NextWeek are deliberately global — real urgency regardless of which weeks are
-        // currently being browsed, so switching the range never hides something overdue. Total is
-        // deliberately scoped to the visible range instead ("Totale nel periodo" promises exactly that),
-        // so it always matches the row count actually shown below it.
-        var inRange = entries
-            .Where(e => e.Date >= rangeStart && e.Date < rangeEnd)
-            .OrderBy(e => e.Date)
-            .ToList();
-
+        // currently being browsed. Total is scoped to the visible range.
+        var inRange = entries.OrderBy(e => e.Date).ToList();
         var dashboard = new PlanningDashboardResponse(
-            Overdue: entries.Count(e => e.Date.Date < today),
-            ThisWeek: entries.Count(e => e.Date.Date >= thisWeekStart && e.Date.Date < nextWeekStart),
-            NextWeek: entries.Count(e => e.Date.Date >= nextWeekStart && e.Date.Date < nextWeekEnd),
+            Overdue: allDueDates.Count(date => date.Date < today),
+            ThisWeek: allDueDates.Count(date => date.Date >= thisWeekStart && date.Date < nextWeekStart),
+            NextWeek: allDueDates.Count(date => date.Date >= nextWeekStart && date.Date < nextWeekEnd),
             Total: inRange.Count);
 
         return Ok(new PlanningResponse(rangeStart, weeks, inRange, dashboard));

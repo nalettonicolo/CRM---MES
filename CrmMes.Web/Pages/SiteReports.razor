@@ -1,0 +1,89 @@
+@page "/cantiere"
+@inject Api Api
+@inject NavigationManager Nav
+
+<PageTitle>Rapportini cantiere · Nicolò MES</PageTitle>
+
+<div class="page-head">
+    <div>
+        <div class="eyebrow">Produzione</div>
+        <h1>Rapportini cantiere</h1>
+        <p class="sub">Ore e materiali firmati dal cliente. I tecnici compilano da telefono su /tecnici.</p>
+    </div>
+</div>
+
+<div class="toolbar">
+    <div class="chips" role="group" aria-label="Stato">
+        @foreach (var (key, label) in Filters)
+        {
+            <button class="chip @(_status == key ? "active" : "")" aria-pressed="@(_status == key)" @onclick="() => ChangeAsync(key)">@label</button>
+        }
+    </div>
+</div>
+
+<div class="card">
+    @if (_error is not null)
+    {
+        <div class="state"><strong>@Labels.LoadFailed("i rapportini")</strong>@_error
+            <div class="actions"><button class="secondary small" @onclick="LoadAsync">@Labels.Retry</button></div></div>
+    }
+    else if (_rows is null)
+    {
+        <div class="state">@Labels.Loading</div>
+    }
+    else if (_rows.Count == 0)
+    {
+        <div class="state">Nessun rapportino in questo stato.</div>
+    }
+    else
+    {
+        <div class="table-wrap">
+            <table class="cards">
+                <thead><tr><th>Codice</th><th>Commessa</th><th>Cliente</th><th>Data</th><th class="num">Minuti</th><th>Stato</th></tr></thead>
+                <tbody>
+                    @foreach (var row in _rows)
+                    {
+                        <tr class="link" @onclick="@(() => Nav.NavigateTo($"cantiere/{row.Id}"))">
+                            <td data-label="Codice" class="code">@row.Code</td>
+                            <td data-label="Commessa" class="code">@row.WorkOrderCode</td>
+                            <td data-label="Cliente">@(row.CustomerName ?? "—")</td>
+                            <td data-label="Data">@Labels.Date(row.WorkDate)</td>
+                            <td data-label="Minuti" class="num">@Labels.Number(row.TotalMinutes)</td>
+                            <td data-label="Stato"><span class="badge @Labels.SiteReportStatusClass(row.Status)">@Labels.SiteReportStatus(row.Status)</span></td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    }
+</div>
+
+@code {
+    private static readonly (string Key, string Label)[] Filters = [("", "Tutti"), ("Draft", "Bozza"), ("Signed", "Firmati")];
+    private string _status = "";
+    private List<SiteReportSummary>? _rows;
+    private string? _error;
+
+    protected override Task OnInitializedAsync() => LoadAsync();
+
+    private Task ChangeAsync(string status)
+    {
+        _status = status;
+        _rows = null;
+        return LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        _error = null;
+        try
+        {
+            var query = string.IsNullOrEmpty(_status) ? "api/site-reports" : $"api/site-reports?status={_status}";
+            _rows = await Api.GetAsync<List<SiteReportSummary>>(query);
+        }
+        catch (ApiException exception)
+        {
+            _error = exception.Message;
+        }
+    }
+}

@@ -75,7 +75,7 @@ else
             {
                 <div class="table-wrap">
                     <table class="cards">
-                        <thead><tr><th>Materiale</th><th class="num">Quantità</th><th>Origine</th><th>Dal</th></tr></thead>
+                        <thead><tr><th>Materiale</th><th class="num">Quantità</th><th>Origine</th><th>Distinta</th><th>Dal</th></tr></thead>
                         <tbody>
                             @foreach (var item in _missing)
                             {
@@ -83,6 +83,16 @@ else
                                     <td data-label="Materiale" class="code">@item.MaterialCode</td>
                                     <td data-label="Quantità" class="num">@Labels.Number(item.Quantity)</td>
                                     <td data-label="Origine" class="muted">@Labels.MissingSource(item.Source)</td>
+                                    <td data-label="Distinta">
+                                        @if (item.WithdrawalSlipId is { } slipId)
+                                        {
+                                            <a href="distinte/@slipId" class="code">Apri</a>
+                                        }
+                                        else
+                                        {
+                                            <span class="muted">—</span>
+                                        }
+                                    </td>
                                     <td data-label="Dal">@Labels.Date(item.CreatedAt)</td>
                                 </tr>
                             }

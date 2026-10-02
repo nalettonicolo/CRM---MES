@@ -1,0 +1,77 @@
+@page "/margini"
+@inject Api Api
+@inject Session Session
+@inject NavigationManager Nav
+
+<PageTitle>Margini · Nicolò MES</PageTitle>
+
+<div class="page-head">
+    <div>
+        <div class="eyebrow">Produzione</div>
+        <h1>Margini</h1>
+        <p class="sub">Costo stimato e reale sulle commesse con prezzo di vendita. Solo direzione.</p>
+    </div>
+</div>
+
+@if (Session.Role is not ("Admin" or "Management"))
+{
+    <div class="card state"><strong>@Labels.ForbiddenTitle</strong>I margini sono riservati alla direzione.</div>
+}
+else if (_error is not null)
+{
+    <div class="card state"><strong>@Labels.LoadFailed("i margini")</strong>@_error
+        <div class="actions"><button class="secondary small" @onclick="LoadAsync">@Labels.Retry</button></div></div>
+}
+else if (_data is null)
+{
+    <div class="card state">@Labels.Loading</div>
+}
+else
+{
+    <div class="kpis">
+        <div class="card kpi"><div class="label">Ricavi</div><div class="value">@Labels.Money(_data.Revenue)</div></div>
+        <div class="card kpi"><div class="label">Costo reale</div><div class="value">@Labels.Money(_data.ActualCost)</div></div>
+        <div class="card kpi"><div class="label">Margine</div><div class="value">@Labels.Money(_data.Margin)</div><div class="hint">@Labels.Percent(_data.MarginRatio)</div></div>
+        <div class="card kpi"><div class="label">In perdita</div><div class="value">@_data.LossMakingCount</div><div class="hint">@_data.PricedWorkOrderCount commesse con prezzo</div></div>
+    </div>
+    <div class="card">
+        @if (_data.WorkOrders.Count == 0)
+        {
+            <div class="state">Nessuna commessa da valorizzare.</div>
+        }
+        else
+        {
+            <div class="table-wrap">
+                <table class="cards">
+                    <thead><tr><th>Commessa</th><th>Cliente</th><th class="num">Vendita</th><th class="num">Costo reale</th><th class="num">Margine</th></tr></thead>
+                    <tbody>
+                        @foreach (var row in _data.WorkOrders)
+                        {
+                            <tr class="link" @onclick="@(() => Nav.NavigateTo($"commesse/{row.WorkOrderId}"))">
+                                <td data-label="Commessa" class="code">@row.WorkOrderCode <div class="small muted">@row.ProductName</div></td>
+                                <td data-label="Cliente">@(row.CustomerName ?? "—")</td>
+                                <td data-label="Vendita" class="num">@(row.SalePrice is null ? "—" : Labels.Money(row.SalePrice.Value))</td>
+                                <td data-label="Costo reale" class="num">@Labels.Money(row.ActualCost)</td>
+                                <td data-label="Margine" class="num">@(row.ActualMargin is null ? "—" : Labels.Money(row.ActualMargin.Value))</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        }
+    </div>
+}
+
+@code {
+    private MarginOverview? _data;
+    private string? _error;
+
+    protected override Task OnInitializedAsync() => Session.Role is "Admin" or "Management" ? LoadAsync() : Task.CompletedTask;
+
+    private async Task LoadAsync()
+    {
+        _error = null;
+        try { _data = await Api.GetAsync<MarginOverview>("api/margins"); }
+        catch (ApiException exception) { _error = exception.Message; }
+    }
+}

@@ -1,0 +1,76 @@
+@page "/commesse/{Id:guid}/verifica-quadro"
+@inject Api Api
+
+<PageTitle>Verifica quadro · Nicolò MES</PageTitle>
+
+<div class="page-head">
+    <div>
+        <div class="eyebrow"><a href="verifica-quadri">Verifica quadri</a></div>
+        <h1>@(_row is null ? "Verifica quadro" : $"Verifica {_row.WorkOrderCode}")</h1>
+        @if (_row is not null)
+        {
+            <p class="sub"><a href="commesse/@Id" class="code">@_row.WorkOrderCode</a> · @_row.ProductName</p>
+        }
+    </div>
+    @if (_row is not null)
+    {
+        <span class="badge @Labels.DocumentStatusClass(_row.Status == "Completed" ? "Issued" : "Draft")">@(_row.Status == "Completed" ? "Completata" : "Bozza")</span>
+    }
+</div>
+
+@if (_error is not null)
+{
+    <div class="card state"><strong>Impossibile aprire la verifica</strong>@_error</div>
+}
+else if (_row is null)
+{
+    <div class="card state">@Labels.Loading</div>
+}
+else
+{
+    <div class="stack">
+        <div class="card card-pad">
+            <div class="facts">
+                <div class="fact"><div class="label">Norma</div><div class="value">@_row.Standard</div></div>
+                <div class="fact"><div class="label">Un</div><div class="value">@(_row.RatedVoltage is null ? "—" : Labels.Number(_row.RatedVoltage.Value) + " V")</div></div>
+                <div class="fact"><div class="label">InA</div><div class="value">@(_row.RatedCurrent is null ? "—" : Labels.Number(_row.RatedCurrent.Value) + " A")</div></div>
+                <div class="fact"><div class="label">IP</div><div class="value">@(_row.IpRating ?? "—")</div></div>
+                <div class="fact"><div class="label">Verificato da</div><div class="value">@(_row.VerifiedBy ?? "—")</div></div>
+                <div class="fact"><div class="label">Completata</div><div class="value">@Labels.DateTime(_row.CompletedAt)</div></div>
+            </div>
+        </div>
+        <div class="card">
+            <div class="section-head"><h2>Prove di rito (CEI EN 61439-1 cl. 11)</h2></div>
+            <div class="table-wrap">
+                <table class="cards">
+                    <thead><tr><th>Clausola</th><th>Prova</th><th>Esito</th></tr></thead>
+                    <tbody>
+                        @foreach (var check in _row.Checks)
+                        {
+                            <tr>
+                                <td data-label="Clausola" class="code">@check.Clause</td>
+                                <td data-label="Prova">@check.Description</td>
+                                <td data-label="Esito"><span class="badge @Labels.CheckResultClass(check.Result)">@Labels.CheckResult(check.Result)</span></td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+            <p class="muted small">La compilazione e il completamento restano nel programma desktop, in officina.</p>
+        </div>
+    </div>
+}
+
+@code {
+    [Parameter] public Guid Id { get; set; }
+    private PanelVerification? _row;
+    private string? _error;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        _row = null;
+        _error = null;
+        try { _row = await Api.GetAsync<PanelVerification>($"api/work-orders/{Id}/panel-verification"); }
+        catch (ApiException exception) { _error = exception.Message; }
+    }
+}

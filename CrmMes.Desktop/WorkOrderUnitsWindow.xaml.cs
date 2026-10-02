@@ -30,7 +30,7 @@ public partial class WorkOrderUnitsWindow : Window
                 return;
             }
 
-            InfoText.Text = $"{units.Count} unità pianificate. Ogni unità nasce \"In attesa\": diventa \"Scartata\" se le si registra contro una non conformità, oppure \"Buona\" automaticamente al completamento della commessa se non è mai stata scartata. Doppio click su una riga per il dettaglio (fasi attraversate e lotti materiali attribuiti).";
+            InfoText.Text = $"{units.Count} unità pianificate. Ogni unità nasce \"Da fare\": diventa \"Scartata\" se le si registra contro una non conformità, oppure \"Buona\" automaticamente al completamento della commessa se non è mai stata scartata. Doppio click su una riga per il dettaglio (fasi attraversate e lotti materiali attribuiti).";
             UnitsList.ItemsSource = units;
         }
         catch (Exception exception)

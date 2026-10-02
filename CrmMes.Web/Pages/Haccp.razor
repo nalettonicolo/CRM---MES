@@ -1,0 +1,102 @@
+@page "/haccp"
+@inject Api Api
+
+<PageTitle>HACCP · Nicolò MES</PageTitle>
+
+<div class="page-head">
+    <div>
+        <div class="eyebrow">Qualità</div>
+        <h1>HACCP</h1>
+        <p class="sub">Punti di controllo e ultime letture. Fuori limite serve l'azione correttiva.</p>
+    </div>
+</div>
+
+@if (_error is not null)
+{
+    <div class="card state"><strong>@Labels.LoadFailed("i registri HACCP")</strong>@_error
+        <div class="actions"><button class="secondary small" @onclick="LoadAsync">@Labels.Retry</button></div></div>
+}
+else if (_points is null)
+{
+    <div class="card state">@Labels.Loading</div>
+}
+else if (_points.Count == 0)
+{
+    <div class="card state"><strong>Nessun punto di controllo</strong>Si definiscono dal programma desktop.</div>
+}
+else
+{
+    <div class="stack">
+        <div class="card">
+            <div class="table-wrap">
+                <table class="cards">
+                    <thead><tr><th>Punto</th><th>Luogo</th><th>Ultima lettura</th><th>Esito</th></tr></thead>
+                    <tbody>
+                        @foreach (var point in _points)
+                        {
+                            <tr>
+                                <td data-label="Punto">@point.Name <div class="small muted">@(point.Hazard ?? point.Frequency)</div></td>
+                                <td data-label="Luogo">@(point.Location ?? "—")</td>
+                                <td data-label="Ultima lettura">@Labels.DateTime(point.LastReadAt) @if (point.LastValue is not null) {<span> · @Labels.Number(point.LastValue.Value) @(point.Unit)</span>}</td>
+                                <td data-label="Esito">
+                                    @if (point.LastCompliant is true) {<span class="badge ok">Conforme</span>}
+                                    else if (point.LastCompliant is false) {<span class="badge danger">Non conforme</span>}
+                                    else {<span class="muted">—</span>}
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        @if (_readings is { Count: > 0 })
+        {
+            <div class="card">
+                <div class="section-head"><h2>Letture degli ultimi 14 giorni</h2></div>
+                <div class="table-wrap">
+                    <table class="cards">
+                        <thead><tr><th>Quando</th><th>Punto</th><th>Valore</th><th>Esito</th></tr></thead>
+                        <tbody>
+                            @foreach (var reading in _readings)
+                            {
+                                <tr>
+                                    <td data-label="Quando">@Labels.DateTime(reading.ReadAt)</td>
+                                    <td data-label="Punto">@reading.ControlPointName</td>
+                                    <td data-label="Valore">@(reading.Value is null ? (reading.Compliant ? "OK" : "KO") : Labels.Number(reading.Value.Value))</td>
+                                    <td data-label="Esito">
+                                        @if (reading.Compliant) {<span class="badge ok">Conforme</span>}
+                                        else {<span class="badge danger">Azione: @(reading.CorrectiveAction ?? "—")</span>}
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        }
+    </div>
+}
+
+@code {
+    private List<HaccpControlPoint>? _points;
+    private List<HaccpReading>? _readings;
+    private string? _error;
+
+    protected override Task OnInitializedAsync() => LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        _error = null;
+        try
+        {
+            _points = await Api.GetAsync<List<HaccpControlPoint>>("api/haccp/control-points");
+            var from = DateTime.UtcNow.Date.AddDays(-14).ToString("yyyy-MM-dd");
+            var to = DateTime.UtcNow.Date.ToString("yyyy-MM-dd");
+            _readings = await Api.GetAsync<List<HaccpReading>>($"api/haccp/readings?from={from}&to={to}");
+        }
+        catch (ApiException exception)
+        {
+            _error = exception.Message;
+        }
+    }
+}

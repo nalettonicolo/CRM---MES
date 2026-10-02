@@ -31,6 +31,7 @@ public class WorkOrdersController : ControllerBase
     public async Task<ActionResult<IEnumerable<WorkOrderSummaryResponse>>> GetWorkOrders(
         [FromQuery] string? status = null,
         [FromQuery] Guid? siteId = null,
+        [FromQuery] Guid? quoteId = null,
         CancellationToken cancellationToken = default)
     {
         var query = _dbContext.WorkOrders.AsNoTracking();
@@ -47,6 +48,11 @@ public class WorkOrdersController : ControllerBase
         if (siteId.HasValue)
         {
             query = query.Where(order => order.Area != null && order.Area.SiteId == siteId);
+        }
+
+        if (quoteId.HasValue)
+        {
+            query = query.Where(order => order.QuoteId == quoteId);
         }
 
         var orders = await query
@@ -73,10 +79,7 @@ public class WorkOrdersController : ControllerBase
     [HttpGet("{id:guid}")]
     public async Task<ActionResult<WorkOrderResponse>> GetWorkOrder(Guid id, CancellationToken cancellationToken = default)
     {
-        var order = await _dbContext.WorkOrders
-            .AsNoTracking()
-            .Include(o => o.Operations)
-            .SingleOrDefaultAsync(o => o.Id == id, cancellationToken);
+        var order = await LoadWorkOrderAsync(id, cancellationToken);
 
         return order is null ? NotFound() : Ok(ToResponse(order));
     }
@@ -90,6 +93,8 @@ public class WorkOrdersController : ControllerBase
         var order = await _dbContext.WorkOrders
             .AsNoTracking()
             .Include(o => o.Operations)
+            .Include(o => o.Customer)
+            .Include(o => o.Quote)
             .SingleOrDefaultAsync(o => o.Code == code, cancellationToken);
 
         return order is null ? NotFound() : Ok(ToResponse(order));
@@ -446,7 +451,7 @@ public class WorkOrdersController : ControllerBase
 
         if (operation.Status != "Pending")
         {
-            return Conflict(new { message = "Solo una fase in attesa può essere avviata." });
+            return Conflict(new { message = "Solo una fase da fare può essere avviata." });
         }
 
         operation.Status = "InProgress";
@@ -1042,8 +1047,19 @@ public class WorkOrdersController : ControllerBase
                 .ToList(),
             order.CustomerId,
             order.QuoteId,
-            order.ProductRevision);
+            order.ProductRevision,
+            order.Customer?.Name,
+            order.Quote?.Code,
+            order.SalePrice);
     }
+
+    private Task<WorkOrder?> LoadWorkOrderAsync(Guid id, CancellationToken cancellationToken) =>
+        _dbContext.WorkOrders
+            .AsNoTracking()
+            .Include(o => o.Operations)
+            .Include(o => o.Customer)
+            .Include(o => o.Quote)
+            .SingleOrDefaultAsync(o => o.Id == id, cancellationToken);
 
     /// <summary>Minutes actually spent on a finished operation, or null while it's still open — the raw
     /// number a performance ratio is built from.</summary>
@@ -1143,12 +1159,69 @@ public class WorkOrdersController : ControllerBase
             ? Math.Max(0, goodWeight / totalWeight)
             : (decimal?)null;
 
+        var averagePerformanceRatio = performanceRatios.Count > 0 ? performanceRatios.Average() : (decimal?)null;
+
+        // Prefer machine readings when present: availability and quality from the gateway are closer to
+        // what MES buyers and Transizione 5.0/iperammortamento expect than operator-declared stops.
+        var to = DateTime.UtcNow;
+        var lookback = since.AddHours(-1);
+        var equipmentQuery = _dbContext.Equipment.AsNoTracking().Where(e => e.IsActive);
+        if (siteId is not null)
+        {
+            equipmentQuery = equipmentQuery.Where(e => e.WorkCenter != null && e.WorkCenter.SiteId == siteId);
+        }
+
+        var equipmentIds = await equipmentQuery.Select(e => e.Id).ToListAsync(cancellationToken);
+        decimal? machineAvailability = null;
+        decimal? machineQuality = null;
+        var machinesReporting = 0;
+        if (equipmentIds.Count > 0)
+        {
+            var events = await _dbContext.MachineEvents.AsNoTracking()
+                .Where(e => equipmentIds.Contains(e.EquipmentId) && e.Timestamp >= lookback && e.Timestamp < to)
+                .ToListAsync(cancellationToken);
+            decimal running = 0, planned = 0;
+            long pieces = 0, scrap = 0;
+            foreach (var group in events.GroupBy(e => e.EquipmentId))
+            {
+                var inWindow = group.Any(e => e.Timestamp >= since && e.Timestamp < to);
+                if (!inWindow)
+                {
+                    continue;
+                }
+
+                var stats = MachineStats.Compute(group.ToList(), since, to);
+                machinesReporting++;
+                running += stats.MinutesByState.GetValueOrDefault("Running");
+                planned += stats.MinutesByState.Where(m => m.Key != "Off").Sum(m => m.Value);
+                pieces += stats.Pieces;
+                scrap += stats.Scrap;
+            }
+
+            if (planned > 0)
+            {
+                machineAvailability = Math.Round(running / planned, 4);
+            }
+
+            if (pieces + scrap > 0)
+            {
+                machineQuality = Math.Round((decimal)pieces / (pieces + scrap), 4);
+            }
+        }
+
+        var declaredAvailability = availabilityRatio;
+        var declaredQuality = qualityRatio;
+        var usedAvailability = machineAvailability ?? declaredAvailability;
+        var usedQuality = machineQuality ?? declaredQuality;
+        var oeeSource = machineAvailability is not null && machineQuality is not null ? "Machine"
+            : machineAvailability is not null || machineQuality is not null ? "Hybrid"
+            : "Declared";
+
         // Full OEE: Performance is capped at 1 for this composite (finishing faster than estimated
         // shouldn't inflate OEE past 100%, even though the standalone AveragePerformanceRatio above can
         // exceed 1 to show "ahead of schedule").
-        var averagePerformanceRatio = performanceRatios.Count > 0 ? performanceRatios.Average() : (decimal?)null;
-        var oeeRatio = availabilityRatio.HasValue && averagePerformanceRatio.HasValue && qualityRatio.HasValue
-            ? availabilityRatio.Value * Math.Min(1, averagePerformanceRatio.Value) * qualityRatio.Value
+        var oeeRatio = usedAvailability.HasValue && averagePerformanceRatio.HasValue && usedQuality.HasValue
+            ? usedAvailability.Value * Math.Min(1, averagePerformanceRatio.Value) * usedQuality.Value
             : (decimal?)null;
 
         return Ok(new WorkOrderDashboardResponse(
@@ -1159,10 +1232,14 @@ public class WorkOrdersController : ControllerBase
             completedOrders.Count,
             ordersWithDueDate.Count > 0 ? (decimal)onTimeCount / ordersWithDueDate.Count : null,
             totalDowntimeMinutes,
-            availabilityRatio,
+            usedAvailability,
             totalScrapQuantity,
-            qualityRatio,
-            oeeRatio));
+            usedQuality,
+            oeeRatio,
+            oeeSource,
+            machineAvailability,
+            machineQuality,
+            machinesReporting));
     }
 }
 
@@ -1219,7 +1296,10 @@ public sealed record WorkOrderResponse(
     IReadOnlyList<WorkOrderOperationResponse> Operations,
     Guid? CustomerId = null,
     Guid? QuoteId = null,
-    string? ProductRevision = null);
+    string? ProductRevision = null,
+    string? CustomerName = null,
+    string? QuoteCode = null,
+    decimal? SalePrice = null);
 
 public sealed record WorkOrderOperationResponse(
     Guid Id,
@@ -1251,7 +1331,11 @@ public sealed record WorkOrderDashboardResponse(
     decimal? AvailabilityRatio,
     decimal TotalScrapQuantity,
     decimal? QualityRatio,
-    decimal? OeeRatio);
+    decimal? OeeRatio,
+    string OeeSource = "Declared",
+    decimal? MachineAvailabilityRatio = null,
+    decimal? MachineQualityRatio = null,
+    int MachinesReportingInPeriod = 0);
 
 public sealed record MaterialAvailabilityLineResponse(string MaterialCode, decimal Required, decimal Available, decimal Shortfall);
 

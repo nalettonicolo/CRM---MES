@@ -137,6 +137,27 @@ public class QualityMeasurementsController : ControllerBase
             allPassed, measurements));
     }
 
+    /// <summary>Recent defects from the shop floor, optionally one work order. Complements the
+    /// per-operation list used at the terminal.</summary>
+    [HttpGet("non-conformities")]
+    public async Task<ActionResult<IEnumerable<QualityNonConformityResponse>>> GetNonConformities(
+        [FromQuery] Guid? workOrderId = null, CancellationToken cancellationToken = default)
+    {
+        var query = _dbContext.NonConformities.AsNoTracking()
+            .Include(n => n.Operation).ThenInclude(o => o.WorkOrder)
+            .Include(n => n.Unit)
+            .AsQueryable();
+        if (workOrderId.HasValue)
+        {
+            query = query.Where(n => n.Operation.WorkOrderId == workOrderId);
+        }
+
+        var rows = await query.OrderByDescending(n => n.DetectedAt).Take(200).ToListAsync(cancellationToken);
+        return Ok(rows.Select(n => new QualityNonConformityResponse(
+            n.Id, n.Operation.WorkOrderId, n.Operation.WorkOrder.Code, n.Operation.Name, n.Description,
+            n.ScrapQuantity, n.Notes, n.DetectedAt, n.ReportedBy, n.Unit?.SerialNumber)));
+    }
+
     /// <summary>Null when the checkpoint has no limit on that side (a one-sided or purely observational
     /// measurement) — a null bound never fails the comparison.</summary>
     private static bool? IsWithinTolerance(decimal value, decimal? lowerLimit, decimal? upperLimit)
@@ -172,3 +193,7 @@ public sealed record QualityMeasurementResponse(
 public sealed record QualityCertificateResponse(
     Guid WorkOrderId, string WorkOrderCode, string ProductLotNumber, string ProductCode, string ProductName,
     bool AllPassed, List<QualityMeasurementResponse> Measurements);
+
+public sealed record QualityNonConformityResponse(
+    Guid Id, Guid WorkOrderId, string WorkOrderCode, string OperationName, string Description,
+    decimal ScrapQuantity, string? Notes, DateTime DetectedAt, string? ReportedBy, string? UnitSerialNumber);

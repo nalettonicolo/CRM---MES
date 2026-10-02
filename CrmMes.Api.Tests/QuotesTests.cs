@@ -198,7 +198,12 @@ public class QuotesTests : IClassFixture<AdminSeededApiTestFixture>
         (await _adminClient.PostAsync($"/api/quotes/{quote.Id}/accept", null)).EnsureSuccessStatusCode();
 
         var dueDate = DateTime.UtcNow.Date.AddDays(42);
-        var convert = await _adminClient.PostAsJsonAsync($"/api/quotes/{quote.Id}/convert", new ConvertQuoteRequest(dueDate, null));
+        var areaSuffix = Guid.NewGuid().ToString("N")[..6];
+        var areaResponse = await _adminClient.PostAsJsonAsync("/api/areas",
+            new CreateAreaRequest($"Area {areaSuffix}", $"A{areaSuffix}", null));
+        areaResponse.EnsureSuccessStatusCode();
+        var area = (await areaResponse.Content.ReadFromJsonAsync<Area>())!;
+        var convert = await _adminClient.PostAsJsonAsync($"/api/quotes/{quote.Id}/convert", new ConvertQuoteRequest(dueDate, area.Id));
 
         Assert.Equal(HttpStatusCode.OK, convert.StatusCode);
         var result = (await convert.Content.ReadFromJsonAsync<ConvertQuoteResponse>())!;
@@ -210,12 +215,18 @@ public class QuotesTests : IClassFixture<AdminSeededApiTestFixture>
         Assert.Equal(customer.Id, order.CustomerId);
         Assert.Equal(quote.Id, order.QuoteId);
         Assert.Equal(dueDate, order.DueDate);
+        Assert.Equal(area.Id, order.AreaId);
+        Assert.Equal(3376.35m, order.SalePrice); // 3 × 1250.50 × (1 − 10%)
         Assert.Equal(2, order.Operations.Count); // routing snapshotted like a hand-made work order
         Assert.Equal("Draft", order.Status);
 
         var detail = (await _adminClient.GetFromJsonAsync<CustomerDetailResponse>($"/api/customers/{customer.Id}/detail"))!;
         Assert.Contains(detail.WorkOrders, w => w.Id == created.Id);
         Assert.Contains(detail.Quotes, q => q.Id == quote.Id);
+
+        var reloaded = (await _adminClient.GetFromJsonAsync<QuoteResponse>($"/api/quotes/{quote.Id}"))!;
+        Assert.Equal(created.Id, Assert.Single(reloaded.WorkOrders!).Id);
+        Assert.Equal(created.Code, reloaded.WorkOrders![0].Code);
     }
 
     [Fact]

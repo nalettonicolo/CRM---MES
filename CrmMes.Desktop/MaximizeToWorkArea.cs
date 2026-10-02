@@ -7,7 +7,8 @@ namespace CrmMes.Desktop;
 /// <summary>A window with WindowStyle="None" and a custom WindowChrome maximizes to the whole monitor,
 /// taskbar included: the bottom of the app (end of the sidebar, last rows of long lists) ended up hidden
 /// behind the Windows taskbar. Answering WM_GETMINMAXINFO with the work area of the monitor the window
-/// is on (taskbar excluded) makes maximize stop at the taskbar, on any monitor.</summary>
+/// is on (taskbar excluded) makes maximize stop at the taskbar, on any monitor. MaxTrackSize must match
+/// MaxSize — without it Windows still allows the window to grow to the full screen.</summary>
 public static class MaximizeToWorkArea
 {
     private const int WmGetMinMaxInfo = 0x0024;
@@ -15,11 +16,20 @@ public static class MaximizeToWorkArea
 
     public static void Attach(Window window)
     {
-        window.SourceInitialized += (_, _) =>
+        void Hook()
         {
-            var handle = new WindowInteropHelper(window).Handle;
+            var handle = new WindowInteropHelper(window).EnsureHandle();
             HwndSource.FromHwnd(handle)?.AddHook(WindowProc);
-        };
+        }
+
+        if (new WindowInteropHelper(window).Handle != IntPtr.Zero)
+        {
+            Hook();
+        }
+        else
+        {
+            window.SourceInitialized += (_, _) => Hook();
+        }
     }
 
     private static IntPtr WindowProc(IntPtr hwnd, int msg, IntPtr wParam, IntPtr lParam, ref bool handled)
@@ -29,21 +39,39 @@ public static class MaximizeToWorkArea
             return IntPtr.Zero;
         }
 
-        var monitor = MonitorFromWindow(hwnd, MonitorDefaultToNearest);
-        var info = new MonitorInfo { Size = Marshal.SizeOf<MonitorInfo>() };
-        if (monitor == IntPtr.Zero || !GetMonitorInfo(monitor, ref info))
+        if (!TryGetWorkArea(hwnd, out var work, out var monitor))
         {
             return IntPtr.Zero;
         }
 
         var minMax = Marshal.PtrToStructure<MinMaxInfo>(lParam);
-        minMax.MaxPosition.X = info.Work.Left - info.Monitor.Left;
-        minMax.MaxPosition.Y = info.Work.Top - info.Monitor.Top;
-        minMax.MaxSize.X = info.Work.Right - info.Work.Left;
-        minMax.MaxSize.Y = info.Work.Bottom - info.Work.Top;
-        Marshal.StructureToPtr(minMax, lParam, true);
+        minMax.MaxPosition.X = work.Left - monitor.Left;
+        minMax.MaxPosition.Y = work.Top - monitor.Top;
+        minMax.MaxSize.X = work.Right - work.Left;
+        minMax.MaxSize.Y = work.Bottom - work.Top;
+        // Without MaxTrackSize, maximize still expands to the full monitor (under the taskbar).
+        minMax.MaxTrackSize.X = minMax.MaxSize.X;
+        minMax.MaxTrackSize.Y = minMax.MaxSize.Y;
+        Marshal.StructureToPtr(minMax, lParam, fDeleteOld: true);
         handled = true;
         return IntPtr.Zero;
+    }
+
+    /// <summary>Work and monitor rectangles in physical pixels for the screen that owns <paramref name="hwnd"/>.</summary>
+    internal static bool TryGetWorkArea(IntPtr hwnd, out Rect work, out Rect monitor)
+    {
+        work = default;
+        monitor = default;
+        var handle = MonitorFromWindow(hwnd, MonitorDefaultToNearest);
+        var info = new MonitorInfo { Size = Marshal.SizeOf<MonitorInfo>() };
+        if (handle == IntPtr.Zero || !GetMonitorInfo(handle, ref info))
+        {
+            return false;
+        }
+
+        work = info.Work;
+        monitor = info.Monitor;
+        return work.Right > work.Left && work.Bottom > work.Top;
     }
 
     [DllImport("user32.dll")]
@@ -70,7 +98,7 @@ public static class MaximizeToWorkArea
     }
 
     [StructLayout(LayoutKind.Sequential)]
-    private struct Rect
+    internal struct Rect
     {
         public int Left;
         public int Top;

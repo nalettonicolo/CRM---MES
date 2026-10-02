@@ -1,0 +1,156 @@
+@page "/fatture-passive"
+@inject Api Api
+@inject Session Session
+@inject NavigationManager Nav
+
+<PageTitle>Fatture passive · Nicolò MES</PageTitle>
+
+<div class="page-head">
+    <div>
+        <div class="eyebrow">Acquisti</div>
+        <h1>Fatture passive</h1>
+        <p class="sub">Importa le fatture elettroniche ricevute dai fornitori (XML FatturaPA). Le scadenze di pagamento compaiono nello <a href="scadenziario">scadenziario</a>.</p>
+    </div>
+</div>
+
+@if (!PayablesRules.CanImportPassive(Session.Role))
+{
+    <div class="card state"><strong>Non disponibile per il tuo ruolo</strong>L'import è riservato ad acquisti e amministrazione.</div>
+}
+else
+{
+    <div class="toolbar">
+        <label class="file-pick">
+            Importa XML FatturaPA
+            <InputFile OnChange="ImportAsync" accept=".xml,application/xml,text/xml" />
+        </label>
+        <button class="secondary" @onclick="LoadAsync">Aggiorna</button>
+    </div>
+
+    @if (_importError is not null)
+    {
+        <div class="card state danger"><strong>Import non riuscito</strong>@_importError</div>
+    }
+    else if (_importOk is not null)
+    {
+        <div class="card state ok">@_importOk</div>
+    }
+
+    <div class="card">
+        @if (_error is not null)
+        {
+            <div class="state"><strong>Impossibile caricare l'elenco</strong>@_error
+                <div class="actions"><button class="secondary small" @onclick="LoadAsync">Riprova</button></div></div>
+        }
+        else if (_invoices is null)
+        {
+            <div class="state">Caricamento...</div>
+        }
+        else if (_invoices.Count == 0)
+        {
+            <div class="state"><strong>Nessuna fattura passive</strong>Carica il file XML scaricato dal portale Fatture e Corrispettivi o dal commercialista.</div>
+        }
+        else
+        {
+            <div class="table-wrap">
+                <table class="cards">
+                    <thead>
+                        <tr>
+                            <th>Numero</th>
+                            <th>Data</th>
+                            <th>Fornitore</th>
+                            <th class="num">Imponibile</th>
+                            <th>Scadenze</th>
+                            <th>Importata</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var invoice in _invoices)
+                        {
+                            <tr class="link" @onclick="@(() => Nav.NavigateTo($"fatture-passive/{invoice.Id}"))">
+                                <td data-label="Numero"><CopyCode Value="@invoice.DocumentNumber" /></td>
+                                <td data-label="Data">@Labels.Date(invoice.DocumentDate)</td>
+                                <td data-label="Fornitore">@invoice.SupplierName</td>
+                                <td data-label="Imponibile" class="num">@Labels.Money(invoice.TaxableTotal)</td>
+                                <td data-label="Scadenze">
+                                    @if (invoice.OpenInstallments > 0)
+                                    {
+                                        <span class="badge warn">@invoice.OpenInstallments aperte</span>
+                                    }
+                                    @if (invoice.PaidInstallments > 0)
+                                    {
+                                        <span class="badge ok">@invoice.PaidInstallments pagate</span>
+                                    }
+                                </td>
+                                <td data-label="Importata" class="muted">@Labels.DateTime(invoice.ImportedAt)</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        }
+    </div>
+}
+
+@code {
+    private List<PurchaseInvoiceSummary>? _invoices;
+    private string? _error;
+    private string? _importError;
+    private string? _importOk;
+    private bool _importing;
+
+    protected override Task OnInitializedAsync() =>
+        PayablesRules.CanImportPassive(Session.Role) ? LoadAsync() : Task.CompletedTask;
+
+    private async Task LoadAsync()
+    {
+        _error = null;
+        _invoices = null;
+        try
+        {
+            _invoices = await Api.GetAsync<List<PurchaseInvoiceSummary>>("api/payables/purchase-invoices");
+        }
+        catch (Exception ex)
+        {
+            _error = ex.Message;
+        }
+    }
+
+    private async Task ImportAsync(InputFileChangeEventArgs e)
+    {
+        if (_importing)
+        {
+            return;
+        }
+
+        var file = e.File;
+        if (file.Size == 0)
+        {
+            _importError = "Il file è vuoto.";
+            return;
+        }
+
+        _importing = true;
+        _importError = null;
+        _importOk = null;
+        try
+        {
+            await using var stream = file.OpenReadStream(maxAllowedSize: 5_000_000);
+            using var memory = new MemoryStream();
+            await stream.CopyToAsync(memory);
+            var detail = await Api.PostFileAsync<PurchaseInvoiceDetail>(
+                "api/payables/purchase-invoices/import", memory.ToArray(), file.Name);
+            _importOk = $"Importata fattura {detail.DocumentNumber} di {detail.SupplierName} con {detail.Schedule.Count} scadenza/e.";
+            await LoadAsync();
+            Nav.NavigateTo($"fatture-passive/{detail.Id}");
+        }
+        catch (Exception ex)
+        {
+            _importError = ex.Message;
+        }
+        finally
+        {
+            _importing = false;
+        }
+    }
+}

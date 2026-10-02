@@ -41,15 +41,15 @@ public static class Labels
     public static string OperationStatus(string status) => status switch
     {
         "Pending" => "Da fare",
-        "InProgress" => "In corso",
-        "Completed" => "Completata",
+        "InProgress" => "In lavorazione",
+        "Done" or "Completed" => "Completata",
         _ => status,
     };
 
     public static string OperationStatusClass(string status) => status switch
     {
         "InProgress" => "warn",
-        "Completed" => "ok",
+        "Done" or "Completed" => "ok",
         _ => string.Empty,
     };
 
@@ -146,6 +146,91 @@ public static class Labels
     public static string Number(decimal value) => value.ToString(value == decimal.Truncate(value) ? "N0" : "N2", Italian);
 
     public static string Percent(decimal? ratio) => ratio is null ? "—" : (ratio.Value * 100).ToString("N0", Italian) + "%";
+
+    public const string Loading = "Caricamento...";
+    public const string Retry = "Riprova";
+    public const string ForbiddenTitle = "Non disponibile per il tuo ruolo";
+    public const string Forbidden = "Il tuo ruolo non ha i permessi per questa operazione.";
+    public const string Unreachable = "Server non raggiungibile. Controlla la connessione e riprova.";
+
+    public static string LoadFailed(string subject) => $"Impossibile caricare {subject}";
+
+    public static string SlipStatus(string status) => status switch
+    {
+        "Draft" => "Bozza",
+        "Ready" => "Pronta",
+        "Closed" => "Chiusa",
+        "Cancelled" => "Annullata",
+        _ => status,
+    };
+
+    public static string SlipStatusClass(string status) => status switch
+    {
+        "Ready" => "info",
+        "Closed" => "ok",
+        "Cancelled" => "danger",
+        _ => string.Empty,
+    };
+
+    public static string ShipmentDirection(string direction) => direction switch
+    {
+        "Inbound" => "In ingresso",
+        "Outbound" => "In uscita",
+        _ => direction,
+    };
+
+    public static string ShipmentStatus(string status) => status switch
+    {
+        "Preparing" => "In preparazione",
+        "Shipped" => "Spedita",
+        "Delivered" => "Consegnata",
+        "Cancelled" => "Annullata",
+        _ => status,
+    };
+
+    public static string ShipmentStatusClass(string status) => status switch
+    {
+        "Shipped" => "info",
+        "Delivered" => "ok",
+        "Cancelled" => "danger",
+        "Preparing" => "warn",
+        _ => string.Empty,
+    };
+
+    public static string SiteReportStatus(string status) => status switch
+    {
+        "Draft" => "Bozza",
+        "Signed" => "Firmato",
+        _ => status,
+    };
+
+    public static string SiteReportStatusClass(string status) => status == "Signed" ? "ok" : string.Empty;
+
+    public static string CheckResult(string? result) => result switch
+    {
+        "Pass" => "Superata",
+        "Fail" => "Non superata",
+        "NotApplicable" => "Non applicabile",
+        _ => "Da fare",
+    };
+
+    public static string CheckResultClass(string? result) => result switch
+    {
+        "Pass" => "ok",
+        "Fail" => "danger",
+        "NotApplicable" => "info",
+        _ => string.Empty,
+    };
+
+    public static string PlanningStatus(string status) => status switch
+    {
+        "InValutazione" => "In valutazione",
+        "Confermata" => "Confermata",
+        "InProduzione" => "In produzione",
+        "Sospesa" => "Sospesa",
+        "Consegnata" => "Consegnata",
+        _ => status,
+    };
 
     /// <summary>Width class (w0…w100, steps of 10) for a progress bar: the CSP forbids inline styles.</summary>
     public static string ProgressClass(int done, int total)

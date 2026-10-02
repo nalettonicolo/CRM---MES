@@ -1,264 +1,194 @@
 # Analisi di mercato dei MES e confronto con Nicolò MES
 
-Aggiornata al 30/09/2026. Punto di vista del team: commerciale, commercialista, specialista fatturazione, capocantiere, responsabile tecnico impianti, capo area e capo reparto, ingegneri (gestionale, meccanico, informatico, Industria 4.0/5.0), cybersecurity manager, data analyst e graphic designer.
+Aggiornata al **2 ottobre 2026** (allineata allo stato prodotto in [STATO-PROGETTO.md](STATO-PROGETTO.md) e a ricerca di mercato ripresa in questa data). Punto di vista del team: commerciale, commercialista, specialista fatturazione, capocantiere, responsabile tecnico impianti, capo area e capo reparto, ingegneri (gestionale, meccanico, informatico, Industria 4.0/5.0), cybersecurity manager, data analyst e graphic designer.
 
 ## 1. In sintesi
 
-- **Il mercato.** In Italia il mercato dei MES cresce: secondo lo studio AlixPartners e Qualitas arriverà a circa 120 milioni di euro nel 2027, con una crescita del 5,2% annuo. Quasi tutti i prodotti promettono le stesse cose (raccolta dati, OEE, tracciabilità). A fare la differenza sono tre cose:
-  - il collegamento diretto con le macchine;
-  - i dati in tempo reale;
-  - l'integrazione con l'ERP e con la contabilità.
-- **Il nostro punto di forza.** Un solo prodotto copre produzione, parte commerciale, documenti fiscali italiani (DDT, FatturaPA) e requisiti di settore (CEI EN 61439, HACCP e allergeni, rapportini firmati). Si configura per attività e reparti e si usa da desktop, web e telefono. I concorrenti PMI di solito coprono una sola di queste aree e si appoggiano a un ERP esterno.
-- **I nostri vuoti principali:**
-  - l'invio automatico allo SdI e la contabilità (scadenziario, incassi, pagamenti);
-  - la schedulazione a capacità finita;
-  - le istruzioni di lavoro digitali al terminale;
-  - il monitoraggio energetico per l'iperammortamento 2026;
-  - il service post-vendita e l'ufficio tecnico (in sviluppo);
-  - l'autenticazione a due fattori;
-  - alcune integrazioni attese per settore: EPLAN per i quadristi, DM 37/08 per gli impiantisti, tabella nutrizionale per l'alimentare.
-- **Il momento favorevole.** La legge di bilancio 2026 (L. 199/2025) ha sostituito il credito d'imposta 5.0 con un **iperammortamento al 180%**, valido dal 1/1/2026 al 30/9/2028. È ammesso anche il software per l'interconnessione e la gestione dell'energia, purché dimostri l'interconnessione e misuri i consumi in modo continuo. Chi ha già un MES con dati macchina ed energia ha un argomento di vendita forte.
+- **Il mercato.** In Italia i MES resteranno un pezzo centrale della digitalizzazione di fabbrica: studio AlixPartners–Qualitas (marzo 2025) → **~120 M€ entro il 2027**, CAGR **5,2%** (2022–2027). In Europa occidentale il CAGR è più alto (**6,7%**, mercato UE ~**887 M€** al 2027); a livello globale si parla di circa **3 Md€** al 2027 (CAGR ~5,6%). Il mercato italiano è **frammentato (~23 fornitori)**: 11 specializzati MES, pochi indipendenti; consolidamento e passaggio da software “fatto in casa” a prodotti standard, cloud, IoT/edge e AI.
+- **Cosa distingue ancora i prodotti.** Connettività macchina reale, dati in tempo reale, integrazione ERP/contabilità, e (dal 2026) **documentazione di interconnessione** utile alla perizia dell’iperammortamento. I MES “solo reparto” vincono sul campo; chi ha anche commerciale e fiscale italiano riduce i pezzi da integrare.
+- **Il nostro punto di forza.** Un solo prodotto: produzione + commerciale + documenti italiani (DDT, FatturaPA validata) + moduli di settore (CEI EN 61439, HACCP/allergeni/SSCC, rapportini firmati, collaudo FAT/SAT e CE, service, energia, ufficio tecnico). Configurabile per attività e reparti; desktop, web e telefono. I MES PMI tipici restano sul reparto e demandano ERP esterno per clienti, DDT e fatture.
+- **Vuoti ancora rilevanti (02/10/2026, dopo chiusura contro in codice):**
+  - **invio automatico allo SdI** (G9); G8 passive/scadenziario: codice + migrazione Neon fatti, **commit/push ancora da fare**;
+  - **capacità finita** e **ubicazioni** magazzino;
+  - MRP: **esplosione distinta + proposte fatti** (G10 base); resta creazione automatica ordini e multi-livello;
+  - **OEE cruscotto da macchina** quando ci sono letture (`OeeSource`); resta collegare macchine/contatori in campo;
+  - **origine UE software**: pagina/API fatti; veridicità a carico del produttore;
+  - pacchetti verticali (EPLAN/lista fili, DM 37/08/SAL, 3.1, nutrizionale/bilance);
+  - **assistente IA**, SSO, più lingue; web ancora più consultazione che creazione;
+  - hosting a pagamento e referenze pubbliche (scelta del titolare).
+- **Momento favorevole (incentivi).** La L. 199/2025 (bilancio 2026) ha sostituito i crediti 4.0/5.0 con **iperammortamento** (maggiorazione del costo ammortizzabile): **180%** fino a 2,5 M€, **100%** fino a 10 M€, **50%** fino a 20 M€, investimenti **1/1/2026–30/9/2028**. Software in Allegato V agevolabile se **interconnesso** al sistema di gestione produzione / rete di fornitura; serve perizia asseverata. Dal **12/06/2026** è attiva la piattaforma GSE per le comunicazioni. Attenzione nuova: il decreto attuativo chiede dichiarazione di **origine UE** del software (≥50% del valore di sviluppo sostanziale in UE/SEE) — rilevante in vendita e in perizia.
 
 ## 2. Mappa del mercato
 
-| Fascia | Esempi | Per chi | Prezzo indicativo | Punto forte | Limite per una PMI |
+| Fascia | Esempi | Per chi | Prezzo indicativo (2026) | Punto forte | Limite per una PMI |
 |---|---|---|---|---|---|
-| MES enterprise | Siemens Opcenter, SAP Digital Manufacturing, Rockwell FactoryTalk e Plex, AVEVA MES, Critical Manufacturing | Grandi gruppi, multinazionali | Progetti da decine a centinaia di migliaia di euro più canoni | Profondità, tracciabilità, PLC e SCADA, pianificazione avanzata | Costi e tempi di progetto (mesi), richiedono integratori |
-| MES italiani per PMI | Bravo Manufacturing, siMES (SiVaF), MES Factory (Campi), Opera MES, moduli MES di TeamSystem Enterprise e Zucchetti | PMI manifatturiere italiane | Su preventivo; la sola connettività parte da circa 150 €/anno a macchina (siMES) | Raccolta dati dalle macchine, OEE, pronti per la Transizione 5.0 | Solo reparto: parte commerciale, DDT e fatture restano nell'ERP |
-| MRP ed ERP cloud | MRPeasy, Katana, Odoo MRP | Piccole aziende, spesso sotto i 50 addetti | 49-500 $/mese; Katana da 299 $/mese più 199 $ per la produzione | Rapidi da avviare, distinte, magazzino | Poco adatti all'Italia (fiscale), qualità e schedulazione leggere, niente macchine |
-| Piattaforme MES "no code" | Tulip | Aziende con ufficio tecnico interno | 100-250 $/mese per interfaccia, minimo 10 | App di reparto su misura, istruzioni digitali | Va costruito tutto, 3-6 mesi |
-| Verticali per l'impiantistica | TeamSystem Cantieri, Antos Impianti.net, D-TEC, mInterventi, ArxService | Impiantisti, manutentori | Canoni per utente | Computo metrico, listini Metel, ticket, app tecnici | Niente produzione |
-| Verticali per l'alimentare | Plex e AVEVA per il food, V5 Traceability, FoodDocs, SafetyChain | Alimentare | Da canoni SaaS a progetti | HACCP, richiami, ricette, audit IFS e BRC | Spesso stranieri, fiscale italiano assente |
+| MES enterprise | Siemens Opcenter, SAP DM, Rockwell FactoryTalk/Plex, AVEVA, Critical Manufacturing | Grandi gruppi | Progetti da decine–centinaia di k€ + canoni | Profondità, PLC/SCADA, APS, AI/governance | Costi, mesi di progetto, integratori |
+| MES italiani per PMI | Bravo Manufacturing, siMES (SiVaF), Opera MES, MES Factory (Campi), moduli TeamSystem / Zucchetti, NET@PRO (Qualitas) | PMI manifatturiere | Bravo Plus ~**290 €/risorsa**/anno (min. 10); siMES da ~**3.500 €/macchina** + canone ~15%; connettività campo citata da ~**150 €/anno**/macchina | OEE da macchina, IoT, ERP connector, marketing Transizione 5.0 / iperammortamento | Quasi sempre **solo reparto**: commerciale, DDT, FatturaPA restano nell’ERP |
+| MRP / ERP cloud | MRPeasy, Katana, Odoo MRP | Piccole aziende | Decine–centinaia $/mese (Katana fascia alta) | Avvio rapido, distinte, magazzino | Fiscale IT debole, poche macchine, qualità/schedulazione leggere |
+| MES “no code” / composable | Tulip e simili | Chi ha ufficio tecnico interno | Centinaia $/mese per interfaccia | App di reparto su misura, istruzioni digitali | Va costruito tutto (mesi) |
+| Verticali impiantistica | TeamSystem Cantieri, Antos Impianti.net, D-TEC, mInterventi | Impiantisti | Canoni per utente | Computo, Metel, ticket, app tecnici | Niente produzione di fabbrica |
+| Verticali alimentare | Plex/AVEVA food, V5, FoodDocs, SafetyChain | Food | SaaS → progetti | HACCP, richiami, audit | Spesso esteri; fiscale IT assente |
+
+**Lettura competitiva (ricerca 02/10/2026).** Bravo spinge costi di commessa, dashboard e IoT come add-on; siMES spinge AI predittiva e retrofit macchine legacy; Opera MES spinge modularità (produzione, qualità, energia, manutenzione) + connettori ERP. Nessuno di questi, nella fascia PMI, mette insieme **FatturaPA nativa + DDT + settori IT** come Nicolò: il confronto tipico del cliente è “MES + ERP già in casa”, non “un solo prodotto”.
 
 ## 3. Cosa chiede il mercato nel 2026
 
-1. **Interconnessione vera con le macchine**: OPC UA, MQTT, Modbus, S7, con dati in tempo reale e non a fine turno. È anche il requisito dell'iperammortamento.
-2. **Energia misurata per macchina e per prodotto**: consumi rapportati alla produzione, con valutazione ex ante e verifica ex post (risparmio minimo 3% di stabilimento o 5% di processo).
-3. **Schedulazione a capacità finita**: capacità, manodopera, materiali, attrezzaggi, precedenze. Più fornitori la stanno lanciando nel 2026.
-4. **Istruzioni di lavoro digitali**: disegni, foto e video alla postazione, sempre più generati con l'IA.
-5. **Assistente IA ("copilota")**: domande in linguaggio naturale sui dati di produzione, previsione di fermi, ritardi e scarti.
-6. **Cloud e mobile**, con in parallelo l'installazione presso il cliente per chi la chiede.
-7. **Costo totale e tempi di avvio**: la licenza è la parte minore, conta quanto si impiega a partire (per una PMI con 20 macchine si citano 2-4 mesi).
+1. **Interconnessione vera** (OPC UA, MQTT, Modbus, S7…): dati in tempo reale, non a fine turno — base anche per la perizia.
+2. **Energia e digitalizzazione agevolabile**: software interconnesso (Allegato V); per chi punta al risparmio restano utili dashboard kWh e confronti prima/dopo (il vecchio credito 5.0 con soglie 3%/5% è stato sostituito dall’iperammortamento, ma i clienti e i periti continuano a chiedere **prove di misura**).
+3. **Schedulazione a capacità finita** e, in prospettiva, ripianificazione guidata da eventi (AI “copilota” con umano in loop — Gartner MES Guide 2026: interoperabilità, API aperte, fiducia/governance prima dell’autonomia).
+4. **Istruzioni digitali** alla postazione (disegni, foto, video; sempre più assistite da IA).
+5. **Cloud e mobile**, con opzione **on-premise** per chi non vuole tutto fuori.
+6. **Time-to-value**: per una PMI con ~20 macchine restano citati **2–4 mesi** di avvio; la licenza è spesso la parte minore del costo totale.
+7. **Sicurezza e conformità** (2FA, audit, NIS2 per clienti strutturati).
 
 ## 4. Confronto funzione per funzione
 
-Legenda: ✅ c'è · 🟡 parziale · ❌ manca · 🔧 in sviluppo
+Legenda: ✅ c’è · 🟡 parziale · ❌ manca · 📦 codice pronto / da pubblicare
 
-| Area | Nicolò MES | MES PMI italiani | MRP cloud | Enterprise |
+| Area | Nicolò MES (02/10/2026) | MES PMI italiani | MRP cloud | Enterprise |
 |---|---|---|---|---|
 | Distinte, cicli, commesse, fasi | ✅ | ✅ | ✅ | ✅ |
 | Terminale di reparto con PIN, anche offline | ✅ | ✅ | 🟡 | ✅ |
-| Filtro per reparto al terminale | ✅ (lato server; manca ancora il selettore nel terminale e nella pagina tecnici) | ✅ | ❌ | ✅ |
-| Tracciabilità lotti avanti e indietro, richiamo | ✅ | ✅ | 🟡 | ✅ |
-| Matricole (singolo pezzo o singola macchina) | ❌ | 🟡 | 🟡 | ✅ |
-| OEE | 🟡 da fasi dichiarate; dati macchina nel dettaglio | ✅ da macchina | ❌ | ✅ |
-| Interconnessione macchine (OPC UA, MQTT) | ✅ gateway pronto, manca il collegamento reale | ✅ | ❌ | ✅ |
-| Monitoraggio energetico (Transizione 5.0) | ❌ | ✅ | ❌ | ✅ |
-| Schedulazione a capacità finita | 🟡 board scadenze e planning, senza vincoli | 🟡/✅ | 🟡 | ✅ |
-| Istruzioni di lavoro e disegni alla postazione | ❌ | 🟡 | ❌ | ✅ |
-| Qualità: piani di controllo, non conformità, certificati | ✅ | ✅ | 🟡 | ✅ |
-| Taratura strumenti, azioni correttive, audit ISO 9001 | ❌ | 🟡 | ❌ | ✅ |
+| Filtro / selettore “mio reparto” al terminale e su /tecnici | 🟡 server sì; selettore UI ancora da chiudere (G1) | ✅ | ❌ | ✅ |
+| Tracciabilità lotti avanti/indietro, richiamo | ✅ | ✅ | 🟡 | ✅ |
+| Matricole / unità per pezzo | ✅ | 🟡 | 🟡 | ✅ |
+| OEE | ✅ fasi; **da macchina sul cruscotto** se ci sono letture (`OeeSource`) | ✅ da macchina | ❌ | ✅ |
+| Interconnessione macchine (OPC UA, MQTT) | ✅ gateway + token; manca campo reale | ✅ | ❌ | ✅ |
+| Monitoraggio energetico (iperammortamento / 5.0) | ✅ kWh macchina/commessa, progetti, stampa; manca contatore reale | ✅ | ❌ | ✅ |
+| Dichiarazione origine UE software (perizia) | ✅ `/origine-software` + API | 🟡 | ❌ | 🟡 |
+| Schedulazione a capacità finita | 🟡 board/planning senza vincoli duri | 🟡/✅ | 🟡 | ✅ |
+| Istruzioni di lavoro e disegni alla postazione | ✅ terminale + web | 🟡 | ❌ | ✅ |
+| Ufficio tecnico (revisioni, MT, allegati) | ✅ | 🟡 | ❌ | ✅ |
+| Collaudo FAT/SAT, fascicolo, dichiarazione CE/UE | ✅ | 🟡 | ❌ | ✅ |
+| Service post-vendita (matricola, garanzia, RA, interventi) | ✅ | 🟡 | ❌ | ✅ |
+| Qualità: piani, NC, certificati | ✅ | ✅ | 🟡 | ✅ |
+| Taratura strumenti, CAPA, audit ISO 9001 | ❌ | 🟡 | ❌ | ✅ |
 | Manutenzione macchine | ✅ | ✅ | ❌ | ✅ |
-| Calcolo fabbisogni (MRP) con proposte d'ordine | 🟡 sotto scorta e mancanti, senza calcolo sulle distinte | 🟡 dall'ERP | ✅ | ✅ |
-| Magazzino con ubicazioni, inventario a barcode, etichette | 🟡 lotti sì, ubicazioni e inventario da telefono no | 🟡 | ✅ | ✅ |
-| Clienti, preventivi, ordini | ✅ | ❌ (è nell'ERP) | ✅ | 🟡 |
+| MRP sulle distinte + proposte d’ordine | ✅ esplosione + proposta; ❌ crea PO da solo | 🟡 dall’ERP | ✅ | ✅ |
+| Magazzino ubicazioni, inventario barcode da telefono | 🟡 lotti sì | 🟡 | ✅ | ✅ |
+| Clienti, preventivi | ✅ | ❌ (ERP) | ✅ | 🟡 |
 | DDT, conto lavoro | ✅ | ❌ | 🟡 | 🟡 |
-| Fattura elettronica: file XML | ✅ validato sullo schema ufficiale | ❌ (è nell'ERP) | ❌ | ❌ |
-| Invio allo SdI e fatture passive | ❌ | ❌ | ❌ | ❌ |
-| Scadenziario, incassi, pagamenti, prima nota | ❌ (solo esportazione per la contabilità) | ❌ | 🟡 | ❌ |
+| Fattura elettronica XML FatturaPA | ✅ schema ufficiale | ❌ (ERP) | ❌ | ❌ |
+| Invio allo SdI | ❌ (caricamento manuale) | ❌ | ❌ | ❌ |
+| Fatture passive + scadenziario | ✅ codice+DB Neon; 📦 push release | ❌ | 🟡 | ❌ |
 | Costi e margini di commessa | ✅ | 🟡 | 🟡 | ✅ |
-| Presenze e timbrature | ❌ (ore per commessa sì) | 🟡 | ❌ | ✅ |
-| Web e telefono | ✅ piattaforma web in crescita, pagina tecnici | ✅ | ✅ | ✅ |
-| Cloud o server del cliente | ✅ cloud; 🟡 server del cliente (basi pronte) | ✅ | solo cloud | ✅ |
-| Teleassistenza | 🟡 basi lato server | ✅ | ✅ | ✅ |
-| Autenticazione a due fattori, accesso unico aziendale (SSO) | ❌ | 🟡 | ✅ | ✅ |
-| API pubbliche documentate per integrazioni | 🟡 l'API esiste, manca la documentazione per terzi | 🟡 | ✅ | ✅ |
-| Assistente IA | ❌ | 🟡 (siMES) | 🟡 | ✅ |
+| Presenze / timbrature | ❌ (ore di commessa sì) | 🟡 | ❌ | ✅ |
+| Web e telefono | ✅ web in crescita (molto consultazione); /tecnici | ✅ | ✅ | ✅ |
+| Cloud o server del cliente | ✅ entrambi (installer server da provare su Windows Server reale) | ✅ | solo cloud | ✅ |
+| Teleassistenza | ✅ | ✅ | ✅ | ✅ |
+| Autenticazione a due fattori | ✅ TOTP + recovery; ❌ SSO | 🟡 | ✅ | ✅ |
+| API pubbliche documentate per terzi | 🟡 API sì, docs terzi no | 🟡 | ✅ | ✅ |
+| Assistente IA | ❌ | 🟡 (es. siMES) | 🟡 | ✅ |
 | Più lingue e valute | ❌ | 🟡 | ✅ | ✅ |
 
-## 5. Settore per settore: cosa hanno gli altri e quali integrazioni servono
+## 5. Settore per settore
 
 ### 5.1 Quadri elettrici e automazione
-- **Abbiamo:**
-  - commesse e cablaggio con fasi;
-  - verifica e dichiarazione CEI EN 61439;
-  - lotti dei componenti;
-  - DDT e fattura;
-  - costi di commessa.
-- **Gli altri hanno:**
-  - scambio con EPLAN Electric P8 (codici articolo e distinte dallo schema, interfacce verso ERP e PLM);
-  - listini Metel dei produttori;
-  - lista fili per le macchine di taglio e siglatura;
-  - etichette di cavi e morsetti.
-- **Integrazioni mirate:**
-  1. **Import distinta da EPLAN** (o da file Excel o CSV generato da EPLAN): la distinta del quadro diventa la distinta della commessa.
-  2. **Metel**: l'importatore è pronto a metà e serve un file reale di un produttore.
-  3. **Lista fili ed etichette** esportate per stampanti e siglatrici.
-  4. **Allegati di commessa**: schema, layout e fotografie del quadro finito, da agganciare alla dichiarazione.
+- **Abbiamo:** commesse/cablaggio, verifica e dichiarazione CEI EN 61439, lotti, DDT/fattura, costi, **Metel** (import ANIE), documenti tecnici.
+- **Gli altri:** EPLAN → distinta, lista fili per taglio/siglatura, etichette cavi/morsetti.
+- **Resta:** import EPLAN (Excel/CSV), lista fili ed etichette, allegati di commessa legati alla dichiarazione.
 
-### 5.2 Meccanica e carpenteria (conto terzi)
-- **Abbiamo:**
-  - cicli con centri di lavoro;
-  - conto lavoro per trattamenti con rientri e scarti;
-  - OEE;
-  - manutenzione;
-  - dati macchina.
-- **Gli altri hanno:**
-  - versioni dei programmi CNC e invio alla macchina (DNC);
-  - preventivazione con tempi e pesi;
-  - certificati di materiale EN 10204 3.1 legati alla colata;
-  - nesting della lamiera;
-  - controllo dimensionale con strumenti tarati.
-- **Integrazioni mirate:**
-  1. Programmi CNC come allegati versionati della fase, scaricabili al terminale.
-  2. **Certificato 3.1 sul lotto di materiale**, con numero di colata, richiamato nel certificato di conformità al cliente.
-  3. Preventivo meccanico: tempi per fase per costo orario, materiale a peso, trattamenti.
-  4. Taratura degli strumenti di misura, con scadenze.
+### 5.2 Meccanica e carpenteria
+- **Abbiamo:** cicli, conto lavoro, OEE (dichiarato), manutenzione, dati macchina, documenti/CNC come allegati di fase, istruzioni al terminale.
+- **Gli altri:** DNC verso macchina, nesting, 3.1 su colata, taratura strumenti.
+- **Resta:** certificato 3.1 sul lotto, preventivo meccanico avanzato, taratura.
 
-### 5.3 Costruzione macchine e impianti (nuova attività configurabile)
-- **Abbiamo:**
-  - la configurazione per reparti (produzione meccanica, montaggio, quadristi, collaudo, service);
-  - commesse con fasi;
-  - verifica 61439 del quadro a bordo macchina;
-  - rapportini presso il cliente.
-- **Gli altri hanno:**
-  - ufficio tecnico con revisioni e modifiche tecniche;
-  - commessa su più livelli (gruppi e sottogruppi) con avanzamento percentuale;
-  - service post-vendita per matricola, con garanzia e ricambi;
-  - collaudi in fabbrica e presso il cliente (FAT e SAT);
-  - fascicolo tecnico e dichiarazione CE.
-- **Sviluppi decisi (in quest'ordine):**
-  1. **Ufficio tecnico**: revisioni di distinte e cicli, allegati (disegni, schemi), modifiche tecniche approvate che aggiornano le commesse aperte.
-  2. **Collaudo macchine e CE**: liste di controllo FAT e SAT, fascicolo tecnico, dichiarazione CE secondo la Direttiva Macchine e il Regolamento macchine UE 2023/1230, obbligatorio dal 20/01/2027.
-  3. **Service post-vendita**: macchine installate con matricola e garanzia, richieste di assistenza, interventi con rapportino, ricambi dalla distinta, storico per matricola.
-- **Integrazioni mirate:** distinte dal CAD meccanico (SolidWorks, Inventor, Solid Edge) tramite Excel o CSV, e matricole con codice QR sulla macchina che aprono lo storico.
+### 5.3 Costruzione macchine e impianti
+- **Abbiamo (chiuso rispetto all’analisi di settembre):** ufficio tecnico, collaudo FAT/SAT + fascicolo + dichiarazione CE/UE (base giuridica automatica fino/oltre 20/01/2027), service con matricola/garanzia/RA/interventi, energia per perizia, firma a schermo sulla dichiarazione (non qualificata).
+- **Resta:** PDF autonomo rapporto collaudo, firma digitale qualificata se richiesta, distinte CAD via Excel/CSV già usabili ma non verticalizzate, QR matricola → storico.
 
-### 5.4 Impiantistica e installazioni
-- **Abbiamo:**
-  - rapportini con ore, materiali e firma del cliente da telefono;
-  - costi del cantiere nella commessa;
-  - DDT e fattura.
-- **Gli altri hanno:**
-  - computo metrico e preventivi da listini (Metel, Angaisa);
-  - avanzamento lavori e SAL;
-  - pianificazione delle squadre su calendario;
-  - richieste di intervento (ticket);
-  - contratti di manutenzione periodica sugli impianti dei clienti;
-  - **dichiarazione di conformità secondo il DM 37/08**;
-  - magazzino del furgone.
-- **Integrazioni mirate:**
-  1. **Dichiarazione di conformità DM 37/08** generata dal cantiere, con i materiali del rapportino.
-  2. **SAL e fatture di acconto** dalla commessa.
-  3. **Calendario delle squadre** e richieste di intervento, riusando il futuro modulo Service.
-  4. Listini Metel e Angaisa per i preventivi.
+### 5.4 Impiantistica
+- **Abbiamo:** rapportini firmati da telefono, costi in commessa, DDT/fattura, Metel.
+- **Gli altri:** computo, SAL, calendario squadre, ticket, DM 37/08, magazzino furgone.
+- **Resta:** DM 37/08, SAL/acconti, calendario squadre (riuso Service), Angaisa.
 
 ### 5.5 Alimentare
-- **Abbiamo:**
-  - scadenze dei lotti, con prelievo del lotto che scade prima;
-  - ingredienti e allergeni dalla distinta;
-  - etichetta del lotto;
-  - pallet con codice SSCC ed etichetta GS1-128;
-  - richiamo avanti e indietro;
-  - registri HACCP.
-- **Gli altri hanno:**
-  - ricette con resa e cali peso;
-  - **tabella nutrizionale** secondo il Reg. UE 1169/2011;
-  - pesatura con bilance collegate;
-  - procedure di pulizia per gli allergeni;
-  - preparazione agli audit IFS e BRC;
-  - gestione dei resi.
-- **Integrazioni mirate:**
-  1. **Valori nutrizionali** per materia prima e calcolo sull'etichetta.
-  2. Collegamento con le **bilance**, tramite il gateway macchine già esistente.
-  3. Ricetta con resa e calo peso, che genera quantità e costi.
-  4. Piano HACCP guidato per tipologia di azienda.
+- **Abbiamo:** scadenze FEFO, allergeni, etichetta lotto, SSCC, richiamo, HACCP.
+- **Gli altri:** resa/cali, tabella nutrizionale, bilance, IFS/BRC, resi.
+- **Resta:** nutrizionale, bilance via gateway, ricetta con resa, HACCP guidato per tipologia.
 
 ### 5.6 Manifattura generica
-I moduli comuni coprono il fabbisogno. Il vuoto che si nota di più è il **calcolo dei fabbisogni sulle distinte**, con le proposte d'ordine ai fornitori.
+Moduli comuni coprono il nucleo. MRP base (esplosione + proposte) c’è; i vuoti più sentiti restano **capacità finita** e **ubicazioni**.
 
-## 6. I nostri pro e contro
+## 6. I nostri pro e contro (aggiornati)
 
 **Pro**
-- Un solo sistema dal preventivo alla fattura, con requisiti italiani nativi: DDT, FatturaPA validata sullo schema ufficiale, 61439, HACCP, conto lavoro.
-- Si configura per attività multiple e reparti; per ogni ruolo e area si decide se usarlo da desktop, dal web o da entrambi.
-- Tracciabilità lotti completa, con richiamo in un clic.
-- Interconnessione predisposta: token per macchina e gateway OPC UA/MQTT con coda locale.
-- Costi e margini reali per commessa, riservati alla direzione.
-- Sicurezza curata:
-  - token a rotazione, limiti ai tentativi, blocco dell'account;
-  - protezioni del browser (CSP) sulle pagine web;
-  - registro delle operazioni;
-  - backup verificato.
-- Oltre 440 test automatici e una pipeline che controlla ogni rilascio.
-- Aggiornamento automatico del client e installer che non richiede i permessi di amministratore di Windows.
-- Nessun costo di licenza di terzi: si può proporre a un prezzo competitivo.
+- Un solo sistema dal preventivo alla fattura, con requisiti italiani nativi (DDT, FatturaPA validata, 61439, HACCP, conto lavoro).
+- Configurazione multi-attività e multi-reparto; canali desktop/web/mobile per ruolo e area.
+- Tracciabilità lotti + richiamo; matricole; ufficio tecnico; collaudo CE; service; energia.
+- Interconnessione predisposta; **OEE di cruscotto che preferisce i dati macchina** quando arrivano.
+- **MRP** con esplosione distinta e proposte; **fatture passive + scadenziario** (DB pronto); **dichiarazione origine UE** stampabile.
+- Margini di commessa riservati alla direzione; 2FA; test e CI; auto-update; server del cliente.
+- Argomento vendita 2026–2028: interconnessione + energia + origine UE in un prodotto italiano.
 
 **Contro**
-- Invio allo SdI, fatture passive e scadenziario assenti: il commercialista resta su un altro programma.
-- Nessuna schedulazione a capacità finita e nessuna istruzione di lavoro alla postazione.
-- Energia non misurata: oggi non basta per la perizia dell'iperammortamento.
-- La piattaforma web non copre ancora tutto: mancano qualità, HACCP, cantiere, manutenzione e pianificazione, e sul web oggi si consulta, non si crea.
-- Il client completo gira solo su Windows.
-- Non ci sono autenticazione a due fattori, accesso unico aziendale né più lingue.
-- Hosting sul piano gratuito: nessuna garanzia di continuità finché non si passa a un piano a pagamento.
-- Prodotto giovane: nessuna referenza pubblica, nessuna certificazione, sviluppo e assistenza concentrati su poche persone.
+- Nessun invio SdI automatico; prima nota completa resta fuori.
+- Lavoro 02/10 (G8/OEE/origine/MRP) **ancora da commit/push** su `main`.
+- Niente capacità finita né ubicazioni; MRP non crea ancora gli ordini da solo né multi-livello.
+- Senza macchine/contatori in campo OEE “Machine” ed energia restano vuoti in produzione reale.
+- Web incompleto in scrittura; Windows-first; niente IA, SSO, multilingua.
+- Hosting free senza SLA; poche referenze; team piccolo.
+- Concorrenza MES di campo ancora avanti su AI marketing e connettività plug-and-play.
 
-## 7. Cosa hanno gli altri e noi no: priorità proposte
+## 7. Priorità proposte (dopo quanto già chiuso in codice)
 
-Impatto: valore per il cliente e per la vendita. Impegno: stima relativa (S piccolo, M medio, L grande).
-
-| # | Funzione mancante | Chi la chiede | Impatto | Impegno | Nota |
+| # | Funzione | Chi la chiede | Impatto | Impegno | Nota |
 |---|---|---|---|---|---|
-| 1 | Ufficio tecnico: revisioni, allegati, modifiche tecniche | Ingegnere meccanico, capo reparto | Alto | M | Già deciso; serve anche per le istruzioni di lavoro |
-| 2 | Collaudo macchine FAT/SAT e dichiarazione CE | Responsabile tecnico, costruttori | Alto | M | Regolamento UE 2023/1230 in vigore dal 20/01/2027 |
-| 3 | Service post-vendita con matricole | Commerciale, capo area | Alto | M | Deciso; margini alti su ricambi e interventi |
-| 4 | Monitoraggio energetico per l'iperammortamento 2026 | Ingegnere 4.0/5.0, commerciale | Molto alto | M | Il gateway esiste già: vanno aggiunti kWh per macchina e il report ex ante ed ex post |
-| 5 | Invio SdI con intermediario e fatture passive | Commercialista, specialista fatturazione | Alto | M | Serve la scelta dell'intermediario (costo) |
-| 6 | Scadenziario incassi e pagamenti, solleciti | Commercialista | Alto | M | |
-| 7 | Autenticazione a due fattori e accesso unico aziendale | Cybersecurity manager | Alto (NIS2, clienti strutturati) | S-M | |
-| 8 | Istruzioni di lavoro e disegni al terminale | Capo reparto | Alto | S dopo il punto 1 | |
-| 9 | Schedulazione a capacità finita (Gantt con vincoli) | Ingegnere gestionale | Alto | L | |
-| 10 | Calcolo fabbisogni sulle distinte con proposte d'ordine | Ingegnere gestionale, acquisti | Medio-alto | M | |
-| 11 | Magazzino con ubicazioni, inventario a barcode dal telefono, etichette per stampanti industriali | Capo area, magazzino | Medio-alto | M | |
-| 12 | DM 37/08, SAL, calendario squadre | Capocantiere, responsabile impianti | Alto per l'impiantistica | M | |
-| 13 | Import da EPLAN, lista fili, Metel | Quadristi | Alto per i quadristi | S-M | Metel in attesa di un file reale |
-| 14 | Certificati 3.1 e versioni dei programmi CNC | Meccanica | Medio | S | |
-| 15 | Tabella nutrizionale, ricette con resa, bilance | Alimentare | Alto per l'alimentare | M | |
-| 16 | Presenze e timbrature | Capo area, commercialista | Medio | M | |
-| 17 | Taratura strumenti, azioni correttive, audit ISO 9001 | Qualità | Medio | S-M | |
-| 18 | Assistente IA sui dati di produzione | Data analyst | Medio (fa colpo in vendita) | M | Dopo che i dati sono completi |
-| 19 | Portale clienti e fornitori | Commerciale | Medio | M | La piattaforma web è la base |
-| 20 | Più lingue, API documentate per terzi, app offline per il magazzino | Ingegnere informatico | Medio | M | |
+| 1 | Commit/push release (G8 + OEE + origine + MRP) | Tutti | Alto | S | Migrazioni Neon già applicate |
+| 2 | G9 SdI automatico (intermediario) | Commercialista | Alto | M | Serve contratto |
+| 3 | Una macchina + contatore reali in campo | 4.0/5.0 | Molto alto | M | Gateway e OEE pronti |
+| 4 | Ubicazioni + inventario barcode (G11) | Magazzino | Medio-alto | M | |
+| 5 | Capacità finita (G12) | Gestionale | Alto | L | |
+| 6 | MRP: crea PO dalle proposte; multi-livello | Acquisti | Medio | M | Base G10 fatta |
+| 7 | Selettore reparto UI (G1) | Capo reparto | Medio | S | |
+| 8 | Pacchetti settore (G13) | Verticali | Alto sul verticale | M | Metel già ok |
+| 9 | Hosting a pagamento + referenze | Commerciale | Alto | Titolare | |
+| 10 | Web scrittura, API docs, SSO, IA | IT / utenti | Medio | M | |
 
-## 8. Proposta di percorso
+## 8. Percorso consigliato
 
-1. **Adesso, per completare il lavoro avviato**:
-   - finire la configurazione per reparti nel terminale e nella pagina tecnici (selettore "mio reparto / tutto");
-   - poi Ufficio tecnico, Collaudo e CE, Service post-vendita.
-2. **Subito dopo, per vendere con l'incentivo**: monitoraggio energetico con report per la perizia; OEE e andon in tempo reale dai dati macchina.
-3. **Per chiudere il ciclo amministrativo**: intermediario SdI, fatture passive, scadenziario (serve la tua scelta dell'intermediario).
-4. **Sicurezza e fiducia**: autenticazione a due fattori, hosting a pagamento, documentazione dell'API.
-5. **Profondità di reparto**: schedulazione a capacità finita, fabbisogni sulle distinte, magazzino con ubicazioni.
-6. **Pacchetti di settore**: EPLAN e lista fili, DM 37/08 e SAL, certificati 3.1, tabella nutrizionale e bilance.
+1. **Push** del lavoro 02/10 (vedi [HANDOFF-CLAUDE.md](HANDOFF-CLAUDE.md)).
+2. **G9 SdI** quando c’è intermediario; intanto XML manuale resta valido.
+3. **Prova campo** una macchina + energia; verificare OEE `Machine` sul cruscotto.
+4. **Ubicazioni → capacità finita**; approfondire MRP (PO automatici).
+5. **Pacchetti di settore** sul primo cliente esterno.
+6. **Fiducia commerciale**: hosting a pagamento, referenze, docs API.
+
+## 9. Cosa è cambiato il 02/10/2026 (sessione contro)
+
+- G8: migrazione Neon `AddPayables`; gate chiuso (push pending).
+- OEE cruscotto da letture macchina (`OeeSource`).
+- Dichiarazione origine UE software (migrazione + pagina stampabile).
+- MRP base (esplosione distinta + proposte; web `/mrp`).
+- Prossimo focus operativo: **push**, poi G9 / campo / G11 / G12.
 
 ## Fonti
 
-- [I 7 migliori software MES per l'Industria 4.0 nel 2026 (Logisticamente)](https://www.logisticamente.it/articoli/57360/migliori-software-mes-industria-2026-funzioni-vantaggi-prezzi/)
-- [Confronto MES per PMI manifatturiere (SiVaF)](https://www.sivaf.it/confronto-mes-pmi-manifatturiere/)
-- [Mercato dei MES in forte crescita in Italia, studio AlixPartners e Qualitas](https://www.alixpartners.com/newsroom/mercato-dei-mes-in-forte-crescita-in-italia-studio-alixpartners-e-qualitas/)
-- [Best Manufacturing Software 2026 (Morsa)](https://morsa.ai/guides/best-manufacturing-software)
-- [Best Katana Alternatives 2026 (Qoblex)](https://qoblex.com/blog/8-best-katana-mrp-alternatives-in-2026-ranked-compared/)
-- [TeamSystem: produzione e MES in TS Enterprise](https://www.teamsystem.com/aziende/enterprise/funzionalita/produzione-mes-ts-enteprise/)
-- [Nuova Transizione 5.0 per il 2026: iperammortamento (BibLus)](https://biblus.acca.it/transizione-5-0-credito-imposta-efficientamento-energetico/)
-- [Software di monitoraggio energetico, MES e IoT per la Transizione 5.0 (Consulmarc)](https://www.consulmarc.it/2025/12/22/monitoraggio-energetico-software-mes-transizione-5-0/)
-- [Piano Transizione 5.0 (MIMIT)](https://www.mimit.gov.it/it/incentivi/piano-transizione-5-0)
-- [EPLAN e interfacce verso ERP e PLM (FAU FAPS)](https://www.faps.fau.eu/?p=2020)
-- [Gestionali per elettricisti e impiantisti (Koalendar)](https://koalendar.com/it/blog/miglior-gestionale-elettricisti)
-- [Antos Impianti.net per impiantisti (01net)](https://www.01net.it/?p=71705)
-- [TeamSystem Construction: preventivi e computo metrico](https://www.teamsystem.com/construction/teamsystem-cantieri/funzionalita/preventivi-computo-metrico/)
-- [Software di tracciabilità alimentare (Capterra)](https://www.capterra.it/directory/30563/food-traceability/software)
-- [Tracciabilità dei prodotti da forno con V5 (SG Systems)](https://sgsystemsglobal.com/it/?p=6779)
-- [Service post-vendita e ERP per costruttori di macchine (Edana)](https://edana.ch/en/2026/02/09/industrial-after-sales-service-erp-as-a-driver-of-customer-loyalty-profitability-and-industry-4-0-maintenance/)
-- [Copiloti IA nei MES (Critical Manufacturing)](https://www.criticalmanufacturing.com/blog/the-rise-of-copilots-transforming-the-interaction-with-manufacturing-execution-systems-mes/)
-- [5 tendenze MES per il 2026 (SPK)](https://www.spkaa.com/blog/5-mes-trends-for-2026-and-how-to-get-ahead)
-- [Tendenze ERP e MES 2026 (PSI)](https://www.psi.de/en/trends/article/erp-mes-trends-for-2026-these-developments-will-shape-the-new-year)
+### Mercato e tendenze
+- [Mercato MES Italia — AlixPartners e Qualitas](https://www.alixpartners.com/newsroom/mercato-dei-mes-in-forte-crescita-in-italia-studio-alixpartners-e-qualitas/) (19/03/2025)
+- [Automazione News: 120 M€ al 2027, 23 fornitori, Europa 887 M€](https://www.automazionenews.it/il-mercato-dei-mes-in-italia-cresce-previsti-120-milioni-di-euro-entro-il-2027/)
+- [Industria Italiana — evoluzione MES](https://www.industriaitaliana.it/manufacturing-execution-systems-alixpartners-digitalizzazione-manifattura/)
+- [Qualitas: trend MES / Net@PRO](https://www.qualitas.it/blog/un-mercato-in-crescita-i-trend-del-mes)
+- [Gartner MES Market Guide 2026 — lettura Siemens Opcenter (AI, API, trust)](https://blogs.sw.siemens.com/opcenter/2026-gartner-market-guide-for-manufacturing-execution-systems-how-ai-is-shaping-mes-and-where-we-believe-opcenter-adds-customer-value/)
+- [AI agents in MES (IIoT World)](https://www.iiot-world.com/smart-manufacturing/ai-agents-mes-beyond-chatbot/)
+- [Agentic scheduling / UNS (HiveMQ)](https://www.hivemq.com/blog/agentic-scheduling-adaptive-planning-uns/)
+
+### Incentivi
+- [MIMIT — Nuovo Piano Transizione 5.0 / Iperammortamento](https://www.mimit.gov.it/it/incentivi/nuovo-piano-transizione-5-0-iperammortamento)
+- [Heuris — iperammortamento e software MES 2026](https://www.heuris.it/iperammortamento-mes-2026)
+- [Innovation Post — decreto attuativo, origine UE software](https://www.innovationpost.it/attualita/il-decreto-attuativo-del-nuovo-iper-ammortamento-2026-ecco-tutti-i-dettagli-della-normativa-con-le-definizioni-di-made-in-eu/)
+
+### Concorrenti e prezzi
+- [Bravo Manufacturing — prezzi Plus/Pro](https://www.bravomanufacturing.it/confronta-prezzi/)
+- [siMES — MES PMI / AI / prezzi macchina](https://www.sivaf.it/software-mes-per-pmi-infallibile-controllo-produzione/)
+- [Confronto MES PMI (SiVaF)](https://www.sivaf.it/confronto-mes-pmi-manifatturiere/)
+- [Opera MES](https://www.operames.it/opera-mes/)
+- [TeamSystem produzione/MES](https://www.teamsystem.com/aziende/enterprise/funzionalita/produzione-mes-ts-enteprise/)
+
+### Verticali e contorno
+- [Logisticamente — MES Industria 4.0 2026](https://www.logisticamente.it/articoli/57360/migliori-software-mes-industria-2026-funzioni-vantaggi-prezzi/)
+- [TeamSystem Cantieri / computo](https://www.teamsystem.com/construction/teamsystem-cantieri/funzionalita/preventivi-computo-metrico/)
+- [Antos Impianti.net](https://www.01net.it/?p=71705)
+- [Tracciabilità alimentare (Capterra IT)](https://www.capterra.it/directory/30563/food-traceability/software)
+
+Stato prodotto di riferimento: [STATO-PROGETTO.md](STATO-PROGETTO.md). Gate aperti: [GATES.md](GATES.md).

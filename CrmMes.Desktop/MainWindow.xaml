@@ -9,7 +9,7 @@
         MinHeight="580" MinWidth="1000"
         WindowStyle="None" AllowsTransparency="False" ResizeMode="CanResize"
         StateChanged="Window_StateChanged"
-        Background="{StaticResource BackgroundBrush}">
+        Background="{DynamicResource BackgroundBrush}">
     <WindowChrome.WindowChrome>
         <WindowChrome CaptionHeight="40" ResizeBorderThickness="6" GlassFrameThickness="0" UseAeroCaptionButtons="False" />
     </WindowChrome.WindowChrome>
@@ -106,6 +106,12 @@
                                             <TextBlock Text="Fatture" Margin="6,0,0,0" />
                                         </StackPanel>
                                     </RadioButton>
+                                    <RadioButton x:Name="NavPaymentSchedule" Style="{StaticResource NavItem}" GroupName="Nav" Tag="28" Checked="NavItem_Checked">
+                                        <StackPanel Orientation="Horizontal">
+                                            <TextBlock Text="&#xE787;" FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets" FontSize="16" Width="24" />
+                                            <TextBlock Text="Scadenziario" Margin="6,0,0,0" />
+                                        </StackPanel>
+                                    </RadioButton>
                                 </StackPanel>
                             </Expander>
 
@@ -162,6 +168,12 @@
                                         <StackPanel Orientation="Horizontal">
                                             <TextBlock Text="&#xE721;" FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets" FontSize="16" Width="24" />
                                             <TextBlock Text="Ricerca catalogo" Margin="6,0,0,0" />
+                                        </StackPanel>
+                                    </RadioButton>
+                                    <RadioButton x:Name="NavPurchaseInvoices" Style="{StaticResource NavItem}" GroupName="Nav" Tag="29" Checked="NavItem_Checked">
+                                        <StackPanel Orientation="Horizontal">
+                                            <TextBlock Text="&#xE8A1;" FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets" FontSize="16" Width="24" />
+                                            <TextBlock Text="Fatture passive" Margin="6,0,0,0" />
                                         </StackPanel>
                                     </RadioButton>
                                     <RadioButton x:Name="NavSubcontracting" Style="{StaticResource NavItem}" GroupName="Nav" Tag="24" Checked="NavItem_Checked">
@@ -317,6 +329,12 @@
                                             <TextBlock Text="Canali di accesso" Margin="6,0,0,0" />
                                         </StackPanel>
                                     </Button>
+                                    <Button x:Name="AppearanceButton" Style="{StaticResource SidebarLinkButton}" HorizontalAlignment="Stretch" HorizontalContentAlignment="Left" Margin="26,6,10,0" Click="AppearanceButton_Click" Visibility="Collapsed">
+                                        <StackPanel Orientation="Horizontal">
+                                            <TextBlock Text="&#xE790;" FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets" FontSize="16" Width="24" />
+                                            <TextBlock Text="Aspetto grafico" Margin="6,0,0,0" />
+                                        </StackPanel>
+                                    </Button>
                                     <Button x:Name="CompanySetupButton" Style="{StaticResource SidebarLinkButton}" HorizontalAlignment="Stretch" HorizontalContentAlignment="Left" Margin="26,6,10,0" Click="CompanySetupButton_Click" Visibility="Collapsed">
                                         <StackPanel Orientation="Horizontal">
                                             <TextBlock Text="&#xE713;" FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets" FontSize="16" Width="24" />
@@ -362,6 +380,7 @@
                                     <Button x:Name="ImportArticlesButton" DockPanel.Dock="Right" Style="{StaticResource SecondaryButton}" Content="Importa da Excel" Width="140" Height="36" Margin="0,0,10,0" Click="ImportArticlesButton_Click" />
                                     <Button x:Name="MaterialFoodButton" DockPanel.Dock="Right" Style="{StaticResource SecondaryButton}" Content="Dati alimentari" Width="130" Height="36" Margin="0,0,10,0" Click="MaterialFoodButton_Click" Visibility="Collapsed" />
                                     <Button DockPanel.Dock="Right" Style="{StaticResource SecondaryButton}" Content="Importa catalogo Excel" Width="170" Height="36" Margin="0,0,10,0" Click="ImportCatalogButton_Click" />
+                                    <Button x:Name="ImportMetelButton" DockPanel.Dock="Right" Style="{StaticResource SecondaryButton}" Content="Importa listino Metel" Width="170" Height="36" Margin="0,0,10,0" Click="ImportMetelButton_Click" Visibility="Collapsed" />
                                     <Button DockPanel.Dock="Right" Style="{StaticResource SecondaryButton}" Content="Importa catalogo PDF" Width="160" Height="36" Margin="0,0,10,0" Click="ImportCatalogPdfButton_Click" />
                                     <Button DockPanel.Dock="Right" Style="{StaticResource SecondaryButton}" Content="Cerca" Width="90" Height="36" Margin="0,0,10,0" Click="SearchButton_Click" />
                                     <Button DockPanel.Dock="Right" Style="{StaticResource SecondaryButton}" Content="Esporta ▾" Width="90" Height="36" Margin="0,0,10,0" Click="ExportMenuButton_Click">
@@ -1670,6 +1689,85 @@
                                                 </GridViewColumn>
                                                 <GridViewColumn Header="Firmato da" DisplayMemberBinding="{Binding SignedByName}" Width="160" />
                                                 <GridViewColumn Header="Tecnico" DisplayMemberBinding="{Binding CreatedBy}" Width="140" />
+                                            </GridView>
+                                        </ListView.View>
+                                    </ListView>
+                                </Border>
+                            </Grid>
+                        </TabItem>
+
+                        <TabItem Header="Scadenziario">
+                            <Grid>
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto" />
+                                    <RowDefinition Height="*" />
+                                </Grid.RowDefinitions>
+                                <DockPanel Grid.Row="0" Margin="0,0,0,14">
+                                    <Button DockPanel.Dock="Right" Content="Aggiorna" Width="100" Height="36" Click="RefreshPaymentSchedule_Click" />
+                                    <ComboBox x:Name="PaymentScheduleDirectionFilter" DockPanel.Dock="Right" Width="140" Height="36" Margin="0,0,10,0" SelectionChanged="PaymentScheduleFilter_Changed">
+                                        <ComboBoxItem Content="Tutte" Tag="" IsSelected="True" />
+                                        <ComboBoxItem Content="Da pagare" Tag="Payable" />
+                                        <ComboBoxItem Content="Da incassare" Tag="Receivable" />
+                                    </ComboBox>
+                                    <ComboBox x:Name="PaymentScheduleStatusFilter" DockPanel.Dock="Right" Width="120" Height="36" Margin="0,0,10,0" SelectionChanged="PaymentScheduleFilter_Changed">
+                                        <ComboBoxItem Content="Aperte" Tag="Open" IsSelected="True" />
+                                        <ComboBoxItem Content="Chiuse" Tag="Paid" />
+                                        <ComboBoxItem Content="Tutte" Tag="" />
+                                    </ComboBox>
+                                    <TextBlock x:Name="PaymentScheduleInfoText" VerticalAlignment="Center" Foreground="{StaticResource TextSecondaryBrush}" TextWrapping="Wrap" />
+                                </DockPanel>
+                                <Border Grid.Row="1" Style="{StaticResource CardBorder}" Padding="4">
+                                    <ListView x:Name="PaymentScheduleList" SelectionMode="Single">
+                                        <ListView.View>
+                                            <GridView>
+                                                <GridViewColumn Header="Scadenza" DisplayMemberBinding="{Binding DueDate, StringFormat=dd/MM/yyyy}" Width="100" />
+                                                <GridViewColumn Header="Controparte" DisplayMemberBinding="{Binding CounterpartyName}" Width="220" />
+                                                <GridViewColumn Header="Descrizione" DisplayMemberBinding="{Binding Description}" Width="260" />
+                                                <GridViewColumn Header="Importo €" DisplayMemberBinding="{Binding Amount, StringFormat=N2}" Width="100" />
+                                                <GridViewColumn Header="Tipo" DisplayMemberBinding="{Binding DirectionLabel}" Width="100" />
+                                                <GridViewColumn Header="Stato" Width="100">
+                                                    <GridViewColumn.CellTemplate>
+                                                        <DataTemplate>
+                                                            <Border Style="{StaticResource Pill}">
+                                                                <TextBlock Style="{StaticResource PillText}" Text="{Binding StatusLabel}" Foreground="{Binding BrushStatus, Converter={StaticResource StatusToBrush}, ConverterParameter=Foreground}" />
+                                                            </Border>
+                                                        </DataTemplate>
+                                                    </GridViewColumn.CellTemplate>
+                                                </GridViewColumn>
+                                            </GridView>
+                                        </ListView.View>
+                                        <ListView.ContextMenu>
+                                            <ContextMenu>
+                                                <MenuItem Header="Segna pagato" Click="MarkScheduleEntryPaid_Click" />
+                                                <MenuItem Header="Registra sollecito" Click="RemindScheduleEntry_Click" />
+                                            </ContextMenu>
+                                        </ListView.ContextMenu>
+                                    </ListView>
+                                </Border>
+                            </Grid>
+                        </TabItem>
+
+                        <TabItem Header="Fatture passive">
+                            <Grid>
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto" />
+                                    <RowDefinition Height="*" />
+                                </Grid.RowDefinitions>
+                                <DockPanel Grid.Row="0" Margin="0,0,0,14">
+                                    <Button DockPanel.Dock="Right" Content="Importa XML..." Width="130" Height="36" Click="ImportPurchaseInvoice_Click" />
+                                    <Button DockPanel.Dock="Right" Style="{StaticResource SecondaryButton}" Content="Aggiorna" Width="100" Height="36" Margin="0,0,10,0" Click="RefreshPurchaseInvoices_Click" />
+                                    <TextBlock x:Name="PurchaseInvoicesInfoText" VerticalAlignment="Center" Foreground="{StaticResource TextSecondaryBrush}" TextWrapping="Wrap" />
+                                </DockPanel>
+                                <Border Grid.Row="1" Style="{StaticResource CardBorder}" Padding="4">
+                                    <ListView x:Name="PurchaseInvoicesList" SelectionMode="Single">
+                                        <ListView.View>
+                                            <GridView>
+                                                <GridViewColumn Header="Numero" DisplayMemberBinding="{Binding DocumentNumber}" Width="100" />
+                                                <GridViewColumn Header="Data" DisplayMemberBinding="{Binding DocumentDate, StringFormat=dd/MM/yyyy}" Width="100" />
+                                                <GridViewColumn Header="Fornitore" DisplayMemberBinding="{Binding SupplierName}" Width="260" />
+                                                <GridViewColumn Header="Imponibile €" DisplayMemberBinding="{Binding TaxableTotal, StringFormat=N2}" Width="110" />
+                                                <GridViewColumn Header="Scadenze aperte" DisplayMemberBinding="{Binding OpenInstallments}" Width="120" />
+                                                <GridViewColumn Header="Importata" DisplayMemberBinding="{Binding ImportedAt, StringFormat=dd/MM/yyyy HH:mm}" Width="130" />
                                             </GridView>
                                         </ListView.View>
                                     </ListView>

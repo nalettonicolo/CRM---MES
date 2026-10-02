@@ -269,6 +269,19 @@ namespace CrmMes.Api.Migrations
                         .HasMaxLength(50)
                         .HasColumnType("character varying(50)");
 
+                    b.Property<string>("SoftwareDevelopmentPlaces")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<decimal>("SoftwareEuDevelopmentPercent")
+                        .HasColumnType("numeric");
+
+                    b.Property<string>("SoftwareOriginSignatory")
+                        .HasColumnType("text");
+
+                    b.Property<DateTime?>("SoftwareOriginUpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
                     b.Property<string>("Street")
                         .HasMaxLength(60)
                         .HasColumnType("character varying(60)");
@@ -279,6 +292,10 @@ namespace CrmMes.Api.Migrations
                         .HasColumnType("character varying(4)");
 
                     b.Property<string>("TwoFactorRoles")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("UiTheme")
                         .IsRequired()
                         .HasColumnType("text");
 
@@ -1781,6 +1798,79 @@ namespace CrmMes.Api.Migrations
                     b.ToTable("PanelVerificationChecks");
                 });
 
+            modelBuilder.Entity("CrmMes.Core.Models.PaymentScheduleEntry", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<decimal>("Amount")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
+
+                    b.Property<string>("CounterpartyName")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Currency")
+                        .IsRequired()
+                        .HasMaxLength(3)
+                        .HasColumnType("character varying(3)");
+
+                    b.Property<string>("Description")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<string>("Direction")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<DateTime>("DueDate")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("InvoiceId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime?>("PaidAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("PaidBy")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<Guid?>("PurchaseInvoiceId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime?>("RemindedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("ReminderCount")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("ReminderNote")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("InvoiceId");
+
+                    b.HasIndex("PurchaseInvoiceId");
+
+                    b.HasIndex("Direction", "Status", "DueDate");
+
+                    b.ToTable("PaymentScheduleEntries");
+                });
+
             modelBuilder.Entity("CrmMes.Core.Models.PlanningCategory", b =>
                 {
                     b.Property<Guid>("Id")
@@ -1974,6 +2064,130 @@ namespace CrmMes.Api.Migrations
                         .IsUnique();
 
                     b.ToTable("ProductRevisions");
+                });
+
+            modelBuilder.Entity("CrmMes.Core.Models.PurchaseInvoice", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("ContentHash")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<string>("Currency")
+                        .HasMaxLength(3)
+                        .HasColumnType("character varying(3)");
+
+                    b.Property<DateTime>("DocumentDate")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("DocumentNumber")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
+
+                    b.Property<string>("DocumentType")
+                        .IsRequired()
+                        .HasMaxLength(4)
+                        .HasColumnType("character varying(4)");
+
+                    b.Property<DateTime>("ImportedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("ImportedBy")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<string>("Notes")
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)");
+
+                    b.Property<string>("OriginalFileName")
+                        .HasMaxLength(260)
+                        .HasColumnType("character varying(260)");
+
+                    b.Property<string>("PaymentMethod")
+                        .HasMaxLength(4)
+                        .HasColumnType("character varying(4)");
+
+                    b.Property<Guid?>("SupplierId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("SupplierName")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<string>("SupplierVat")
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ContentHash")
+                        .IsUnique();
+
+                    b.HasIndex("SupplierId");
+
+                    b.HasIndex("SupplierVat", "DocumentNumber", "DocumentDate");
+
+                    b.ToTable("PurchaseInvoices");
+                });
+
+            modelBuilder.Entity("CrmMes.Core.Models.PurchaseInvoiceLine", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Code")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<string>("Description")
+                        .IsRequired()
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)");
+
+                    b.Property<decimal>("DiscountPercent")
+                        .HasPrecision(6, 2)
+                        .HasColumnType("numeric(6,2)");
+
+                    b.Property<int>("LineNumber")
+                        .HasColumnType("integer");
+
+                    b.Property<Guid>("PurchaseInvoiceId")
+                        .HasColumnType("uuid");
+
+                    b.Property<decimal>("Quantity")
+                        .HasPrecision(18, 3)
+                        .HasColumnType("numeric(18,3)");
+
+                    b.Property<string>("Unit")
+                        .IsRequired()
+                        .HasMaxLength(10)
+                        .HasColumnType("character varying(10)");
+
+                    b.Property<decimal>("UnitPrice")
+                        .HasPrecision(18, 4)
+                        .HasColumnType("numeric(18,4)");
+
+                    b.Property<string>("VatNature")
+                        .HasMaxLength(5)
+                        .HasColumnType("character varying(5)");
+
+                    b.Property<decimal>("VatRate")
+                        .HasPrecision(6, 2)
+                        .HasColumnType("numeric(6,2)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("PurchaseInvoiceId");
+
+                    b.ToTable("PurchaseInvoiceLines");
                 });
 
             modelBuilder.Entity("CrmMes.Core.Models.PurchaseOrder", b =>
@@ -3873,6 +4087,23 @@ namespace CrmMes.Api.Migrations
                     b.Navigation("PanelVerification");
                 });
 
+            modelBuilder.Entity("CrmMes.Core.Models.PaymentScheduleEntry", b =>
+                {
+                    b.HasOne("CrmMes.Core.Models.Invoice", "Invoice")
+                        .WithMany()
+                        .HasForeignKey("InvoiceId")
+                        .OnDelete(DeleteBehavior.Cascade);
+
+                    b.HasOne("CrmMes.Core.Models.PurchaseInvoice", "PurchaseInvoice")
+                        .WithMany("Schedule")
+                        .HasForeignKey("PurchaseInvoiceId")
+                        .OnDelete(DeleteBehavior.Cascade);
+
+                    b.Navigation("Invoice");
+
+                    b.Navigation("PurchaseInvoice");
+                });
+
             modelBuilder.Entity("CrmMes.Core.Models.PlanningCell", b =>
                 {
                     b.HasOne("CrmMes.Core.Models.PlanningCategory", "Category")
@@ -3900,6 +4131,27 @@ namespace CrmMes.Api.Migrations
                         .OnDelete(DeleteBehavior.SetNull);
 
                     b.Navigation("WorkOrder");
+                });
+
+            modelBuilder.Entity("CrmMes.Core.Models.PurchaseInvoice", b =>
+                {
+                    b.HasOne("CrmMes.Core.Models.Supplier", "Supplier")
+                        .WithMany()
+                        .HasForeignKey("SupplierId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.Navigation("Supplier");
+                });
+
+            modelBuilder.Entity("CrmMes.Core.Models.PurchaseInvoiceLine", b =>
+                {
+                    b.HasOne("CrmMes.Core.Models.PurchaseInvoice", "PurchaseInvoice")
+                        .WithMany("Lines")
+                        .HasForeignKey("PurchaseInvoiceId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("PurchaseInvoice");
                 });
 
             modelBuilder.Entity("CrmMes.Core.Models.PurchaseOrder", b =>
@@ -4407,6 +4659,13 @@ namespace CrmMes.Api.Migrations
                     b.Navigation("BillOfMaterial");
 
                     b.Navigation("RoutingSteps");
+                });
+
+            modelBuilder.Entity("CrmMes.Core.Models.PurchaseInvoice", b =>
+                {
+                    b.Navigation("Lines");
+
+                    b.Navigation("Schedule");
                 });
 
             modelBuilder.Entity("CrmMes.Core.Models.PurchaseOrder", b =>

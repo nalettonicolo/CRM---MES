@@ -1,0 +1,65 @@
+@page "/spedizioni/{Id:guid}"
+@inject Api Api
+
+<PageTitle>@(_row?.Code ?? "Spedizione") · Nicolò MES</PageTitle>
+
+<div class="page-head">
+    <div>
+        <div class="eyebrow"><a href="spedizioni">Spedizioni</a></div>
+        <h1>@(_row is null ? "Spedizione" : $"Spedizione {_row.Code}")</h1>
+    </div>
+    @if (_row is not null)
+    {
+        <span class="badge @Labels.ShipmentStatusClass(_row.Status)">@Labels.ShipmentStatus(_row.Status)</span>
+    }
+</div>
+
+@if (_error is not null)
+{
+    <div class="card state"><strong>Impossibile aprire la spedizione</strong>@_error</div>
+}
+else if (_row is null)
+{
+    <div class="card state">@Labels.Loading</div>
+}
+else
+{
+    <div class="card card-pad">
+        <div class="facts">
+            <div class="fact"><div class="label">Direzione</div><div class="value">@Labels.ShipmentDirection(_row.Direction)</div></div>
+            <div class="fact"><div class="label">Corriere</div><div class="value">@_row.CarrierName</div></div>
+            <div class="fact"><div class="label">Tracking</div><div class="value">@(_row.TrackingNumber ?? "—")</div></div>
+            <div class="fact"><div class="label">Controparte</div><div class="value">@(_row.CounterpartReference ?? "—")</div></div>
+            <div class="fact"><div class="label">Indirizzo</div><div class="value">@(_row.Address ?? "—")</div></div>
+            <div class="fact"><div class="label">Prevista</div><div class="value">@Labels.Date(_row.ExpectedAt)</div></div>
+            <div class="fact"><div class="label">Spedita</div><div class="value">@Labels.DateTime(_row.ShippedAt)</div></div>
+            <div class="fact"><div class="label">Consegnata</div><div class="value">@Labels.DateTime(_row.DeliveredAt)</div></div>
+            @if (_row.WorkOrderId is { } wo)
+            {
+                <div class="fact"><div class="label">Commessa</div><div class="value"><a href="commesse/@wo" class="code">@(_row.WorkOrderCode ?? "apri")</a></div></div>
+            }
+            @if (_row.PurchaseOrderId is { } po)
+            {
+                <div class="fact"><div class="label">Ordine fornitore</div><div class="value"><a href="ordini-fornitore/@po">@(_row.PurchaseOrderCode ?? "apri")</a></div></div>
+            }
+        </div>
+        @if (!string.IsNullOrWhiteSpace(_row.Notes))
+        {
+            <p class="muted small">@_row.Notes</p>
+        }
+    </div>
+}
+
+@code {
+    [Parameter] public Guid Id { get; set; }
+    private ShipmentDetail? _row;
+    private string? _error;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        _row = null;
+        _error = null;
+        try { _row = await Api.GetAsync<ShipmentDetail>($"api/shipments/{Id}"); }
+        catch (ApiException exception) { _error = exception.Message; }
+    }
+}

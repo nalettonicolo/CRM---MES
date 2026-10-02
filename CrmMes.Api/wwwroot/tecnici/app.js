@@ -101,7 +101,9 @@
       throw new Error("Sessione scaduta.");
     }
     if (!response.ok) {
-      let message = `Errore ${response.status}`;
+      let message = response.status === 403
+        ? "Il tuo ruolo non ha i permessi per questa operazione."
+        : `Errore ${response.status}`;
       try {
         const data = await response.json();
         message = data.message || data.title || message;
@@ -281,7 +283,7 @@
   }
 
   // ---------- phases (same rules as the shop floor terminal: only a released job, one phase at a time)
-  const phaseStatus = { Pending: ["pending", "Da fare"], InProgress: ["running", "In corso"], Completed: ["signed", "Completata"] };
+  const phaseStatus = { Pending: ["pending", "Da fare"], InProgress: ["running", "In lavorazione"], Done: ["signed", "Completata"], Completed: ["signed", "Completata"] };
 
   async function openPhases(order, remember = true) {
     $("phases-title").textContent = order.code;

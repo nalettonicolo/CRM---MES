@@ -104,4 +104,49 @@ public class ServiceWebTests : TestContext
         page.WaitForAssertion(() => Assert.Contains("Mario Bianchi", page.Markup));
         Assert.Contains("In lavorazione", page.Markup);
     }
+
+    [Fact]
+    public async Task CreatingARequest_PicksTheMachineFromTheDropdown_AndSendsItsRealId()
+    {
+        await LogInAsync("Sales");
+        ServeBase([]);
+        var row = Row("Open");
+        var created = new ServiceRequestDetail(row.Id, row.Number, _machineId, "Quadro generale", "SN-01", _customerId, "Officine Aurora",
+            row.Subject, null, "Normal", "Open", "Phone", null, null, row.OpenedAt, null, []);
+        _server.OnJson("POST", "/api/service/requests", created);
+
+        var page = RenderComponent<Service>();
+        page.WaitForAssertion(() => Assert.Contains("Nuova richiesta", page.Markup));
+
+        page.Find("select[aria-label='Macchina installata per la nuova richiesta']").Change(_machineId.ToString());
+        page.Find("input[aria-label='Oggetto della richiesta']").Change("Allarme termico");
+        page.FindAll("button").Single(b => b.TextContent == "Apri richiesta").Click();
+
+        page.WaitForAssertion(() => Assert.Contains(_server.Requests, r => r.Request.Method == HttpMethod.Post && r.Request.RequestUri!.AbsolutePath == "/api/service/requests"));
+        var sent = _server.Requests.Single(r => r.Request.Method == HttpMethod.Post && r.Request.RequestUri!.AbsolutePath == "/api/service/requests");
+        Assert.Contains(_machineId.ToString(), sent.Body);
+    }
+
+    [Fact]
+    public async Task CreatingAMachine_PicksTheCustomerFromTheDropdown_AndSendsItsRealId()
+    {
+        await LogInAsync("Sales");
+        ServeBase([]);
+        _server.OnJson("GET", "/api/customers", new List<Customer> { new(_customerId, "CLI-01", "Officine Aurora", null, null, null, null, null, true) });
+        _server.OnJson("POST", "/api/service/machines", new InstalledMachine(Guid.NewGuid(), _customerId, "Officine Aurora", null, "Quadro nuovo", null, "SN-99", null, null, null, "Active", null, 0));
+
+        var page = RenderComponent<Service>();
+        page.WaitForAssertion(() => Assert.Contains("Nuova richiesta", page.Markup));
+        page.FindAll("button.chip").Single(b => b.TextContent == "Macchine installate").Click();
+        page.WaitForAssertion(() => Assert.Contains("Nuova macchina installata", page.Markup));
+
+        page.Find("select[aria-label='Cliente per la nuova macchina']").Change(_customerId.ToString());
+        page.Find("input[aria-label='Nome della macchina']").Change("Quadro nuovo");
+        page.Find("input[aria-label='Matricola della macchina']").Change("SN-99");
+        page.FindAll("button").Single(b => b.TextContent == "Registra macchina").Click();
+
+        page.WaitForAssertion(() => Assert.Contains(_server.Requests, r => r.Request.Method == HttpMethod.Post && r.Request.RequestUri!.AbsolutePath == "/api/service/machines"));
+        var sent = _server.Requests.Single(r => r.Request.Method == HttpMethod.Post && r.Request.RequestUri!.AbsolutePath == "/api/service/machines");
+        Assert.Contains(_customerId.ToString(), sent.Body);
+    }
 }

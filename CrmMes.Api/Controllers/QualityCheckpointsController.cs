@@ -39,9 +39,10 @@ public class QualityCheckpointsController : ControllerBase
         }
 
         var checkpoints = await query
-            .OrderBy(c => c.Name)
+            .OrderBy(c => c.Product.Code).ThenBy(c => c.Name)
             .Select(c => new QualityCheckpointResponse(
-                c.Id, c.ProductId, c.Name, c.Unit, c.NominalValue, c.LowerLimit, c.UpperLimit, c.IsActive))
+                c.Id, c.ProductId, c.Name, c.Unit, c.NominalValue, c.LowerLimit, c.UpperLimit, c.IsActive,
+                c.Product.Code, c.Product.Name))
             .ToListAsync(cancellationToken);
 
         return Ok(checkpoints);
@@ -85,7 +86,8 @@ public class QualityCheckpointsController : ControllerBase
 
         var response = new QualityCheckpointResponse(
             checkpoint.Id, checkpoint.ProductId, checkpoint.Name, checkpoint.Unit,
-            checkpoint.NominalValue, checkpoint.LowerLimit, checkpoint.UpperLimit, checkpoint.IsActive);
+            checkpoint.NominalValue, checkpoint.LowerLimit, checkpoint.UpperLimit, checkpoint.IsActive,
+            product.Code, product.Name);
         return Created($"api/quality-checkpoints/{checkpoint.Id}", response);
     }
 
@@ -109,4 +111,5 @@ public sealed record CreateQualityCheckpointRequest(
     Guid ProductId, string? Name, string? Unit, decimal? NominalValue, decimal? LowerLimit, decimal? UpperLimit);
 
 public sealed record QualityCheckpointResponse(
-    Guid Id, Guid ProductId, string Name, string? Unit, decimal? NominalValue, decimal? LowerLimit, decimal? UpperLimit, bool IsActive);
+    Guid Id, Guid ProductId, string Name, string? Unit, decimal? NominalValue, decimal? LowerLimit, decimal? UpperLimit, bool IsActive,
+    string? ProductCode = null, string? ProductName = null);

@@ -1,0 +1,167 @@
+@page "/distinte/{Id:guid}"
+@inject Api Api
+@inject Session Session
+@inject NavigationManager Nav
+
+<PageTitle>@(_slip?.Code ?? "Distinta di prelievo") · Nicolò MES</PageTitle>
+
+<div class="page-head">
+    <div>
+        <div class="eyebrow"><a href="distinte">Distinte di prelievo</a></div>
+        <h1>@(_slip is null ? "Distinta di prelievo" : $"Distinta {_slip.Code}")</h1>
+        @if (_slip?.WorkOrderId is { } workOrderId)
+        {
+            <p class="sub">Commessa <a href="commesse/@workOrderId" class="code">@(_slip.WorkOrderCode ?? "apri")</a></p>
+        }
+    </div>
+    @if (_slip is not null)
+    {
+        <span class="badge @Labels.SlipStatusClass(_slip.Status)">@Labels.SlipStatus(_slip.Status)</span>
+    }
+</div>
+
+@if (_error is not null)
+{
+    <div class="card state"><strong>Impossibile aprire la distinta</strong>@_error</div>
+}
+else if (_slip is null)
+{
+    <div class="card state">@Labels.Loading</div>
+}
+else
+{
+    <div class="stack">
+        @if (_actionError is not null)
+        {
+            <div class="alert" role="alert">@_actionError</div>
+        }
+        @if (_slip.Items.Any(i => i.IsMissing))
+        {
+            <div class="notice">Ci sono materiali mancanti.
+                <a href="da-ordinare">Apri da ordinare</a>
+                per creare l'ordine fornitore, poi chiudi la distinta quando lo stock rientra.
+            </div>
+        }
+        else if (_slip.Status is "Draft" or "Ready")
+        {
+            <div class="notice">Chiudere la distinta scarica lo stock (FEFO/FIFO sui lotti).</div>
+        }
+
+        @if (CanAct)
+        {
+            <div class="actions">
+                @if (_slip.Status == "Draft" && !_slip.Items.Any(i => i.IsMissing))
+                {
+                    <button class="secondary" @onclick="MarkReadyAsync" disabled="@_busy">Segna pronta</button>
+                }
+                @if (CanWarehouse && _slip.Status is "Draft" or "Ready")
+                {
+                    <button @onclick="CloseAsync" disabled="@_busy">Chiudi e scarica stock</button>
+                }
+            </div>
+        }
+
+        <div class="card card-pad">
+            <div class="facts">
+                <div class="fact"><div class="label">Codice</div><div class="value"><CopyCode Value="@_slip.Code" /></div></div>
+                <div class="fact"><div class="label">Creata</div><div class="value">@Labels.Date(_slip.CreatedAt)</div></div>
+                <div class="fact"><div class="label">Righe</div><div class="value">@_slip.Items.Count</div></div>
+                <div class="fact"><div class="label">Mancanti</div><div class="value">@_slip.Items.Count(i => i.IsMissing)</div></div>
+            </div>
+            @if (!string.IsNullOrWhiteSpace(_slip.Notes))
+            {
+                <p class="muted small">@_slip.Notes</p>
+            }
+        </div>
+
+        <div class="card">
+            <div class="section-head"><h2>Materiali</h2></div>
+            @if (_slip.Items.Count == 0)
+            {
+                <div class="state">Nessuna riga.</div>
+            }
+            else
+            {
+                <div class="table-wrap">
+                    <table class="cards">
+                        <thead><tr><th>Codice</th><th>Descrizione</th><th class="num">Quantità</th><th>UM</th><th>Mancante</th></tr></thead>
+                        <tbody>
+                            @foreach (var item in _slip.Items)
+                            {
+                                <tr>
+                                    <td data-label="Codice" class="code">@item.MaterialCode</td>
+                                    <td data-label="Descrizione">@item.Description</td>
+                                    <td data-label="Quantità" class="num">@Labels.Number(item.Quantity)</td>
+                                    <td data-label="UM" class="muted">@item.Unit</td>
+                                    <td data-label="Mancante">@(item.IsMissing ? "Sì" : "—")</td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            }
+        </div>
+    </div>
+}
+
+@code {
+    [Parameter] public Guid Id { get; set; }
+
+    private WithdrawalSlipDetail? _slip;
+    private string? _error;
+    private string? _actionError;
+    private bool _busy;
+
+    private bool CanWarehouse => Session.Role is "Admin" or "Warehouse";
+    private bool CanAct => _slip is not null && (CanWarehouse || Session.Role is "Operator" or "Purchasing");
+
+    protected override async Task OnParametersSetAsync()
+    {
+        _slip = null;
+        _error = null;
+        try
+        {
+            _slip = await Api.GetAsync<WithdrawalSlipDetail>($"api/withdrawal-slips/{Id}");
+        }
+        catch (ApiException exception)
+        {
+            _error = exception.Message;
+        }
+    }
+
+    private async Task MarkReadyAsync()
+    {
+        _busy = true;
+        _actionError = null;
+        try
+        {
+            _slip = await Api.PostAsync<WithdrawalSlipDetail>($"api/withdrawal-slips/{Id}/ready");
+        }
+        catch (ApiException exception)
+        {
+            _actionError = exception.Message;
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+
+    private async Task CloseAsync()
+    {
+        _busy = true;
+        _actionError = null;
+        try
+        {
+            _slip = await Api.PostAsync<WithdrawalSlipDetail>($"api/withdrawal-slips/{Id}/close");
+        }
+        catch (ApiException exception)
+        {
+            _actionError = exception.Message;
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+}

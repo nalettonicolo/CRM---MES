@@ -1,0 +1,249 @@
+@page "/scadenziario"
+@inject Api Api
+@inject Session Session
+
+<PageTitle>Scadenziario · Nicolò MES</PageTitle>
+
+<div class="page-head">
+    <div>
+        <div class="eyebrow">Amministrazione</div>
+        <h1>Scadenziario</h1>
+        <p class="sub">Scadenze da pagare (fatture passive) e da incassare (fatture emesse). Segna pagato o registra un sollecito — senza invio email automatico.</p>
+    </div>
+</div>
+
+@if (!PayablesRules.CanSeeSchedule(Session.Role))
+{
+    <div class="card state"><strong>Non disponibile per il tuo ruolo</strong>Lo scadenziario è per acquisti, commerciale e direzione.</div>
+}
+else
+{
+    <div class="toolbar">
+        <div class="chips" role="group" aria-label="Direzione">
+            @foreach (var (key, label) in DirectionFilters)
+            {
+                <button class="chip @(_direction == key ? "active" : "")" aria-pressed="@(_direction == key)" @onclick="() => ChangeDirectionAsync(key)">@label</button>
+            }
+        </div>
+        <div class="chips" role="group" aria-label="Stato">
+            @foreach (var (key, label) in StatusFilters)
+            {
+                <button class="chip @(_status == key ? "active" : "")" aria-pressed="@(_status == key)" @onclick="() => ChangeStatusAsync(key)">@label</button>
+            }
+        </div>
+    </div>
+
+    @if (_message is not null)
+    {
+        <div class="card state ok">@_message</div>
+    }
+
+    <div class="card">
+        @if (_error is not null)
+        {
+            <div class="state"><strong>Impossibile caricare lo scadenziario</strong>@_error
+                <div class="actions"><button class="secondary small" @onclick="LoadAsync">Riprova</button></div></div>
+        }
+        else if (_entries is null)
+        {
+            <div class="state">Caricamento...</div>
+        }
+        else if (_entries.Count == 0)
+        {
+            <div class="state"><strong>Nessuna scadenza</strong>Importa una fattura passive XML oppure emetti una fattura di vendita con data di pagamento.</div>
+        }
+        else
+        {
+            <div class="table-wrap">
+                <table class="cards">
+                    <thead>
+                        <tr>
+                            <th>Scadenza</th>
+                            <th>Controparte</th>
+                            <th>Descrizione</th>
+                            <th class="num">Importo</th>
+                            <th>Tipo</th>
+                            <th>Stato</th>
+                            <th></th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var entry in _entries)
+                        {
+                            <tr class="@(entry.Overdue ? "overdue" : "")">
+                                <td data-label="Scadenza">
+                                    @Labels.Date(entry.DueDate)
+                                    @if (entry.Overdue)
+                                    {
+                                        <span class="badge danger">Scaduta</span>
+                                    }
+                                </td>
+                                <td data-label="Controparte">@(entry.CounterpartyName ?? "—")</td>
+                                <td data-label="Descrizione" class="muted">@(entry.Description ?? "—")</td>
+                                <td data-label="Importo" class="num">@Labels.Money(entry.Amount)</td>
+                                <td data-label="Tipo"><span class="badge @(entry.Direction == "Payable" ? "warn" : "info")">@DirectionLabel(entry.Direction)</span></td>
+                                <td data-label="Stato"><span class="badge @ScheduleStatusClass(entry.Status)">@ScheduleStatusLabel(entry.Status)</span></td>
+                                <td data-label="Azioni">
+                                    @if (entry.Status == "Open")
+                                    {
+                                        <div class="actions inline">
+                                            <button class="secondary small" disabled="@(_busyId == entry.Id)" @onclick="() => MarkPaidAsync(entry)">Pagato</button>
+                                            <button class="ghost small" disabled="@(_busyId == entry.Id)" @onclick="() => RemindAsync(entry)">Sollecito</button>
+                                        </div>
+                                        @if (entry.ReminderCount > 0)
+                                        {
+                                            <div class="muted small">@entry.ReminderCount sollecit@(entry.ReminderCount == 1 ? "o" : "i")</div>
+                                        }
+                                    }
+                                    else if (entry.PaidAt is not null)
+                                    {
+                                        <span class="muted small">@Labels.DateTime(entry.PaidAt.Value)</span>
+                                    }
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+            <div class="section-head small muted">
+                <span>@_entries.Count scadenze</span>
+                <span>Aperti @Labels.Money(_entries.Where(e => e.Status == "Open").Sum(e => e.Amount))</span>
+            </div>
+        }
+    </div>
+}
+
+@code {
+    private static readonly (string Key, string Label)[] DirectionFilters =
+    [
+        ("", "Tutte"), ("Payable", "Da pagare"), ("Receivable", "Da incassare"),
+    ];
+
+    private static readonly (string Key, string Label)[] StatusFilters =
+    [
+        ("Open", "Aperte"), ("Paid", "Chiuse"), ("", "Tutte"),
+    ];
+
+    private string _direction = "";
+    private string _status = "Open";
+    private List<PaymentScheduleEntry>? _entries;
+    private string? _error;
+    private string? _message;
+    private Guid? _busyId;
+
+    protected override Task OnInitializedAsync() =>
+        PayablesRules.CanSeeSchedule(Session.Role) ? LoadAsync() : Task.CompletedTask;
+
+    private static string DirectionLabel(string direction) => direction switch
+    {
+        "Payable" => "Pagamento",
+        "Receivable" => "Incasso",
+        _ => direction,
+    };
+
+    private static string ScheduleStatusLabel(string status) => status switch
+    {
+        "Open" => "Aperta",
+        "Paid" => "Pagata",
+        _ => status,
+    };
+
+    private static string ScheduleStatusClass(string status) => status switch
+    {
+        "Paid" => "ok",
+        _ => string.Empty,
+    };
+
+    private async Task ChangeDirectionAsync(string direction)
+    {
+        _direction = direction;
+        await LoadAsync();
+    }
+
+    private async Task ChangeStatusAsync(string status)
+    {
+        _status = status;
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        _error = null;
+        _message = null;
+        _entries = null;
+        try
+        {
+            var query = new List<string>();
+            if (!string.IsNullOrEmpty(_direction))
+            {
+                query.Add($"direction={Uri.EscapeDataString(_direction)}");
+            }
+
+            if (!string.IsNullOrEmpty(_status))
+            {
+                query.Add($"status={Uri.EscapeDataString(_status)}");
+            }
+
+            var path = query.Count == 0 ? "api/payables/schedule" : $"api/payables/schedule?{string.Join("&", query)}";
+            _entries = await Api.GetAsync<List<PaymentScheduleEntry>>(path);
+        }
+        catch (Exception ex)
+        {
+            _error = ex.Message;
+        }
+    }
+
+    private async Task MarkPaidAsync(PaymentScheduleEntry entry)
+    {
+        _busyId = entry.Id;
+        _message = null;
+        try
+        {
+            var updated = await Api.PostAsync<PaymentScheduleEntry>($"api/payables/schedule/{entry.Id}/mark-paid", null);
+            ReplaceEntry(updated);
+            _message = "Scadenza segnata come pagata.";
+        }
+        catch (Exception ex)
+        {
+            _error = ex.Message;
+        }
+        finally
+        {
+            _busyId = null;
+        }
+    }
+
+    private async Task RemindAsync(PaymentScheduleEntry entry)
+    {
+        _busyId = entry.Id;
+        _message = null;
+        try
+        {
+            var updated = await Api.PostAsync<PaymentScheduleEntry>($"api/payables/schedule/{entry.Id}/remind", new { note = (string?)null });
+            ReplaceEntry(updated);
+            _message = "Sollecito registrato (nessuna email inviata).";
+        }
+        catch (Exception ex)
+        {
+            _error = ex.Message;
+        }
+        finally
+        {
+            _busyId = null;
+        }
+    }
+
+    private void ReplaceEntry(PaymentScheduleEntry updated)
+    {
+        if (_entries is null)
+        {
+            return;
+        }
+
+        var index = _entries.FindIndex(e => e.Id == updated.Id);
+        if (index >= 0)
+        {
+            _entries[index] = updated;
+        }
+    }
+}

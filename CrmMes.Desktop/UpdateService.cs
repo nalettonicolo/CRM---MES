@@ -8,8 +8,9 @@ using System.Text.Json.Serialization;
 
 namespace CrmMes.Desktop;
 
-/// <summary>Checks GitHub Releases for a newer client and updates through the installer
-/// (installer/NicoloMES.iss).
+/// <summary>Checks GitHub Releases for a newer client and updates through the suite installer
+/// (installer/NicoloMES.iss → NicoloMES-Setup.exe). With /UPDATE=1 the suite installs only the
+/// desktop program and never touches a server installation.
 ///
 /// Until v1.2 the update unzipped the release over the running folder from a .cmd script that waited a
 /// fixed 2 seconds: the app often hadn't finished closing (its logout call can take much longer while the
@@ -114,7 +115,7 @@ public sealed class UpdateService
             // /SILENT: progress window only, no questions; real errors are still shown.
             // /CLOSEAPPLICATIONS: waits for this program to close (Restart Manager) before replacing files.
             // /UPDATE=1: the installer reopens the program when done (see [Run] in NicoloMES.iss).
-            Arguments = $"/SILENT /SP- /NOCANCEL /CLOSEAPPLICATIONS /UPDATE=1 /LOG=\"{logPath}\"",
+            Arguments = $"/SILENT /SP- /NOCANCEL /CLOSEAPPLICATIONS /TYPE=client /COMPONENTS=\"client\" /UPDATE=1 /LOG=\"{logPath}\"",
             UseShellExecute = true
         });
     }

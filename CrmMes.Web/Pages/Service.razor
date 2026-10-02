@@ -152,7 +152,7 @@
             <h2>Nuova richiesta</h2>
             <div class="form-grid">
                 <label>Macchina installata
-                    <select @bind="_newRequestMachineId">
+                    <select @bind="_newRequestMachineId" aria-label="Macchina installata per la nuova richiesta">
                         <option value="">Scegli...</option>
                         @if (_machines is not null)
                         {
@@ -163,15 +163,15 @@
                         }
                     </select>
                 </label>
-                <label>Oggetto<input @bind="_newRequestSubject" /></label>
+                <label>Oggetto<input @bind="_newRequestSubject" aria-label="Oggetto della richiesta" /></label>
                 <label>Priorità
-                    <select @bind="_newRequestPriority">
+                    <select @bind="_newRequestPriority" aria-label="Priorità">
                         <option value="Normal">Normale</option>
                         <option value="Urgente">Urgente</option>
                     </select>
                 </label>
                 <label>Canale
-                    <select @bind="_newRequestChannel">
+                    <select @bind="_newRequestChannel" aria-label="Canale">
                         <option value="Phone">Telefono</option>
                         <option value="Email">Email</option>
                         <option value="Portal">Portale</option>
@@ -231,7 +231,7 @@ else
             <h2>Nuova macchina installata</h2>
             <div class="form-grid">
                 <label>Cliente
-                    <select @bind="_newMachineCustomerId">
+                    <select @bind="_newMachineCustomerId" aria-label="Cliente per la nuova macchina">
                         <option value="">Scegli...</option>
                         @if (_customers is not null)
                         {
@@ -242,9 +242,9 @@ else
                         }
                     </select>
                 </label>
-                <label>Nome<input @bind="_newMachineName" placeholder="es. Quadro generale BT" /></label>
+                <label>Nome<input @bind="_newMachineName" placeholder="es. Quadro generale BT" aria-label="Nome della macchina" /></label>
                 <label>Modello<input @bind="_newMachineModel" /></label>
-                <label>Matricola<input @bind="_newMachineSerial" /></label>
+                <label>Matricola<input @bind="_newMachineSerial" aria-label="Matricola della macchina" /></label>
                 <label>Ubicazione<input @bind="_newMachineLocation" /></label>
                 <label>Installata il<input type="date" @bind="_newMachineInstalledAt" /></label>
                 <label>Garanzia fino al<input type="date" @bind="_newMachineWarrantyUntil" /></label>

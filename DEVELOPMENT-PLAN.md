@@ -67,7 +67,7 @@ Risultato: meno inserimento manuale e codici riconosciuti automaticamente.
 
 Obiettivo: rendere i flussi utilizzabili dagli operatori.
 
-- Login e sessione JWT collegati all'API (attualmente bypassato con auto-login di test per velocizzare lo sviluppo: `SkipLoginForTesting` in `MainWindow.xaml.cs`, da rimettere a `false` prima di un uso reale).
+- Login e sessione JWT collegati all'API. Nelle build **Release** il login è sempre manuale. Nelle build **Debug**, se sul PC ci sono `CRMMES_DEV_EMAIL` e `CRMMES_DEV_PASSWORD`, il client può accedere da solo (nessuna credenziale nel codice; il vecchio flag `SkipLoginForTesting` non esiste più).
 - Interfaccia con chrome personalizzato e sidebar di navigazione a icone (non più tab orizzontali).
 - Dashboard implementata per materiali, sotto scorta, materiali mancanti, distinte, ordini fornitore, aree, utenti.
 - Ricerca materiali e disponibilita presenti nella shell base.

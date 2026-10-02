@@ -1,0 +1,110 @@
+@page "/pianificazione"
+@inject Api Api
+
+<PageTitle>Pianificazione · Nicolò MES</PageTitle>
+
+<div class="page-head">
+    <div>
+        <div class="eyebrow">Produzione</div>
+        <h1>Pianificazione</h1>
+        <p class="sub">Board settimanale. Il colore delle fasi si dipinge dal programma desktop.</p>
+    </div>
+</div>
+
+@if (_error is not null)
+{
+    <div class="card state"><strong>@Labels.LoadFailed("la pianificazione")</strong>@_error
+        <div class="actions"><button class="secondary small" @onclick="LoadAsync">@Labels.Retry</button></div></div>
+}
+else if (_projects is null || _categories is null || _cells is null)
+{
+    <div class="card state">@Labels.Loading</div>
+}
+else if (_projects.Count == 0)
+{
+    <div class="card state"><strong>Nessun progetto</strong>Crea le righe della board dal programma desktop.</div>
+}
+else
+{
+    <div class="card">
+        <div class="table-wrap">
+            <table class="cards">
+                <thead>
+                    <tr>
+                        <th>Progetto</th>
+                        @foreach (var week in _weeks)
+                        {
+                            <th>@week.ToString("dd/MM")</th>
+                        }
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var project in _projects)
+                    {
+                        <tr>
+                            <td data-label="Progetto">
+                                @project.Name
+                                <div class="small muted">@Labels.PlanningStatus(project.Status)</div>
+                                @if (project.WorkOrderId is { } wo)
+                                {
+                                    <a href="commesse/@wo" class="small">Commessa</a>
+                                }
+                            </td>
+                            @foreach (var week in _weeks)
+                            {
+                                var names = CellNames(project.Id, week);
+                                <td data-label="@week.ToString("dd/MM")">@(string.IsNullOrEmpty(names) ? "—" : names)</td>
+                            }
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+}
+
+@code {
+    private List<PlanningProject>? _projects;
+    private List<PlanningCategory>? _categories;
+    private List<PlanningCell>? _cells;
+    private List<DateTime> _weeks = [];
+    private string? _error;
+
+    protected override Task OnInitializedAsync() => LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        _error = null;
+        var monday = Monday(DateTime.UtcNow);
+        _weeks = Enumerable.Range(0, 8).Select(i => monday.AddDays(i * 7)).ToList();
+        try
+        {
+            _categories = await Api.GetAsync<List<PlanningCategory>>("api/planning-board/categories");
+            _projects = await Api.GetAsync<List<PlanningProject>>("api/planning-board/projects");
+            var from = monday.ToString("yyyy-MM-dd");
+            _cells = await Api.GetAsync<List<PlanningCell>>($"api/planning-board/cells?from={from}&weeks=8");
+        }
+        catch (ApiException exception)
+        {
+            _error = exception.Message;
+        }
+    }
+
+    private string CellNames(Guid projectId, DateTime week)
+    {
+        if (_cells is null || _categories is null)
+        {
+            return "";
+        }
+
+        var ids = _cells.Where(c => c.ProjectId == projectId && c.WeekStart.Date == week.Date).Select(c => c.CategoryId).ToHashSet();
+        return string.Join(", ", _categories.Where(c => ids.Contains(c.Id)).Select(c => c.Code));
+    }
+
+    private static DateTime Monday(DateTime utc)
+    {
+        var day = utc.Date;
+        var delta = ((int)day.DayOfWeek + 6) % 7;
+        return DateTime.SpecifyKind(day.AddDays(-delta), DateTimeKind.Utc);
+    }
+}

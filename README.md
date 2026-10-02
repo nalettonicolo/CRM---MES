@@ -1,38 +1,31 @@
-# Gestionale Distinte di Prelievo
+# Nicolò MES
 
-La mappa aggiornata di cio che e gia costruito e di cio che manca si trova in [PROJECT-MAP.md](PROJECT-MAP.md).
+Gestionale di produzione (MES) con magazzino, acquisti, vendite e documenti. Configurabile per quadri elettrici, meccanica, macchine e impianti, alimentare, impiantistica.
 
-Sistema gestionale MVP per la gestione di distinte di prelievo, materiali mancanti, aree riservate agli utenti e conferma ordini fornitore.
+La mappa del repository è in [PROJECT-MAP.md](PROJECT-MAP.md). Lo stato di moduli e gap è in [STATO-PROGETTO.md](STATO-PROGETTO.md).
 
-## Funzionalità principali
+## Direzione ufficiale
 
-- creazione di aree e utenti
-- assegnazione di aree riservate per singolo utente
-- lanci di distinta di prelievo per area
-- inserimento di codici materiale e quantità
-- caricamento di PDF della distinta esterna
-- rilevamento automazione di codici mancanti
-- generazione di alert per ufficio acquisti
-- creazione e conferma di ordini fornitore
-- dashboard di riepilogo e log eventi
+**API .NET 8 + PostgreSQL + client Windows + piattaforma web `/app/` + pagina tecnici `/tecnici/`.**
 
-## Avvio locale
+Il prototipo Node (`server.js`, `public/`, `data/store.json`) è solo un riferimento storico. Non è il prodotto e non è il database.
+
+## Avvio
+
+Soluzione Visual Studio / `dotnet` su `CrmMes.sln`. L'API serve anche la web. Il client Windows si collega all'URL configurato in Impostazioni server.
 
 ```bash
-npm install
-npm start
+dotnet test CrmMes.sln
 ```
 
-Aprire il browser su http://localhost:3000
+## Funzionalità (nucleo)
 
-## Struttura logica
+- anagrafiche, distinte di prelievo, lotti, sottoscorta
+- prodotti, cicli, commesse, terminale di reparto
+- acquisti, cataloghi, **listini Metel** (modulo)
+- preventivi, DDT, fattura elettronica (moduli)
+- qualità, manutenzione, cantiere, collaudo CE, service, energia (moduli di settore)
 
-- utenti e aree: accessi e autorizzazioni
-- distinte: prelievi attivi e chiusi
-- materiali mancanti: codici non presenti in magazzino o non riconosciuti
-- ordini fornitore: richieste con stato draft/confirmed
-- regole: logica base per il trattamento dei materiali mancanti
+## Login
 
-## Nota
-
-Questo è un MVP per dimostrare il flusso operativo e può essere esteso con autenticazione, database reale, gestione documentale e integrazione con ERP.
+In produzione si accede sempre con email e password (e 2FA se obbligatoria). Nelle build Debug il PC di sviluppo può usare le variabili d'ambiente `CRMMES_DEV_EMAIL` / `CRMMES_DEV_PASSWORD` per un accesso automatico locale: le credenziali non sono nel codice.

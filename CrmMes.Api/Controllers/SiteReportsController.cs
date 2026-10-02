@@ -20,10 +20,12 @@ public class SiteReportsController : ControllerBase
     private const int MaxCodeAttempts = 3;
     private static readonly byte[] PngMagic = [0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A];
     private readonly ApplicationDbContext _dbContext;
+    private readonly StockLedger _stock;
 
-    public SiteReportsController(ApplicationDbContext dbContext)
+    public SiteReportsController(ApplicationDbContext dbContext, StockLedger stock)
     {
         _dbContext = dbContext;
+        _stock = stock;
     }
 
     /// <summary>Work orders a technician can report on: not completed nor cancelled, with the customer.</summary>
@@ -219,6 +221,8 @@ public class SiteReportsController : ControllerBase
             });
         }
 
+        await ConsumeExtraSiteMaterialsAsync(report, cancellationToken);
+
         _dbContext.AuditLogs.Add(new AuditLog
         {
             Action = "SiteReportSigned",
@@ -229,6 +233,41 @@ public class SiteReportsController : ControllerBase
         });
         await _dbContext.SaveChangesAsync(cancellationToken);
         return Ok(ToResponse(report));
+    }
+
+    /// <summary>Materials already taken with a closed pick list for this job are not deducted again.
+    /// Anything extra on the rapportino (van stock, extras on site) comes off warehouse if it is there.</summary>
+    private async Task ConsumeExtraSiteMaterialsAsync(SiteReport report, CancellationToken cancellationToken)
+    {
+        var reported = report.Materials
+            .Where(line => !string.IsNullOrWhiteSpace(line.MaterialCode))
+            .GroupBy(line => line.MaterialCode!, StringComparer.OrdinalIgnoreCase)
+            .Select(group => (Code: group.Key, Quantity: group.Sum(line => line.Quantity)))
+            .ToList();
+        if (reported.Count == 0)
+        {
+            return;
+        }
+
+        var withdrawn = await _dbContext.WithdrawalItems
+            .Where(item => item.WithdrawalSlip.WorkOrderId == report.WorkOrderId && item.WithdrawalSlip.Status == "Closed")
+            .GroupBy(item => item.MaterialCode)
+            .Select(group => new { Code = group.Key, Quantity = group.Sum(item => item.Quantity) })
+            .ToListAsync(cancellationToken);
+        var already = withdrawn.ToDictionary(row => row.Code, row => row.Quantity, StringComparer.OrdinalIgnoreCase);
+
+        var extra = new List<(string Code, decimal Quantity)>();
+        foreach (var (code, quantity) in reported)
+        {
+            already.TryGetValue(code, out var taken);
+            var leftover = quantity - taken;
+            if (leftover > 0)
+            {
+                extra.Add((code, leftover));
+            }
+        }
+
+        await _stock.ConsumeAvailableAsync(extra, cancellationToken);
     }
 
     private async Task<ActionResult?> ApplyAsync(SiteReport report, SaveSiteReportRequest request, CancellationToken cancellationToken)

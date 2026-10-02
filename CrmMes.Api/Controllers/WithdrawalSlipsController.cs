@@ -15,23 +15,31 @@ public class WithdrawalSlipsController : ControllerBase
 {
     private readonly ApplicationDbContext _dbContext;
     private readonly WithdrawalItemBuilder _itemBuilder;
+    private readonly StockLedger _stock;
 
-    public WithdrawalSlipsController(ApplicationDbContext dbContext, WithdrawalItemBuilder itemBuilder)
+    public WithdrawalSlipsController(ApplicationDbContext dbContext, WithdrawalItemBuilder itemBuilder, StockLedger stock)
     {
         _dbContext = dbContext;
         _itemBuilder = itemBuilder;
+        _stock = stock;
     }
 
     [Authorize]
     [HttpGet]
     public async Task<ActionResult<IEnumerable<WithdrawalSlipSummaryResponse>>> GetWithdrawalSlips(
         [FromQuery] string? status = null,
+        [FromQuery] Guid? workOrderId = null,
         CancellationToken cancellationToken = default)
     {
         var query = _dbContext.WithdrawalSlips.AsNoTracking();
         if (!string.IsNullOrWhiteSpace(status))
         {
             query = query.Where(slip => slip.Status == status.Trim());
+        }
+
+        if (workOrderId.HasValue)
+        {
+            query = query.Where(slip => slip.WorkOrderId == workOrderId);
         }
 
         if (!HasElevatedAccess())
@@ -57,7 +65,9 @@ public class WithdrawalSlipsController : ControllerBase
                 slip.Status,
                 slip.CreatedAt,
                 slip.Items.Count,
-                slip.Items.Count(item => item.IsMissing)))
+                slip.Items.Count(item => item.IsMissing),
+                slip.WorkOrderId,
+                slip.WorkOrder != null ? slip.WorkOrder.Code : null))
             .ToListAsync(cancellationToken);
 
         return Ok(slips);
@@ -222,6 +232,7 @@ public class WithdrawalSlipsController : ControllerBase
         var slip = await _dbContext.WithdrawalSlips
             .AsNoTracking()
             .Include(item => item.Items)
+            .Include(item => item.WorkOrder)
             .SingleOrDefaultAsync(item => item.Id == id, cancellationToken);
 
         if (slip is null)
@@ -307,34 +318,15 @@ public class WithdrawalSlipsController : ControllerBase
         }
 
         var codes = slip.Items.Select(item => item.MaterialCode).Distinct().ToArray();
-        var materials = await _dbContext.Materials
-            .Where(material => codes.Contains(material.Code) && material.IsActive)
-            .ToDictionaryAsync(material => material.Code, cancellationToken);
-
-        var unavailable = slip.Items
-            .Where(item => !materials.TryGetValue(item.MaterialCode, out var material) || material.Stock < item.Quantity)
-            .Select(item => item.MaterialCode)
-            .Distinct()
-            .ToArray();
+        var materials = await _stock.LoadActiveAsync(codes, cancellationToken);
+        var unavailable = StockLedger.Unavailable(materials, slip.Items.Select(item => (item.MaterialCode, item.Quantity)));
 
         if (unavailable.Length > 0)
         {
             return Conflict(new { message = "Stock insufficiente per uno o più materiali.", materials = unavailable });
         }
 
-        // Ordering before GroupBy isn't reliably preserved through SQL translation + materialization,
-        // so the lots are fetched first and grouped/ordered client-side. Order: lots with a use-by date
-        // first, earliest expiry first (FEFO); then the others oldest first (FIFO) — without expiry dates
-        // this is exactly the plain FIFO it always was.
-        var openLots = await _dbContext.MaterialLots
-            .Where(lot => codes.Contains(lot.MaterialCode) && lot.Quantity > 0)
-            .ToListAsync(cancellationToken);
-        var lotsByMaterial = openLots
-            .GroupBy(lot => lot.MaterialCode)
-            .ToDictionary(group => group.Key, group => group
-                .OrderBy(lot => lot.ExpiryDate ?? DateTime.MaxValue)
-                .ThenBy(lot => lot.ReceivedAt)
-                .ToList());
+        var lotsByMaterial = await _stock.LoadOpenLotsAsync(codes, cancellationToken);
 
         // Per-unit lot traceability only applies when this slip is tied to a work order with tracked
         // units (integer quantity) — otherwise there's nothing discrete to attribute lots to.
@@ -368,36 +360,8 @@ public class WithdrawalSlipsController : ControllerBase
 
         foreach (var item in slip.Items)
         {
-            materials[item.MaterialCode].Stock -= item.Quantity;
             item.IsMissing = false;
-
-            // Best-effort FIFO genealogy: consume oldest lots first. If the lot ledger for this
-            // material doesn't cover the full quantity (e.g. stock predates lot tracking), the
-            // remainder is simply not attributed to any lot — Material.Stock above is still the
-            // authoritative decrement, lots are additive traceability metadata on top of it.
-            var remaining = item.Quantity;
-            var consumedLots = new List<(MaterialLot Lot, decimal Quantity)>();
-            if (lotsByMaterial.TryGetValue(item.MaterialCode, out var lots))
-            {
-                foreach (var lot in lots)
-                {
-                    if (remaining <= 0)
-                    {
-                        break;
-                    }
-
-                    var consumed = Math.Min(remaining, lot.Quantity);
-                    lot.Quantity -= consumed;
-                    remaining -= consumed;
-                    consumedLots.Add((lot, consumed));
-                    _dbContext.MaterialLotConsumptions.Add(new MaterialLotConsumption
-                    {
-                        MaterialLotId = lot.Id,
-                        WithdrawalItemId = item.Id,
-                        Quantity = consumed
-                    });
-                }
-            }
+            var consumedLots = _stock.Consume(materials[item.MaterialCode], item.Quantity, lotsByMaterial, item.Id);
 
             if (units is not null && perUnitQuantityByMaterial is not null &&
                 perUnitQuantityByMaterial.TryGetValue(item.MaterialCode, out var perUnitQuantity) && perUnitQuantity > 0)
@@ -415,7 +379,7 @@ public class WithdrawalSlipsController : ControllerBase
         }
 
         slip.Status = "Closed";
-        await CreateLowStockAlertsAsync(materials.Values, cancellationToken);
+        await _stock.RaiseMinStockAlertsAsync(materials.Values, cancellationToken);
         _dbContext.AuditLogs.Add(new AuditLog
         {
             Action = "WithdrawalSlipClosed",
@@ -513,36 +477,6 @@ public class WithdrawalSlipsController : ControllerBase
         return NoContent();
     }
 
-    private async Task CreateLowStockAlertsAsync(IEnumerable<Material> materials, CancellationToken cancellationToken)
-    {
-        var belowMinimum = materials
-            .Where(material => material.MinStock > 0 && material.Stock < material.MinStock)
-            .ToList();
-
-        if (belowMinimum.Count == 0)
-        {
-            return;
-        }
-
-        var codes = belowMinimum.Select(material => material.Code).ToArray();
-        var alreadyOpen = await _dbContext.MissingMaterials
-            .Where(mm => mm.Status == "Open" && mm.Source == "MinStock" && codes.Contains(mm.MaterialCode))
-            .Select(mm => mm.MaterialCode)
-            .ToListAsync(cancellationToken);
-        var alreadyOpenSet = alreadyOpen.ToHashSet(StringComparer.OrdinalIgnoreCase);
-
-        foreach (var material in belowMinimum.Where(material => !alreadyOpenSet.Contains(material.Code)))
-        {
-            _dbContext.MissingMaterials.Add(new MissingMaterial
-            {
-                MaterialCode = material.Code,
-                Quantity = material.MinStock - material.Stock,
-                Source = "MinStock",
-                Status = "Open"
-            });
-        }
-    }
-
     private string? GetCurrentUserName() => User.FindFirstValue(ClaimTypes.Name);
 
     private bool HasElevatedAccess() => User.IsInRole("Admin") || User.IsInRole("Warehouse");
@@ -579,7 +513,8 @@ public class WithdrawalSlipsController : ControllerBase
                 item.Description,
                 item.Quantity,
                 item.Unit,
-                item.IsMissing)).ToList());
+                item.IsMissing)).ToList(),
+            slip.WorkOrder?.Code);
     }
 }
 
@@ -610,7 +545,8 @@ public sealed record WithdrawalSlipResponse(
     string Status,
     string? Notes,
     DateTime CreatedAt,
-    IReadOnlyList<WithdrawalSlipItemResponse> Items);
+    IReadOnlyList<WithdrawalSlipItemResponse> Items,
+    string? WorkOrderCode = null);
 
 public sealed record WithdrawalSlipSummaryResponse(
     Guid Id,
@@ -620,7 +556,9 @@ public sealed record WithdrawalSlipSummaryResponse(
     string Status,
     DateTime CreatedAt,
     int ItemCount,
-    int MissingItemCount);
+    int MissingItemCount,
+    Guid? WorkOrderId = null,
+    string? WorkOrderCode = null);
 
 public sealed record WithdrawalSlipItemResponse(
     Guid Id,

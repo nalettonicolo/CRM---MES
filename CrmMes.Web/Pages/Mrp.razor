@@ -1,0 +1,100 @@
+@page "/mrp"
+@inject Api Api
+@inject Session Session
+
+<PageTitle>Fabbisogni MRP · Nicolò MES</PageTitle>
+
+<div class="page-head">
+    <div>
+        <div class="eyebrow">Acquisti</div>
+        <h1>Fabbisogni (MRP)</h1>
+        <p class="sub">Esplode le distinte delle commesse in bozza, rilasciate e in lavorazione; sottrae giacenza e ordini fornitore aperti.</p>
+    </div>
+    <div class="actions">
+        <button class="primary" @onclick="LoadAsync">Ricalcola</button>
+    </div>
+</div>
+
+@if (Session.Role is not "Admin" and not "Purchasing" and not "Management")
+{
+    <div class="card state"><strong>Non disponibile per il tuo ruolo</strong></div>
+}
+else if (_error is not null)
+{
+    <div class="card state"><strong>Errore</strong>@_error <button class="secondary small" @onclick="LoadAsync">Riprova</button></div>
+}
+else if (_run is null)
+{
+    <div class="card state">Calcolo in corso...</div>
+}
+else
+{
+    <div class="kpis">
+        <div class="card kpi"><div class="label">Commesse considerate</div><div class="value">@_run.WorkOrdersConsidered</div></div>
+        <div class="card kpi"><div class="label">Materiali in distinta</div><div class="value">@_run.Materials</div></div>
+        <div class="card kpi"><div class="label">Da ordinare</div><div class="value">@_run.MaterialsToOrder</div></div>
+    </div>
+
+    <div class="card">
+        @if (_run.Suggestions.Count == 0)
+        {
+            <div class="state"><strong>Nessun fabbisogno</strong>Non ci sono commesse aperte con distinta base.</div>
+        }
+        else
+        {
+            <div class="table-wrap">
+                <table class="cards">
+                    <thead>
+                        <tr>
+                            <th>Materiale</th>
+                            <th class="num">Fabbisogno</th>
+                            <th class="num">Giacenza</th>
+                            <th class="num">In ordine</th>
+                            <th class="num">Netto</th>
+                            <th class="num">Proposta</th>
+                            <th>Commesse</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var s in _run.Suggestions.Where(x => _onlyShortage ? x.SuggestedQuantity > 0 : true))
+                        {
+                            <tr class="@(s.SuggestedQuantity > 0 ? "overdue" : "")">
+                                <td data-label="Materiale"><CopyCode Value="@s.MaterialCode" /> <span class="muted">@s.MaterialName</span></td>
+                                <td data-label="Fabbisogno" class="num">@s.GrossRequirement.ToString("N2", Labels.Italian) @s.Unit</td>
+                                <td data-label="Giacenza" class="num">@s.Stock.ToString("N2", Labels.Italian)</td>
+                                <td data-label="In ordine" class="num">@s.OnOrder.ToString("N2", Labels.Italian)</td>
+                                <td data-label="Netto" class="num">@s.NetRequirement.ToString("N2", Labels.Italian)</td>
+                                <td data-label="Proposta" class="num"><strong>@s.SuggestedQuantity.ToString("N2", Labels.Italian)</strong></td>
+                                <td data-label="Commesse" class="muted">@string.Join(", ", s.WorkOrders.Select(w => w.WorkOrderCode).Distinct().Take(5))</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+            <label class="muted"><input type="checkbox" @bind="_onlyShortage" /> Solo materiali da ordinare</label>
+        }
+    </div>
+}
+
+@code {
+    private MrpRun? _run;
+    private string? _error;
+    private bool _onlyShortage = true;
+
+    protected override Task OnInitializedAsync() =>
+        Session.Role is "Admin" or "Purchasing" or "Management" ? LoadAsync() : Task.CompletedTask;
+
+    private async Task LoadAsync()
+    {
+        _error = null;
+        _run = null;
+        try
+        {
+            _run = await Api.GetAsync<MrpRun>("api/procurement/mrp");
+        }
+        catch (Exception ex)
+        {
+            _error = ex.Message;
+        }
+    }
+}

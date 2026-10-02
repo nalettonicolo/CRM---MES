@@ -1,0 +1,143 @@
+@page "/etichette"
+@inject Api Api
+
+<PageTitle>Etichette alimentari · Nicolò MES</PageTitle>
+
+<div class="page-head">
+    <div>
+        <div class="eyebrow">Qualità</div>
+        <h1>Etichette, allergeni e SSCC</h1>
+        <p class="sub">Etichetta del lotto dalla distinta e pallet etichettati. Ingredienti e allergeni si impostano dal programma desktop.</p>
+    </div>
+</div>
+
+<div class="toolbar">
+    <input class="search" type="search" placeholder="Codice commessa" aria-label="Cerca commessa" @bind="_code" @bind:event="oninput" @onkeydown="OnEnter" />
+    <button class="secondary" @onclick="LoadLabelAsync">Mostra etichetta</button>
+</div>
+
+<div class="stack">
+    @if (_labelError is not null)
+    {
+        <div class="card state"><strong>@Labels.LoadFailed("l'etichetta")</strong>@_labelError</div>
+    }
+    else if (_label is not null)
+    {
+        <div class="card card-pad">
+            <div class="section-head"><h2>@_label.SalesName</h2><span class="code">@_label.WorkOrderCode</span></div>
+            <div class="facts">
+                <div class="fact"><div class="label">Prodotto</div><div class="value code">@_label.ProductCode</div></div>
+                <div class="fact"><div class="label">Lotto</div><div class="value">@(_label.LotNumber ?? "—")</div></div>
+                <div class="fact"><div class="label">Produzione</div><div class="value">@Labels.Date(_label.ProductionDate)</div></div>
+                <div class="fact"><div class="label">@(_label.UseByDate ? "Da consumare entro" : "Scadenza")</div><div class="value">@Labels.Date(_label.ExpiryDate)</div></div>
+                <div class="fact"><div class="label">Quantità</div><div class="value">@(_label.NetQuantity ?? Labels.Number(_label.Quantity))</div></div>
+                <div class="fact"><div class="label">Conservazione</div><div class="value">@(_label.StorageConditions ?? "—")</div></div>
+            </div>
+            @if (_label.Allergens.Count > 0)
+            {
+                <p><strong>Allergeni:</strong> @string.Join(", ", _label.Allergens)</p>
+            }
+            @if (_label.Warnings.Count > 0)
+            {
+                <div class="alert" role="status">@string.Join(" ", _label.Warnings)</div>
+            }
+            <div class="table-wrap">
+                <table class="cards">
+                    <thead><tr><th>Ingrediente</th><th class="num">Quantità</th><th>Allergeni</th></tr></thead>
+                    <tbody>
+                        @foreach (var line in _label.Ingredients)
+                        {
+                            <tr>
+                                <td data-label="Ingrediente">@line.Name <div class="small muted code">@line.MaterialCode</div></td>
+                                <td data-label="Quantità" class="num">@Labels.Number(line.QuantityPerUnit)</td>
+                                <td data-label="Allergeni">@(line.AllergenNames.Count == 0 ? "—" : string.Join(", ", line.AllergenNames))</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    }
+
+    <div class="card">
+        <div class="section-head"><h2>Pallet SSCC</h2></div>
+        @if (_ssccError is not null)
+        {
+            <div class="state"><strong>@Labels.LoadFailed("i pallet")</strong>@_ssccError</div>
+        }
+        else if (_units is null)
+        {
+            <div class="state">@Labels.Loading</div>
+        }
+        else if (_units.Count == 0)
+        {
+            <div class="state">Nessun pallet etichettato.</div>
+        }
+        else
+        {
+            <div class="table-wrap">
+                <table class="cards">
+                    <thead><tr><th>SSCC</th><th>Prodotto</th><th>Lotto</th><th class="num">Quantità</th></tr></thead>
+                    <tbody>
+                        @foreach (var unit in _units)
+                        {
+                            <tr>
+                                <td data-label="SSCC" class="code">@unit.Sscc</td>
+                                <td data-label="Prodotto">@(unit.ProductName ?? unit.ProductCode ?? "—")</td>
+                                <td data-label="Lotto">@(unit.LotNumber ?? "—")</td>
+                                <td data-label="Quantità" class="num">@(unit.Quantity is null ? "—" : Labels.Number(unit.Quantity.Value))</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        }
+    </div>
+</div>
+
+@code {
+    private string _code = "";
+    private FoodLabel? _label;
+    private string? _labelError;
+    private List<LogisticUnit>? _units;
+    private string? _ssccError;
+
+    protected override Task OnInitializedAsync() => LoadUnitsAsync();
+
+    private Task OnEnter(KeyboardEventArgs e) => e.Key == "Enter" ? LoadLabelAsync() : Task.CompletedTask;
+
+    private async Task LoadLabelAsync()
+    {
+        _labelError = null;
+        _label = null;
+        var term = _code.Trim();
+        if (term.Length == 0)
+        {
+            _labelError = "Inserisci il codice commessa.";
+            return;
+        }
+
+        try
+        {
+            var found = await Api.GetAsync<List<WorkOrderLookup>>($"api/work-orders/lookup?q={Uri.EscapeDataString(term)}");
+            var match = found.FirstOrDefault(o => string.Equals(o.Code, term, StringComparison.OrdinalIgnoreCase)) ?? found.FirstOrDefault();
+            if (match is null)
+            {
+                _labelError = "Nessuna commessa trovata.";
+                return;
+            }
+
+            _label = await Api.GetAsync<FoodLabel>($"api/food/work-orders/{match.Id}/label");
+        }
+        catch (ApiException exception)
+        {
+            _labelError = exception.Message;
+        }
+    }
+
+    private async Task LoadUnitsAsync()
+    {
+        try { _units = await Api.GetAsync<List<LogisticUnit>>("api/food/logistic-units"); }
+        catch (ApiException exception) { _ssccError = exception.Message; }
+    }
+}

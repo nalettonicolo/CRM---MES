@@ -1,0 +1,107 @@
+@page "/anagrafiche"
+@inject Api Api
+
+<PageTitle>Anagrafiche · Nicolò MES</PageTitle>
+
+<div class="page-head">
+    <div>
+        <div class="eyebrow">Amministrazione</div>
+        <h1>Anagrafiche</h1>
+        <p class="sub">Sedi, aree e centri di lavoro. Creazione e modifica restano nel programma desktop.</p>
+    </div>
+</div>
+
+<div class="stack">
+    <div class="card">
+        <div class="section-head"><h2>Sedi</h2></div>
+        @if (_sites is null && _error is null) {<div class="state">@Labels.Loading</div>}
+        else if (_sites is { Count: 0 }) {<div class="state">Nessuna sede oltre quella principale.</div>}
+        else if (_sites is not null)
+        {
+            <div class="table-wrap">
+                <table class="cards">
+                    <thead><tr><th>Codice</th><th>Nome</th><th>Indirizzo</th></tr></thead>
+                    <tbody>
+                        @foreach (var site in _sites)
+                        {
+                            <tr>
+                                <td data-label="Codice" class="code">@site.Code</td>
+                                <td data-label="Nome">@site.Name</td>
+                                <td data-label="Indirizzo">@(site.Address ?? "—")</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        }
+    </div>
+    <div class="card">
+        <div class="section-head"><h2>Aree</h2></div>
+        @if (_areas is { Count: > 0 })
+        {
+            <div class="table-wrap">
+                <table class="cards">
+                    <thead><tr><th>Codice</th><th>Nome</th><th>Reparto</th></tr></thead>
+                    <tbody>
+                        @foreach (var area in _areas)
+                        {
+                            <tr>
+                                <td data-label="Codice" class="code">@area.Code</td>
+                                <td data-label="Nome">@area.Name</td>
+                                <td data-label="Reparto">@(area.DepartmentType ?? "—")</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        }
+        else if (_areas is not null) {<div class="state">Nessuna area.</div>}
+    </div>
+    <div class="card">
+        <div class="section-head"><h2>Centri di lavoro</h2></div>
+        @if (_centers is { Count: > 0 })
+        {
+            <div class="table-wrap">
+                <table class="cards">
+                    <thead><tr><th>Codice</th><th>Nome</th><th class="num">Capacità/giorno</th></tr></thead>
+                    <tbody>
+                        @foreach (var center in _centers)
+                        {
+                            <tr>
+                                <td data-label="Codice" class="code">@center.Code</td>
+                                <td data-label="Nome">@center.Name</td>
+                                <td data-label="Capacità/giorno" class="num">@Labels.Number(center.DailyCapacityMinutes) min</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        }
+        else if (_centers is not null) {<div class="state">Nessun centro di lavoro.</div>}
+    </div>
+    @if (_error is not null)
+    {
+        <div class="alert">@_error</div>
+    }
+</div>
+
+@code {
+    private List<SiteRow>? _sites;
+    private List<AreaRow>? _areas;
+    private List<WorkCenterRow>? _centers;
+    private string? _error;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            _sites = await Api.GetAsync<List<SiteRow>>("api/sites");
+            _areas = await Api.GetAsync<List<AreaRow>>("api/areas");
+            _centers = await Api.GetAsync<List<WorkCenterRow>>("api/work-centers");
+        }
+        catch (ApiException exception)
+        {
+            _error = exception.Message;
+        }
+    }
+}

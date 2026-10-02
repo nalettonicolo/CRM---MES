@@ -1,0 +1,105 @@
+@page "/fatture-passive/{Id:guid}"
+@inject Api Api
+@inject Session Session
+@inject NavigationManager Nav
+
+<PageTitle>Fattura passive · Nicolò MES</PageTitle>
+
+@if (!PayablesRules.CanImportPassive(Session.Role))
+{
+    <div class="card state"><strong>Non disponibile per il tuo ruolo</strong></div>
+}
+else if (_error is not null)
+{
+    <div class="card state"><strong>Impossibile caricare la fattura</strong>@_error
+        <div class="actions"><button class="secondary small" @onclick="Back">Torna all'elenco</button></div></div>
+}
+else if (_invoice is null)
+{
+    <div class="card state">Caricamento...</div>
+}
+else
+{
+    <div class="page-head">
+        <div>
+            <div class="eyebrow">Acquisti · Fattura passive</div>
+            <h1>@_invoice.DocumentNumber</h1>
+            <p class="sub">@_invoice.SupplierName · @Labels.Date(_invoice.DocumentDate) · @(_invoice.OriginalFileName ?? "XML importato")</p>
+        </div>
+        <div class="actions">
+            <button class="secondary" @onclick="Back">Elenco</button>
+            <button class="secondary" @onclick="@(() => Nav.NavigateTo("scadenziario"))">Scadenziario</button>
+        </div>
+    </div>
+
+    <div class="card">
+        <h2 class="section-title">Righe</h2>
+        <div class="table-wrap">
+            <table class="cards">
+                <thead><tr><th>#</th><th>Descrizione</th><th class="num">Q.tà</th><th class="num">Prezzo</th><th class="num">IVA %</th></tr></thead>
+                <tbody>
+                    @foreach (var line in _invoice.Lines)
+                    {
+                        <tr>
+                            <td data-label="#">@line.LineNumber</td>
+                            <td data-label="Descrizione">@line.Description</td>
+                            <td data-label="Q.tà" class="num">@line.Quantity.ToString("N2", Labels.Italian) @line.Unit</td>
+                            <td data-label="Prezzo" class="num">@Labels.Money(line.UnitPrice)</td>
+                            <td data-label="IVA" class="num">@line.VatRate.ToString("0.##", Labels.Italian)</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    @if (_invoice.Schedule.Count > 0)
+    {
+        <div class="card">
+            <h2 class="section-title">Scadenze di pagamento</h2>
+            <div class="table-wrap">
+                <table class="cards">
+                    <thead><tr><th>Scadenza</th><th class="num">Importo</th><th>Stato</th></tr></thead>
+                    <tbody>
+                        @foreach (var s in _invoice.Schedule)
+                        {
+                            <tr>
+                                <td data-label="Scadenza">@Labels.Date(s.DueDate)</td>
+                                <td data-label="Importo" class="num">@Labels.Money(s.Amount)</td>
+                                <td data-label="Stato"><span class="badge @(s.Status == "Paid" ? "ok" : s.Overdue ? "danger" : "warn")">@(s.Status == "Paid" ? "Pagata" : s.Overdue ? "Scaduta" : "Aperta")</span></td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    }
+}
+
+@code {
+    [Parameter] public Guid Id { get; set; }
+
+    private PurchaseInvoiceDetail? _invoice;
+    private string? _error;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (!PayablesRules.CanImportPassive(Session.Role))
+        {
+            return;
+        }
+
+        _invoice = null;
+        _error = null;
+        try
+        {
+            _invoice = await Api.GetAsync<PurchaseInvoiceDetail>($"api/payables/purchase-invoices/{Id}");
+        }
+        catch (Exception ex)
+        {
+            _error = ex.Message;
+        }
+    }
+
+    private void Back() => Nav.NavigateTo("fatture-passive");
+}

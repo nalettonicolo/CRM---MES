@@ -19,10 +19,12 @@ public class TransportDocumentsController : ControllerBase
 {
     private const int MaxNumberingAttempts = 3;
     private readonly ApplicationDbContext _dbContext;
+    private readonly StockLedger _stock;
 
-    public TransportDocumentsController(ApplicationDbContext dbContext)
+    public TransportDocumentsController(ApplicationDbContext dbContext, StockLedger stock)
     {
         _dbContext = dbContext;
+        _stock = stock;
     }
 
     [HttpGet("reasons")]
@@ -34,10 +36,11 @@ public class TransportDocumentsController : ControllerBase
         [FromQuery] string? status = null,
         [FromQuery] string? reason = null,
         [FromQuery] string? search = null,
+        [FromQuery] Guid? workOrderId = null,
         [FromQuery] int take = 200,
         CancellationToken cancellationToken = default)
     {
-        var query = _dbContext.TransportDocuments.AsNoTracking().Include(document => document.Lines).AsQueryable();
+        var query = _dbContext.TransportDocuments.AsNoTracking().AsQueryable();
         if (!string.IsNullOrWhiteSpace(status))
         {
             query = query.Where(document => document.Status == status.Trim());
@@ -46,6 +49,11 @@ public class TransportDocumentsController : ControllerBase
         if (!string.IsNullOrWhiteSpace(reason))
         {
             query = query.Where(document => document.Reason == reason.Trim());
+        }
+
+        if (workOrderId.HasValue)
+        {
+            query = query.Where(document => document.WorkOrderId == workOrderId);
         }
 
         if (!string.IsNullOrWhiteSpace(search))
@@ -60,12 +68,28 @@ public class TransportDocumentsController : ControllerBase
             .ThenByDescending(document => document.Number)
             .ThenByDescending(document => document.CreatedAt)
             .Take(Math.Clamp(take, 1, 500))
+            .Select(document => new
+            {
+                document.Id,
+                document.Number,
+                document.Year,
+                document.Status,
+                document.Reason,
+                document.ReasonDetail,
+                document.RecipientName,
+                document.IssuedAt,
+                document.CreatedAt,
+                LineCount = document.Lines.Count,
+                document.WorkOrderId,
+            })
             .ToListAsync(cancellationToken);
 
         return Ok(documents.Select(document => new TransportDocumentSummaryResponse(
-            document.Id, DocumentCode(document), document.Number, document.Year, document.Status, document.Reason,
+            document.Id,
+            document.Number is { } number && document.Year is { } year ? $"{number}/{year}" : "Bozza",
+            document.Number, document.Year, document.Status, document.Reason,
             TransportReasons.Label(document.Reason, document.ReasonDetail), document.RecipientName,
-            document.IssuedAt, document.CreatedAt, document.Lines.Count, document.WorkOrderId)));
+            document.IssuedAt, document.CreatedAt, document.LineCount, document.WorkOrderId)));
     }
 
     [HttpGet("{id:guid}")]
@@ -193,7 +217,7 @@ public class TransportDocumentsController : ControllerBase
     {
         for (var attempt = 1; ; attempt++)
         {
-            var document = await _dbContext.TransportDocuments.Include(d => d.Lines)
+            var document = await _dbContext.TransportDocuments.Include(d => d.Lines).ThenInclude(l => l.Material)
                 .FirstOrDefaultAsync(d => d.Id == id, cancellationToken);
             if (document is null)
             {
@@ -208,6 +232,29 @@ public class TransportDocumentsController : ControllerBase
             if (document.Lines.Count == 0)
             {
                 return BadRequest(new { message = "Aggiungi almeno una riga prima di emettere il DDT." });
+            }
+
+            var materialLines = document.Lines
+                .Where(line => line.MaterialId.HasValue && line.Material is not null)
+                .GroupBy(line => line.Material!.Code, StringComparer.OrdinalIgnoreCase)
+                .Select(group => (group.First().Material!.Code, Quantity: group.Sum(line => line.Quantity)))
+                .ToList();
+            if (materialLines.Count > 0)
+            {
+                var materials = await _stock.LoadActiveAsync(materialLines.Select(line => line.Code), cancellationToken);
+                var unavailable = StockLedger.Unavailable(materials, materialLines);
+                if (unavailable.Length > 0)
+                {
+                    return Conflict(new { message = "Giacenza insufficiente per i materiali del DDT.", materials = unavailable });
+                }
+
+                var lots = await _stock.LoadOpenLotsAsync(materials.Keys, cancellationToken);
+                foreach (var (code, quantity) in materialLines)
+                {
+                    _stock.Consume(materials[code], quantity, lots, withdrawalItemId: null);
+                }
+
+                await _stock.RaiseMinStockAlertsAsync(materials.Values, cancellationToken);
             }
 
             var now = DateTime.UtcNow;
@@ -273,6 +320,15 @@ public class TransportDocumentsController : ControllerBase
         document.Status = "Cancelled";
         document.CancelledAt = DateTime.UtcNow;
         document.CancellationReason = request.Reason.Trim();
+        var returned = document.Lines
+            .Where(line => line.MaterialId.HasValue && line.Material is not null)
+            .GroupBy(line => line.Material!.Code, StringComparer.OrdinalIgnoreCase)
+            .Select(group => (group.First().Material!.Code, Quantity: group.Sum(line => line.Quantity)))
+            .ToList();
+        if (returned.Count > 0)
+        {
+            await _stock.RestoreAsync(returned, $"RESO-{DocumentCode(document)}", cancellationToken);
+        }
         _dbContext.AuditLogs.Add(new AuditLog
         {
             Action = "TransportDocumentCancelled",
@@ -575,6 +631,7 @@ public class TransportDocumentsController : ControllerBase
             .Include(d => d.Carrier)
             .Include(d => d.WorkOrder)
             .Include(d => d.Lines).ThenInclude(l => l.Returns)
+            .Include(d => d.Lines).ThenInclude(l => l.Material)
             .AsSplitQuery();
         return (tracking ? query : query.AsNoTracking()).FirstOrDefaultAsync(d => d.Id == id, cancellationToken);
     }

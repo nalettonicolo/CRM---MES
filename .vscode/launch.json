@@ -1,0 +1,35 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "API (http :5092)",
+      "type": "coreclr",
+      "request": "launch",
+      "preLaunchTask": "build-api",
+      "program": "${workspaceFolder}/CrmMes.Api/bin/Debug/net8.0/CrmMes.Api.dll",
+      "args": [],
+      "cwd": "${workspaceFolder}/CrmMes.Api",
+      "env": {
+        "ASPNETCORE_ENVIRONMENT": "Development",
+        "ASPNETCORE_URLS": "http://localhost:5092"
+      },
+      "console": "internalConsole"
+    },
+    {
+      "name": "Desktop",
+      "type": "coreclr",
+      "request": "launch",
+      "preLaunchTask": "build-desktop",
+      "program": "${workspaceFolder}/CrmMes.Desktop/bin/Debug/net8.0-windows/CrmMes.Desktop.dll",
+      "cwd": "${workspaceFolder}/CrmMes.Desktop",
+      "console": "internalConsole"
+    }
+  ],
+  "compounds": [
+    {
+      "name": "MES: API + Desktop",
+      "configurations": ["API (http :5092)", "Desktop"],
+      "stopAll": true
+    }
+  ]
+}

@@ -294,6 +294,93 @@ public class CompanyProfileController : ControllerBase
         return Ok(ToAccessResponse(settings));
     }
 
+    /// <summary>Company visual theme (colours, radius, density, background). Readable by everyone so
+    /// clients can paint themselves; only Admin may change it.</summary>
+    [HttpGet("theme")]
+    public async Task<ActionResult<UiThemeResponse>> GetTheme(CancellationToken cancellationToken = default)
+    {
+        var stored = await _dbContext.CompanyProfiles.AsNoTracking().Select(p => p.UiTheme).FirstOrDefaultAsync(cancellationToken);
+        return Ok(ToThemeResponse(UiTheme.Parse(stored)));
+    }
+
+    [Authorize(Policy = "AdminOnly")]
+    [HttpPut("theme")]
+    public async Task<ActionResult<UiThemeResponse>> SaveTheme(
+        SaveUiThemeRequest request, CancellationToken cancellationToken = default)
+    {
+        UiTheme.Settings settings;
+        if (!string.IsNullOrWhiteSpace(request.ApplyPreset) &&
+            string.IsNullOrWhiteSpace(request.Accent) &&
+            string.IsNullOrWhiteSpace(request.Background))
+        {
+            settings = UiTheme.FromPreset(request.ApplyPreset);
+        }
+        else
+        {
+            settings = new UiTheme.Settings
+            {
+                Preset = request.Preset ?? UiTheme.PresetOfficina,
+                Background = request.Background ?? "#E6E6E1",
+                Surface = request.Surface ?? "#F5F5F1",
+                SurfaceRaised = request.SurfaceRaised ?? "#ECECE7",
+                Ink = request.Ink ?? "#141414",
+                Muted = request.Muted ?? "#555550",
+                Line = request.Line ?? "#C2C2BA",
+                Accent = request.Accent ?? "#CF2A1F",
+                AccentHover = request.AccentHover ?? "#B0241A",
+                AccentSoft = request.AccentSoft ?? "#F5E4E2",
+                OnAccent = request.OnAccent ?? "#FFF8F7",
+                Sidebar = request.Sidebar ?? "#161616",
+                SidebarText = request.SidebarText ?? "#A3A39C",
+                Ok = request.Ok ?? "#2B5A36",
+                Warn = request.Warn ?? "#8F5A10",
+                Radius = request.Radius ?? 0,
+                Density = request.Density ?? "comfortable",
+                BackgroundStyle = request.BackgroundStyle ?? "solid",
+                FieldBorder = request.FieldBorder ?? 1,
+                FieldHeight = request.FieldHeight ?? 38,
+            };
+        }
+
+        settings = UiTheme.Normalize(settings);
+        var profile = await _dbContext.CompanyProfiles.FirstOrDefaultAsync(cancellationToken);
+        if (profile is null)
+        {
+            profile = new CompanyProfile { ConfiguredAt = DateTime.UtcNow, CompanyName = "Azienda" };
+            _dbContext.CompanyProfiles.Add(profile);
+        }
+
+        profile.UiTheme = UiTheme.Serialize(settings);
+        profile.UpdatedAt = DateTime.UtcNow;
+        _dbContext.AuditLogs.Add(new AuditLog
+        {
+            Action = "UiThemeSaved",
+            EntityType = "CompanyProfile",
+            EntityId = profile.Id,
+            Details = $"{settings.Preset} · accent {settings.Accent} · r{settings.Radius}",
+            UserName = User.FindFirstValue(ClaimTypes.Name),
+        });
+        await _dbContext.SaveChangesAsync(cancellationToken);
+        return Ok(ToThemeResponse(settings));
+    }
+
+    private static UiThemeResponse ToThemeResponse(UiTheme.Settings s) => new(
+        s.Preset, s.Background, s.Surface, s.SurfaceRaised, s.Ink, s.Muted, s.Line,
+        s.Accent, s.AccentHover, s.AccentSoft, s.OnAccent, s.Sidebar, s.SidebarText, s.Ok, s.Warn,
+        s.Radius, s.Density, s.BackgroundStyle, s.FieldBorder, s.FieldHeight,
+        UiTheme.ToCssVariables(s),
+        UiTheme.Presets.Select(p => ToPresetResponse(p)).ToList());
+
+    private static UiThemePresetResponse ToPresetResponse(UiTheme.PresetInfo p)
+    {
+        var v = UiTheme.Normalize(UiTheme.Parse(UiTheme.Serialize(p.Values)));
+        return new UiThemePresetResponse(
+            p.Key, p.Name, p.Description,
+            v.Background, v.Surface, v.SurfaceRaised, v.Ink, v.Muted, v.Line,
+            v.Accent, v.AccentHover, v.AccentSoft, v.OnAccent, v.Sidebar, v.SidebarText, v.Ok, v.Warn,
+            v.Radius, v.Density, v.BackgroundStyle, v.FieldBorder, v.FieldHeight);
+    }
+
     /// <summary>Areas to show on a channel: modules switched on and allowed there by the Admin.</summary>
     [HttpGet("areas")]
     public async Task<ActionResult<List<string>>> GetAreas([FromQuery] string? channel, CancellationToken cancellationToken = default)
@@ -326,7 +413,89 @@ public class CompanyProfileController : ControllerBase
             : profile.Activities.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).ToList());
 
     private static string? Clean(string? value) => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
+
+    /// <summary>Producer declaration for the software origin (UE/SEE ≥ 50%), used in Transizione 5.0 /
+    /// iperammortamento technical reports. Readable by any authenticated user; editable by Admin.</summary>
+    [HttpGet("software-origin")]
+    public async Task<ActionResult<SoftwareOriginDeclarationResponse>> GetSoftwareOrigin(
+        CancellationToken cancellationToken = default)
+    {
+        var profile = await _dbContext.CompanyProfiles.AsNoTracking().FirstOrDefaultAsync(cancellationToken);
+        return Ok(ToSoftwareOrigin(profile));
+    }
+
+    [Authorize(Policy = "AdminOnly")]
+    [HttpPut("software-origin")]
+    public async Task<ActionResult<SoftwareOriginDeclarationResponse>> SaveSoftwareOrigin(
+        SaveSoftwareOriginRequest request, CancellationToken cancellationToken = default)
+    {
+        if (request.EuDevelopmentPercent is < 0 or > 100)
+        {
+            return BadRequest(new { message = "La percentuale di sviluppo UE deve essere tra 0 e 100." });
+        }
+
+        var places = Clean(request.DevelopmentPlaces) ?? "Italia";
+        var profile = await _dbContext.CompanyProfiles.FirstOrDefaultAsync(cancellationToken);
+        if (profile is null)
+        {
+            profile = new CompanyProfile { ConfiguredAt = DateTime.UtcNow, CompanyName = "Azienda" };
+            _dbContext.CompanyProfiles.Add(profile);
+        }
+
+        profile.SoftwareEuDevelopmentPercent = request.EuDevelopmentPercent ?? 100m;
+        profile.SoftwareDevelopmentPlaces = places;
+        profile.SoftwareOriginSignatory = Clean(request.Signatory);
+        profile.SoftwareOriginUpdatedAt = DateTime.UtcNow;
+        profile.UpdatedAt = DateTime.UtcNow;
+        _dbContext.AuditLogs.Add(new AuditLog
+        {
+            Action = "SoftwareOriginSaved",
+            EntityType = "CompanyProfile",
+            EntityId = profile.Id,
+            Details = $"{profile.SoftwareEuDevelopmentPercent}% · {places}",
+            UserName = User.FindFirstValue(ClaimTypes.Name),
+        });
+        await _dbContext.SaveChangesAsync(cancellationToken);
+        return Ok(ToSoftwareOrigin(profile));
+    }
+
+    private SoftwareOriginDeclarationResponse ToSoftwareOrigin(CompanyProfile? profile)
+    {
+        var version = typeof(CompanyProfileController).Assembly.GetName().Version?.ToString(3) ?? "1.0";
+        var producer = string.IsNullOrWhiteSpace(profile?.CompanyName) ? "Produttore del software" : profile!.CompanyName;
+        var percent = profile?.SoftwareEuDevelopmentPercent ?? 100m;
+        var places = string.IsNullOrWhiteSpace(profile?.SoftwareDevelopmentPlaces) ? "Italia" : profile.SoftwareDevelopmentPlaces;
+        var meets = percent >= 50m;
+        var body =
+            $"Il sottoscritto, in qualità di produttore/licenziante del software «Nicolò MES» (versione {version}), " +
+            $"dichiara che lo sviluppo sostanziale (ideazione dell'architettura, scrittura del codice sorgente, testing e debugging) " +
+            $"è stato effettuato per il {percent:0.##}% del relativo valore in sedi nel territorio dell'Unione europea o dello Spazio economico europeo " +
+            $"({places}), e che gli eventuali componenti open source di terze parti non rilevano ai fini della determinazione dell'origine. " +
+            (meets
+                ? "La dichiarazione soddisfa la soglia del 50% prevista per i beni immateriali agevolabili."
+                : "ATTENZIONE: la percentuale dichiarata è inferiore al 50% richiesto dalla normativa.");
+        return new SoftwareOriginDeclarationResponse(
+            "Nicolò MES",
+            version,
+            producer,
+            profile?.VatNumber,
+            percent,
+            places,
+            profile?.SoftwareOriginSignatory,
+            profile?.SoftwareOriginUpdatedAt,
+            meets,
+            body,
+            DateTime.UtcNow.Date);
+    }
 }
+
+public sealed record SoftwareOriginDeclarationResponse(
+    string ProductName, string ProductVersion, string ProducerName, string? ProducerVat,
+    decimal EuDevelopmentPercent, string DevelopmentPlaces, string? Signatory, DateTime? UpdatedAt,
+    bool MeetsEuThreshold, string DeclarationText, DateTime IssuedOn);
+
+public sealed record SaveSoftwareOriginRequest(
+    decimal? EuDevelopmentPercent, string? DevelopmentPlaces, string? Signatory);
 
 public sealed record CompanyProfileResponse(
     bool IsConfigured, string CompanyName, string? VatNumber, string? Address, string? Phone, string? Email,
@@ -367,3 +536,39 @@ public sealed record SaveAccessChannelsRequest(
     List<string>? Channels,
     Dictionary<string, List<string>>? Roles,
     Dictionary<string, List<string>>? Areas);
+
+public sealed record UiThemePresetResponse(
+    string Key, string Name, string Description,
+    string Background, string Surface, string SurfaceRaised, string Ink, string Muted, string Line,
+    string Accent, string AccentHover, string AccentSoft, string OnAccent, string Sidebar, string SidebarText,
+    string Ok, string Warn, int Radius, string Density, string BackgroundStyle, int FieldBorder, int FieldHeight);
+
+public sealed record UiThemeResponse(
+    string Preset, string Background, string Surface, string SurfaceRaised, string Ink, string Muted, string Line,
+    string Accent, string AccentHover, string AccentSoft, string OnAccent, string Sidebar, string SidebarText,
+    string Ok, string Warn, int Radius, string Density, string BackgroundStyle, int FieldBorder, int FieldHeight,
+    Dictionary<string, string> CssVariables, List<UiThemePresetResponse> Presets);
+
+/// <summary>Send <see cref="ApplyPreset"/> alone to load a named palette; otherwise send the full colour set.</summary>
+public sealed record SaveUiThemeRequest(
+    string? ApplyPreset = null,
+    string? Preset = null,
+    string? Background = null,
+    string? Surface = null,
+    string? SurfaceRaised = null,
+    string? Ink = null,
+    string? Muted = null,
+    string? Line = null,
+    string? Accent = null,
+    string? AccentHover = null,
+    string? AccentSoft = null,
+    string? OnAccent = null,
+    string? Sidebar = null,
+    string? SidebarText = null,
+    string? Ok = null,
+    string? Warn = null,
+    int? Radius = null,
+    string? Density = null,
+    string? BackgroundStyle = null,
+    int? FieldBorder = null,
+    int? FieldHeight = null);

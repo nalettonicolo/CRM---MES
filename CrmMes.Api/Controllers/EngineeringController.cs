@@ -204,6 +204,34 @@ public class EngineeringController(ApplicationDbContext db) : ControllerBase
             .Select(ToResponse));
     }
 
+    /// <summary>All current drawings/instructions of a work order's phases in one round-trip (web detail page).</summary>
+    [HttpGet("work-orders/{workOrderId:guid}/documents")]
+    public async Task<ActionResult<IEnumerable<WorkOrderPhaseDocumentsResponse>>> GetWorkOrderDocuments(
+        Guid workOrderId, CancellationToken cancellationToken = default)
+    {
+        var order = await db.WorkOrders.AsNoTracking()
+            .Where(o => o.Id == workOrderId)
+            .Select(o => new { o.ProductId, Operations = o.Operations.Select(op => new { op.Id, op.SequenceNumber }).ToList() })
+            .SingleOrDefaultAsync(cancellationToken);
+        if (order is null)
+        {
+            return NotFound();
+        }
+
+        var documents = await db.TechnicalDocuments.AsNoTracking()
+            .Where(d => d.ProductId == order.ProductId && d.IsCurrent)
+            .ToListAsync(cancellationToken);
+        return Ok(order.Operations
+            .OrderBy(op => op.SequenceNumber)
+            .Select(op => new WorkOrderPhaseDocumentsResponse(
+                op.Id,
+                documents
+                    .Where(d => d.StepSequence is null || d.StepSequence == op.SequenceNumber)
+                    .OrderBy(d => d.StepSequence is null ? 1 : 0).ThenBy(d => d.Kind == "instructions" ? 0 : 1).ThenBy(d => d.Title)
+                    .Select(ToResponse)
+                    .ToList())));
+    }
+
     // ---------- Revisions ----------
 
     [HttpGet("products/{productId:guid}/revisions")]
@@ -618,6 +646,8 @@ public class EngineeringController(ApplicationDbContext db) : ControllerBase
             c.NewRoutingJson is null ? null : Deserialize<RoutingStepRequest>(c.NewRoutingJson),
             affected);
 }
+
+public sealed record WorkOrderPhaseDocumentsResponse(Guid OperationId, List<TechnicalDocumentResponse> Documents);
 
 public sealed record TechnicalDocumentResponse(Guid Id, Guid ProductId, int? StepSequence, string Kind, string KindName, string Title, string FileName,
     string ContentType, long SizeBytes, int Version, string? VersionNote, bool IsCurrent, string? UploadedBy, DateTime UploadedAt);

@@ -1,4 +1,4 @@
-@page "/energia"
+﻿@page "/energia"
 @inject Api Api
 @inject Session Session
 @inject IJSRuntime Js
@@ -122,7 +122,7 @@
         <h2>Nuovo progetto</h2>
         <div class="form-grid">
             <label>Macchina
-                <select @bind="_newEquipmentId">
+                <select @bind="_newEquipmentId" aria-label="Macchina per il nuovo progetto">
                     <option value="">Scegli...</option>
                     @if (_equipment is not null)
                     {
@@ -146,7 +146,7 @@
     <h2>Consumo di una macchina</h2>
     <div class="form-grid">
         <label>Macchina
-            <select @bind="_lookupEquipmentId">
+            <select @bind="_lookupEquipmentId" aria-label="Macchina per il consumo">
                 <option value="">Scegli...</option>
                 @if (_equipment is not null)
                 {

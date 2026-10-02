@@ -12,30 +12,30 @@ public sealed class StatusToBrushConverter : IValueConverter
 {
     private static readonly Dictionary<string, string> Palette = new(StringComparer.OrdinalIgnoreCase)
     {
-        ["Draft"] = "#71717A",
-        ["Pending"] = "#71717A",
-        ["Open"] = "#A15C07",
-        ["PartiallyReceived"] = "#A15C07",
-        ["InProgress"] = "#A15C07",
-        ["Ordered"] = "#2E6F9E",
-        ["Ready"] = "#2E6F9E",
-        ["Confirmed"] = "#2E6F9E",
-        ["Released"] = "#2E6F9E",
-        ["Received"] = "#3D7A4C",
-        ["Resolved"] = "#3D7A4C",
-        ["Closed"] = "#3D7A4C",
-        ["Completed"] = "#3D7A4C",
-        ["Done"] = "#3D7A4C",
-        ["Good"] = "#3D7A4C",
-        ["Cancelled"] = "#C0392B",
-        ["Scrapped"] = "#C0392B",
-        ["Preparing"] = "#71717A",
-        ["Shipped"] = "#2E6F9E",
-        ["Delivered"] = "#3D7A4C",
-        ["Sent"] = "#2E6F9E",
-        ["Accepted"] = "#3D7A4C",
-        ["Rejected"] = "#C0392B",
-        ["Issued"] = "#3D7A4C",
+        ["Draft"] = "#757570",
+        ["Pending"] = "#757570",
+        ["Open"] = "#8F5A10",
+        ["PartiallyReceived"] = "#8F5A10",
+        ["InProgress"] = "#8F5A10",
+        ["Ordered"] = "#3A5F52",
+        ["Ready"] = "#3A5F52",
+        ["Confirmed"] = "#3A5F52",
+        ["Released"] = "#3A5F52",
+        ["Received"] = "#2B5A36",
+        ["Resolved"] = "#2B5A36",
+        ["Closed"] = "#2B5A36",
+        ["Completed"] = "#2B5A36",
+        ["Done"] = "#2B5A36",
+        ["Good"] = "#2B5A36",
+        ["Cancelled"] = "#CF2A1F",
+        ["Scrapped"] = "#CF2A1F",
+        ["Preparing"] = "#757570",
+        ["Shipped"] = "#3A5F52",
+        ["Delivered"] = "#2B5A36",
+        ["Sent"] = "#3A5F52",
+        ["Accepted"] = "#2B5A36",
+        ["Rejected"] = "#CF2A1F",
+        ["Issued"] = "#2B5A36",
     };
 
     public object Convert(object? value, Type targetType, object? parameter, CultureInfo culture)
@@ -46,7 +46,7 @@ public sealed class StatusToBrushConverter : IValueConverter
         }
 
         var key = value as string ?? string.Empty;
-        var hex = Palette.TryGetValue(key, out var color) ? color : "#71717A";
+        var hex = Palette.TryGetValue(key, out var color) ? color : "#757570";
         return new SolidColorBrush((Color)ColorConverter.ConvertFromString(hex));
     }
 
@@ -62,16 +62,16 @@ public sealed class PlanningTypeToBrushConverter : IValueConverter
 {
     private static readonly Dictionary<string, string> Palette = new(StringComparer.OrdinalIgnoreCase)
     {
-        ["WorkOrder"] = "#2E6F9E",
-        ["PurchaseOrder"] = "#A15C07",
-        ["Shipment"] = "#3D7A4C",
-        ["MaintenanceTask"] = "#7B4FA3",
+        ["WorkOrder"] = "#3A5F52",
+        ["PurchaseOrder"] = "#8F5A10",
+        ["Shipment"] = "#2B5A36",
+        ["MaintenanceTask"] = "#5C5346",
     };
 
     public object Convert(object? value, Type targetType, object? parameter, CultureInfo culture)
     {
         var key = value as string ?? string.Empty;
-        var hex = Palette.TryGetValue(key, out var color) ? color : "#71717A";
+        var hex = Palette.TryGetValue(key, out var color) ? color : "#757570";
         return new SolidColorBrush((Color)ColorConverter.ConvertFromString(hex));
     }
 
@@ -91,16 +91,23 @@ public sealed class StatusToItalianTextConverter : IValueConverter
         ["Ordered"] = "Ordinato",
         ["Ready"] = "Pronta",
         ["Confirmed"] = "Confermato",
-        ["PartiallyReceived"] = "Ricevuto parzialmente",
+        ["PartiallyReceived"] = "Ricevuto in parte",
         ["Received"] = "Ricevuto",
         ["Resolved"] = "Risolto",
         ["Closed"] = "Chiusa",
         ["Cancelled"] = "Annullata",
         ["Released"] = "Rilasciata",
-        ["InProgress"] = "In corso",
+        ["InProgress"] = "In lavorazione",
         ["Completed"] = "Completata",
-        ["Pending"] = "In attesa",
+        ["Pending"] = "Da fare",
         ["Done"] = "Completata",
+        ["Issued"] = "Emesso",
+        ["Signed"] = "Firmato",
+        ["InValutazione"] = "In valutazione",
+        ["Confermata"] = "Confermata",
+        ["InProduzione"] = "In produzione",
+        ["Sospesa"] = "Sospesa",
+        ["Consegnata"] = "Consegnata",
         ["Good"] = "Buona",
         ["Scrapped"] = "Scartata",
         ["Preparing"] = "In preparazione",
@@ -171,7 +178,7 @@ public sealed class BoolToBrushConverter : IValueConverter
             return Brushes.Transparent;
         }
 
-        var hex = !isTrue ? "#71717A" : warning ? "#A15C07" : "#2F6B3F";
+        var hex = !isTrue ? "#757570" : warning ? "#8F5A10" : "#2B5A36";
         return new SolidColorBrush((Color)ColorConverter.ConvertFromString(hex));
     }
 

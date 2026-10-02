@@ -1,6 +1,8 @@
 @page "/commesse/{Id:guid}"
 @inject Api Api
 @inject IJSRuntime Js
+@inject Session Session
+@inject NavigationManager Nav
 
 <PageTitle>@(_order?.Code ?? "Commessa") · Nicolò MES</PageTitle>
 
@@ -8,6 +10,19 @@
     <div>
         <div class="eyebrow"><a href="commesse">Commesse</a></div>
         <h1>@(_order is null ? "Commessa" : $"Commessa {_order.Code}")</h1>
+        @if (_order is not null && (_order.CustomerId is not null || _order.QuoteId is not null))
+        {
+            <p class="sub">
+                @if (_order.CustomerId is { } customerId)
+                {
+                    <a href="clienti/@customerId">@(_order.CustomerName ?? "Cliente")</a>
+                }
+                @if (_order.QuoteId is { } quoteId)
+                {
+                    <span> · </span><a href="preventivi/@quoteId" class="code">@(_order.QuoteCode ?? "Preventivo")</a>
+                }
+            </p>
+        }
     </div>
     @if (_order is not null)
     {
@@ -26,12 +41,45 @@ else if (_order is null)
 else
 {
     <div class="stack">
+        @if (_actionError is not null)
+        {
+            <div class="alert" role="alert">@_actionError</div>
+        }
+        @if (_order.AreaId is null && _order.Status is not "Completed" and not "Cancelled")
+        {
+            <div class="notice">Senza area non si può generare la distinta di prelievo.
+                @if (CanWarehouse && _order.Status == "Draft")
+                {
+                    <span> Assegnane una qui sotto.</span>
+                }
+            </div>
+        }
+        @if (CanAct)
+        {
+            <div class="actions">
+                @if (CanWarehouse && _order.Status is not "Completed" and not "Cancelled")
+                {
+                    <button class="secondary" @onclick="GenerateSlipAsync" disabled="@(_busy || _order.AreaId is null)">Genera distinta di prelievo</button>
+                }
+                @if (CanDdt && _order.Status != "Cancelled")
+                {
+                    <button class="secondary" @onclick="CreateDdtAsync" disabled="@_busy">Crea DDT di vendita</button>
+                }
+                @if (Session.HasModule("panel-verification"))
+                {
+                    <a class="button secondary" href="commesse/@Id/verifica-quadro">Verifica quadro</a>
+                }
+            </div>
+        }
+
         <div class="card card-pad">
             <div class="facts">
                 <div class="fact"><div class="label">Codice commessa</div><div class="value"><CopyCode Value="@_order.Code" /></div></div>
                 <div class="fact"><div class="label">Lotto prodotto</div><div class="value"><CopyCode Value="@_order.ProductLotNumber" /></div></div>
                 <div class="fact"><div class="label">Quantità</div><div class="value">@Labels.Number(_order.Quantity)</div></div>
                 <div class="fact"><div class="label">Revisione prodotto</div><div class="value">@(_order.ProductRevision ?? "—")</div></div>
+                <div class="fact"><div class="label">Area</div><div class="value">@AreaLabel</div></div>
+                <div class="fact"><div class="label">Vendita</div><div class="value">@(_order.SalePrice is null ? "—" : Labels.Money(_order.SalePrice.Value))</div></div>
                 <div class="fact"><div class="label">Consegna</div><div class="value">@Labels.Date(_order.DueDate)</div></div>
                 <div class="fact"><div class="label">Riferimento cliente</div><div class="value">@(_order.CustomerReference ?? "—")</div></div>
                 <div class="fact"><div class="label">Creata</div><div class="value">@Labels.Date(_order.CreatedAt)</div></div>
@@ -42,10 +90,23 @@ else
             {
                 <p class="muted small">@_order.Notes</p>
             }
+            @if (CanWarehouse && _order.Status == "Draft")
+            {
+                <div class="actions">
+                    <select @bind="_editAreaId" aria-label="Area di produzione">
+                        <option value="">Senza area</option>
+                        @foreach (var area in _areas ?? [])
+                        {
+                            <option value="@area.Id">@area.Name (@area.Code)</option>
+                        }
+                    </select>
+                    <button class="secondary" @onclick="SaveAreaAsync" disabled="@_busy">Salva area</button>
+                </div>
+            }
         </div>
 
         <div class="card">
-            <div class="section-head"><h2>Fasi</h2><span class="small muted">@_order.Operations.Count(o => o.Status == "Completed") di @_order.Operations.Count completate</span></div>
+            <div class="section-head"><h2>Fasi</h2><span class="small muted">@_order.Operations.Count(o => o.Status is "Done" or "Completed") di @_order.Operations.Count completate</span></div>
             @if (_order.Operations.Count == 0)
             {
                 <div class="state">Questa commessa non ha fasi: il prodotto non ha un ciclo di lavoro.</div>
@@ -89,6 +150,115 @@ else
         </div>
 
         <div class="card">
+            <div class="section-head"><h2>Distinte di prelievo</h2></div>
+            @if (_slips is null)
+            {
+                <div class="state">Caricamento...</div>
+            }
+            else if (_slips.Count == 0)
+            {
+                <div class="state">Nessuna distinta collegata. Generala dalla distinta base, poi chiudila dal magazzino per scaricare lo stock.</div>
+            }
+            else
+            {
+                <div class="table-wrap">
+                    <table class="cards">
+                        <thead><tr><th>Codice</th><th>Stato</th><th class="num">Righe</th></tr></thead>
+                        <tbody>
+                            @foreach (var slip in _slips)
+                            {
+                                <tr class="link" @onclick="@(() => Nav.NavigateTo($"distinte/{slip.Id}"))">
+                                    <td data-label="Codice" class="code">@slip.Code</td>
+                                    <td data-label="Stato"><span class="badge @Labels.SlipStatusClass(slip.Status)">@Labels.SlipStatus(slip.Status)</span></td>
+                                    <td data-label="Righe" class="num">@slip.ItemCount</td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            }
+        </div>
+
+        <div class="card">
+            <div class="section-head"><h2>Documenti di trasporto</h2></div>
+            @if (_documentsOfTransport is null)
+            {
+                <div class="state">Caricamento...</div>
+            }
+            else if (_documentsOfTransport.Count == 0)
+            {
+                <div class="state">Nessun DDT per questa commessa.</div>
+            }
+            else
+            {
+                <div class="table-wrap">
+                    <table class="cards">
+                        <thead><tr><th>Documento</th><th>Destinatario</th><th>Stato</th></tr></thead>
+                        <tbody>
+                            @foreach (var document in _documentsOfTransport)
+                            {
+                                <tr class="link" @onclick="@(() => Nav.NavigateTo($"ddt/{document.Id}"))">
+                                    <td data-label="Documento" class="code">@document.DocumentCode</td>
+                                    <td data-label="Destinatario">@document.RecipientName</td>
+                                    <td data-label="Stato"><span class="badge @Labels.DocumentStatusClass(document.Status)">@Labels.DocumentStatus(document.Status)</span></td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            }
+        </div>
+
+        @if (Session.HasModule("site-work"))
+        {
+            <div class="card">
+                <div class="section-head"><h2>Rapportini cantiere</h2>
+                    <a class="small" href="cantiere">Tutti</a>
+                </div>
+                @if (_siteReports is null)
+                {
+                    <div class="state">Caricamento...</div>
+                }
+                else if (_siteReports.Count == 0)
+                {
+                    <div class="state">Nessun rapportino. Si compilano da telefono (/tecnici) o dal desktop.</div>
+                }
+                else
+                {
+                    <div class="table-wrap">
+                        <table class="cards">
+                            <thead><tr><th>Codice</th><th>Data</th><th>Stato</th><th class="num">Minuti</th></tr></thead>
+                            <tbody>
+                                @foreach (var report in _siteReports)
+                                {
+                                    <tr class="link" @onclick="@(() => Nav.NavigateTo($"cantiere/{report.Id}"))">
+                                        <td data-label="Codice" class="code">@report.Code</td>
+                                        <td data-label="Data">@Labels.Date(report.WorkDate)</td>
+                                        <td data-label="Stato"><span class="badge @Labels.SiteReportStatusClass(report.Status)">@Labels.SiteReportStatus(report.Status)</span></td>
+                                        <td data-label="Minuti" class="num">@Labels.Number(report.TotalMinutes)</td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                }
+            </div>
+        }
+
+        @if (_costing is not null)
+        {
+            <div class="card">
+                <div class="section-head"><h2>Costi e margine</h2></div>
+                <div class="facts">
+                    <div class="fact"><div class="label">Vendita</div><div class="value">@(_costing.SalePrice is null ? "—" : Labels.Money(_costing.SalePrice.Value))</div></div>
+                    <div class="fact"><div class="label">Costo stimato</div><div class="value">@Labels.Money(_costing.Estimated.Total)</div></div>
+                    <div class="fact"><div class="label">Costo reale</div><div class="value">@Labels.Money(_costing.Actual.Total)</div></div>
+                    <div class="fact"><div class="label">Margine reale</div><div class="value">@(_costing.ActualMargin is null ? "—" : Labels.Money(_costing.ActualMargin.Amount))</div></div>
+                </div>
+            </div>
+        }
+
+        <div class="card">
             <div class="section-head"><h2>Lotti di materiale usati</h2></div>
             @if (_lots is null)
             {
@@ -110,7 +280,7 @@ else
                                     <td data-label="Materiale" class="code">@lot.MaterialCode</td>
                                     <td data-label="Lotto"><CopyCode Value="@lot.LotNumber" /></td>
                                     <td data-label="Quantità" class="num">@Labels.Number(lot.QuantityConsumed)</td>
-                                    <td data-label="Prelievo" class="code muted">@lot.WithdrawalSlipCode</td>
+                                    <td data-label="Prelievo"><a href="distinte/@lot.WithdrawalSlipId" class="code">@lot.WithdrawalSlipCode</a></td>
                                 </tr>
                             }
                         </tbody>
@@ -126,18 +296,57 @@ else
 
     private WorkOrderDetail? _order;
     private List<WorkOrderMaterialLot>? _lots;
+    private List<WithdrawalSlipSummary>? _slips;
+    private List<TransportDocumentSummary>? _documentsOfTransport;
+    private List<SiteReportSummary>? _siteReports;
+    private WorkOrderCosting? _costing;
+    private List<AreaRow>? _areas;
+    private string _editAreaId = "";
     private Dictionary<Guid, List<TechnicalDocument>> _documents = [];
     private string? _error;
+    private string? _actionError;
+    private bool _busy;
+
+    private bool CanWarehouse => Session.Role is "Admin" or "Warehouse";
+    private bool CanDdt => Session.HasModule("shipping") && Session.Role is "Admin" or "Sales" or "Warehouse" or "Purchasing";
+    private bool CanAct => _order is not null && (CanWarehouse || CanDdt || Session.HasModule("panel-verification"));
+    private bool CanSeeCosts => Session.Role is "Admin" or "Management";
+
+    private string AreaLabel =>
+        _order?.AreaId is { } areaId
+            ? (_areas?.FirstOrDefault(a => a.Id == areaId) is { } area ? $"{area.Name} ({area.Code})" : areaId.ToString()[..8])
+            : "—";
 
     protected override async Task OnParametersSetAsync()
     {
         _order = null;
         _lots = null;
+        _slips = null;
+        _documentsOfTransport = null;
+        _siteReports = null;
         _error = null;
         try
         {
             _order = await Api.GetAsync<WorkOrderDetail>($"api/work-orders/{Id}");
+            _editAreaId = _order.AreaId?.ToString() ?? "";
             _lots = await Api.GetAsync<List<WorkOrderMaterialLot>>($"api/work-orders/{Id}/material-lots");
+            _slips = await Api.GetAsync<List<WithdrawalSlipSummary>>($"api/withdrawal-slips?workOrderId={Id}");
+            _documentsOfTransport = await Api.GetAsync<List<TransportDocumentSummary>>($"api/transport-documents?workOrderId={Id}");
+            if (Session.HasModule("site-work"))
+            {
+                try { _siteReports = await Api.GetAsync<List<SiteReportSummary>>($"api/site-reports?workOrderId={Id}"); }
+                catch (ApiException) { _siteReports = []; }
+            }
+            if (CanWarehouse || _order.AreaId is not null)
+            {
+                try { _areas ??= await Api.GetAsync<List<AreaRow>>("api/areas"); }
+                catch (ApiException) { _areas = []; }
+            }
+            if (CanSeeCosts)
+            {
+                try { _costing = await Api.GetAsync<WorkOrderCosting>($"api/work-orders/{Id}/costing"); }
+                catch (ApiException) { _costing = null; }
+            }
             await LoadDocumentsAsync();
         }
         catch (ApiException exception)
@@ -146,20 +355,88 @@ else
         }
     }
 
-    /// <summary>Drawings and instructions of each phase (from the engineering office); none is fine.</summary>
+    private async Task SaveAreaAsync()
+    {
+        if (_order is null) return;
+        _busy = true;
+        _actionError = null;
+        try
+        {
+            Guid? areaId = Guid.TryParse(_editAreaId, out var parsed) ? parsed : null;
+            _order = await Api.PutAsync<WorkOrderDetail>($"api/work-orders/{Id}", new
+            {
+                quantity = _order.Quantity,
+                areaId,
+                customerReference = _order.CustomerReference,
+                dueDate = _order.DueDate,
+                notes = _order.Notes,
+            });
+            _editAreaId = _order.AreaId?.ToString() ?? "";
+        }
+        catch (ApiException exception)
+        {
+            _actionError = exception.Message;
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+
+    private async Task GenerateSlipAsync()
+    {
+        _busy = true;
+        _actionError = null;
+        try
+        {
+            var created = await Api.PostAsync<WorkOrderWithdrawalSlip>($"api/work-orders/{Id}/generate-withdrawal-slip");
+            Nav.NavigateTo($"distinte/{created.WithdrawalSlipId}");
+        }
+        catch (ApiException exception)
+        {
+            _actionError = exception.Message;
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+
+    private async Task CreateDdtAsync()
+    {
+        _busy = true;
+        _actionError = null;
+        try
+        {
+            var draft = await Api.PostAsync<TransportDocument>($"api/transport-documents/from-work-order/{Id}");
+            Nav.NavigateTo($"ddt/{draft.Id}");
+        }
+        catch (ApiException exception)
+        {
+            _actionError = exception.Message;
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+
     private async Task LoadDocumentsAsync()
     {
         _documents = [];
-        foreach (var op in _order!.Operations)
+        if (_order is null || _order.Operations.Count == 0)
         {
-            try
-            {
-                _documents[op.Id] = await Api.GetAsync<List<TechnicalDocument>>($"api/engineering/work-orders/{Id}/operations/{op.Id}/documents");
-            }
-            catch (ApiException)
-            {
-                return;
-            }
+            return;
+        }
+
+        try
+        {
+            var phases = await Api.GetAsync<List<WorkOrderPhaseDocuments>>($"api/engineering/work-orders/{Id}/documents");
+            _documents = phases.ToDictionary(p => p.OperationId, p => p.Documents);
+        }
+        catch (ApiException)
+        {
+            // Older servers or module off: keep the page usable without drawings.
         }
     }
 

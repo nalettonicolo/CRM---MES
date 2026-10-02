@@ -18,10 +18,10 @@ public class StatusToBrushConverterTests
     }
 
     [Theory]
-    [InlineData("Draft", "#71717A")]
-    [InlineData("Cancelled", "#C0392B")]
-    [InlineData("Done", "#3D7A4C")]
-    [InlineData("InProgress", "#A15C07")]
+    [InlineData("Draft", "#757570")]
+    [InlineData("Cancelled", "#CF2A1F")]
+    [InlineData("Done", "#2B5A36")]
+    [InlineData("InProgress", "#8F5A10")]
     public void Convert_WithForegroundParameter_ReturnsExpectedColorForKnownStatus(string status, string expectedHex)
     {
         var result = _converter.Convert(status, typeof(Brush), "Foreground", CultureInfo.InvariantCulture);
@@ -44,7 +44,7 @@ public class StatusToBrushConverterTests
     {
         var result = _converter.Convert("SomeUnknownStatus", typeof(Brush), "Foreground", CultureInfo.InvariantCulture);
 
-        var expected = (Color)ColorConverter.ConvertFromString("#71717A");
+        var expected = (Color)ColorConverter.ConvertFromString("#757570");
         Assert.Equal(expected, Assert.IsType<SolidColorBrush>(result).Color);
     }
 
@@ -60,9 +60,12 @@ public class StatusToItalianTextConverterTests
 {
     [Theory]
     [InlineData("Draft", "Bozza")]
-    [InlineData("Done", "Completata")]
-    [InlineData("Completed", "Completata")]
-    [InlineData("Cancelled", "Annullata")]
+        [InlineData("Done", "Completata")]
+        [InlineData("Completed", "Completata")]
+        [InlineData("Pending", "Da fare")]
+        [InlineData("InProgress", "In lavorazione")]
+        [InlineData("Confermata", "Confermata")]
+        [InlineData("Cancelled", "Annullata")]
     public void Translate_KnownStatus_ReturnsItalianLabel(string status, string expected)
     {
         Assert.Equal(expected, StatusToItalianTextConverter.Translate(status));
@@ -87,7 +90,7 @@ public class StatusToItalianTextConverterTests
 
         var result = converter.Convert("Pending", typeof(string), null, CultureInfo.InvariantCulture);
 
-        Assert.Equal("In attesa", result);
+        Assert.Equal("Da fare", result);
     }
 }
 
@@ -138,7 +141,7 @@ public class BoolToBrushConverterTests
     {
         var result = _converter.Convert(false, typeof(Brush), "Foreground", CultureInfo.InvariantCulture);
 
-        var expected = (Color)ColorConverter.ConvertFromString("#71717A");
+        var expected = (Color)ColorConverter.ConvertFromString("#757570");
         Assert.Equal(expected, Assert.IsType<SolidColorBrush>(result).Color);
     }
 
@@ -147,7 +150,7 @@ public class BoolToBrushConverterTests
     {
         var result = _converter.Convert(true, typeof(Brush), "Foreground_warning", CultureInfo.InvariantCulture);
 
-        var expected = (Color)ColorConverter.ConvertFromString("#A15C07");
+        var expected = (Color)ColorConverter.ConvertFromString("#8F5A10");
         Assert.Equal(expected, Assert.IsType<SolidColorBrush>(result).Color);
     }
 
@@ -156,7 +159,7 @@ public class BoolToBrushConverterTests
     {
         var result = _converter.Convert(true, typeof(Brush), "Foreground", CultureInfo.InvariantCulture);
 
-        var expected = (Color)ColorConverter.ConvertFromString("#2F6B3F");
+        var expected = (Color)ColorConverter.ConvertFromString("#2B5A36");
         Assert.Equal(expected, Assert.IsType<SolidColorBrush>(result).Color);
     }
 }

@@ -56,4 +56,28 @@ public class MaintenanceWebTests : TestContext
         page.WaitForAssertion(() => Assert.Contains("generata la prossima scadenza", page.Markup));
         Assert.Contains(_server.Requests, r => r.Request.Method == HttpMethod.Post && r.Request.RequestUri!.AbsolutePath.EndsWith("/complete"));
     }
+
+    [Fact]
+    public async Task CreatingATask_PicksTheMachineFromTheDropdown_AndSendsItsRealId()
+    {
+        await LogInAsync("Warehouse");
+        _server.OnJson("GET", "/api/equipment", new List<Equipment> { new(_equipmentId, "Pressa 120t", "PR-01", null, null, true) });
+        _server.OnJson("GET", "/api/maintenance-tasks?status=Pending", new List<MaintenanceTask>());
+        _server.OnJson("POST", "/api/maintenance-tasks", Task("Pending", DateTime.Today.AddDays(30)));
+
+        var page = RenderComponent<Maintenance>();
+        page.WaitForAssertion(() => Assert.Contains("Nuovo intervento", page.Markup));
+
+        // Nothing selected yet: a clear error, not a silent failure.
+        page.Find("button").Click();
+        page.WaitForAssertion(() => Assert.Contains("Scegli la macchina", page.Markup));
+
+        page.Find("select[aria-label='Macchina per il nuovo intervento']").Change(_equipmentId.ToString());
+        page.Find("input[placeholder='es. Controllo cinghie']").Change("Controllo cinghie");
+        page.Find("button").Click();
+
+        page.WaitForAssertion(() => Assert.Contains(_server.Requests, r => r.Request.Method == HttpMethod.Post && r.Request.RequestUri!.AbsolutePath == "/api/maintenance-tasks"));
+        var created = _server.Requests.Single(r => r.Request.Method == HttpMethod.Post && r.Request.RequestUri!.AbsolutePath == "/api/maintenance-tasks");
+        Assert.Contains(_equipmentId.ToString(), created.Body);
+    }
 }

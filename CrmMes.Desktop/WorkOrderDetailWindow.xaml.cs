@@ -144,10 +144,17 @@ public partial class WorkOrderDetailWindow : Window
             StatusText.Foreground = (System.Windows.Media.Brush)StatusBrush.Convert(order.Status, typeof(System.Windows.Media.Brush), "Foreground", System.Globalization.CultureInfo.CurrentCulture)!;
 
             _productId = order.ProductId;
-            ProductText.Text = _productNames.GetValueOrDefault(order.ProductId, order.ProductId.ToString());
+            ProductText.Text = _productNames.GetValueOrDefault(order.ProductId, order.ProductId.ToString())
+                + (string.IsNullOrWhiteSpace(order.ProductRevision) ? "" : $" rev. {order.ProductRevision}");
             QuantityText.Text = order.Quantity.ToString();
             DueDateText.Text = order.DueDate?.ToLocalTime().ToString("d") ?? "-";
-            CustomerReferenceText.Text = string.IsNullOrWhiteSpace(order.CustomerReference) ? "-" : order.CustomerReference;
+            CustomerReferenceText.Text = order.CustomerName is { Length: > 0 } customer
+                ? (string.IsNullOrWhiteSpace(order.CustomerReference) ? customer : $"{customer} ({order.CustomerReference})")
+                : (string.IsNullOrWhiteSpace(order.CustomerReference) ? "-" : order.CustomerReference);
+            if (!string.IsNullOrWhiteSpace(order.QuoteCode))
+            {
+                CustomerReferenceText.Text += $" · {order.QuoteCode}";
+            }
             CreatedAtText.Text = order.CreatedAt.ToLocalTime().ToString("g");
             NotesText.Text = string.IsNullOrWhiteSpace(order.Notes) ? "-" : order.Notes;
 

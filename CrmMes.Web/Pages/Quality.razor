@@ -1,0 +1,102 @@
+@page "/qualita"
+@inject Api Api
+@inject NavigationManager Nav
+
+<PageTitle>Qualità · Nicolò MES</PageTitle>
+
+<div class="page-head">
+    <div>
+        <div class="eyebrow">Produzione</div>
+        <h1>Qualità</h1>
+        <p class="sub">Piani di controllo e non conformità dal reparto. Le misure e il certificato si registrano dal programma o dal terminale.</p>
+    </div>
+</div>
+
+<div class="stack">
+    <div class="card">
+        <div class="section-head"><h2>Non conformità</h2></div>
+        @if (_ncError is not null)
+        {
+            <div class="state"><strong>@Labels.LoadFailed("le non conformità")</strong>@_ncError</div>
+        }
+        else if (_ncs is null)
+        {
+            <div class="state">@Labels.Loading</div>
+        }
+        else if (_ncs.Count == 0)
+        {
+            <div class="state">Nessuna non conformità registrata.</div>
+        }
+        else
+        {
+            <div class="table-wrap">
+                <table class="cards">
+                    <thead><tr><th>Quando</th><th>Commessa</th><th>Fase</th><th>Descrizione</th><th class="num">Scarto</th></tr></thead>
+                    <tbody>
+                        @foreach (var row in _ncs)
+                        {
+                            <tr class="link" @onclick="@(() => Nav.NavigateTo($"commesse/{row.WorkOrderId}"))">
+                                <td data-label="Quando">@Labels.DateTime(row.DetectedAt)</td>
+                                <td data-label="Commessa" class="code">@row.WorkOrderCode</td>
+                                <td data-label="Fase">@row.OperationName</td>
+                                <td data-label="Descrizione">@row.Description @if (row.ReportedBy is not null) {<div class="small muted">@row.ReportedBy</div>}</td>
+                                <td data-label="Scarto" class="num">@Labels.Number(row.ScrapQuantity)</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        }
+    </div>
+
+    <div class="card">
+        <div class="section-head"><h2>Caratteristiche da misurare</h2></div>
+        @if (_cpError is not null)
+        {
+            <div class="state"><strong>@Labels.LoadFailed("i checkpoint")</strong>@_cpError</div>
+        }
+        else if (_points is null)
+        {
+            <div class="state">@Labels.Loading</div>
+        }
+        else if (_points.Count == 0)
+        {
+            <div class="state">Nessun piano di controllo. Si imposta sul prodotto dal programma desktop.</div>
+        }
+        else
+        {
+            <div class="table-wrap">
+                <table class="cards">
+                    <thead><tr><th>Prodotto</th><th>Caratteristica</th><th>Nominale</th><th>Limiti</th><th>UM</th></tr></thead>
+                    <tbody>
+                        @foreach (var point in _points)
+                        {
+                            <tr>
+                                <td data-label="Prodotto" class="code">@(point.ProductCode ?? "—")</td>
+                                <td data-label="Caratteristica">@point.Name @if (point.ProductName is not null) {<div class="small muted">@point.ProductName</div>}</td>
+                                <td data-label="Nominale" class="num">@(point.NominalValue is null ? "—" : Labels.Number(point.NominalValue.Value))</td>
+                                <td data-label="Limiti">@(point.LowerLimit is null && point.UpperLimit is null ? "—" : $"{Labels.Number(point.LowerLimit ?? 0)} – {Labels.Number(point.UpperLimit ?? 0)}")</td>
+                                <td data-label="UM" class="muted">@(point.Unit ?? "—")</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        }
+    </div>
+</div>
+
+@code {
+    private List<QualityNonConformity>? _ncs;
+    private List<QualityCheckpoint>? _points;
+    private string? _ncError;
+    private string? _cpError;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try { _ncs = await Api.GetAsync<List<QualityNonConformity>>("api/quality-measurements/non-conformities"); }
+        catch (ApiException exception) { _ncError = exception.Message; }
+        try { _points = await Api.GetAsync<List<QualityCheckpoint>>("api/quality-checkpoints"); }
+        catch (ApiException exception) { _cpError = exception.Message; }
+    }
+}

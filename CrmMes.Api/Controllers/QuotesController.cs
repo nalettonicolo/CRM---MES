@@ -58,7 +58,7 @@ public class QuotesController : ControllerBase
     public async Task<ActionResult<QuoteResponse>> GetQuote(Guid id, CancellationToken cancellationToken = default)
     {
         var quote = await LoadQuoteAsync(id, tracking: false, cancellationToken);
-        return quote is null ? NotFound() : Ok(ToResponse(quote));
+        return quote is null ? NotFound() : Ok(await ToResponseAsync(quote, cancellationToken));
     }
 
     [Authorize(Policy = "Sales")]
@@ -92,7 +92,7 @@ public class QuotesController : ControllerBase
         await _dbContext.SaveChangesAsync(cancellationToken);
 
         var created = await LoadQuoteAsync(quote.Id, tracking: false, cancellationToken);
-        return CreatedAtAction(nameof(GetQuote), new { id = quote.Id }, ToResponse(created!));
+        return CreatedAtAction(nameof(GetQuote), new { id = quote.Id }, await ToResponseAsync(created!, cancellationToken));
     }
 
     /// <summary>Replaces header and lines of a Draft quote. Once sent, a quote is a document the customer
@@ -139,7 +139,7 @@ public class QuotesController : ControllerBase
         await _dbContext.SaveChangesAsync(cancellationToken);
 
         var saved = await LoadQuoteAsync(id, tracking: false, cancellationToken);
-        return Ok(ToResponse(saved!));
+        return Ok(await ToResponseAsync(saved!, cancellationToken));
     }
 
     [Authorize(Policy = "Sales")]
@@ -294,7 +294,7 @@ public class QuotesController : ControllerBase
         stamp(quote);
         AddAudit(auditAction, quote, $"Preventivo {quote.Code} {verb}.");
         await _dbContext.SaveChangesAsync(cancellationToken);
-        return Ok(ToResponse(quote));
+        return Ok(await ToResponseAsync(quote, cancellationToken));
     }
 
     private async Task<ActionResult?> ValidateAsync(SaveQuoteRequest request, CancellationToken cancellationToken)
@@ -358,16 +358,25 @@ public class QuotesController : ControllerBase
         DiscountPercent = item.DiscountPercent
     };
 
-    private static QuoteResponse ToResponse(Quote quote) => new(
-        quote.Id, quote.Code, quote.CustomerId, quote.Customer.Name, quote.Customer.Code, quote.Status,
-        quote.ValidUntil, quote.Notes, quote.CreatedAt, quote.SentAt, quote.AcceptedAt, quote.RejectedAt, quote.ConvertedAt,
-        QuotePricing.Total(quote.Items),
-        quote.Items
-            .OrderBy(item => item.SequenceNumber)
-            .Select(item => new QuoteItemResponse(
-                item.Id, item.SequenceNumber, item.ProductId, item.Product?.Code, item.Product?.Name,
-                item.Description, item.Quantity, item.UnitPrice, item.DiscountPercent, QuotePricing.LineTotal(item)))
-            .ToList());
+    private async Task<QuoteResponse> ToResponseAsync(Quote quote, CancellationToken cancellationToken)
+    {
+        var workOrders = await _dbContext.WorkOrders.AsNoTracking()
+            .Where(order => order.QuoteId == quote.Id)
+            .OrderBy(order => order.CreatedAt)
+            .Select(order => new ConvertedWorkOrderResponse(order.Id, order.Code, order.Product.Code, order.Quantity))
+            .ToListAsync(cancellationToken);
+        return new QuoteResponse(
+            quote.Id, quote.Code, quote.CustomerId, quote.Customer.Name, quote.Customer.Code, quote.Status,
+            quote.ValidUntil, quote.Notes, quote.CreatedAt, quote.SentAt, quote.AcceptedAt, quote.RejectedAt, quote.ConvertedAt,
+            QuotePricing.Total(quote.Items),
+            quote.Items
+                .OrderBy(item => item.SequenceNumber)
+                .Select(item => new QuoteItemResponse(
+                    item.Id, item.SequenceNumber, item.ProductId, item.Product?.Code, item.Product?.Name,
+                    item.Description, item.Quantity, item.UnitPrice, item.DiscountPercent, QuotePricing.LineTotal(item)))
+                .ToList(),
+            workOrders);
+    }
 
     private void AddAudit(string action, Quote quote, string details) => _dbContext.AuditLogs.Add(new AuditLog
     {
@@ -398,7 +407,8 @@ public sealed record QuoteItemResponse(
 public sealed record QuoteResponse(
     Guid Id, string Code, Guid CustomerId, string CustomerName, string CustomerCode, string Status,
     DateTime? ValidUntil, string? Notes, DateTime CreatedAt, DateTime? SentAt, DateTime? AcceptedAt,
-    DateTime? RejectedAt, DateTime? ConvertedAt, decimal Total, List<QuoteItemResponse> Items);
+    DateTime? RejectedAt, DateTime? ConvertedAt, decimal Total, List<QuoteItemResponse> Items,
+    List<ConvertedWorkOrderResponse>? WorkOrders = null);
 
 public sealed record ConvertedWorkOrderResponse(Guid Id, string Code, string ProductCode, decimal Quantity);
 

@@ -1,0 +1,120 @@
+@page "/origine-software"
+@inject Api Api
+@inject Session Session
+@inject IJSRuntime Js
+
+<PageTitle>Origine software · Nicolò MES</PageTitle>
+
+<div class="page-head no-print">
+    <div>
+        <div class="eyebrow">Amministrazione</div>
+        <h1>Dichiarazione di origine del software</h1>
+        <p class="sub">Documento per la perizia dell'iperammortamento / Transizione 5.0 (Allegato V): sviluppo sostanziale in UE/SEE ≥ 50%.</p>
+    </div>
+    <div class="actions">
+        <button class="secondary" @onclick="LoadAsync">Aggiorna</button>
+        <button class="primary" @onclick="PrintAsync">Stampa</button>
+    </div>
+</div>
+
+@if (_error is not null)
+{
+    <div class="card state"><strong>Errore</strong>@_error</div>
+}
+else if (_doc is null)
+{
+    <div class="card state">Caricamento...</div>
+}
+else
+{
+    @if (Session.Role == "Admin")
+    {
+        <div class="card no-print">
+            <h2 class="section-title">Dati dichiarati</h2>
+            <div class="form-grid">
+                <label>Sviluppo UE/SEE %
+                    <input type="number" min="0" max="100" step="0.01" @bind="_euPercent" />
+                </label>
+                <label>Sedi di sviluppo
+                    <input @bind="_places" placeholder="Italia" />
+                </label>
+                <label>Firmatario
+                    <input @bind="_signatory" placeholder="Nome e ruolo" />
+                </label>
+            </div>
+            <div class="actions">
+                <button class="primary" disabled="@_saving" @onclick="SaveAsync">Salva</button>
+            </div>
+            @if (_saveOk is not null) { <p class="muted">@_saveOk</p> }
+        </div>
+    }
+
+    <div class="card print-doc">
+        <div class="eyebrow">Dichiarazione del produttore / licenziante</div>
+        <h1>@_doc.ProductName @_doc.ProductVersion</h1>
+        <p class="sub">@_doc.ProducerName@(_doc.ProducerVat is null ? "" : $" · {_doc.ProducerVat}")</p>
+        <p>@_doc.DeclarationText</p>
+        <p>
+            <span class="badge @(_doc.MeetsEuThreshold ? "ok" : "danger")">
+                @(_doc.MeetsEuThreshold ? "Soglia UE soddisfatta" : "Sotto soglia 50%")
+            </span>
+            · @_doc.EuDevelopmentPercent.ToString("0.##", Labels.Italian) % · @_doc.DevelopmentPlaces
+        </p>
+        <p class="muted">Emessa il @Labels.Date(_doc.IssuedOn)@(_doc.Signatory is null ? "" : $" · {_doc.Signatory}")</p>
+    </div>
+}
+
+@code {
+    private SoftwareOriginDeclaration? _doc;
+    private string? _error;
+    private string? _saveOk;
+    private bool _saving;
+    private decimal _euPercent = 100;
+    private string _places = "Italia";
+    private string _signatory = "";
+
+    protected override Task OnInitializedAsync() => LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        _error = null;
+        try
+        {
+            _doc = await Api.GetAsync<SoftwareOriginDeclaration>("api/company-profile/software-origin");
+            _euPercent = _doc.EuDevelopmentPercent;
+            _places = _doc.DevelopmentPlaces;
+            _signatory = _doc.Signatory ?? "";
+        }
+        catch (Exception ex)
+        {
+            _error = ex.Message;
+        }
+    }
+
+    private async Task SaveAsync()
+    {
+        _saving = true;
+        _saveOk = null;
+        _error = null;
+        try
+        {
+            _doc = await Api.PutAsync<SoftwareOriginDeclaration>("api/company-profile/software-origin", new
+            {
+                euDevelopmentPercent = _euPercent,
+                developmentPlaces = _places,
+                signatory = string.IsNullOrWhiteSpace(_signatory) ? null : _signatory,
+            });
+            _saveOk = "Dichiarazione aggiornata.";
+        }
+        catch (Exception ex)
+        {
+            _error = ex.Message;
+        }
+        finally
+        {
+            _saving = false;
+        }
+    }
+
+    private Task PrintAsync() => Js.InvokeVoidAsync("window.print").AsTask();
+}

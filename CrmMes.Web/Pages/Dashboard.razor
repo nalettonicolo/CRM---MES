@@ -47,7 +47,7 @@ else
         <div class="card kpi">
             <div class="label">OEE</div>
             <div class="value">@Labels.Percent(_dashboard.OeeRatio)</div>
-            <div class="hint">Disponibilità @Labels.Percent(_dashboard.AvailabilityRatio) · qualità @Labels.Percent(_dashboard.QualityRatio)</div>
+            <div class="hint">@OeeHint(_dashboard)</div>
         </div>
         <div class="card kpi">
             <div class="label">Fermi nel periodo</div>
@@ -131,4 +131,15 @@ else
     }
 
     private int Count(string status) => _dashboard?.WorkOrdersByStatus.GetValueOrDefault(status) ?? 0;
+
+    private static string OeeHint(WorkOrderDashboard d)
+    {
+        var baseHint = $"Disponibilità {Labels.Percent(d.AvailabilityRatio)} · qualità {Labels.Percent(d.QualityRatio)}";
+        return d.OeeSource switch
+        {
+            "Machine" => $"{baseHint} · da macchine ({d.MachinesReportingInPeriod})",
+            "Hybrid" => $"{baseHint} · misto dichiarati/macchine",
+            _ => $"{baseHint} · da fasi e fermi dichiarati",
+        };
+    }
 }

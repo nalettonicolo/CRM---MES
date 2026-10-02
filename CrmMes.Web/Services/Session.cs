@@ -27,6 +27,10 @@ public sealed class Session
     public string Role => Auth?.Role ?? string.Empty;
     public bool IsAdmin => Role == "Admin";
 
+    public bool HasModule(string key) =>
+        Company is null
+        || Company.EnabledModules.Contains(key, StringComparer.OrdinalIgnoreCase);
+
     public event Action? Changed;
 
     public async Task RestoreAsync()
