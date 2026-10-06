@@ -5,6 +5,93 @@ Punto di vista: commerciale, commercialista, fatturazione, capocantiere, respons
 
 ---
 
+## Ricerca competitor approfondita — 6 ottobre 2026
+
+Ricerca web di giornata sui competitor citati e verifica delle affermazioni già presenti in questo documento. I prezzi vengono da aggregatori e da pagine di terzi, non dai listini ufficiali dei fornitori: prima di usarli in trattativa vanno confermati.
+
+### Correzioni al documento precedente
+- **Bravo** è il prodotto di **Antos SRL** (Marche), "Bravo Manufacturing" con gateway edge plug-and-play. Il prezzo "Bravo Plus ~290 €/risorsa/anno (min. 10)" che avevamo scritto **non è stato verificato** e viene tolto dal confronto finché non si trova una fonte.
+- **siMES**: nessuna fonte trovata in questa ricerca. Il prezzo "da ~3.500 €/macchina" è **non verificato**.
+- **Opera MES** è di Cybertec (dal 1991), disponibile cloud/SaaS/web. **NET@PRO** parla 7 lingue e offre cloud, on-premise o ibrido.
+
+### Prezzi competitor (listino pubblico, 2026)
+
+| Prodotto | Modello | Prezzo indicativo | Note |
+|---|---|---|---|
+| Katana MRP | Free / Core / Advantage | Free; Core **$299/mese**; Advantage su preventivo | Il piano più alto è sceso da ~$1.800 a $299 nel febbraio 2026; un piano aggiunto a luglio 2026 |
+| MRPeasy | 5 piani per utente | **$49–149 per utente/mese** | Il piano top è salito a $149 nel febbraio 2026 |
+| Odoo (Italia, EUR) | Standard / Custom | Standard **€24,90**/utente/mese (€19,90 annuale promo); Custom **€37,40** | Il manifatturiero è incluso nei piani, non venduto a parte |
+| Tulip (MES frontline) | Essentials / Professional | Essentials **$100/interfaccia/mese**, minimo 10 interfacce (~$12k/anno); Professional **$250/interfaccia/mese** (~$30k/anno minimo) | Il prezzo cresce con le postazioni |
+| Retrofit OEE (es. Teeptrak) | Abbonamento + hardware | **€30–150/macchina/mese** + hardware **€200–2.000/macchina** | Dato indicativo da un fornitore: un progetto MES completo costa molto di più |
+| Siemens Opcenter, Plex, AVEVA | Enterprise | Non pubblico | Progetti di mesi; fuori dallo stesso budget di una PMI |
+| **Nicolò MES** | — | **Non definito** | Nessun listino nei documenti del repository: senza un prezzo non si può fare confronto di costo |
+
+**Dato da decidere:** il prezzo di Nicolò MES. Senza, il confronto con MRPeasy o Odoo resta solo di funzioni.
+
+### Pro e contro dei competitor (sintesi)
+
+- **Katana / MRPeasy** — *Pro:* costo basso, avvio rapido, cloud, internazionali. *Contro:* fiscale e FatturaPA italiana debole, poca macchina e shop-floor profondo.
+- **Odoo** — *Pro:* ecosistema enorme, moduli manifatturieri inclusi, localizzazione italiana presente. *Contro:* complessità, costi di implementazione (spesso maggiori del software), dipendenza da partner per la personalizzazione.
+- **Tulip** — *Pro:* app di reparto senza codice, molto forte sul frontline. *Contro:* costo per postazione che cresce in fretta, serve un reparto IT interno, nessuna logica fiscale italiana.
+- **Bravo (Antos)** — *Pro:* gateway per le macchine plug-and-play, prodotto italiano, esperienza su progetti IoT (dichiarazioni del fornitore: oltre 100 gateway, 30 progetti). *Contro:* prezzi non pubblici; la copertura fiscale italiana non è verificata da questa ricerca (il documento precedente la dava per "ERP esterno", da confermare).
+- **Opera MES (Cybertec) / NET@PRO** — *Pro:* MES italiani, distribuzione cloud o locale, tracciabilità. *Contro:* il fiscale italiano non è il loro punto forte (da verificare caso per caso), comunicazione commerciale meno diretta.
+- **TeamSystem Manufacturing / Zucchetti Manufacturing** — *Pro:* rete commerciale, fiscale e contabilità nativi, fiducia delle PMI. *Contro:* dal materiale del fornitore il MES appare come parte di un'offerta più ampia (manufacturing + ERP); la profondità di reparto non è stata verificata sul campo.
+- **Siemens Opcenter / enterprise** — *Pro:* profondità, APS, integrazione PLC/SCADA. *Contro:* costo e tempi, non per una PMI.
+
+### Pro e contro di Nicolò MES (verificati sul repository)
+
+**Pro**
+- Ampiezza in un solo prodotto: 51 controller API, moduli di settore (61439, HACCP, rapportini, FAT/SAT/CE, service, energia), MRP multi-livello, magazzino, qualità, fiscale.
+- Fiscale italiano nativo: FatturaPA validata contro lo schema ufficiale, DDT con numerazione, conto lavoro.
+- Canali multipli: desktop Windows, web, pagina tecnici da telefono; installazione in cloud o sul server del cliente.
+- Sicurezza: 2FA, blocco account, limiti di richiesta, header di sicurezza su tutte le superfici (esteso oggi a `/api`), registro operazioni, backup notturno.
+- Test automatici: 649 in totale, tutti verdi a questa data.
+
+**Contro**
+- **Nessuna referenza né prova sul campo**: nessuna macchina reale collegata, nessun cliente pubblico. È il rischio commerciale più alto.
+- **Prezzo non definito.**
+- **Single-tenant**: un'installazione per azienda, nessun modello SaaS multi-cliente.
+- **Desktop Windows-first**: l'app nativa è solo Windows; il web copre una parte delle funzioni.
+- **Registro operazioni parziale**: circa 23 controller su 51 scrivono traccia (oggi se ne sono aggiunti 2).
+- **Nessuna policy GDPR** (conservazione, cancellazione su richiesta).
+- **Validazione input manuale** endpoint per endpoint; **API non versionata**; **Swagger pubblico** (scelta del 02/10 da confermare).
+- **Import PDF cataloghi** non validato su cataloghi reali.
+- **SSO** incompleto: manca il mapper OIDC di produzione.
+- **Dipendenza dal titolare** per SdI, hosting a pagamento e firma digitale del software.
+
+### Dove ci posizioniamo (ipotesi da verificare)
+Il vantaggio è **l'ampiezza con il fiscale italiano nativo** (MRPeasy e Katana non lo hanno, Bravo lo integra con l'ERP). Il punto debole è **la mancanza di prove**: senza referenze, un cliente sceglie l'attore già conosciuto. Quindi il prossimo passo di mercato conta più del prossimo modulo.
+
+### Punti da migliorare, in ordine di impatto
+
+| # | Punto | Stato oggi | Chi |
+|---|---|---|---|
+| 1 | Pilota con macchina reale e prima referenza | Aperto | Titolare / campo |
+| 2 | Definire il prezzo pubblico e il modello commerciale | Aperto | Titolare |
+| 3 | Registro operazioni su tutti i controller che modificano dati | Parziale: fornitori e corrieri fatti oggi, ~27 controller restanti | Codice |
+| 4 | Vulnerabilità delle dipendenze di test | Quasi chiuso: resta un avviso moderato su AngleSharp (dipendenza di bUnit, solo test) | Codice |
+| 5 | Header di sicurezza, limite dimensione richieste, health check | Fatto oggi | Codice |
+| 6 | Decisione su Swagger pubblico | Aperto | Titolare |
+| 7 | Policy GDPR e cancellazione dati su richiesta | Assente | Titolare (decisioni legali) + codice |
+| 8 | Validazione input sistematica e versionamento API | Non iniziato, da pianificare | Codice |
+| 9 | Verifica del backup notturno | Bloccato: serve autorizzare `gh` | Titolare |
+| 10 | Import PDF su cataloghi reali | Da verificare | Campo |
+| 11 | Mapper OIDC di produzione per SSO | Configurazione | Titolare |
+
+### Fonti
+- Katana: [prezzi 2026](https://costbench.com/software/inventory-management/katana-mrp/), [ribasso febbraio 2026](https://costbench.com/changelog/katana-price-decrease-2026-02-2/), [piano luglio 2026](https://costbench.com/changelog/katana-plan-added-2026-07/)
+- MRPeasy: [prezzi 2026](https://erpresearch.com/pricing/mrpeasy), [aumento febbraio 2026](https://costbench.com/changelog/mrpeasy-price-increase-2026-02/)
+- Odoo Italia: [prezzi EUR](https://oec.sh/odoo-pricing/italy)
+- Tulip: [prezzi](https://toolradar.com/tools/tulip/pricing), [piani](https://pricingsaas.com/companies/tulip)
+- Retrofit OEE: [Teeptrak, prezzi indicativi](https://teeptrak.com/es/precio-software-oee/) (fonte di parte)
+- Bravo / Antos: [caso d'uso Antos](https://www.alleantia.com/resources/use-cases/antos/)
+- Opera MES: [scheda Capterra](https://www.capterra.it/software/1065494/opera-mes)
+- NET@PRO: [scheda Capterra](https://www.capterra.it/software/216295/net-pro)
+- TeamSystem: [guida MES 2026](https://www.teamsystem.com/magazine/manufacturing/mes-software-smart-factory-guida-2026/)
+- Siemens: [pagina MES](https://www.siemens.com/it-it/solutions/manufacturing-execution-system-mes/)
+
+---
+
 ## Aggiornamento 6 ottobre 2026 (stato reale)
 
 - **Pubblicato:** G8–G15 e contro su `main` (`6cad42d`, `293f14f`); GTIN di prodotto con cifra di controllo GS1 e modelli HACCP per tipologia (`48818e8`); correzioni CI installer (`e9a6d3c`, build verde). Suite: API 414, Desktop 122, Web 77, Console 18.
