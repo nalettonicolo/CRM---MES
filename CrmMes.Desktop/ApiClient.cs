@@ -1344,6 +1344,36 @@ public sealed class ApiClient
             ?? throw new InvalidOperationException("Risposta di importazione non valida.");
     }
 
+    // ---------- Strumento Layout ----------
+
+    public async Task<CrmMes.Desktop.Layout.LayoutScreenDto> GetLayoutScreenAsync(string screen, CancellationToken cancellationToken = default)
+    {
+        using var response = await _httpClient.GetAsync($"api/layout/{screen}", cancellationToken);
+        await EnsureSuccessAsync(response, cancellationToken);
+        return await response.Content.ReadFromJsonAsync<CrmMes.Desktop.Layout.LayoutScreenDto>(cancellationToken: cancellationToken)
+            ?? throw new InvalidOperationException("Layout non valido.");
+    }
+
+    public async Task<List<CrmMes.Desktop.Layout.LayoutScreenDto>> GetLayoutScreensAsync(CancellationToken cancellationToken = default)
+    {
+        using var response = await _httpClient.GetAsync("api/layout", cancellationToken);
+        await EnsureSuccessAsync(response, cancellationToken);
+        return await response.Content.ReadFromJsonAsync<List<CrmMes.Desktop.Layout.LayoutScreenDto>>(cancellationToken: cancellationToken) ?? [];
+    }
+
+    public Task<CrmMes.Desktop.Layout.LayoutScreenDto> SaveLayoutScreenAsync(string screen, IEnumerable<CrmMes.Desktop.Layout.LayoutFieldDto> fields, CancellationToken cancellationToken = default)
+        => SendAsync<CrmMes.Desktop.Layout.LayoutScreenDto>(HttpMethod.Put, $"api/layout/{screen}", new
+        {
+            fields = fields.Select(f => new
+            {
+                fieldKey = f.Key,
+                label = string.IsNullOrWhiteSpace(f.Label) || f.Label == f.DefaultLabel ? null : f.Label.Trim(),
+                order = f.Order,
+                visible = f.Visible,
+                required = f.Required,
+            }).ToList(),
+        }, cancellationToken);
+
     // ---------- Service post-vendita ----------
 
     public async Task<List<InstalledMachineDto>> GetInstalledMachinesAsync(CancellationToken cancellationToken = default)

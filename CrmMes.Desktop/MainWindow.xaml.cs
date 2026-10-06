@@ -465,6 +465,9 @@ public partial class MainWindow : Window
     private void ServiceButton_Click(object sender, RoutedEventArgs e) =>
         new ServiceWindow(_apiClient) { Owner = this }.ShowDialog();
 
+    private void LayoutButton_Click(object sender, RoutedEventArgs e) =>
+        new LayoutEditorWindow(_apiClient) { Owner = this }.ShowDialog();
+
     private void EnergyButton_Click(object sender, RoutedEventArgs e) =>
         new EnergyWindow(_apiClient) { Owner = this }.ShowDialog();
 
@@ -617,6 +620,7 @@ public partial class MainWindow : Window
         AppearanceButton.Visibility = Show(_apiClient.CurrentRole == "Admin");
         ServiceButton.Visibility = Show(_apiClient.IsModuleEnabled("service"));
         EnergyButton.Visibility = Show(_apiClient.IsModuleEnabled("energy-monitoring"));
+        LayoutButton.Visibility = Show(_apiClient.CurrentRole == "Admin");
 
         // A section just switched off may be the page on screen: fall back to the first one still shown.
         if (FindCheckedNavItem() is { Visibility: not Visibility.Visible } hidden)

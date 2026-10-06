@@ -153,6 +153,7 @@ Non ancora provato: la pagina web dei tecnici dal browser con accesso reale (il 
 | 06/10/2026 | (prossimo commit) | GTIN di prodotto con cifra di controllo GS1 e unicità (`PUT /api/products/{id}/gtin`); modelli HACCP per tipologia (`GET`/`POST api/haccp/templates`) con pagina web; migrazione `AddProductGtin` applicata a Neon (additiva); suite 631/631 |
 | 06/10/2026 | (prossimo commit) | GTIN nelle schermate desktop e web del prodotto. **Strumento Layout (primo passo operativo):** l'Admin imposta etichetta, ordine, visibilità e obbligatorietà dei campi del modulo *Nuova richiesta* del Service dalla pagina `/layout`; il modulo legge la configurazione e blocca i campi obbligatori; API `GET/PUT api/layout/{schermata}`; migrazione `AddFormLayout` applicata a Neon (additiva). Da estendere: altre schermate, editor delle finestre modali del desktop |
 | 30/09/2026 | v1.6.0 | Installer da collegare in seguito; piattaforma web `/app/`; canali di accesso; basi server cliente e teleassistenza |
+| 06/10/2026 | (prossimo commit) | **Strumento Layout, web e programma.** Motore unico: ogni schermata dichiara i suoi campi nel registro (`CrmMes.Core/Layout`), l'Admin li imposta da `/layout` (web) o da *Layout dei moduli* (programma, solo Admin), e le schermate li applicano: etichetta, ordine, visibilità, obbligatorietà con controllo dei campi mancanti. **Coperte**: web: richiesta di assistenza, nuovo cliente, nuovo intervento di manutenzione, nuovo progetto energetico. Programma: nuovo intervento di manutenzione, nuovo prodotto, nuovo materiale, nuova macchina. **Da fare**: le altre circa 27 pagine web e circa 45 finestre del programma con campi; le finestre modali senza campi di input |
 | prossimo | - | Push del tree su main; poi restano solo contratto SdI, macchina fisica, G16 e IdP OIDC di produzione |
 
 ## Pubblicazione e ambienti
@@ -168,15 +169,17 @@ Il titolare ha chiesto di portare il sistema a un livello enterprise. Area scelt
 
 | # | Step | Rischio | Stato |
 |---|---|---|---|
-| 1 | Header di sicurezza (X-Content-Type-Options, X-Frame-Options, Referrer-Policy, Permissions-Policy) anche su `/api/*` — oggi solo `/app` e `/tecnici` li hanno | Basso | ⏳ In corso |
-| 2 | Limite dimensione richiesta globale (oggi solo il default Kestrel 30 MB; gli endpoint di upload hanno già un `[RequestSizeLimit]` esplicito più alto che resta valido) | Basso | ⏳ In corso |
-| 3 | Indice sulla tabella `AuditLog` (oggi nessuno: su `EntityType`+`EntityId` e su `CreatedAt`), per quando i log cresceranno | Basso | ⏳ In corso |
-| 4 | Rivalutare l'esposizione pubblica di Swagger in produzione (scelta deliberata del 02/10 per dare documentazione a chi integra) | Da decidere col titolare | Non ancora iniziato — nessuna azione senza conferma, è una scelta deliberata recente |
-| 5 | Audit log esteso ai controller che oggi non scrivono traccia (circa 30 su 51: presenze, spedizioni, fornitori, clienti, corrieri, aree, centri di lavoro...) | Basso ma esteso | Non ancora iniziato |
-| 6 | Health check consolidato (oggi `/health` minimal-API e `/api/health/status` fanno la stessa cosa in due posti; `/health` è usato dal client per il retry "server in avvio", va trattato con cautela) | Basso, ma tocca un endpoint già consumato dal client | Non ancora iniziato |
-| 7 | Validazione input sistematica (oggi manuale endpoint per endpoint, nessuna FluentValidation) e versionamento API (`/api/v1/`, oggi assente) | Più alto — tocca molti controller esistenti, da pianificare a parte | Non ancora iniziato, rimandato di proposito |
+| 1 | Header di sicurezza (X-Content-Type-Options, X-Frame-Options, Referrer-Policy, Permissions-Policy) anche su `/api/*` e `/swagger` — prima solo `/app` e `/tecnici` li avevano | Basso | ✅ Fatto — commit `77e6d1e`, su `main`, build e 639 test verdi |
+| 2 | Limite dimensione richiesta globale a 10 MB per gli endpoint senza `[RequestSizeLimit]` proprio (verificato: tutti gli 8 endpoint di upload file nei 5 controller con `IFormFile` hanno già il loro limite esplicito più alto, che resta valido e ha precedenza) | Basso | ✅ Fatto — commit `77e6d1e` |
+| 3 | Indici sulla tabella `AuditLog` (prima nessuno): su `EntityType`+`EntityId` e su `CreatedAt` | Basso | ✅ Fatto — commit `77e6d1e`, migrazione `AddAuditLogIndexes` da applicare su Neon (vedi sotto) |
+| 4 | Rivalutare l'esposizione pubblica di Swagger in produzione (scelta deliberata del 02/10 per dare documentazione a chi integra) | Da decidere col titolare | Non iniziato — nessuna azione senza conferma, è una scelta deliberata recente |
+| 5 | Audit log esteso ai controller che oggi non scrivono traccia (circa 30 su 51: presenze, spedizioni, fornitori, clienti, corrieri, aree, centri di lavoro...) | Basso ma esteso | Non iniziato |
+| 6 | Nuovo endpoint `/health/detailed` basato sul framework standard ASP.NET Core Health Checks, per strumenti di monitoring esterni — **additivo**, non sostituisce `/health` (lasciato intonso: il client desktop lo usa per il retry "server in avvio" al login, cambiarne la forma non valeva il rischio) | Basso | ✅ Fatto — commit `77e6d1e` |
+| 7 | Validazione input sistematica (oggi manuale endpoint per endpoint, nessuna FluentValidation) e versionamento API (`/api/v1/`, oggi assente) | Più alto — tocca molti controller esistenti, da pianificare a parte | Non iniziato, rimandato di proposito |
 
-Step 1-3 in corso ora. Step 4 resta sospeso in attesa di conferma esplicita (non è un bug, è una scelta già fatta). Step 5-6 sono il passo successivo naturale a basso rischio. Step 7 è il più esteso e rischioso: va preventivato a parte, non infilato di fretta in questa sessione.
+Step 1, 2, 3, 6 fatti e verificati (build pulita, 639/639 test, pushati su `main`). **Nota**: durante questo lavoro un'altra sessione Claude Code era attiva in parallelo sullo stesso repository, sviluppando uno "Strumento Layout" — le mie modifiche erano finite per una volta in un commit di quella sessione (`abaf0db`, non intenzionale ma innocuo), poi separate in commit propri da qui in avanti. Step 4 resta sospeso in attesa di conferma esplicita del titolare (non è un bug, è una scelta già fatta). Step 5 è il prossimo passo naturale a basso rischio, ma esteso (30 controller) — da fare con calma, verificando ogni controller prima di toccarlo per non entrare in conflitto con lavoro in corso altrove nel repository. Step 7 resta il più esteso e rischioso: va preventivato a parte.
+
+**Da fare, non da codice**: applicare la migrazione `AddAuditLogIndexes` su Neon produzione con `dotnet ef database update` (additiva, nessun rischio sui dati esistenti — crea solo due indici).
 
 ## Decisioni in sospeso
 

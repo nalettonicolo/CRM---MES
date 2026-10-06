@@ -1,4 +1,5 @@
-using System.Windows;
+﻿using System.Windows;
+using CrmMes.Desktop.Layout;
 
 namespace CrmMes.Desktop;
 
@@ -8,10 +9,26 @@ public partial class CreateMaterialWindow : Window
 
     public bool Created { get; private set; }
 
+    private IReadOnlyList<LayoutFieldDto> _layout = [];
+
     public CreateMaterialWindow(ApiClient apiClient)
     {
         InitializeComponent();
         _apiClient = apiClient;
+        Loaded += async (_, _) => await LoadLayoutAsync();
+    }
+
+    private async Task LoadLayoutAsync()
+    {
+        _layout = await FormLayoutApplier.LoadAsync(_apiClient, "materials.new");
+        FormLayoutApplier.Apply(_layout,
+        [
+            new FieldBinding("code", CodeBox),
+            new FieldBinding("name", NameBox),
+            new FieldBinding("unit", UnitBox),
+            new FieldBinding("stock", StockBox),
+            new FieldBinding("minStock", MinStockBox),
+        ]);
     }
 
     private async void Create_Click(object sender, RoutedEventArgs e)
@@ -20,9 +37,18 @@ public partial class CreateMaterialWindow : Window
         var name = NameBox.Text.Trim();
         var unit = string.IsNullOrWhiteSpace(UnitBox.Text) ? "pz" : UnitBox.Text.Trim();
 
-        if (string.IsNullOrWhiteSpace(code) || string.IsNullOrWhiteSpace(name))
+        var missing = FormLayoutApplier.Missing(_layout, key => key switch
         {
-            ErrorText.Text = "Codice e descrizione sono obbligatori.";
+            "code" => !string.IsNullOrWhiteSpace(code),
+            "name" => !string.IsNullOrWhiteSpace(name),
+            "unit" => !string.IsNullOrWhiteSpace(UnitBox.Text),
+            "stock" => !string.IsNullOrWhiteSpace(StockBox.Text),
+            "minStock" => !string.IsNullOrWhiteSpace(MinStockBox.Text),
+            _ => true,
+        });
+        if (missing.Count > 0)
+        {
+            ErrorText.Text = "Compila i campi obbligatori: " + string.Join(", ", missing) + ".";
             return;
         }
 

@@ -1,4 +1,5 @@
-using System.Windows;
+﻿using System.Windows;
+using CrmMes.Desktop.Layout;
 
 namespace CrmMes.Desktop;
 
@@ -6,6 +7,7 @@ public partial class CreateProductWindow : Window
 {
     private readonly ApiClient _apiClient;
     private readonly Guid? _editingProductId;
+    private IReadOnlyList<LayoutFieldDto> _layout = [];
 
     public bool Created { get; private set; }
 
@@ -31,6 +33,21 @@ public partial class CreateProductWindow : Window
             NameBox.Text = existing.Name;
             DescriptionBox.Text = existing.Description;
         }
+        else
+        {
+            Loaded += async (_, _) => await LoadLayoutAsync();
+        }
+    }
+
+    private async Task LoadLayoutAsync()
+    {
+        _layout = await FormLayoutApplier.LoadAsync(_apiClient, "products.new");
+        FormLayoutApplier.Apply(_layout,
+        [
+            new FieldBinding("code", CodeBox),
+            new FieldBinding("name", NameBox),
+            new FieldBinding("description", DescriptionBox),
+        ]);
     }
 
     private async void Create_Click(object sender, RoutedEventArgs e)
@@ -43,6 +60,22 @@ public partial class CreateProductWindow : Window
         }
 
         var description = string.IsNullOrWhiteSpace(DescriptionBox.Text) ? null : DescriptionBox.Text.Trim();
+
+        if (_editingProductId is null)
+        {
+            var missingFields = FormLayoutApplier.Missing(_layout, key => key switch
+            {
+                "code" => !string.IsNullOrWhiteSpace(CodeBox.Text),
+                "name" => !string.IsNullOrWhiteSpace(NameBox.Text),
+                "description" => description is not null,
+                _ => true,
+            });
+            if (missingFields.Count > 0)
+            {
+                ErrorText.Text = "Compila i campi obbligatori: " + string.Join(", ", missingFields) + ".";
+                return;
+            }
+        }
 
         CreateButton.IsEnabled = false;
         try
