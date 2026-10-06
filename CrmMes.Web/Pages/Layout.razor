@@ -1,4 +1,4 @@
-@page "/layout"
+﻿@page "/layout"
 @inject Api Api
 @inject Session Session
 
@@ -30,9 +30,9 @@ else
     <div class="card card-pad stack">
         <label>Modulo
             <select aria-label="Modulo da configurare" @onchange="ScreenChangedAsync">
-                @foreach (var (key, name) in Screens)
+                @foreach (var s in _screens)
                 {
-                    <option value="@key" selected="@(key == _screen)">@name</option>
+                    <option value="@s.Screen" selected="@(s.Screen == _screen)">@s.Name</option>
                 }
             </select>
         </label>
@@ -75,8 +75,7 @@ else
 }
 
 @code {
-    private static readonly (string Key, string Name)[] Screens = [("service.request", "Nuova richiesta di assistenza (Service)")];
-
+    private List<LayoutScreen> _screens = [];
     private string _screen = "service.request";
     private LayoutScreen? _layout;
     private List<EditableField> _fields = [];
@@ -90,6 +89,9 @@ else
     {
         if (IsAdmin)
         {
+            try { _screens = await Api.GetAsync<List<LayoutScreen>>("api/layout"); }
+            catch (ApiException exception) { _error = exception.Message; }
+            if (_screens.Count > 0 && _screens.All(s => s.Screen != _screen)) _screen = _screens[0].Screen;
             await LoadAsync();
         }
     }

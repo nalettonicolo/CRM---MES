@@ -31,7 +31,7 @@ public class LayoutWebTests : TestContext
         {
             new(_machineId, Guid.NewGuid(), "Officine", null, "Pressa", null, "SN-1", null, null, null, "Active", null, 0),
         });
-        _server.OnJson("GET", "/api/layout/service.request", new LayoutScreen("service.request", fields));
+        _server.OnJson("GET", "/api/layout/service.request", new LayoutScreen("service.request", "Nuova richiesta di assistenza (Service)", fields));
     }
 
     [Fact]
@@ -75,12 +75,12 @@ public class LayoutWebTests : TestContext
     public async Task LayoutEditor_SavesTheChangedLabelAndOrder()
     {
         await LogInAsync("Admin");
-        _server.OnJson("GET", "/api/layout/service.request", new LayoutScreen("service.request",
+        _server.OnJson("GET", "/api/layout/service.request", new LayoutScreen("service.request", "Nuova richiesta di assistenza (Service)",
         [
             F("subject", "Oggetto", 1, true, true, false),
             F("description", "Descrizione", 2, true, false, true),
         ]));
-        _server.OnJson("PUT", "/api/layout/service.request", new LayoutScreen("service.request",
+        _server.OnJson("PUT", "/api/layout/service.request", new LayoutScreen("service.request", "Nuova richiesta di assistenza (Service)",
         [
             F("description", "Guasto", 1, true, false, true),
             F("subject", "Oggetto", 2, true, true, false),

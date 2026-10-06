@@ -269,6 +269,11 @@ public class ApplicationDbContext : DbContext
             entity.Property(a => a.Action).HasMaxLength(100);
             entity.Property(a => a.EntityType).HasMaxLength(100);
             entity.Property(a => a.UserName).HasMaxLength(200);
+            // "What happened to this entity" (entity detail screens) and "what happened recently"
+            // (an audit review) are the two ways this table gets queried; neither had an index, so both
+            // degrade to a full scan once the log grows past a trivial size.
+            entity.HasIndex(a => new { a.EntityType, a.EntityId });
+            entity.HasIndex(a => a.CreatedAt);
         });
 
         modelBuilder.Entity<RefreshToken>(entity =>

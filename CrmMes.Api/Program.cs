@@ -141,6 +141,14 @@ builder.Services.Configure<Microsoft.AspNetCore.Builder.ForwardedHeadersOptions>
     options.KnownNetworks.Clear();
     options.KnownProxies.Clear();
 });
+// Default cap for any request body that doesn't declare its own [RequestSizeLimit] — plain JSON
+// endpoints (create/update DTOs) have no business receiving more than a few hundred KB. The file-upload
+// endpoints (catalog import, documents, product images...) already set their own higher limit via
+// [RequestSizeLimit], which takes precedence over this default, so they are unaffected.
+builder.Services.Configure<Microsoft.AspNetCore.Server.Kestrel.Core.KestrelServerOptions>(options =>
+{
+    options.Limits.MaxRequestBodySize = 10_000_000;
+});
 CrmMes.Api.Services.RateLimits.Add(builder.Services, builder.Configuration);
 builder.Services.AddScoped<CrmMes.Api.Services.WithdrawalItemBuilder>();
 builder.Services.AddSingleton<CrmMes.Api.Services.WorkOrderFactory>();
@@ -255,6 +263,20 @@ app.Use(async (context, next) =>
         headers["X-Frame-Options"] = "DENY";
         headers["Permissions-Policy"] = "camera=(), microphone=(), geolocation=()";
         headers["Cache-Control"] = "no-cache";
+    }
+
+    // The JSON API (/api/*) and Swagger: no CSP (a browser never executes script from
+    // application/json, so a content policy has nothing to restrict there), but the same
+    // defense-in-depth headers every other surface already gets — a browser that ever renders an
+    // error page or the Swagger UI from this origin shouldn't be framed, sniffed into a different
+    // content type, or leak the referrer.
+    if (context.Request.Path.StartsWithSegments("/api") || context.Request.Path.StartsWithSegments("/swagger"))
+    {
+        var headers = context.Response.Headers;
+        headers["X-Content-Type-Options"] = "nosniff";
+        headers["Referrer-Policy"] = "no-referrer";
+        headers["X-Frame-Options"] = "DENY";
+        headers["Permissions-Policy"] = "camera=(), microphone=(), geolocation=()";
     }
 
     await next();

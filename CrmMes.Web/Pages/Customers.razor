@@ -1,4 +1,4 @@
-@page "/clienti"
+﻿@page "/clienti"
 @implements IDisposable
 @inject Api Api
 @inject Session Session
@@ -29,9 +29,21 @@
     <div class="card card-pad stack stack-gap">
         <h2>Nuovo cliente</h2>
         <div class="form-grid">
-            <label>Codice<input @bind="_newCode" placeholder="es. CLI-001" autocomplete="off" /></label>
-            <label>Ragione sociale<input @bind="_newName" placeholder="Nome o ragione sociale" /></label>
-            <label>Partita IVA (opzionale)<input @bind="_newVat" placeholder="IT12345678901" /></label>
+            @foreach (var f in _fields.Where(f => f.Visible).OrderBy(f => f.Order))
+            {
+                switch (f.Key)
+                {
+                    case "code":
+                        <label>@LabelOf(f)<input @bind="_newCode" placeholder="es. CLI-001" autocomplete="off" /></label>
+                        break;
+                    case "name":
+                        <label>@LabelOf(f)<input @bind="_newName" placeholder="Nome o ragione sociale" /></label>
+                        break;
+                    case "vatNumber":
+                        <label>@LabelOf(f)<input @bind="_newVat" placeholder="IT12345678901" /></label>
+                        break;
+                }
+            }
         </div>
         <div class="actions"><button @onclick="CreateAsync" disabled="@_creating">@(_creating ? "Salvataggio..." : "Crea cliente")</button></div>
     </div>
@@ -93,7 +105,11 @@
 
     private bool CanCreate => Session.Role is "Admin" or "Sales";
 
-    protected override Task OnInitializedAsync() => LoadAsync();
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadAsync();
+        await LoadCreateLayoutAsync();
+    }
 
     private async Task OnSearchInput(ChangeEventArgs e)
     {
@@ -127,8 +143,42 @@
         }
     }
 
+    /// <summary>Campi del modulo Nuovo cliente come li ha impostati l'Admin nello strumento Layout.</summary>
+    private List<LayoutField> _fields =
+    [
+        new("code", "Codice", 1, true, true, false),
+        new("name", "Ragione sociale", 2, true, true, false),
+        new("vatNumber", "Partita IVA", 3, true, false, true),
+    ];
+
+    private static string LabelOf(LayoutField f) => f.Required ? f.Label + " *" : f.Label;
+
+    private async Task LoadCreateLayoutAsync()
+    {
+        try
+        {
+            _fields = (await Api.GetAsync<LayoutScreen>("api/layout/customers.new")).Fields;
+        }
+        catch (ApiException)
+        {
+            // Restano i default: il layout non deve impedire di creare clienti.
+        }
+    }
+
     private async Task CreateAsync()
     {
+        var missing = _fields.Where(f => f.Visible && f.Required && string.IsNullOrWhiteSpace(f.Key switch
+            {
+                "code" => _newCode,
+                "name" => _newName,
+                "vatNumber" => _newVat,
+                _ => null,
+            })).Select(LabelOf).ToList();
+        if (missing.Count > 0)
+        {
+            _createError = "Compila i campi obbligatori: " + string.Join(", ", missing) + ".";
+            return;
+        }
         _creating = true;
         _createError = null;
         try

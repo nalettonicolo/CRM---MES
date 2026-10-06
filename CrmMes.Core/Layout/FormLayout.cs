@@ -1,4 +1,4 @@
-namespace CrmMes.Core.Layout;
+﻿namespace CrmMes.Core.Layout;
 
 /// <summary>Impostazioni di un campo di una schermata, modificabili dall'Admin dallo strumento Layout:
 /// etichetta mostrata, ordine, visibilità e obbligatorietà. Le schermate che usano il modello hanno un
@@ -33,10 +33,24 @@ public sealed record FormFieldDefault(string Key, string DefaultLabel, int Order
 public static class FormLayoutRegistry
 {
     public const string ServiceRequest = "service.request";
+    public const string CustomerNew = "customers.new";
+
+    /// <summary>Nome leggibile della schermata, per l'elenco nello strumento Layout.</summary>
+    public static readonly IReadOnlyDictionary<string, string> Names = new Dictionary<string, string>
+    {
+        [ServiceRequest] = "Nuova richiesta di assistenza (Service)",
+        [CustomerNew] = "Nuovo cliente (Vendite)",
+    };
 
     public static readonly IReadOnlyDictionary<string, IReadOnlyList<FormFieldDefault>> Screens =
         new Dictionary<string, IReadOnlyList<FormFieldDefault>>
         {
+            [CustomerNew] =
+            [
+                new("code", "Codice", 1, Required: true, CanHide: false),
+                new("name", "Ragione sociale", 2, Required: true, CanHide: false),
+                new("vatNumber", "Partita IVA", 3, Required: false, CanHide: true),
+            ],
             [ServiceRequest] =
             [
                 new("subject", "Oggetto", 1, Required: true, CanHide: false),
@@ -49,4 +63,8 @@ public static class FormLayoutRegistry
         };
 
     public static bool IsKnown(string screen) => Screens.ContainsKey(screen);
+
+    /// <summary>Regola unica per tutte le schermate: un campo che non si può nascondere ed è obbligatorio
+    /// per default resta obbligatorio. Vale per l'oggetto della richiesta come per il codice cliente.</summary>
+    public static bool RequiredFor(FormFieldDefault def, bool requested) => (!def.CanHide && def.Required) || requested;
 }

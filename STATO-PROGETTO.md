@@ -162,6 +162,22 @@ Non ancora provato: la pagina web dei tecnici dal browser con accesso reale (il 
 - **Client**: release GitHub con `NicoloMES-Setup.exe` e checksum; il programma avvisa e si aggiorna da solo.
 - **Branch Neon di prova ancora esistente**: `test-multisettore`, da eliminare quando non serve più.
 
+## Livello enterprise: mappa di hardening (avviata 06/10/2026)
+
+Il titolare ha chiesto di portare il sistema a un livello enterprise. Area scelta per prima: **sicurezza perimetrale API**, più **osservabilità/audit** (stessa fascia di rischio basso) decise in autonomia. Mappa degli step, aggiornata man mano che procedono — niente si considera fatto finché non è qui segnato "✅ Fatto" con la verifica.
+
+| # | Step | Rischio | Stato |
+|---|---|---|---|
+| 1 | Header di sicurezza (X-Content-Type-Options, X-Frame-Options, Referrer-Policy, Permissions-Policy) anche su `/api/*` — oggi solo `/app` e `/tecnici` li hanno | Basso | ⏳ In corso |
+| 2 | Limite dimensione richiesta globale (oggi solo il default Kestrel 30 MB; gli endpoint di upload hanno già un `[RequestSizeLimit]` esplicito più alto che resta valido) | Basso | ⏳ In corso |
+| 3 | Indice sulla tabella `AuditLog` (oggi nessuno: su `EntityType`+`EntityId` e su `CreatedAt`), per quando i log cresceranno | Basso | ⏳ In corso |
+| 4 | Rivalutare l'esposizione pubblica di Swagger in produzione (scelta deliberata del 02/10 per dare documentazione a chi integra) | Da decidere col titolare | Non ancora iniziato — nessuna azione senza conferma, è una scelta deliberata recente |
+| 5 | Audit log esteso ai controller che oggi non scrivono traccia (circa 30 su 51: presenze, spedizioni, fornitori, clienti, corrieri, aree, centri di lavoro...) | Basso ma esteso | Non ancora iniziato |
+| 6 | Health check consolidato (oggi `/health` minimal-API e `/api/health/status` fanno la stessa cosa in due posti; `/health` è usato dal client per il retry "server in avvio", va trattato con cautela) | Basso, ma tocca un endpoint già consumato dal client | Non ancora iniziato |
+| 7 | Validazione input sistematica (oggi manuale endpoint per endpoint, nessuna FluentValidation) e versionamento API (`/api/v1/`, oggi assente) | Più alto — tocca molti controller esistenti, da pianificare a parte | Non ancora iniziato, rimandato di proposito |
+
+Step 1-3 in corso ora. Step 4 resta sospeso in attesa di conferma esplicita (non è un bug, è una scelta già fatta). Step 5-6 sono il passo successivo naturale a basso rischio. Step 7 è il più esteso e rischioso: va preventivato a parte, non infilato di fretta in questa sessione.
+
 ## Decisioni in sospeso
 
 1. Acquisto dell'hosting a pagamento su Render e del certificato di firma: vedi le istruzioni in fondo a [RIEPILOGO-SVILUPPO.md](RIEPILOGO-SVILUPPO.md), sezione "Hosting e firma".

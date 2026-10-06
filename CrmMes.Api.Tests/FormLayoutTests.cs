@@ -1,4 +1,4 @@
-using System.Net;
+﻿using System.Net;
 using System.Net.Http.Json;
 using CrmMes.Api.Controllers;
 using CrmMes.Core.Layout;
@@ -29,6 +29,7 @@ public class FormLayoutTests : IClassFixture<AdminSeededApiTestFixture>
 
         Assert.NotNull(screen);
         Assert.Equal(FormLayoutRegistry.Screens[FormLayoutRegistry.ServiceRequest].Count, screen!.Fields.Count);
+        Assert.Equal("Nuova richiesta di assistenza (Service)", screen.Name);
         Assert.Equal("subject", screen.Fields[0].Key);
         Assert.Equal("Oggetto", screen.Fields[0].Label);
         Assert.True(screen.Fields[0].DefaultRequired);

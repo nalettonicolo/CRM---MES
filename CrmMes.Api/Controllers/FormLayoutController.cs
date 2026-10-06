@@ -1,4 +1,4 @@
-using System.Security.Claims;
+﻿using System.Security.Claims;
 using CrmMes.Core.Data;
 using CrmMes.Core.Layout;
 using Microsoft.AspNetCore.Authorization;
@@ -15,6 +15,16 @@ namespace CrmMes.Api.Controllers;
 [Route("api/layout")]
 public class FormLayoutController(ApplicationDbContext db) : ControllerBase
 {
+    /// <summary>Elenco di tutte le schermate gestite dallo strumento Layout, con i loro campi di default.</summary>
+    [HttpGet]
+    public ActionResult<List<LayoutScreenResponse>> List()
+    {
+        var saved = new List<FormFieldSetting>();
+        return Ok(FormLayoutRegistry.Screens.Keys.OrderBy(k => k)
+            .Select(screen => Merge(screen, saved))
+            .ToList());
+    }
+
     [HttpGet("{screen}")]
     public async Task<ActionResult<LayoutScreenResponse>> Get(string screen, CancellationToken cancellationToken = default)
     {
@@ -69,7 +79,7 @@ public class FormLayoutController(ApplicationDbContext db) : ControllerBase
                 Order = item.Order,
                 // Un campo non nascondibile resta sempre visibile, e l'oggetto della richiesta resta obbligatorio.
                 Visible = def.CanHide ? item.Visible : true,
-                Required = item.FieldKey == "subject" || item.Required,
+                Required = FormLayoutRegistry.RequiredFor(def, item.Required),
                 UpdatedBy = user,
                 UpdatedAt = DateTime.UtcNow,
             });
@@ -94,20 +104,20 @@ public class FormLayoutController(ApplicationDbContext db) : ControllerBase
                     s?.Label ?? def.DefaultLabel,
                     s?.Order ?? def.Order,
                     s?.Visible ?? true,
-                    s?.Required ?? def.Required,
+                    FormLayoutRegistry.RequiredFor(def, s?.Required ?? def.Required),
                     def.CanHide,
                     def.Required);
             })
             .OrderBy(f => f.Order)
             .ToList();
-        return new LayoutScreenResponse(screen, fields);
+        return new LayoutScreenResponse(screen, FormLayoutRegistry.Names[screen], fields);
     }
 }
 
 public sealed record LayoutFieldResponse(
     string Key, string DefaultLabel, string Label, int Order, bool Visible, bool Required, bool CanHide, bool DefaultRequired);
 
-public sealed record LayoutScreenResponse(string Screen, List<LayoutFieldResponse> Fields);
+public sealed record LayoutScreenResponse(string Screen, string Name, List<LayoutFieldResponse> Fields);
 
 public sealed record SaveLayoutRequest(List<SaveLayoutFieldRequest>? Fields);
 
