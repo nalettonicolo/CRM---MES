@@ -183,4 +183,14 @@ public class FormLayoutTests : IClassFixture<AdminSeededApiTestFixture>
         Assert.True(fields["customer"].Required);
         Assert.True(fields["payment"].CanHide);
     }
+
+    [Fact]
+    public void QuoteConvert_ScreenIsRegisteredAndOptionalByDefault()
+    {
+        var fields = FormLayoutRegistry.Screens[FormLayoutRegistry.QuoteConvert].ToDictionary(f => f.Key);
+
+        Assert.False(fields["area"].Required);
+        Assert.True(fields["area"].CanHide);
+        Assert.True(fields["dueDate"].CanHide);
+    }
 }

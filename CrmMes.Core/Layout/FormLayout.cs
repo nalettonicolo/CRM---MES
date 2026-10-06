@@ -43,6 +43,7 @@ public static class FormLayoutRegistry
     public const string PurchaseOrderNew = "purchaseOrder.new";
     public const string QuoteNew = "quote.new";
     public const string InvoiceNew = "invoice.new";
+    public const string QuoteConvert = "quote.convert";
 
     /// <summary>Nome leggibile della schermata, per l'elenco nello strumento Layout.</summary>
     public static readonly IReadOnlyDictionary<string, string> Names = new Dictionary<string, string>
@@ -58,6 +59,7 @@ public static class FormLayoutRegistry
         [PurchaseOrderNew] = "Nuovo ordine fornitore (acquisti)",
         [QuoteNew] = "Nuovo preventivo (vendite)",
         [InvoiceNew] = "Nuova fattura elettronica (testata)",
+        [QuoteConvert] = "Conversione preventivo in commesse (web)",
     };
 
     public static readonly IReadOnlyDictionary<string, IReadOnlyList<FormFieldDefault>> Screens =
@@ -68,6 +70,11 @@ public static class FormLayoutRegistry
                 new("code", "Codice", 1, Required: true, CanHide: false),
                 new("name", "Nome", 2, Required: true, CanHide: false),
                 new("description", "Descrizione", 3, Required: false, CanHide: true),
+            ],
+            [QuoteConvert] =
+            [
+                new("area", "Area di produzione", 1, Required: false, CanHide: true),
+                new("dueDate", "Consegna prevista", 2, Required: false, CanHide: true),
             ],
             [InvoiceNew] =
             [
