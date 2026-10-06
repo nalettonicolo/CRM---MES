@@ -1,6 +1,7 @@
 using System.Globalization;
 using System.Security.Claims;
 using ClosedXML.Excel;
+using CrmMes.Api.Services;
 using CrmMes.Core.Data;
 using CrmMes.Core.Models;
 using Microsoft.AspNetCore.Authorization;
@@ -152,6 +153,49 @@ public class ProductsController : ControllerBase
         product.IsActive = false;
         await _dbContext.SaveChangesAsync(cancellationToken);
         return NoContent();
+    }
+
+    /// <summary>Sets or clears the GTIN of the finished product. The check digit is verified here, and a GTIN
+    /// already used by another product is refused: it is the code the label and the retail barcode carry.</summary>
+    [Authorize(Policy = "Warehouse")]
+    [HttpPut("{id:guid}/gtin")]
+    public async Task<ActionResult<ProductResponse>> SetGtin(
+        Guid id,
+        SetProductGtinRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        var product = await _dbContext.Products
+            .Include(p => p.BillOfMaterial)
+            .Include(p => p.RoutingSteps)
+            .SingleOrDefaultAsync(p => p.Id == id, cancellationToken);
+        if (product is null)
+        {
+            return NotFound();
+        }
+
+        var gtin = string.IsNullOrWhiteSpace(request.Gtin) ? null : request.Gtin.Trim();
+        if (gtin is not null && !Gs1.IsValidGtin(gtin))
+        {
+            return BadRequest(new { message = "GTIN non valido: servono 8, 12, 13 o 14 cifre con la cifra di controllo corretta." });
+        }
+
+        if (gtin is not null && await _dbContext.Products.AnyAsync(p => p.Gtin == gtin && p.Id != id, cancellationToken))
+        {
+            return Conflict(new { message = $"Il GTIN {gtin} è già assegnato a un altro prodotto." });
+        }
+
+        var previous = product.Gtin;
+        product.Gtin = gtin;
+        _dbContext.AuditLogs.Add(new AuditLog
+        {
+            Action = "ProductGtinChanged",
+            EntityType = "Product",
+            EntityId = product.Id,
+            UserName = GetCurrentUserName(),
+            Details = $"Prodotto {product.Code}: GTIN {previous ?? "—"} → {gtin ?? "—"}."
+        });
+        await _dbContext.SaveChangesAsync(cancellationToken);
+        return Ok(ToResponse(product));
     }
 
     [Authorize(Policy = "Warehouse")]
@@ -428,7 +472,8 @@ public class ProductsController : ControllerBase
             product.RoutingSteps
                 .OrderBy(step => step.SequenceNumber)
                 .Select(step => new RoutingStepResponse(step.Id, step.SequenceNumber, step.Name, step.Description, step.WorkCenter, step.EstimatedMinutes))
-                .ToList());
+                .ToList(),
+            product.Gtin);
     }
 }
 
@@ -450,7 +495,10 @@ public sealed record ProductResponse(
     string? Description,
     bool IsActive,
     IReadOnlyList<BillOfMaterialItemResponse> BillOfMaterial,
-    IReadOnlyList<RoutingStepResponse> RoutingSteps);
+    IReadOnlyList<RoutingStepResponse> RoutingSteps,
+    string? Gtin = null);
+
+public sealed record SetProductGtinRequest(string? Gtin);
 
 public sealed record BillOfMaterialItemResponse(Guid Id, string MaterialCode, decimal Quantity, string? Notes);
 

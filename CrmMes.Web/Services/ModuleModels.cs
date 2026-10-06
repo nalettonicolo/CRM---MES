@@ -24,6 +24,14 @@ public sealed record HaccpReading(
     decimal? MaxValue, decimal? Value, bool Compliant, string? CorrectiveAction, string? Notes, DateTime ReadAt,
     string? OperatorName);
 
+public sealed record HaccpTemplate(string Key, string Name, string Description, List<HaccpTemplatePoint> Points);
+
+public sealed record HaccpTemplatePoint(
+    string Name, string Location, string Hazard, string? Unit, decimal? MinValue, decimal? MaxValue,
+    string Frequency, string CorrectiveActionHint);
+
+public sealed record ApplyHaccpTemplateResult(string Key, int Created, int Skipped);
+
 public sealed record SiteReportSummary(
     Guid Id, string Code, Guid WorkOrderId, string WorkOrderCode, string? CustomerName, string Status, DateTime WorkDate,
     decimal TotalMinutes, string? SignedByName, DateTime? SignedAt, string? CreatedBy);

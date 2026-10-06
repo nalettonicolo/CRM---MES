@@ -1,4 +1,5 @@
 using System.Security.Claims;
+using CrmMes.Api.Services;
 using CrmMes.Core.Data;
 using CrmMes.Core.Models;
 using Microsoft.AspNetCore.Authorization;
@@ -41,6 +42,64 @@ public class HaccpController : ControllerBase
             .GroupBy(reading => reading.ControlPointId)
             .ToDictionary(group => group.Key, group => group.MaxBy(reading => reading.ReadAt)!);
         return Ok(points.Select(point => ToResponse(point, last.GetValueOrDefault(point.Id))));
+    }
+
+    /// <summary>Models of control points by type of process, to start the plan from.</summary>
+    [HttpGet("templates")]
+    public ActionResult<IEnumerable<HaccpTemplateResponse>> GetTemplates() =>
+        Ok(HaccpTemplates.All.Select(template => new HaccpTemplateResponse(
+            template.Key, template.Name, template.Description, template.Points)));
+
+    /// <summary>Adds the points of a model to the register. A point whose name is already active is left
+    /// alone, so applying the same model twice creates nothing new.</summary>
+    [Authorize(Policy = "Warehouse")]
+    [HttpPost("templates/{key}/apply")]
+    public async Task<ActionResult<ApplyHaccpTemplateResponse>> ApplyTemplate(
+        string key, CancellationToken cancellationToken = default)
+    {
+        var template = HaccpTemplates.Find(key);
+        if (template is null)
+        {
+            return NotFound(new { message = "Modello HACCP non trovato." });
+        }
+
+        var existing = (await _dbContext.HaccpControlPoints.AsNoTracking()
+                .Where(point => point.IsActive)
+                .Select(point => point.Name)
+                .ToListAsync(cancellationToken))
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+        var created = 0;
+        foreach (var model in template.Points)
+        {
+            if (!existing.Add(model.Name))
+            {
+                continue;
+            }
+
+            _dbContext.HaccpControlPoints.Add(new HaccpControlPoint
+            {
+                Name = model.Name,
+                Location = model.Location,
+                Hazard = model.Hazard,
+                Unit = model.Unit,
+                MinValue = model.MinValue,
+                MaxValue = model.MaxValue,
+                Frequency = model.Frequency,
+                CorrectiveActionHint = model.CorrectiveActionHint
+            });
+            created++;
+        }
+
+        _dbContext.AuditLogs.Add(new AuditLog
+        {
+            Action = "HaccpTemplateApplied",
+            EntityType = "HaccpControlPoint",
+            UserName = User.FindFirstValue(ClaimTypes.Name),
+            Details = $"Modello HACCP '{template.Name}': {created} punti aggiunti, {template.Points.Count - created} già presenti."
+        });
+        await _dbContext.SaveChangesAsync(cancellationToken);
+        return Ok(new ApplyHaccpTemplateResponse(template.Key, created, template.Points.Count - created));
     }
 
     [Authorize(Policy = "Warehouse")]
@@ -217,6 +276,11 @@ public sealed record HaccpControlPointResponse(
     Guid Id, string Name, string? Location, string? Hazard, string? Unit, decimal? MinValue, decimal? MaxValue,
     string? Frequency, string? CorrectiveActionHint, bool IsActive, bool IsNumeric,
     DateTime? LastReadAt, decimal? LastValue, bool? LastCompliant);
+
+public sealed record HaccpTemplateResponse(
+    string Key, string Name, string Description, IReadOnlyList<HaccpTemplates.Point> Points);
+
+public sealed record ApplyHaccpTemplateResponse(string Key, int Created, int Skipped);
 
 public sealed record AddHaccpReadingRequest(decimal? Value, bool? Compliant, string? CorrectiveAction, string? Notes, DateTime? ReadAt);
 

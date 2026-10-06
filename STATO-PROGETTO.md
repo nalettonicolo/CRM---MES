@@ -1,12 +1,12 @@
 # Stato del progetto: Nicolò MES (CrmMes)
 
-Aggiornato: **2 ottobre 2026 (sera, chiusura gap)**. Diario tecnico: [RIEPILOGO-SVILUPPO.md](RIEPILOGO-SVILUPPO.md). Istruzioni operative: [HANDOFF-CLAUDE.md](HANDOFF-CLAUDE.md). Gate: [GATES.md](GATES.md).
+Aggiornato: **6 ottobre 2026 (GTIN e modelli HACCP)**. Diario tecnico: [RIEPILOGO-SVILUPPO.md](RIEPILOGO-SVILUPPO.md). Istruzioni operative: [HANDOFF-CLAUDE.md](HANDOFF-CLAUDE.md). Gate: [GATES.md](GATES.md).
 
 > **Punto della situazione**
 >
-> - **In produzione (`main` / Render):** ancora indietro rispetto al tree (push da fare).
-> - **Fatto in codice + Neon:** G9–G15 + contro (SdI HTTP, demo campo, SSO, locale/valuta, assistente IA, CAPA, presenze, Swagger…). Suite **623/623** (API 408 + Desktop 122 + Web 75 + Console 18).
-> - **Prossimo passo:** commit/push.
+> - **In produzione (`main` / Render):** allineato a `293f14f` (G9–G15 e contro già pubblicati). Il lavoro del 6 ottobre (GTIN e modelli HACCP) è in commit successivo, con migrazione `AddProductGtin` già applicata su Neon.
+> - **Fatto in codice + Neon:** G9–G15 + contro (SdI HTTP, demo campo, SSO, locale/valuta, assistente IA, CAPA, presenze, Swagger…), GTIN di prodotto con cifra di controllo, modelli HACCP per tipologia. Suite **631/631** (API 414 + Desktop 122 + Web 77 + Console 18).
+> - **Prossimo passo:** campo GTIN nei form desktop e web del prodotto (oggi si imposta via API).
 > - **Non è codice:** contratto SdI, macchina fisica, G16 hosting/referenze, IdP OIDC completo.
 
 ## In sintesi
@@ -14,7 +14,7 @@ Aggiornato: **2 ottobre 2026 (sera, chiusura gap)**. Diario tecnico: [RIEPILOGO-
 - **Cos'è**: gestionale di produzione (MES) con parte commerciale e documentale, per piccole e medie aziende manifatturiere. Nato per un quadrista, oggi si configura per cinque settori.
 - **Versione pubblicata**: v1.7.0 (30/09/2026) + push 02/10 con G8/OEE/MRP/tema. I PC si aggiornano da soli dalle release GitHub.
 - **Architettura**: client Windows (WPF, .NET 8) + API web (ASP.NET Core 8) su Render + database Postgres su Neon. Stessa API per `/app/` (Blazor) e `/tecnici/`.
-- **Test automatici** (working tree chiusura gap): **623/623** verdi — API 408, Desktop 122, Web 75, Console 18.
+- **Test automatici** (06/10/2026): **631/631** verdi — API 414, Desktop 122, Web 77, Console 18.
 - **Backtest end-to-end** (30/09/2026): 68/68 su DB vuoto isolato.
 - **Uso attuale**: interno, un'azienda con due sedi.
 
@@ -57,7 +57,8 @@ Aggiornato: **2 ottobre 2026 (sera, chiusura gap)**. Diario tecnico: [RIEPILOGO-
   - richiamo di lotto guidato (anche da lotto prodotto) con rapporto PDF;
   - allergeni UE ed etichetta del lotto (ingredienti in ordine di quantità, allergeni in grassetto, data di scadenza);
   - pallet SSCC con etichetta GS1-128;
-  - registri HACCP con azioni correttive obbligatorie ed esportazione per le ispezioni.
+  - registri HACCP con azioni correttive obbligatorie ed esportazione per le ispezioni;
+  - modelli di punti di controllo per tipologia (ricevimento, refrigerazione, abbattimento, cottura, corpi estranei, sanificazione), applicabili al registro senza duplicati, dalla pagina web HACCP (Admin e Magazzino).
 - **Impiantistica**: rapportini di cantiere con ore, materiali e firma del cliente. Firmati, entrano nei costi della commessa. PDF con la firma.
 - **Costruzione macchine: collaudo e CE** (01/10/2026, piattaforma web, pagina "Collaudo e CE"):
   - collaudi **FAT** (in fabbrica) e **SAT** (presso il cliente) numerati, con lista di verifiche standard modificabile (marcatura e documenti, sicurezza elettrica EN 60204-1, arresto di emergenza e ripari, dispositivi di sicurezza, prove funzionali; per il SAT installazione, prove in produzione, formazione e consegna), valore atteso e rilevato, esito per ogni verifica; chiusura con matricola, data e nome del collaudatore; basta una verifica non superata e il collaudo resta come "non superato" (se ne apre uno nuovo); riapertura solo Admin;
@@ -111,7 +112,6 @@ Non ancora provato: la pagina web dei tecnici dal browser con accesso reale (il 
 
 | Punto | Stato | Cosa serve |
 |---|---|---|
-| **Commit/push G9–G15** | Urgente (operativo) | Pubblicare il working tree su `main` → Render. Neon ha già le migrazioni SdI/ubicazioni |
 | G9 intermediario SdI reale | Codice pronto, dipende dal titolare | Provider HTTP, stati e registrazione esito; servono contratto, URL e chiavi su Render |
 | G11/G12 | Fatto in tree | Pubblicare; poi uso operativo |
 | G13 pack settore | Fatto in codice | Persistenza EPLAN, wire-list, nutrizionale, DM 37/08, SAL e certificati 3.1; hardware bilance da collegare sul campo |
@@ -122,7 +122,8 @@ Non ancora provato: la pagina web dei tecnici dal browser con accesso reale (il 
 | Collegamento macchine in campo | Da configurare | PC gateway + OPC UA/MQTT reali (codice e OEE pronti) |
 | Stripe / console in cloud | Chiavi titolare | `STRIPE_*`, `CONSOLE_SECRET`, deploy console |
 | Listini Metel | Modulo fatto | Eventuale listino produttore reale solo per tarare |
-| GTIN / HACCP guidato per tipologia | Da fare | Azienda pilota alimentare |
+| GTIN nei form prodotto | Parziale | Il GTIN si imposta da `PUT /api/products/{id}/gtin` (Magazzino); mancano campo nei form desktop e web del prodotto |
+| HACCP: limiti per cliente | Da verificare | I modelli per tipologia sono un punto di partenza; i limiti reali li conferma l'azienda pilota alimentare |
 | Import PDF cataloghi su file reali | Da verificare | Primo catalogo fornitore vero |
 | Server on-prem | Installer fatto | Prova su Windows Server reale |
 | Grafana Cloud | Codice pronto | Account + variabili su Render |
@@ -148,14 +149,15 @@ Non ancora provato: la pagina web dei tecnici dal browser con accesso reale (il 
 | 01/10/2026 | (prossima release) | Chiusura lacune tecniche segnalate: notifica garanzia in scadenza (Service), collegamento automatico commessa→macchina installata alla spedizione, kWh per commessa e report stampabile (Energia), schermate nel programma desktop per Service post-vendita, Collaudo e CE e Monitoraggio energetico. Nessuna migrazione |
 | 01/10/2026 | (prossima release) | Collaudo e CE: collegamento degli elementi del fascicolo tecnico ai documenti dell'ufficio tecnico (sempre la versione attuale, validato contro il prodotto della commessa); firma a schermo facoltativa sulla dichiarazione di conformità, stampata sul documento — chiaramente non una firma digitale qualificata. Migrazione AddMachineTestingDocumentAndSignature applicata al database di produzione |
 | 02/10/2026 | (su main) | G8 + OEE macchina + origine UE + MRP base + tema; migrazioni Neon; push `6cad42d` |
-| 02/10/2026 | (working tree) | G9–G15 e contro: SdI HTTP, demo campo, SSO, locale/valuta, assistente IA, CAPA/taratura/presenze, Swagger, MRP avanzato, pack persistiti e planning web; migration Neon applicate; suite 623/623; **commit/push da fare** |
+| 02/10/2026 | `293f14f` (su main) | G9–G15 e contro: SdI HTTP, demo campo, SSO, locale/valuta, assistente IA, CAPA/taratura/presenze, Swagger, MRP avanzato, pack persistiti e planning web; migration Neon applicate; suite 623/623 |
+| 06/10/2026 | (prossimo commit) | GTIN di prodotto con cifra di controllo GS1 e unicità (`PUT /api/products/{id}/gtin`); modelli HACCP per tipologia (`GET`/`POST api/haccp/templates`) con pagina web; migrazione `AddProductGtin` applicata a Neon (additiva); suite 631/631 |
 | 30/09/2026 | v1.6.0 | Installer da collegare in seguito; piattaforma web `/app/`; canali di accesso; basi server cliente e teleassistenza |
 | prossimo | - | Push del tree su main; poi restano solo contratto SdI, macchina fisica, G16 e IdP OIDC di produzione |
 
 ## Pubblicazione e ambienti
 
 - **API**: https://crmmes-api.onrender.com (piano gratuito Render), deploy automatico a ogni push su `main`.
-- **Database**: Neon Postgres, progetto `cool-field-94626300`. Migration presenti e applicate fino a `AddSsoAndLocale`, incluse `AddPayables`, `AddSoftwareOriginDeclaration`, `AddUiTheme`, `AddSdiSubmissionTracking`, `AddSdiAndWarehouseLocations`, `AddQualityCapaAndCalibration` e `AddSectorPackPersistence`. Verificato il 02/10/2026 con `dotnet ef database update`: nessuna migration pendente.
+- **Database**: Neon Postgres, progetto `cool-field-94626300`. Migration presenti e applicate fino a `AddProductGtin` (06/10/2026), incluse `AddSsoAndLocale`,  `AddPayables`, `AddSoftwareOriginDeclaration`, `AddUiTheme`, `AddSdiSubmissionTracking`, `AddSdiAndWarehouseLocations`, `AddQualityCapaAndCalibration` e `AddSectorPackPersistence`. Verificato il 02/10/2026 con `dotnet ef database update`: nessuna migration pendente.
 - **Client**: release GitHub con `NicoloMES-Setup.exe` e checksum; il programma avvisa e si aggiorna da solo.
 - **Branch Neon di prova ancora esistente**: `test-multisettore`, da eliminare quando non serve più.
 

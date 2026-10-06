@@ -16,6 +16,8 @@ public class Product
     public bool UseByDate { get; set; }
     public string? StorageConditions { get; set; }
     public string? NetQuantity { get; set; }
+    /// <summary>GS1 GTIN of the finished product (8, 12, 13 or 14 digits, check digit verified). Optional; unique when set.</summary>
+    public string? Gtin { get; set; }
     /// <summary>Engineering revision (A, B, C...): moves on when an approved engineering change is applied.</summary>
     public string Revision { get; set; } = "A";
 

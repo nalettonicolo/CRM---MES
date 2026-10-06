@@ -1,5 +1,6 @@
 @page "/haccp"
 @inject Api Api
+@inject Session Session
 
 <PageTitle>HACCP · Nicolò MES</PageTitle>
 
@@ -10,6 +11,52 @@
         <p class="sub">Punti di controllo e ultime letture. Fuori limite serve l'azione correttiva.</p>
     </div>
 </div>
+
+@if (_templates is { Count: > 0 })
+{
+    <div class="card">
+        <div class="section-head"><h2>Modelli per tipologia</h2></div>
+        <p class="sub">Punti di controllo tipici del processo. Si aggiungono al registro; quelli già presenti non vengono duplicati. I limiti si adattano poi dal programma desktop.</p>
+        @if (_notice is not null)
+        {
+            <div class="notice" role="status">@_notice</div>
+        }
+        @if (_applyError is not null)
+        {
+            <div class="notice" role="alert"><strong>Modello non applicato.</strong> @_applyError</div>
+        }
+        <div class="table-wrap">
+            <table class="cards">
+                <thead><tr><th>Tipologia</th><th>Punti</th><th>Azione</th></tr></thead>
+                <tbody>
+                    @foreach (var template in _templates)
+                    {
+                        <tr>
+                            <td data-label="Tipologia">@template.Name <div class="small muted">@template.Description</div></td>
+                            <td data-label="Punti">@template.Points.Count</td>
+                            <td data-label="Azione">
+                                @if (!CanApply)
+                                {
+                                    <span class="muted">Solo magazzino e amministrazione</span>
+                                }
+                                else if (_pendingKey == template.Key)
+                                {
+                                    <span>Aggiungo il modello al registro? </span>
+                                    <button class="small" disabled="@_applying" @onclick="() => ApplyAsync(template.Key)">Conferma</button>
+                                    <button class="secondary small" disabled="@_applying" @onclick="() => _pendingKey = null">Annulla</button>
+                                }
+                                else
+                                {
+                                    <button class="secondary small" disabled="@_applying" @onclick="() => _pendingKey = template.Key">Applica</button>
+                                }
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+}
 
 @if (_error is not null)
 {
@@ -22,7 +69,7 @@ else if (_points is null)
 }
 else if (_points.Count == 0)
 {
-    <div class="card state"><strong>Nessun punto di controllo</strong>Si definiscono dal programma desktop.</div>
+    <div class="card state"><strong>Nessun punto di controllo</strong>Applica un modello qui sopra oppure definisci i punti dal programma desktop.</div>
 }
 else
 {
@@ -80,7 +127,14 @@ else
 @code {
     private List<HaccpControlPoint>? _points;
     private List<HaccpReading>? _readings;
+    private List<HaccpTemplate>? _templates;
+    private string? _pendingKey;
+    private string? _notice;
+    private string? _applyError;
+    private bool _applying;
     private string? _error;
+
+    private bool CanApply => Session.Role is "Admin" or "Warehouse";
 
     protected override Task OnInitializedAsync() => LoadAsync();
 
@@ -89,6 +143,7 @@ else
         _error = null;
         try
         {
+            _templates = await Api.GetAsync<List<HaccpTemplate>>("api/haccp/templates");
             _points = await Api.GetAsync<List<HaccpControlPoint>>("api/haccp/control-points");
             var from = DateTime.UtcNow.Date.AddDays(-14).ToString("yyyy-MM-dd");
             var to = DateTime.UtcNow.Date.ToString("yyyy-MM-dd");
@@ -97,6 +152,28 @@ else
         catch (ApiException exception)
         {
             _error = exception.Message;
+        }
+    }
+
+    private async Task ApplyAsync(string key)
+    {
+        _applying = true;
+        _notice = null;
+        _applyError = null;
+        try
+        {
+            var result = await Api.PostAsync<ApplyHaccpTemplateResult>($"api/haccp/templates/{key}/apply");
+            _notice = $"Modello applicato: aggiunti {result.Created}, già presenti {result.Skipped}.";
+            _pendingKey = null;
+            await LoadAsync();
+        }
+        catch (ApiException exception)
+        {
+            _applyError = exception.Message;
+        }
+        finally
+        {
+            _applying = false;
         }
     }
 }

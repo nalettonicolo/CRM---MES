@@ -286,7 +286,9 @@ public class ApplicationDbContext : DbContext
             entity.Property(p => p.Name).HasMaxLength(250);
             entity.Property(p => p.Description).HasMaxLength(1000);
             entity.Property(p => p.Revision).HasMaxLength(10);
+            entity.Property(p => p.Gtin).HasMaxLength(14);
             entity.HasIndex(p => p.Code).IsUnique();
+            entity.HasIndex(p => p.Gtin).IsUnique().HasFilter("\"Gtin\" IS NOT NULL");
         });
 
         modelBuilder.Entity<TechnicalDocument>(entity =>

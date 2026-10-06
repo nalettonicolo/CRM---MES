@@ -48,4 +48,9 @@ public static class Gs1
 
     public static bool IsValidSscc(string? sscc) =>
         sscc is { Length: 18 } && sscc.All(char.IsAsciiDigit) && CheckDigit(sscc[..17]) == sscc[17] - '0';
+
+    /// <summary>GTIN-8, GTIN-12, GTIN-13 or GTIN-14: the last digit is the check digit of the others.</summary>
+    public static bool IsValidGtin(string? gtin) =>
+        gtin is { Length: 8 or 12 or 13 or 14 } && gtin.All(char.IsAsciiDigit)
+        && CheckDigit(gtin[..^1]) == gtin[^1] - '0';
 }
