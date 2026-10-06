@@ -5,6 +5,19 @@ Punto di vista: commerciale, commercialista, fatturazione, capocantiere, respons
 
 ---
 
+## Aggiornamento 6 ottobre 2026 (stato reale)
+
+- **Pubblicato:** G8–G15 e contro su `main` (`6cad42d`, `293f14f`); GTIN di prodotto con cifra di controllo GS1 e modelli HACCP per tipologia (`48818e8`); correzioni CI installer (`e9a6d3c`, build verde). Suite: API 414, Desktop 122, Web 77, Console 18.
+- **Superate le voci "contro" del 2 ottobre:** push e deploy (fatto); modulo passive/scadenziario (fatto); MRP con crea PO (fatto); ubicazioni e inventario (fatto); capacità finita (fatto); CAPA, taratura e presenze (base fatti); SdI con provider HTTP e stati (fatto, manca il contratto).
+- **Ancora aperto, in ordine di impatto commerciale:**
+  1. Contratto con un intermediario SdI e relative chiavi (titolare).
+  2. Un contatore o una macchina reale collegata in officina, per la perizia (campo).
+  3. Hosting a pagamento e 1–2 referenze, G16 (titolare).
+  4. Mapper OIDC di produzione per SSO aziendale (configurazione).
+  5. Campo GTIN nelle schermate desktop e web del prodotto (oggi solo via API): prossimo passo di sviluppo.
+  6. Backup notturno: il segreto `NEON_DATABASE_URL` va verificato su GitHub, il job fallisce ogni notte.
+- **Limiti da dichiarare ai clienti:** IA come assistente, non come pianificazione predittiva; contabilità fino a fattura e scadenziario, non prima nota; verticali (DNC, computo, IFS) non profondi come gli specialisti.
+
 ## 1. In sintesi
 
 - **Il mercato.** In Italia i MES restano pezzo centrale della digitalizzazione di fabbrica: studio AlixPartners–Qualitas (marzo 2025) → **~120 M€ entro il 2027**, CAGR **5,2%** (2022–2027). Europa occidentale CAGR **6,7%** (~**887 M€** al 2027); globale ~**3 Md€** al 2027 (CAGR ~5,6%). Mercato italiano **frammentato (~23 fornitori)**: consolidamento, uscita dal “fatto in casa”, cloud, IoT/edge, AI.
