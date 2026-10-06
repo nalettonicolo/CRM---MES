@@ -35,6 +35,7 @@ public static class FormLayoutRegistry
     public const string ServiceRequest = "service.request";
     public const string CustomerNew = "customers.new";
     public const string MaintenanceNew = "maintenance.new";
+    public const string EnergyProjectNew = "energy.project.new";
 
     /// <summary>Nome leggibile della schermata, per l'elenco nello strumento Layout.</summary>
     public static readonly IReadOnlyDictionary<string, string> Names = new Dictionary<string, string>
@@ -42,11 +43,20 @@ public static class FormLayoutRegistry
         [ServiceRequest] = "Nuova richiesta di assistenza (Service)",
         [CustomerNew] = "Nuovo cliente (Vendite)",
         [MaintenanceNew] = "Nuovo intervento di manutenzione",
+        [EnergyProjectNew] = "Nuovo progetto di efficientamento energetico",
     };
 
     public static readonly IReadOnlyDictionary<string, IReadOnlyList<FormFieldDefault>> Screens =
         new Dictionary<string, IReadOnlyList<FormFieldDefault>>
         {
+            [EnergyProjectNew] =
+            [
+                new("equipment", "Macchina", 1, Required: true, CanHide: false),
+                new("title", "Titolo", 2, Required: true, CanHide: false),
+                new("baselineFrom", "Ex ante dal", 3, Required: true, CanHide: false),
+                new("baselineTo", "Ex ante al", 4, Required: true, CanHide: false),
+                new("description", "Descrizione", 5, Required: false, CanHide: true),
+            ],
             [MaintenanceNew] =
             [
                 new("equipment", "Macchina", 1, Required: true, CanHide: false),

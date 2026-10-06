@@ -121,23 +121,40 @@
     <div class="card card-pad stack">
         <h2>Nuovo progetto</h2>
         <div class="form-grid">
-            <label>Macchina
-                <select @bind="_newEquipmentId" aria-label="Macchina per il nuovo progetto">
-                    <option value="">Scegli...</option>
-                    @if (_equipment is not null)
-                    {
-                        @foreach (var e in _equipment)
-                        {
-                            <option value="@e.Id">@e.Name</option>
-                        }
-                    }
-                </select>
-            </label>
-            <label>Titolo<input @bind="_newTitle" placeholder="es. Sostituzione forno con pompa di calore" /></label>
-            <label>Ex ante dal<input type="date" @bind="_newBaselineFrom" /></label>
-            <label>Ex ante al<input type="date" @bind="_newBaselineTo" /></label>
+            @foreach (var f in _newFields.Where(f => f.Visible).OrderBy(f => f.Order))
+            {
+                switch (f.Key)
+                {
+                    case "equipment":
+                        <label>@LayoutHelper.LabelOf(f)
+                            <select @bind="_newEquipmentId" aria-label="Macchina per il nuovo progetto">
+                                <option value="">Scegli...</option>
+                                @if (_equipment is not null)
+                                {
+                                    @foreach (var e in _equipment)
+                                    {
+                                        <option value="@e.Id">@e.Name</option>
+                                    }
+                                }
+                            </select>
+                        </label>
+                        break;
+                    case "title":
+                        <label>@LayoutHelper.LabelOf(f)<input @bind="_newTitle" placeholder="es. Sostituzione forno con pompa di calore" /></label>
+                        break;
+                    case "baselineFrom":
+                        <label>@LayoutHelper.LabelOf(f)<input type="date" @bind="_newBaselineFrom" /></label>
+                        break;
+                    case "baselineTo":
+                        <label>@LayoutHelper.LabelOf(f)<input type="date" @bind="_newBaselineTo" /></label>
+                        break;
+                }
+            }
         </div>
-        <label>Descrizione<textarea class="textarea" @bind="_newDescription"></textarea></label>
+        @foreach (var f in _newFields.Where(f => f.Visible && f.Key == "description"))
+        {
+            <label>@LayoutHelper.LabelOf(f)<textarea class="textarea" @bind="_newDescription"></textarea></label>
+        }
         <div class="actions"><button @onclick="CreateProjectAsync" disabled="@_busy">Crea progetto</button></div>
     </div>
 }
@@ -228,6 +245,7 @@
         try
         {
             _equipment = await Api.GetAsync<List<Equipment>>("api/equipment");
+            await LoadNewLayoutAsync();
             await LoadProjectsAsync();
         }
         catch (ApiException exception)
@@ -248,11 +266,36 @@
         }
     }
 
+    /// <summary>Campi del modulo come li ha impostati l'Admin nello strumento Layout (default prima della risposta).</summary>
+    private List<LayoutField> _newFields =
+    [
+        new("equipment", "Macchina", 1, true, true, false),
+        new("title", "Titolo", 2, true, true, false),
+        new("baselineFrom", "Ex ante dal", 3, true, true, false),
+        new("baselineTo", "Ex ante al", 4, true, true, false),
+        new("description", "Descrizione", 5, true, false, true),
+    ];
+
+    private async Task LoadNewLayoutAsync()
+    {
+        try { _newFields = (await Api.GetAsync<LayoutScreen>("api/layout/energy.project.new")).Fields; }
+        catch (ApiException) { /* restano i default */ }
+    }
+
     private async Task CreateProjectAsync()
     {
-        if (_newEquipmentId is null || string.IsNullOrWhiteSpace(_newTitle) || _newBaselineFrom is null || _newBaselineTo is null)
+        var missing = LayoutHelper.Missing(_newFields, key => key switch
         {
-            _error = "Scegli la macchina, scrivi il titolo e imposta il periodo di riferimento (ex ante).";
+            "equipment" => _newEquipmentId?.ToString(),
+            "title" => _newTitle,
+            "baselineFrom" => _newBaselineFrom?.ToString(),
+            "baselineTo" => _newBaselineTo?.ToString(),
+            "description" => _newDescription,
+            _ => null,
+        });
+        if (missing.Count > 0)
+        {
+            _error = "Compila i campi obbligatori: " + string.Join(", ", missing) + ".";
             return;
         }
 
