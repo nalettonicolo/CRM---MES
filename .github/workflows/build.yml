@@ -40,19 +40,26 @@ jobs:
       - name: Verify installer compiles
         shell: pwsh
         run: |
-          dotnet publish CrmMes.Desktop/CrmMes.Desktop.csproj -c Release -r win-x64 --self-contained false -o publish
-          choco install innosetup --no-progress -y
-          if ($LASTEXITCODE -notin 0, 3010) { throw "Installazione di Inno Setup fallita (codice $LASTEXITCODE)." }
-          # Cerca ISCC.exe nei percorsi di installazione possibili (sistema e utente).
+          # Ogni errore viene pubblicato come annotazione (::error::), leggibile anche senza accesso ai log.
+          function Fail-WithOutput($what, $output) {
+            $tail = @($output) | Select-Object -Last 25
+            foreach ($line in $tail) { Write-Host "::error title=$what::$line" }
+            throw "$what fallito."
+          }
+          $out = dotnet publish CrmMes.Desktop/CrmMes.Desktop.csproj -c Release -r win-x64 --self-contained false -o publish 2>&1
+          if ($LASTEXITCODE -ne 0) { Fail-WithOutput "Publish client" $out }
+          $out = choco install innosetup --no-progress -y 2>&1
+          if ($LASTEXITCODE -notin 0, 3010) { Fail-WithOutput "Installazione Inno Setup" $out }
           $iscc = Get-ChildItem "C:\Program Files (x86)\Inno Setup 6", "C:\Program Files\Inno Setup 6", "$env:LOCALAPPDATA\Programs\Inno Setup 6" -Filter ISCC.exe -ErrorAction SilentlyContinue |
             Select-Object -First 1 -ExpandProperty FullName
           if (-not $iscc) { throw "ISCC.exe non trovato dopo l'installazione di Inno Setup." }
           Write-Host "ISCC: $iscc"
-          & $iscc "/DMyAppVersion=0.0.0" installer\NicoloMES.iss
-          if ($LASTEXITCODE -ne 0) { throw "Compilazione dell'installer fallita." }
-          dotnet publish CrmMes.Api/CrmMes.Api.csproj -c Release -r win-x64 --self-contained true -o publish-server
-          & $iscc "/DMyAppVersion=0.0.0" installer\NicoloMES-Server.iss
-          if ($LASTEXITCODE -ne 0) { throw "Compilazione dell'installer del server fallita." }
+          $out = & $iscc "/DMyAppVersion=0.0.0" installer\NicoloMES.iss 2>&1
+          if ($LASTEXITCODE -ne 0) { Fail-WithOutput "Compilazione installer client" $out }
+          $out = dotnet publish CrmMes.Api/CrmMes.Api.csproj -c Release -r win-x64 --self-contained true -o publish-server 2>&1
+          if ($LASTEXITCODE -ne 0) { Fail-WithOutput "Publish server" $out }
+          $out = & $iscc "/DMyAppVersion=0.0.0" installer\NicoloMES-Server.iss 2>&1
+          if ($LASTEXITCODE -ne 0) { Fail-WithOutput "Compilazione installer server" $out }
           foreach ($script in Get-ChildItem server\windows\*.ps1) {
             $errors = $null
             [void][System.Management.Automation.Language.Parser]::ParseFile($script.FullName, [ref]$null, [ref]$errors)
