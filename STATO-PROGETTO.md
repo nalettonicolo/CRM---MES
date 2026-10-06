@@ -151,6 +151,7 @@ Non ancora provato: la pagina web dei tecnici dal browser con accesso reale (il 
 | 02/10/2026 | (su main) | G8 + OEE macchina + origine UE + MRP base + tema; migrazioni Neon; push `6cad42d` |
 | 02/10/2026 | `293f14f` (su main) | G9–G15 e contro: SdI HTTP, demo campo, SSO, locale/valuta, assistente IA, CAPA/taratura/presenze, Swagger, MRP avanzato, pack persistiti e planning web; migration Neon applicate; suite 623/623 |
 | 06/10/2026 | (prossimo commit) | GTIN di prodotto con cifra di controllo GS1 e unicità (`PUT /api/products/{id}/gtin`); modelli HACCP per tipologia (`GET`/`POST api/haccp/templates`) con pagina web; migrazione `AddProductGtin` applicata a Neon (additiva); suite 631/631 |
+| 06/10/2026 | (prossimo commit) | GTIN nelle schermate desktop e web del prodotto. **Strumento Layout (primo passo operativo):** l'Admin imposta etichetta, ordine, visibilità e obbligatorietà dei campi del modulo *Nuova richiesta* del Service dalla pagina `/layout`; il modulo legge la configurazione e blocca i campi obbligatori; API `GET/PUT api/layout/{schermata}`; migrazione `AddFormLayout` applicata a Neon (additiva). Da estendere: altre schermate, editor delle finestre modali del desktop |
 | 30/09/2026 | v1.6.0 | Installer da collegare in seguito; piattaforma web `/app/`; canali di accesso; basi server cliente e teleassistenza |
 | prossimo | - | Push del tree su main; poi restano solo contratto SdI, macchina fisica, G16 e IdP OIDC di produzione |
 

@@ -1,4 +1,4 @@
-namespace CrmMes.Web.Services;
+﻿namespace CrmMes.Web.Services;
 
 /// <summary>The web menu: an entry appears when the page exists on the web, the Admin shows its area on
 /// the web (Canali di accesso) and the role may use it. Areas that exist only in the desktop program so far
@@ -51,6 +51,7 @@ public static class Navigation
         new("maintenance", "Manutenzione", "manutenzione", "Produzione"),
         new("service", "Service post-vendita", "service", "Produzione"),
         new("energy-monitoring", "Monitoraggio energetico", "energia", "Produzione"),
+        new("users", "Layout dei moduli", "layout", "Amministrazione", ["Admin"]),
         new("haccp", "HACCP", "haccp", "Qualità"),
         new("site-work", "Rapportini cantiere", "cantiere", "Produzione"),
         new("panel-verification", "Verifica quadri", "verifica-quadri", "Produzione"),

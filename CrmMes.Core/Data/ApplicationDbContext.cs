@@ -1,4 +1,4 @@
-using CrmMes.Core.Models;
+﻿using CrmMes.Core.Models;
 using Microsoft.EntityFrameworkCore;
 
 namespace CrmMes.Core.Data;
@@ -81,6 +81,7 @@ public class ApplicationDbContext : DbContext
     public DbSet<MachineConnection> MachineConnections => Set<MachineConnection>();
     public DbSet<MachineEvent> MachineEvents => Set<MachineEvent>();
     public DbSet<EnergyProject> EnergyProjects => Set<EnergyProject>();
+    public DbSet<CrmMes.Core.Layout.FormFieldSetting> FormFieldSettings => Set<CrmMes.Core.Layout.FormFieldSetting>();
     public DbSet<WarehouseLocation> WarehouseLocations => Set<WarehouseLocation>();
     public DbSet<LocationStock> LocationStocks => Set<LocationStock>();
     public DbSet<InventorySession> InventorySessions => Set<InventorySession>();
@@ -727,6 +728,15 @@ public class ApplicationDbContext : DbContext
             entity.Property(e => e.AlarmText).HasMaxLength(200);
             entity.Property(e => e.WorkOrderCode).HasMaxLength(50);
             entity.Property(e => e.EnergyKwh).HasColumnType("numeric(18,3)");
+        });
+
+        modelBuilder.Entity<CrmMes.Core.Layout.FormFieldSetting>(entity =>
+        {
+            entity.HasIndex(f => new { f.Screen, f.FieldKey }).IsUnique();
+            entity.Property(f => f.Screen).HasMaxLength(100);
+            entity.Property(f => f.FieldKey).HasMaxLength(100);
+            entity.Property(f => f.Label).HasMaxLength(120);
+            entity.Property(f => f.UpdatedBy).HasMaxLength(200);
         });
 
         modelBuilder.Entity<EnergyProject>(entity =>

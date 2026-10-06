@@ -1,0 +1,52 @@
+namespace CrmMes.Core.Layout;
+
+/// <summary>Impostazioni di un campo di una schermata, modificabili dall'Admin dallo strumento Layout:
+/// etichetta mostrata, ordine, visibilità e obbligatorietà. Le schermate che usano il modello hanno un
+/// insieme di campi di default nel codice (<see cref="FormLayoutRegistry"/>); una riga salvata sovrascrive
+/// solo ciò che l'Admin ha cambiato.</summary>
+public class FormFieldSetting
+{
+    public Guid Id { get; set; } = Guid.NewGuid();
+
+    /// <summary>Chiave della schermata, es. "service.request".</summary>
+    public string Screen { get; set; } = string.Empty;
+
+    /// <summary>Chiave del campo dentro la schermata, es. "subject".</summary>
+    public string FieldKey { get; set; } = string.Empty;
+
+    /// <summary>Etichetta personalizzata; null = etichetta di default.</summary>
+    public string? Label { get; set; }
+
+    public int Order { get; set; }
+    public bool Visible { get; set; } = true;
+    public bool Required { get; set; }
+
+    public string? UpdatedBy { get; set; }
+    public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
+}
+
+/// <summary>Campo di default di una schermata: il punto di partenza prima di qualunque personalizzazione.</summary>
+public sealed record FormFieldDefault(string Key, string DefaultLabel, int Order, bool Required, bool CanHide);
+
+/// <summary>Schermate che lo strumento Layout sa gestire. Aggiungerne una significa dichiararne i campi qui
+/// e farla leggere dalla propria pagina con il servizio di layout.</summary>
+public static class FormLayoutRegistry
+{
+    public const string ServiceRequest = "service.request";
+
+    public static readonly IReadOnlyDictionary<string, IReadOnlyList<FormFieldDefault>> Screens =
+        new Dictionary<string, IReadOnlyList<FormFieldDefault>>
+        {
+            [ServiceRequest] =
+            [
+                new("subject", "Oggetto", 1, Required: true, CanHide: false),
+                new("description", "Descrizione", 2, Required: false, CanHide: true),
+                new("priority", "Priorità", 3, Required: true, CanHide: false),
+                new("channel", "Canale", 4, Required: true, CanHide: false),
+                new("requestedBy", "Richiesta da", 5, Required: false, CanHide: true),
+                new("contactInfo", "Contatto", 6, Required: false, CanHide: true),
+            ],
+        };
+
+    public static bool IsKnown(string screen) => Screens.ContainsKey(screen);
+}

@@ -1,0 +1,191 @@
+@page "/layout"
+@inject Api Api
+@inject Session Session
+
+<PageTitle>Layout dei moduli · Nicolò MES</PageTitle>
+
+<div class="page-head">
+    <div>
+        <div class="eyebrow">Amministrazione</div>
+        <h1>Layout dei moduli</h1>
+        <p class="sub">Scegli come appaiono i campi di un modulo: etichetta, ordine, visibilità e obbligatorietà. Le modifiche valgono per tutti gli utenti.</p>
+    </div>
+</div>
+
+@if (_error is not null)
+{
+    <div class="alert" role="alert">@_error</div>
+}
+@if (_info is not null)
+{
+    <div class="success" role="status">@_info</div>
+}
+
+@if (!IsAdmin)
+{
+    <div class="card state"><strong>Solo amministratore</strong>Le impostazioni dei moduli le modifica l'Admin.</div>
+}
+else
+{
+    <div class="card card-pad stack">
+        <label>Modulo
+            <select aria-label="Modulo da configurare" @onchange="ScreenChangedAsync">
+                @foreach (var (key, name) in Screens)
+                {
+                    <option value="@key" selected="@(key == _screen)">@name</option>
+                }
+            </select>
+        </label>
+
+        @if (_layout is null)
+        {
+            <div class="state">@Labels.Loading</div>
+        }
+        else
+        {
+            <div class="table-wrap">
+                <table class="cards">
+                    <thead><tr><th>Ordine</th><th>Campo (predefinito)</th><th>Etichetta mostrata</th><th>Visibile</th><th>Obbligatorio</th></tr></thead>
+                    <tbody>
+                        @foreach (var f in _fields)
+                        {
+                            <tr>
+                                <td data-label="Ordine"><input type="number" min="1" @bind="f.Order" aria-label="Ordine di @f.DefaultLabel" style="width:80px" /></td>
+                                <td data-label="Campo" class="muted">@f.DefaultLabel</td>
+                                <td data-label="Etichetta"><input @bind="f.Label" aria-label="Etichetta di @f.DefaultLabel" /></td>
+                                <td data-label="Visibile">
+                                    <input type="checkbox" @bind="f.Visible" disabled="@(!f.CanHide)" aria-label="Visibile: @f.DefaultLabel" />
+                                    @if (!f.CanHide) {<div class="small muted">sempre visibile</div>}
+                                </td>
+                                <td data-label="Obbligatorio">
+                                    <input type="checkbox" @bind="f.Required" disabled="@(f.Key == "subject")" aria-label="Obbligatorio: @f.DefaultLabel" />
+                                    @if (f.Key == "subject") {<div class="small muted">sempre obbligatorio</div>}
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+            <div class="actions">
+                <button @onclick="SaveAsync" disabled="@_busy">@(_busy ? "Salvataggio..." : "Salva layout")</button>
+                <button class="secondary" @onclick="ResetAsync" disabled="@_busy">Ripristina i valori predefiniti</button>
+            </div>
+        }
+    </div>
+}
+
+@code {
+    private static readonly (string Key, string Name)[] Screens = [("service.request", "Nuova richiesta di assistenza (Service)")];
+
+    private string _screen = "service.request";
+    private LayoutScreen? _layout;
+    private List<EditableField> _fields = [];
+    private string? _error;
+    private string? _info;
+    private bool _busy;
+
+    private bool IsAdmin => Session.Role == "Admin";
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (IsAdmin)
+        {
+            await LoadAsync();
+        }
+    }
+
+    private async Task ScreenChangedAsync(ChangeEventArgs e)
+    {
+        _screen = e.Value?.ToString() ?? _screen;
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        _error = null;
+        _info = null;
+        try
+        {
+            _layout = await Api.GetAsync<LayoutScreen>($"api/layout/{_screen}");
+            _fields = _layout.Fields.OrderBy(f => f.Order).Select(f => new EditableField(f)).ToList();
+        }
+        catch (ApiException exception)
+        {
+            _error = exception.Message;
+        }
+    }
+
+    private async Task SaveAsync()
+    {
+        _busy = true;
+        _error = null;
+        _info = null;
+        try
+        {
+            var body = new
+            {
+                fields = _fields.Select(f => new
+                {
+                    fieldKey = f.Key,
+                    label = string.IsNullOrWhiteSpace(f.Label) || f.Label == f.DefaultLabel ? null : f.Label.Trim(),
+                    order = f.Order,
+                    visible = f.Visible,
+                    required = f.Required,
+                }).ToList(),
+            };
+            _layout = await Api.PutAsync<LayoutScreen>($"api/layout/{_screen}", body);
+            _fields = _layout.Fields.OrderBy(f => f.Order).Select(f => new EditableField(f)).ToList();
+            _info = "Layout salvato.";
+        }
+        catch (ApiException exception)
+        {
+            _error = exception.Message;
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+
+    private async Task ResetAsync()
+    {
+        _busy = true;
+        try
+        {
+            _layout = await Api.PutAsync<LayoutScreen>($"api/layout/{_screen}", new { fields = Array.Empty<object>() });
+            _fields = _layout.Fields.OrderBy(f => f.Order).Select(f => new EditableField(f)).ToList();
+            _info = "Valori predefiniti ripristinati.";
+        }
+        catch (ApiException exception)
+        {
+            _error = exception.Message;
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+
+    /// <summary>Copia modificabile di un campo: i record non si cambiano in place.</summary>
+    private sealed class EditableField
+    {
+        public EditableField(LayoutField f)
+        {
+            Key = f.Key;
+            DefaultLabel = f.DefaultLabel.Length > 0 ? f.DefaultLabel : f.Label;
+            Label = f.Label;
+            Order = f.Order;
+            Visible = f.Visible;
+            Required = f.Required;
+            CanHide = f.CanHide;
+        }
+
+        public string Key { get; }
+        public string DefaultLabel { get; }
+        public string Label { get; set; }
+        public int Order { get; set; }
+        public bool Visible { get; set; }
+        public bool Required { get; set; }
+        public bool CanHide { get; }
+    }
+}

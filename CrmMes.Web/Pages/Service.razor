@@ -163,24 +163,42 @@
                         }
                     </select>
                 </label>
-                <label>Oggetto<input @bind="_newRequestSubject" aria-label="Oggetto della richiesta" /></label>
-                <label>Priorità
-                    <select @bind="_newRequestPriority" aria-label="Priorità">
-                        <option value="Normal">Normale</option>
-                        <option value="Urgente">Urgente</option>
-                    </select>
-                </label>
-                <label>Canale
-                    <select @bind="_newRequestChannel" aria-label="Canale">
-                        <option value="Phone">Telefono</option>
-                        <option value="Email">Email</option>
-                        <option value="Portal">Portale</option>
-                    </select>
-                </label>
-                <label>Richiesta da<input @bind="_newRequestedBy" /></label>
-                <label>Contatto<input @bind="_newContactInfo" /></label>
+                @foreach (var f in _requestFields.Where(f => f.Visible).OrderBy(f => f.Order))
+                {
+                    switch (f.Key)
+                    {
+                        case "subject":
+                            <label>@LabelOf(f)<input @bind="_newRequestSubject" aria-label="Oggetto della richiesta" /></label>
+                            break;
+                        case "priority":
+                            <label>@LabelOf(f)
+                                <select @bind="_newRequestPriority" aria-label="Priorità">
+                                    <option value="Normal">Normale</option>
+                                    <option value="Urgente">Urgente</option>
+                                </select>
+                            </label>
+                            break;
+                        case "channel":
+                            <label>@LabelOf(f)
+                                <select @bind="_newRequestChannel" aria-label="Canale">
+                                    <option value="Phone">Telefono</option>
+                                    <option value="Email">Email</option>
+                                    <option value="Portal">Portale</option>
+                                </select>
+                            </label>
+                            break;
+                        case "requestedBy":
+                            <label>@LabelOf(f)<input @bind="_newRequestedBy" /></label>
+                            break;
+                        case "contactInfo":
+                            <label>@LabelOf(f)<input @bind="_newContactInfo" /></label>
+                            break;
+                        case "description":
+                            <label>@LabelOf(f)<textarea class="textarea" @bind="_newRequestDescription"></textarea></label>
+                            break;
+                    }
+                }
             </div>
-            <label>Descrizione<textarea class="textarea" @bind="_newRequestDescription"></textarea></label>
             <div class="actions"><button @onclick="CreateRequestAsync" disabled="@_busy">Apri richiesta</button></div>
         </div>
     }
@@ -291,9 +309,37 @@ else
 
     private bool CanManage => Session.Role is "Admin" or "Management" or "Sales";
 
+    /// <summary>Campi del modulo "Nuova richiesta" come li ha impostati l'Admin nello strumento Layout.
+    /// Prima della risposta del server valgono i default, così il modulo è sempre utilizzabile.</summary>
+    private List<LayoutField> _requestFields =
+    [
+        new("subject", "Oggetto", 1, true, true, false),
+        new("description", "Descrizione", 2, true, false, true),
+        new("priority", "Priorità", 3, true, true, false),
+        new("channel", "Canale", 4, true, true, false),
+        new("requestedBy", "Richiesta da", 5, true, false, true),
+        new("contactInfo", "Contatto", 6, true, false, true),
+    ];
+
+    private static string LabelOf(LayoutField f) => f.Required ? f.Label + " *" : f.Label;
+
+    private async Task LoadRequestLayoutAsync()
+    {
+        try
+        {
+            var screen = await Api.GetAsync<LayoutScreen>("api/layout/service.request");
+            _requestFields = screen.Fields;
+        }
+        catch (ApiException)
+        {
+            // Il modulo resta con i default: un problema di layout non deve bloccare l'apertura delle richieste.
+        }
+    }
+
     protected override async Task OnInitializedAsync()
     {
         await LoadRequestsAsync();
+        await LoadRequestLayoutAsync();
         try
         {
             _machines = await Api.GetAsync<List<InstalledMachine>>("api/service/machines");
@@ -357,9 +403,22 @@ else
 
     private async Task CreateRequestAsync()
     {
-        if (_newRequestMachineId is null || string.IsNullOrWhiteSpace(_newRequestSubject))
+        if (_newRequestMachineId is null)
         {
-            _error = "Scegli la macchina e scrivi l'oggetto della richiesta.";
+            _error = "Scegli la macchina installata.";
+            return;
+        }
+
+        var values = new Dictionary<string, string?>
+        {
+            ["subject"] = _newRequestSubject, ["description"] = _newRequestDescription, ["requestedBy"] = _newRequestedBy,
+            ["contactInfo"] = _newContactInfo, ["priority"] = _newRequestPriority, ["channel"] = _newRequestChannel,
+        };
+        var missing = _requestFields.Where(f => f.Visible && f.Required && string.IsNullOrWhiteSpace(values.GetValueOrDefault(f.Key)))
+            .Select(LabelOf).ToList();
+        if (missing.Count > 0)
+        {
+            _error = "Compila i campi obbligatori: " + string.Join(", ", missing) + ".";
             return;
         }
 
