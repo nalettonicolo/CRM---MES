@@ -1,5 +1,6 @@
 using System.Security.Claims;
 using CrmMes.Core.Data;
+using CrmMes.Api.Services;
 using CrmMes.Core.Models;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -59,6 +60,7 @@ public class AttendanceController : ControllerBase
         };
 
         _dbContext.AttendancePunches.Add(punch);
+        AuditTrail.Add(_dbContext, User, "AttendancePunched", "AttendancePunch", punch.Id, $"Timbratura {kind}.");
         await _dbContext.SaveChangesAsync(cancellationToken);
 
         var userName = await _dbContext.Users.AsNoTracking()

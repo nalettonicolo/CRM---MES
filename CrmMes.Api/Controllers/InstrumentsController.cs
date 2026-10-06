@@ -1,4 +1,5 @@
 using System.Security.Claims;
+using CrmMes.Api.Services;
 using CrmMes.Core.Data;
 using CrmMes.Core.Models;
 using Microsoft.AspNetCore.Authorization;
@@ -89,6 +90,7 @@ public class InstrumentsController : ControllerBase
         };
 
         _dbContext.MeasuringInstruments.Add(instrument);
+        AuditTrail.Add(_dbContext, User, "InstrumentCreated", "MeasuringInstrument", instrument.Id, $"Strumento {instrument.Code} creato.");
         await _dbContext.SaveChangesAsync(cancellationToken);
 
         return Created($"api/instruments/{instrument.Id}", ToResponse(instrument));
@@ -123,6 +125,7 @@ public class InstrumentsController : ControllerBase
         instrument.Notes = string.IsNullOrWhiteSpace(request.Notes) ? null : request.Notes.Trim();
         instrument.NextCalibrationDue = request.NextCalibrationDue;
 
+        AuditTrail.Add(_dbContext, User, "InstrumentUpdated", "MeasuringInstrument", instrument.Id, $"Strumento {instrument.Code} modificato.");
         await _dbContext.SaveChangesAsync(cancellationToken);
         return Ok(ToResponse(instrument));
     }
@@ -138,6 +141,7 @@ public class InstrumentsController : ControllerBase
         }
 
         instrument.IsActive = false;
+        AuditTrail.Add(_dbContext, User, "InstrumentDeactivated", "MeasuringInstrument", instrument.Id, $"Strumento {instrument.Code} disattivato.");
         await _dbContext.SaveChangesAsync(cancellationToken);
         return NoContent();
     }
@@ -180,6 +184,7 @@ public class InstrumentsController : ControllerBase
         instrument.LastCalibrationAt = calibratedAt;
         instrument.NextCalibrationDue = nextDue;
 
+        AuditTrail.Add(_dbContext, User, "InstrumentCalibrated", "MeasuringInstrument", instrument.Id, $"Taratura registrata per {instrument.Code}.");
         await _dbContext.SaveChangesAsync(cancellationToken);
 
         return Ok(new InstrumentCalibrationResponse(
