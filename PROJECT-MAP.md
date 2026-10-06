@@ -1,6 +1,6 @@
 # Mappa progetto — Nicolò MES
 
-Aggiornata: 2026-10-01.
+Aggiornata: 2026-10-06 (pulizia cartelle, vedi sezione in fondo).
 
 Questa è la mappa di **cosa c'è nel repository oggi**, non lo storico dell'MVP 2025. Lo stato funzionale (moduli, gap, versioni) sta in [STATO-PROGETTO.md](STATO-PROGETTO.md); il diario tecnico in [RIEPILOGO-SVILUPPO.md](RIEPILOGO-SVILUPPO.md).
 
@@ -103,3 +103,19 @@ CI: `.github/workflows/build.yml`. Health: `GET /health`.
 | 81 test API, manca qualità/OEE | Suite completa; OEE, qualità, DDT, FatturaPA, ecc. sono nel prodotto |
 | `SkipLoginForTesting = false` prima dell'uso | Flag rimosso; Release ha sempre il login |
 | Metel "in arrivo" in attesa di un file reale | Modulo attivabile, parser e import coperti da test sintetici |
+
+
+## Pulizia del 6 ottobre 2026
+
+Verifica di cosa è necessario nella radice del repository.
+
+| Cartella / file | Esito | Motivo |
+|---|---|---|
+| `CrmMes.*` (API, Core, Desktop, Web, Console, Licensing, test) | Tenute | Prodotto |
+| `installer/`, `server/`, `scripts/` | Tenute | Installer, distribuzione server, gateway macchine |
+| `.github/`, `.vscode/`, `.claude/` | Tenute | CI, editor, impostazioni locali (`.claude` non tracciata) |
+| `public/`, `data/`, `package.json`, `package-lock.json` | **Rimosse** | Prototipo Node del 2025, non il prodotto. Recuperabili dalla storia git |
+| `node_modules/`, `publish/`, `publish-server/`, `installer-output/`, `tmp/` | **Rimosse dal disco** | Generate dalla build o dal prototipo; ignorate da git, si rigenerano |
+| `scripts/machine-gateway/__pycache__/` | **Rimossa** | Cache Python tracciata per errore |
+
+Dopo la pulizia la soluzione `CrmMes.sln` compila senza errori.
