@@ -1,7 +1,8 @@
-using System.Collections.ObjectModel;
+﻿using System.Collections.ObjectModel;
 using System.Globalization;
 using System.Windows;
 using System.Windows.Controls;
+using CrmMes.Desktop.Layout;
 
 namespace CrmMes.Desktop;
 
@@ -16,6 +17,8 @@ public partial class QuoteEditorWindow : Window
     private readonly ObservableCollection<QuoteLineRow> _lines = new();
 
     public bool Created { get; private set; }
+
+    private IReadOnlyList<LayoutFieldDto> _layout = [];
 
     public QuoteEditorWindow(ApiClient apiClient, QuoteDto? existing = null)
     {
@@ -45,6 +48,27 @@ public partial class QuoteEditorWindow : Window
         }
 
         Loaded += async (_, _) => await LoadListsAsync(existing?.CustomerId);
+        if (existing is null)
+        {
+            Loaded += async (_, _) => await LoadLayoutAsync();
+        }
+    }
+
+    /// <summary>Layout del preventivo in creazione: testata (cliente, validità, note) e colonne delle righe
+    /// (descrizione, quantità, prezzo, sconto) con etichette e obbligatorietà scelte dall'Admin.</summary>
+    private async Task LoadLayoutAsync()
+    {
+        _layout = await FormLayoutApplier.LoadAsync(_apiClient, "quote.new");
+        FormLayoutApplier.Apply(_layout,
+        [
+            new FieldBinding("customer", CustomerCombo, CustomerLabel),
+            new FieldBinding("validUntil", ValidUntilPicker, ValidUntilLabel),
+            new FieldBinding("notes", NotesBox, NotesLabel),
+            new FieldBinding("lineDescription", DescriptionBox, LineDescriptionLabel),
+            new FieldBinding("lineQuantity", QuantityBox, LineQuantityLabel),
+            new FieldBinding("linePrice", PriceBox, LinePriceLabel),
+            new FieldBinding("lineDiscount", DiscountBox, LineDiscountLabel),
+        ]);
     }
 
     private async Task LoadListsAsync(Guid? selectCustomerId)

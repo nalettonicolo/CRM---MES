@@ -1,4 +1,4 @@
-<Window x:Class="CrmMes.Desktop.LayoutEditorWindow"
+﻿<Window x:Class="CrmMes.Desktop.LayoutEditorWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         Title="Layout dei moduli" Icon="Assets/logo.ico" Width="900" Height="600"
@@ -21,6 +21,12 @@
                 <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Margin="0,0,0,10">
                     <TextBlock Text="Modulo" VerticalAlignment="Center" Foreground="{StaticResource TextSecondaryBrush}" Margin="0,0,10,0" />
                     <ComboBox x:Name="ScreenCombo" Width="360" DisplayMemberPath="Name" SelectionChanged="ScreenCombo_SelectionChanged" />
+                </StackPanel>
+                <StackPanel x:Name="AccessPanel" DockPanel.Dock="Bottom" Visibility="Collapsed" Margin="0,10,0,0">
+                    <TextBlock Text="Chi può modificare i layout, oltre all'Admin" Foreground="{StaticResource TextSecondaryBrush}" Margin="0,0,0,6" />
+                    <WrapPanel x:Name="RolesPanel" />
+                    <Button Style="{StaticResource SecondaryButton}" Content="Salva autorizzazioni" Width="170" Height="32"
+                            HorizontalAlignment="Left" Margin="0,8,0,0" Click="SaveAccess_Click" />
                 </StackPanel>
                 <ListView x:Name="FieldsList">
                     <ListView.View>

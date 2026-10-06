@@ -756,6 +756,7 @@ public class ApplicationDbContext : DbContext
 
         modelBuilder.Entity<CompanyProfile>(entity =>
         {
+            entity.Property(c => c.LayoutEditorRoles).HasMaxLength(200);
             entity.Property(c => c.CompanyName).HasMaxLength(250);
             entity.Property(c => c.VatNumber).HasMaxLength(40);
             entity.Property(c => c.Address).HasMaxLength(500);

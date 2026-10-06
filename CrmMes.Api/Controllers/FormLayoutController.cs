@@ -1,5 +1,6 @@
 ﻿using System.Security.Claims;
 using CrmMes.Core.Data;
+using CrmMes.Core.Models;
 using CrmMes.Core.Layout;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -9,12 +10,59 @@ namespace CrmMes.Api.Controllers;
 
 /// <summary>Strumento Layout: legge e salva l'ordine, l'etichetta, la visibilità e l'obbligatorietà dei campi
 /// delle schermate gestite. Leggere è aperto a tutti gli utenti autenticati (ogni schermata ne ha bisogno per
-/// mostrarsi); modificare è solo Admin. Un campo non personalizzato resta con i valori di default del codice.</summary>
+/// mostrarsi); modificare è riservato all'Admin e ai ruoli che l'Admin ha autorizzato. Un campo non personalizzato
+/// resta con i valori di default del codice.</summary>
 [ApiController]
 [Authorize]
 [Route("api/layout")]
 public class FormLayoutController(ApplicationDbContext db) : ControllerBase
 {
+    /// <summary>Chi può modificare i layout, per l'utente che chiede: serve ai client per mostrare o nascondere
+    /// i comandi di modifica. Aperto a tutti gli utenti autenticati.</summary>
+    [HttpGet("access")]
+    public async Task<ActionResult<LayoutAccessResponse>> GetAccess(CancellationToken cancellationToken = default)
+    {
+        var granted = await LoadGrantedRolesAsync(cancellationToken);
+        var role = User.FindFirstValue(ClaimTypes.Role);
+        return Ok(new LayoutAccessResponse(
+            FormLayoutAccess.CanEdit(role, string.Join(',', granted)),
+            granted,
+            FormLayoutAccess.GrantableRoles.ToList()));
+    }
+
+    /// <summary>Ruoli autorizzati a modificare i layout (solo Admin). Admin è sempre autorizzato e non va inviato.</summary>
+    [Authorize(Policy = "AdminOnly")]
+    [HttpPut("access")]
+    public async Task<ActionResult<LayoutAccessResponse>> SaveAccess(SaveLayoutAccessRequest request, CancellationToken cancellationToken = default)
+    {
+        var requested = request.Roles ?? [];
+        var unknown = requested.FirstOrDefault(r => !FormLayoutAccess.GrantableRoles.Contains(r));
+        if (unknown is not null)
+        {
+            return BadRequest(new { message = $"Il ruolo '{unknown}' non può essere autorizzato allo strumento Layout." });
+        }
+
+        var profile = await db.CompanyProfiles.FirstOrDefaultAsync(cancellationToken);
+        if (profile is null)
+        {
+            return Conflict(new { message = "Configura prima l'azienda (ragione sociale e settore)." });
+        }
+
+        var granted = FormLayoutAccess.Parse(FormLayoutAccess.Format(requested));
+        profile.LayoutEditorRoles = FormLayoutAccess.Format(granted);
+        profile.UpdatedAt = DateTime.UtcNow;
+        db.AuditLogs.Add(new AuditLog
+        {
+            Action = "LayoutAccessSaved",
+            EntityType = "CompanyProfile",
+            EntityId = profile.Id,
+            UserName = User.FindFirstValue(ClaimTypes.Name),
+            Details = $"Ruoli che possono modificare i layout: {(granted.Count == 0 ? "solo Admin" : profile.LayoutEditorRoles)}"
+        });
+        await db.SaveChangesAsync(cancellationToken);
+        return Ok(new LayoutAccessResponse(true, granted.ToList(), FormLayoutAccess.GrantableRoles.ToList()));
+    }
+
     /// <summary>Elenco di tutte le schermate gestite dallo strumento Layout, con i loro campi di default.</summary>
     [HttpGet]
     public ActionResult<List<LayoutScreenResponse>> List()
@@ -37,10 +85,15 @@ public class FormLayoutController(ApplicationDbContext db) : ControllerBase
         return Ok(Merge(screen, saved));
     }
 
-    [Authorize(Policy = "AdminOnly")]
     [HttpPut("{screen}")]
     public async Task<ActionResult<LayoutScreenResponse>> Save(string screen, SaveLayoutRequest request, CancellationToken cancellationToken = default)
     {
+        var granted = await LoadGrantedRolesAsync(cancellationToken);
+        if (!FormLayoutAccess.CanEdit(User.FindFirstValue(ClaimTypes.Role), string.Join(',', granted)))
+        {
+            return Forbid();
+        }
+
         if (!FormLayoutRegistry.IsKnown(screen))
         {
             return NotFound(new { message = "Schermata non gestita dallo strumento Layout." });
@@ -90,6 +143,12 @@ public class FormLayoutController(ApplicationDbContext db) : ControllerBase
         return Ok(Merge(screen, saved));
     }
 
+    private async Task<List<string>> LoadGrantedRolesAsync(CancellationToken cancellationToken)
+    {
+        var stored = await db.CompanyProfiles.AsNoTracking().Select(p => p.LayoutEditorRoles).FirstOrDefaultAsync(cancellationToken);
+        return FormLayoutAccess.Parse(stored).ToList();
+    }
+
     /// <summary>Unisce i default del codice con le personalizzazioni salvate, in ordine.</summary>
     internal static LayoutScreenResponse Merge(string screen, IReadOnlyList<FormFieldSetting> saved)
     {
@@ -118,6 +177,10 @@ public sealed record LayoutFieldResponse(
     string Key, string DefaultLabel, string Label, int Order, bool Visible, bool Required, bool CanHide, bool DefaultRequired);
 
 public sealed record LayoutScreenResponse(string Screen, string Name, List<LayoutFieldResponse> Fields);
+
+public sealed record LayoutAccessResponse(bool CanEdit, List<string> GrantedRoles, List<string> GrantableRoles);
+
+public sealed record SaveLayoutAccessRequest(List<string>? Roles);
 
 public sealed record SaveLayoutRequest(List<SaveLayoutFieldRequest>? Fields);
 

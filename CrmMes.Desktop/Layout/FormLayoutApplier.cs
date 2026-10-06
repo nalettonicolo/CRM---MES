@@ -1,11 +1,12 @@
-using System.Windows;
+﻿using System.Windows;
 using System.Windows.Controls;
 
 namespace CrmMes.Desktop.Layout;
 
-/// <summary>Un controllo di una finestra associato a un campo dello strumento Layout. L'etichetta è il
-/// <see cref="TextBlock"/> che lo precede nello stesso pannello: non serve nominarla a parte.</summary>
-public sealed record FieldBinding(string Key, FrameworkElement Control);
+/// <summary>Un controllo di una finestra associato a un campo dello strumento Layout. Se <paramref name="Label"/> manca,
+/// l'etichetta è il <see cref="TextBlock"/> che precede il controllo nello stesso pannello; le righe di un elenco
+/// (intestazioni di colonna) la passano esplicitamente.</summary>
+public sealed record FieldBinding(string Key, FrameworkElement Control, TextBlock? Label = null);
 
 /// <summary>Applica alle finestre WPF la configurazione salvata dall'Admin nello strumento Layout: nasconde i
 /// campi, cambia l'etichetta e segna gli obbligatori. Le stesse regole del web, per la stessa schermata.</summary>
@@ -40,7 +41,7 @@ public static class FormLayoutApplier
             }
 
             binding.Control.Visibility = field.Visible ? Visibility.Visible : Visibility.Collapsed;
-            var label = PrecedingLabel(binding.Control);
+            var label = binding.Label ?? PrecedingLabel(binding.Control);
             if (label is not null)
             {
                 label.Text = LabelText(field);

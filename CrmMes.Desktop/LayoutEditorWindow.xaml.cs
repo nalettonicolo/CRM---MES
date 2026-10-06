@@ -1,4 +1,4 @@
-using System.ComponentModel;
+﻿using System.ComponentModel;
 using System.Net.Http;
 using System.Windows;
 using System.Windows.Controls;
@@ -66,6 +66,43 @@ public partial class LayoutEditorWindow : Window
             var screens = await _apiClient.GetLayoutScreensAsync();
             ScreenCombo.ItemsSource = screens;
             ScreenCombo.SelectedIndex = screens.Count > 0 ? 0 : -1;
+            if (_apiClient.CurrentRole == "Admin")
+            {
+                await LoadAccessAsync();
+            }
+        }
+        catch (Exception exception) when (exception is HttpRequestException or InvalidOperationException)
+        {
+            ErrorText.Text = exception.Message;
+        }
+    }
+
+    /// <summary>Solo l'Admin vede la scelta dei ruoli autorizzati: le regole le fa rispettare comunque il server.</summary>
+    private async Task LoadAccessAsync()
+    {
+        var access = await _apiClient.GetLayoutAccessAsync();
+        RolesPanel.Children.Clear();
+        foreach (var role in access.GrantableRoles)
+        {
+            RolesPanel.Children.Add(new CheckBox
+            {
+                Content = role,
+                Tag = role,
+                IsChecked = access.GrantedRoles.Contains(role),
+                Margin = new Thickness(0, 0, 18, 0),
+            });
+        }
+
+        AccessPanel.Visibility = Visibility.Visible;
+    }
+
+    private async void SaveAccess_Click(object sender, RoutedEventArgs e)
+    {
+        var roles = RolesPanel.Children.OfType<CheckBox>().Where(c => c.IsChecked == true).Select(c => (string)c.Tag).ToList();
+        try
+        {
+            await _apiClient.SaveLayoutAccessAsync(roles);
+            ErrorText.Text = "Autorizzazioni salvate.";
         }
         catch (Exception exception) when (exception is HttpRequestException or InvalidOperationException)
         {

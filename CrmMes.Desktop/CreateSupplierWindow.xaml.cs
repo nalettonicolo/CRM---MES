@@ -1,4 +1,5 @@
-using System.Windows;
+﻿using System.Windows;
+using CrmMes.Desktop.Layout;
 
 namespace CrmMes.Desktop;
 
@@ -8,6 +9,8 @@ public partial class CreateSupplierWindow : Window
     private readonly Guid? _editingSupplierId;
 
     public bool Created { get; private set; }
+
+    private IReadOnlyList<LayoutFieldDto> _layout = [];
 
     /// <summary>Creation mode.</summary>
     public CreateSupplierWindow(ApiClient apiClient) : this(apiClient, existing: null)
@@ -20,6 +23,11 @@ public partial class CreateSupplierWindow : Window
     {
         InitializeComponent();
         _apiClient = apiClient;
+
+        if (existing is null)
+        {
+            Loaded += async (_, _) => await LoadLayoutAsync();
+        }
 
         if (existing is not null)
         {
@@ -36,6 +44,21 @@ public partial class CreateSupplierWindow : Window
         }
     }
 
+    /// <summary>Layout del modulo fornitore in creazione: etichette, visibilità e obbligatorietà dall'Admin.
+    /// Nome e codice restano sempre obbligatori: il server li richiede comunque.</summary>
+    private async Task LoadLayoutAsync()
+    {
+        _layout = await FormLayoutApplier.LoadAsync(_apiClient, "suppliers.new");
+        FormLayoutApplier.Apply(_layout,
+        [
+            new FieldBinding("name", NameBox),
+            new FieldBinding("code", CodeBox),
+            new FieldBinding("email", EmailBox),
+            new FieldBinding("phone", PhoneBox),
+            new FieldBinding("website", WebsiteBox),
+        ]);
+    }
+
     private async void Create_Click(object sender, RoutedEventArgs e)
     {
         var name = NameBox.Text.Trim();
@@ -45,6 +68,24 @@ public partial class CreateSupplierWindow : Window
         {
             ErrorText.Text = "Nome e codice sono obbligatori.";
             return;
+        }
+
+        if (_editingSupplierId is null)
+        {
+            var missing = FormLayoutApplier.Missing(_layout, key => key switch
+            {
+                "name" => true,
+                "code" => true,
+                "email" => !string.IsNullOrWhiteSpace(EmailBox.Text),
+                "phone" => !string.IsNullOrWhiteSpace(PhoneBox.Text),
+                "website" => !string.IsNullOrWhiteSpace(WebsiteBox.Text),
+                _ => true,
+            });
+            if (missing.Count > 0)
+            {
+                ErrorText.Text = "Compila i campi obbligatori: " + string.Join(", ", missing) + ".";
+                return;
+            }
         }
 
         CreateButton.IsEnabled = false;

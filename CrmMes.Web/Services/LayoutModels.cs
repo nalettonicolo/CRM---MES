@@ -8,3 +8,6 @@ public sealed record LayoutField(string Key, string Label, int Order, bool Visib
 }
 
 public sealed record LayoutScreen(string Screen, string Name, List<LayoutField> Fields);
+
+/// <summary>Chi può modificare i layout: l'utente corrente, i ruoli autorizzati e quelli che l'Admin può autorizzare.</summary>
+public sealed record LayoutAccess(bool CanEdit, List<string> GrantedRoles, List<string> GrantableRoles);

@@ -39,6 +39,10 @@ public static class FormLayoutRegistry
     public const string ProductNew = "products.new";
     public const string MaterialNew = "materials.new";
     public const string EquipmentNew = "equipment.new";
+    public const string SupplierNew = "suppliers.new";
+    public const string PurchaseOrderNew = "purchaseOrder.new";
+    public const string QuoteNew = "quote.new";
+    public const string InvoiceNew = "invoice.new";
 
     /// <summary>Nome leggibile della schermata, per l'elenco nello strumento Layout.</summary>
     public static readonly IReadOnlyDictionary<string, string> Names = new Dictionary<string, string>
@@ -50,6 +54,10 @@ public static class FormLayoutRegistry
         [ProductNew] = "Nuovo prodotto (distinta e cicli)",
         [MaterialNew] = "Nuovo materiale (magazzino)",
         [EquipmentNew] = "Nuova macchina (manutenzione)",
+        [SupplierNew] = "Nuovo fornitore (acquisti)",
+        [PurchaseOrderNew] = "Nuovo ordine fornitore (acquisti)",
+        [QuoteNew] = "Nuovo preventivo (vendite)",
+        [InvoiceNew] = "Nuova fattura elettronica (testata)",
     };
 
     public static readonly IReadOnlyDictionary<string, IReadOnlyList<FormFieldDefault>> Screens =
@@ -60,6 +68,38 @@ public static class FormLayoutRegistry
                 new("code", "Codice", 1, Required: true, CanHide: false),
                 new("name", "Nome", 2, Required: true, CanHide: false),
                 new("description", "Descrizione", 3, Required: false, CanHide: true),
+            ],
+            [InvoiceNew] =
+            [
+                new("customer", "Cliente", 1, Required: true, CanHide: false),
+                new("payment", "Pagamento", 2, Required: false, CanHide: true),
+                new("dueDate", "Scadenza", 3, Required: false, CanHide: true),
+                new("notes", "Causale / note", 4, Required: false, CanHide: true),
+            ],
+            [QuoteNew] =
+            [
+                new("customer", "Cliente", 1, Required: true, CanHide: false),
+                new("validUntil", "Valido fino al", 2, Required: false, CanHide: true),
+                new("notes", "Note per il cliente", 3, Required: false, CanHide: true),
+                new("lineDescription", "Descrizione", 4, Required: true, CanHide: false),
+                new("lineQuantity", "Q.tà", 5, Required: true, CanHide: false),
+                new("linePrice", "Prezzo unit. €", 6, Required: true, CanHide: false),
+                new("lineDiscount", "Sconto %", 7, Required: false, CanHide: true),
+            ],
+            [PurchaseOrderNew] =
+            [
+                new("supplier", "Fornitore", 1, Required: true, CanHide: false),
+                new("itemCode", "Codice", 2, Required: true, CanHide: false),
+                new("itemQuantity", "Quantità", 3, Required: true, CanHide: false),
+                new("itemPrice", "Prezzo", 4, Required: false, CanHide: true),
+            ],
+            [SupplierNew] =
+            [
+                new("name", "Nome", 1, Required: true, CanHide: false),
+                new("code", "Codice", 2, Required: true, CanHide: false),
+                new("email", "Email", 3, Required: false, CanHide: true),
+                new("phone", "Telefono", 4, Required: false, CanHide: true),
+                new("website", "Sito web / catalogo", 5, Required: false, CanHide: true),
             ],
             [MaterialNew] =
             [

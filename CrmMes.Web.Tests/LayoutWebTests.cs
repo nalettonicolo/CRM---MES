@@ -1,4 +1,4 @@
-using Bunit;
+﻿using Bunit;
 using CrmMes.Web.Pages;
 using CrmMes.Web.Services;
 using Microsoft.Extensions.DependencyInjection;
@@ -63,18 +63,38 @@ public class LayoutWebTests : TestContext
     }
 
     [Fact]
-    public async Task LayoutEditor_IsAdminOnly()
+    public async Task LayoutEditor_IsReadOnly_ForRolesNotAuthorisedByTheAdmin()
     {
         await LogInAsync("Operator");
+        _server.OnJson("GET", "/api/layout/access", new LayoutAccess(false, [], ["Management", "Sales"]));
+
         var page = RenderComponent<CrmMes.Web.Pages.Layout>();
-        Assert.Contains("Solo amministratore", page.Markup);
-        Assert.Empty(_server.Requests);
+        page.WaitForAssertion(() => Assert.Contains("Sola lettura", page.Markup));
+        Assert.DoesNotContain("Salva layout", page.Markup);
+        Assert.DoesNotContain("Chi può modificare i layout", page.Markup);
+        Assert.DoesNotContain(_server.Requests, r => r.Request.Method == HttpMethod.Put);
+    }
+
+    [Fact]
+    public async Task LayoutEditor_IsOpenToRolesAuthorisedByTheAdmin()
+    {
+        await LogInAsync("Sales");
+        _server.OnJson("GET", "/api/layout/access", new LayoutAccess(true, ["Sales"], ["Management", "Sales"]));
+        _server.OnJson("GET", "/api/layout/service.request", new LayoutScreen("service.request", "Nuova richiesta di assistenza (Service)",
+        [
+            F("subject", "Oggetto", 1, true, true, false),
+        ]));
+
+        var page = RenderComponent<CrmMes.Web.Pages.Layout>();
+        page.WaitForAssertion(() => Assert.Contains("Salva layout", page.Markup));
+        Assert.DoesNotContain("Chi può modificare i layout", page.Markup);
     }
 
     [Fact]
     public async Task LayoutEditor_SavesTheChangedLabelAndOrder()
     {
         await LogInAsync("Admin");
+        _server.OnJson("GET", "/api/layout/access", new LayoutAccess(true, [], ["Management", "Sales"]));
         _server.OnJson("GET", "/api/layout/service.request", new LayoutScreen("service.request", "Nuova richiesta di assistenza (Service)",
         [
             F("subject", "Oggetto", 1, true, true, false),

@@ -1,5 +1,6 @@
-using System.Collections.ObjectModel;
+﻿using System.Collections.ObjectModel;
 using System.Windows;
+using CrmMes.Desktop.Layout;
 
 namespace CrmMes.Desktop;
 
@@ -10,6 +11,8 @@ public partial class CreatePurchaseOrderWindow : Window
     private readonly ObservableCollection<ItemRow> _items = new();
 
     public bool Created { get; private set; }
+
+    private IReadOnlyList<LayoutFieldDto> _layout = [];
 
     /// <summary>Creation mode.</summary>
     public CreatePurchaseOrderWindow(ApiClient apiClient, IReadOnlyList<SupplierDto> suppliers)
@@ -23,6 +26,11 @@ public partial class CreatePurchaseOrderWindow : Window
         InitializeComponent();
         _apiClient = apiClient;
         SupplierCombo.ItemsSource = suppliers;
+
+        if (existing is null)
+        {
+            Loaded += async (_, _) => await LoadLayoutAsync();
+        }
 
         if (existing is not null)
         {
@@ -41,6 +49,20 @@ public partial class CreatePurchaseOrderWindow : Window
         }
 
         ItemsList.ItemsSource = _items;
+    }
+
+    /// <summary>Layout dell'ordine in creazione: fornitore, e per le righe le intestazioni di colonna
+    /// (codice, quantità, prezzo) con visibilità e obbligatorietà scelte dall'Admin.</summary>
+    private async Task LoadLayoutAsync()
+    {
+        _layout = await FormLayoutApplier.LoadAsync(_apiClient, "purchaseOrder.new");
+        FormLayoutApplier.Apply(_layout,
+        [
+            new FieldBinding("supplier", SupplierCombo, SupplierLabel),
+            new FieldBinding("itemCode", ItemCodeBox, ItemCodeLabel),
+            new FieldBinding("itemQuantity", ItemQuantityBox, ItemQuantityLabel),
+            new FieldBinding("itemPrice", ItemPriceBox, ItemPriceLabel),
+        ]);
     }
 
     private void AddItem_Click(object sender, RoutedEventArgs e)

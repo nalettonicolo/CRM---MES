@@ -1,4 +1,4 @@
-namespace CrmMes.Core.Models;
+﻿namespace CrmMes.Core.Models;
 
 /// <summary>The company using the system, configured once by an Admin at first start: its registry data
 /// (printed on transport documents and declarations) and the industry it works in, which decides which
@@ -48,6 +48,10 @@ public class CompanyProfile
 
     /// <summary>Roles that must use two-factor authentication, comma-separated. Empty: optional for all.</summary>
     public string TwoFactorRoles { get; set; } = string.Empty;
+
+    /// <summary>Roles the Admin has authorised to change the module layouts (Layout dei moduli), comma-separated.
+    /// The Admin can always do it; this list adds other roles. Empty: Admin only.</summary>
+    public string LayoutEditorRoles { get; set; } = string.Empty;
 
     /// <summary>Subscription from the vendor console (see LicenseState in CrmMes.Api): the last signed license
     /// received, the console's public key pinned at the first contact, and when it was last checked.</summary>

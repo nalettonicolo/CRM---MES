@@ -51,7 +51,7 @@ public static class Navigation
         new("maintenance", "Manutenzione", "manutenzione", "Produzione"),
         new("service", "Service post-vendita", "service", "Produzione"),
         new("energy-monitoring", "Monitoraggio energetico", "energia", "Produzione"),
-        new("users", "Layout dei moduli", "layout", "Amministrazione", ["Admin"]),
+        new("users", "Layout dei moduli", "layout", "Amministrazione"),
         new("haccp", "HACCP", "haccp", "Qualità"),
         new("site-work", "Rapportini cantiere", "cantiere", "Produzione"),
         new("panel-verification", "Verifica quadri", "verifica-quadri", "Produzione"),

@@ -1,5 +1,6 @@
 ﻿using System.ComponentModel;
 using System.Diagnostics;
+using System.Net.Http;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Data;
@@ -18,6 +19,7 @@ public partial class MainWindow : Window
     private readonly ApiClient _apiClient = new();
     private readonly UpdateService _updateService = new();
     private bool _isAuthenticated;
+    private bool _canEditLayouts;
     private Guid _currentUserId;
     private string? _currentRole;
     private string? _refreshToken;
@@ -465,6 +467,21 @@ public partial class MainWindow : Window
     private void ServiceButton_Click(object sender, RoutedEventArgs e) =>
         new ServiceWindow(_apiClient) { Owner = this }.ShowDialog();
 
+    /// <summary>Il pulsante Layout appare a chi il server dice di poter modificare i layout: Admin e ruoli autorizzati.</summary>
+    private async Task RefreshLayoutAccessAsync()
+    {
+        try
+        {
+            _canEditLayouts = (await _apiClient.GetLayoutAccessAsync()).CanEdit;
+        }
+        catch (Exception exception) when (exception is HttpRequestException or InvalidOperationException)
+        {
+            _canEditLayouts = false;
+        }
+
+        ApplyEnabledModules();
+    }
+
     private void LayoutButton_Click(object sender, RoutedEventArgs e) =>
         new LayoutEditorWindow(_apiClient) { Owner = this }.ShowDialog();
 
@@ -511,6 +528,7 @@ public partial class MainWindow : Window
         _ = FlagAvailableUpdateAsync();
         _ = ShowLicenseStateAsync();
         ApplyEnabledModules();
+        _ = RefreshLayoutAccessAsync();
         CompanySetupButton.Visibility = auth.Role == "Admin" ? Visibility.Visible : Visibility.Collapsed;
         if (reloadMaterials && auth.Role is "Admin" or "Management")
         {
@@ -620,7 +638,7 @@ public partial class MainWindow : Window
         AppearanceButton.Visibility = Show(_apiClient.CurrentRole == "Admin");
         ServiceButton.Visibility = Show(_apiClient.IsModuleEnabled("service"));
         EnergyButton.Visibility = Show(_apiClient.IsModuleEnabled("energy-monitoring"));
-        LayoutButton.Visibility = Show(_apiClient.CurrentRole == "Admin");
+        LayoutButton.Visibility = Show(_canEditLayouts);
 
         // A section just switched off may be the page on screen: fall back to the first one still shown.
         if (FindCheckedNavItem() is { Visibility: not Visibility.Visible } hidden)

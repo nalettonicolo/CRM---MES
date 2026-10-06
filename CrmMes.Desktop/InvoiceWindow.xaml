@@ -1,4 +1,4 @@
-<Window x:Class="CrmMes.Desktop.InvoiceWindow"
+﻿<Window x:Class="CrmMes.Desktop.InvoiceWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         Title="Fattura elettronica" Icon="Assets/logo.ico" Height="800" Width="1120" MinHeight="600" MinWidth="900"
@@ -27,11 +27,11 @@
                 <ColumnDefinition Width="3*" />
             </Grid.ColumnDefinitions>
             <StackPanel Grid.Column="0">
-                <TextBlock Text="Cliente" Foreground="{StaticResource TextSecondaryBrush}" FontSize="12.5" Margin="0,0,0,5" />
+                <TextBlock x:Name="CustomerLabel" Text="Cliente" Foreground="{StaticResource TextSecondaryBrush}" FontSize="12.5" Margin="0,0,0,5" />
                 <ComboBox x:Name="CustomerCombo" Height="34" DisplayMemberPath="Name" />
             </StackPanel>
             <StackPanel Grid.Column="2">
-                <TextBlock Text="Pagamento" Foreground="{StaticResource TextSecondaryBrush}" FontSize="12.5" Margin="0,0,0,5" />
+                <TextBlock x:Name="PaymentLabel" Text="Pagamento" Foreground="{StaticResource TextSecondaryBrush}" FontSize="12.5" Margin="0,0,0,5" />
                 <ComboBox x:Name="PaymentCombo" Height="34" SelectedValuePath="Tag">
                     <ComboBoxItem Content="Bonifico" Tag="MP05" IsSelected="True" />
                     <ComboBoxItem Content="RIBA" Tag="MP12" />
@@ -42,11 +42,11 @@
                 </ComboBox>
             </StackPanel>
             <StackPanel Grid.Column="4">
-                <TextBlock Text="Scadenza" Foreground="{StaticResource TextSecondaryBrush}" FontSize="12.5" Margin="0,0,0,5" />
+                <TextBlock x:Name="DueDateLabel" Text="Scadenza" Foreground="{StaticResource TextSecondaryBrush}" FontSize="12.5" Margin="0,0,0,5" />
                 <DatePicker x:Name="DueDatePicker" Height="34" />
             </StackPanel>
             <StackPanel Grid.Column="6">
-                <TextBlock Text="Causale / note" Foreground="{StaticResource TextSecondaryBrush}" FontSize="12.5" Margin="0,0,0,5" />
+                <TextBlock x:Name="NotesLabel" Text="Causale / note" Foreground="{StaticResource TextSecondaryBrush}" FontSize="12.5" Margin="0,0,0,5" />
                 <TextBox x:Name="NotesBox" />
             </StackPanel>
         </Grid>

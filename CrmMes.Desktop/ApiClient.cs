@@ -1361,6 +1361,17 @@ public sealed class ApiClient
         return await response.Content.ReadFromJsonAsync<List<CrmMes.Desktop.Layout.LayoutScreenDto>>(cancellationToken: cancellationToken) ?? [];
     }
 
+    public async Task<CrmMes.Desktop.Layout.LayoutAccessDto> GetLayoutAccessAsync(CancellationToken cancellationToken = default)
+    {
+        using var response = await _httpClient.GetAsync("api/layout/access", cancellationToken);
+        await EnsureSuccessAsync(response, cancellationToken);
+        return await response.Content.ReadFromJsonAsync<CrmMes.Desktop.Layout.LayoutAccessDto>(cancellationToken: cancellationToken)
+            ?? new CrmMes.Desktop.Layout.LayoutAccessDto(false, [], []);
+    }
+
+    public Task<CrmMes.Desktop.Layout.LayoutAccessDto> SaveLayoutAccessAsync(IEnumerable<string> roles, CancellationToken cancellationToken = default)
+        => SendAsync<CrmMes.Desktop.Layout.LayoutAccessDto>(HttpMethod.Put, "api/layout/access", new { roles = roles.ToList() }, cancellationToken);
+
     public Task<CrmMes.Desktop.Layout.LayoutScreenDto> SaveLayoutScreenAsync(string screen, IEnumerable<CrmMes.Desktop.Layout.LayoutFieldDto> fields, CancellationToken cancellationToken = default)
         => SendAsync<CrmMes.Desktop.Layout.LayoutScreenDto>(HttpMethod.Put, $"api/layout/{screen}", new
         {

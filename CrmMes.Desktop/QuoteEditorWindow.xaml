@@ -1,4 +1,4 @@
-<Window x:Class="CrmMes.Desktop.QuoteEditorWindow"
+﻿<Window x:Class="CrmMes.Desktop.QuoteEditorWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         Title="Preventivo" Icon="Assets/logo.ico" Height="720" Width="980"
@@ -30,18 +30,18 @@
                 <ColumnDefinition Width="3*" />
             </Grid.ColumnDefinitions>
             <StackPanel Grid.Column="0">
-                <TextBlock Text="Cliente" Foreground="{StaticResource TextSecondaryBrush}" FontSize="12.5" Margin="0,0,0,5" />
+                <TextBlock x:Name="CustomerLabel" Text="Cliente" Foreground="{StaticResource TextSecondaryBrush}" FontSize="12.5" Margin="0,0,0,5" />
                 <DockPanel>
                     <Button DockPanel.Dock="Right" Style="{StaticResource SecondaryButton}" Content="Nuovo" Width="70" Height="34" Margin="8,0,0,0" Click="NewCustomer_Click" />
                     <ComboBox x:Name="CustomerCombo" Height="34" DisplayMemberPath="Name" />
                 </DockPanel>
             </StackPanel>
             <StackPanel Grid.Column="2">
-                <TextBlock Text="Valido fino al" Foreground="{StaticResource TextSecondaryBrush}" FontSize="12.5" Margin="0,0,0,5" />
+                <TextBlock x:Name="ValidUntilLabel" Text="Valido fino al" Foreground="{StaticResource TextSecondaryBrush}" FontSize="12.5" Margin="0,0,0,5" />
                 <DatePicker x:Name="ValidUntilPicker" Height="34" />
             </StackPanel>
             <StackPanel Grid.Column="4">
-                <TextBlock Text="Note per il cliente (opzionale)" Foreground="{StaticResource TextSecondaryBrush}" FontSize="12.5" Margin="0,0,0,5" />
+                <TextBlock x:Name="NotesLabel" Text="Note per il cliente (opzionale)" Foreground="{StaticResource TextSecondaryBrush}" FontSize="12.5" Margin="0,0,0,5" />
                 <TextBox x:Name="NotesBox" Height="34" Tag="Es. consegna in 6 settimane dall'ordine, IVA esclusa" />
             </StackPanel>
         </Grid>
@@ -50,6 +50,10 @@
 
         <!-- New line strip -->
         <Grid Grid.Row="3" Margin="0,0,0,6">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+            </Grid.RowDefinitions>
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="220" />
                 <ColumnDefinition Width="10" />
@@ -63,12 +67,17 @@
                 <ColumnDefinition Width="10" />
                 <ColumnDefinition Width="Auto" />
             </Grid.ColumnDefinitions>
-            <ComboBox Grid.Column="0" x:Name="ProductCombo" Height="34" DisplayMemberPath="Label" SelectionChanged="ProductCombo_SelectionChanged" />
-            <TextBox Grid.Column="2" x:Name="DescriptionBox" Height="34" Tag="Descrizione riga" />
-            <TextBox Grid.Column="4" x:Name="QuantityBox" Height="34" Text="1" Tag="Q.tà" />
-            <TextBox Grid.Column="6" x:Name="PriceBox" Height="34" Tag="Prezzo unit. €" />
-            <TextBox Grid.Column="8" x:Name="DiscountBox" Height="34" Text="0" Tag="Sconto %" />
-            <Button Grid.Column="10" Content="Aggiungi riga" Width="120" Height="34" Click="AddLine_Click" />
+            <TextBlock Grid.Row="0" Grid.Column="0" Text="Prodotto" Foreground="{StaticResource TextSecondaryBrush}" FontSize="12.5" Margin="0,0,0,5" />
+            <TextBlock x:Name="LineDescriptionLabel" Grid.Row="0" Grid.Column="2" Text="Descrizione" Foreground="{StaticResource TextSecondaryBrush}" FontSize="12.5" Margin="0,0,0,5" />
+            <TextBlock x:Name="LineQuantityLabel" Grid.Row="0" Grid.Column="4" Text="Q.tà" Foreground="{StaticResource TextSecondaryBrush}" FontSize="12.5" Margin="0,0,0,5" />
+            <TextBlock x:Name="LinePriceLabel" Grid.Row="0" Grid.Column="6" Text="Prezzo unit. €" Foreground="{StaticResource TextSecondaryBrush}" FontSize="12.5" Margin="0,0,0,5" />
+            <TextBlock x:Name="LineDiscountLabel" Grid.Row="0" Grid.Column="8" Text="Sconto %" Foreground="{StaticResource TextSecondaryBrush}" FontSize="12.5" Margin="0,0,0,5" />
+            <ComboBox Grid.Row="1" Grid.Column="0" x:Name="ProductCombo" Height="34" DisplayMemberPath="Label" SelectionChanged="ProductCombo_SelectionChanged" />
+            <TextBox Grid.Row="1" Grid.Column="2" x:Name="DescriptionBox" Height="34" Tag="Descrizione riga" />
+            <TextBox Grid.Row="1" Grid.Column="4" x:Name="QuantityBox" Height="34" Text="1" Tag="Q.tà" />
+            <TextBox Grid.Row="1" Grid.Column="6" x:Name="PriceBox" Height="34" Tag="Prezzo unit. €" />
+            <TextBox Grid.Row="1" Grid.Column="8" x:Name="DiscountBox" Height="34" Text="0" Tag="Sconto %" />
+            <Button Grid.Row="1" Grid.Column="10" Content="Aggiungi riga" Width="120" Height="34" Click="AddLine_Click" />
         </Grid>
 
         <!-- Price estimate from the bill of materials -->

@@ -1,4 +1,4 @@
-# Stato del progetto: Nicolò MES (CrmMes)
+﻿# Stato del progetto: Nicolò MES (CrmMes)
 
 Aggiornato: **6 ottobre 2026 (GTIN e modelli HACCP)**. Diario tecnico: [RIEPILOGO-SVILUPPO.md](RIEPILOGO-SVILUPPO.md). Istruzioni operative: [HANDOFF-CLAUDE.md](HANDOFF-CLAUDE.md). Gate: [GATES.md](GATES.md).
 
@@ -14,7 +14,7 @@ Aggiornato: **6 ottobre 2026 (GTIN e modelli HACCP)**. Diario tecnico: [RIEPILOG
 - **Cos'è**: gestionale di produzione (MES) con parte commerciale e documentale, per piccole e medie aziende manifatturiere. Nato per un quadrista, oggi si configura per cinque settori.
 - **Versione pubblicata**: v1.7.0 (30/09/2026) + push 02/10 con G8/OEE/MRP/tema. I PC si aggiornano da soli dalle release GitHub.
 - **Architettura**: client Windows (WPF, .NET 8) + API web (ASP.NET Core 8) su Render + database Postgres su Neon. Stessa API per `/app/` (Blazor) e `/tecnici/`.
-- **Test automatici** (06/10/2026): **631/631** verdi — API 414, Desktop 122, Web 77, Console 18.
+- **Test automatici** (06/10/2026): **645/645** verdi — API 421, Desktop 125, Web 81, Console 18.
 - **Backtest end-to-end** (30/09/2026): 68/68 su DB vuoto isolato.
 - **Uso attuale**: interno, un'azienda con due sedi.
 
@@ -154,6 +154,11 @@ Non ancora provato: la pagina web dei tecnici dal browser con accesso reale (il 
 | 06/10/2026 | (prossimo commit) | GTIN nelle schermate desktop e web del prodotto. **Strumento Layout (primo passo operativo):** l'Admin imposta etichetta, ordine, visibilità e obbligatorietà dei campi del modulo *Nuova richiesta* del Service dalla pagina `/layout`; il modulo legge la configurazione e blocca i campi obbligatori; API `GET/PUT api/layout/{schermata}`; migrazione `AddFormLayout` applicata a Neon (additiva). Da estendere: altre schermate, editor delle finestre modali del desktop |
 | 30/09/2026 | v1.6.0 | Installer da collegare in seguito; piattaforma web `/app/`; canali di accesso; basi server cliente e teleassistenza |
 | 06/10/2026 | (prossimo commit) | **Strumento Layout, web e programma.** Motore unico: ogni schermata dichiara i suoi campi nel registro (`CrmMes.Core/Layout`), l'Admin li imposta da `/layout` (web) o da *Layout dei moduli* (programma, solo Admin), e le schermate li applicano: etichetta, ordine, visibilità, obbligatorietà con controllo dei campi mancanti. **Coperte**: web: richiesta di assistenza, nuovo cliente, nuovo intervento di manutenzione, nuovo progetto energetico. Programma: nuovo intervento di manutenzione, nuovo prodotto, nuovo materiale, nuova macchina. **Da fare**: le altre circa 27 pagine web e circa 45 finestre del programma con campi; le finestre modali senza campi di input |
+| 06/10/2026 | (prossimo commit) | **Strumento Layout: permessi per ruolo.** L'Admin autorizza altri ruoli a modificare i layout (`CompanyProfile.LayoutEditorRoles`, CSV; ruoli autorizzabili: Management, Sales, Purchasing, Warehouse, Operator; Admin sempre abilitato). API: `PUT api/layout/{schermata}` non è più solo Admin e verifica il permesso (403 se non autorizzato); `GET api/layout/access` per tutti gli autenticati; `PUT api/layout/access` solo Admin. Web: la pagina Layout è in sola lettura per chi non è autorizzato e l'Admin sceglie i ruoli. Desktop: il pulsante Layout appare a chi il server autorizza; l'editor ha la sezione *Chi può modificare* per l'Admin. Migrazione `AddLayoutEditorRoles` (additiva) applicata a Neon. Test: API +3, Web +2 (aggiornati quelli Admin-only). |
+| 06/10/2026 | (prossimo commit) | **Strumento Layout: fornitori.** Aggiunta la schermata `suppliers.new` (Nuovo fornitore, acquisti) al registro e collegata alla finestra desktop in creazione (nome e codice sempre obbligatori). Il web non ha un form di creazione fornitori, quindi la copertura è solo desktop. Migrazione `AddLayoutEditorRoles` applicata a Neon dall'utente. **Ancora da fare:** preventivi e ordini, fatture, e il resto delle schermate (circa 27 pagine web e 45 finestre desktop). |
+| 06/10/2026 | (prossimo commit) | **Strumento Layout: ordini fornitore.** Schermata `purchaseOrder.new` (fornitore, codice, quantità, prezzo di riga) con le intestazioni di colonna come etichette, modificabili dall'Admin. `FieldBinding` accetta un'etichetta esplicita. Desktop: finestra *Nuovo ordine fornitore*. **Ancora da fare:** preventivi (`QuoteEditorWindow`), fatture (`InvoiceWindow`) e il resto. Test API 425/425, Desktop 125/125. |
+| 06/10/2026 | (prossimo commit) | **Strumento Layout: preventivi.** Schermata `quote.new` (cliente, validità, note in testata; descrizione, quantità, prezzo, sconto di riga) con intestazioni di colonna come etichette. Desktop: editor *Nuovo preventivo* in creazione. Stima da distinta invariata. **Ancora da fare:** fatture (`InvoiceWindow`) e il resto delle schermate. Test API 426/426, Desktop 125/125. Analisi competitor in `ANALISI-COMPETITOR-MES.md`. |
+| 06/10/2026 | (prossimo commit) | **Strumento Layout: fatture (testata).** Schermata `invoice.new` (cliente sempre obbligatorio; pagamento, scadenza e causale nascondibili) in *Nuova fattura*, desktop. Le righe restano nella griglia con le sue intestazioni. Il controllo dei campi obbligatori è in `BuildRequest`, quindi vale per salvataggio ed emissione. Web non ancora collegato. |
 | prossimo | - | Push del tree su main; poi restano solo contratto SdI, macchina fisica, G16 e IdP OIDC di produzione |
 
 ## Pubblicazione e ambienti
@@ -171,7 +176,7 @@ Il titolare ha chiesto di portare il sistema a un livello enterprise. Area scelt
 |---|---|---|---|
 | 1 | Header di sicurezza (X-Content-Type-Options, X-Frame-Options, Referrer-Policy, Permissions-Policy) anche su `/api/*` e `/swagger` — prima solo `/app` e `/tecnici` li avevano | Basso | ✅ Fatto — commit `77e6d1e`, su `main`, build e 639 test verdi |
 | 2 | Limite dimensione richiesta globale a 10 MB per gli endpoint senza `[RequestSizeLimit]` proprio (verificato: tutti gli 8 endpoint di upload file nei 5 controller con `IFormFile` hanno già il loro limite esplicito più alto, che resta valido e ha precedenza) | Basso | ✅ Fatto — commit `77e6d1e` |
-| 3 | Indici sulla tabella `AuditLog` (prima nessuno): su `EntityType`+`EntityId` e su `CreatedAt` | Basso | ✅ Fatto — commit `77e6d1e`, migrazione `AddAuditLogIndexes` da applicare su Neon (vedi sotto) |
+| 3 | Indici sulla tabella `AuditLog` (prima nessuno): su `EntityType`+`EntityId` e su `CreatedAt` | Basso | ✅ Fatto — commit `77e6d1e`, migrazione `AddAuditLogIndexes` applicata e verificata su Neon produzione il 06/10/2026 |
 | 4 | Rivalutare l'esposizione pubblica di Swagger in produzione (scelta deliberata del 02/10 per dare documentazione a chi integra) | Da decidere col titolare | Non iniziato — nessuna azione senza conferma, è una scelta deliberata recente |
 | 5 | Audit log esteso ai controller che oggi non scrivono traccia (circa 30 su 51: presenze, spedizioni, fornitori, clienti, corrieri, aree, centri di lavoro...) | Basso ma esteso | Non iniziato |
 | 6 | Nuovo endpoint `/health/detailed` basato sul framework standard ASP.NET Core Health Checks, per strumenti di monitoring esterni — **additivo**, non sostituisce `/health` (lasciato intonso: il client desktop lo usa per il retry "server in avvio" al login, cambiarne la forma non valeva il rischio) | Basso | ✅ Fatto — commit `77e6d1e` |
@@ -179,7 +184,7 @@ Il titolare ha chiesto di portare il sistema a un livello enterprise. Area scelt
 
 Step 1, 2, 3, 6 fatti e verificati (build pulita, 639/639 test, pushati su `main`). **Nota**: durante questo lavoro un'altra sessione Claude Code era attiva in parallelo sullo stesso repository, sviluppando uno "Strumento Layout" — le mie modifiche erano finite per una volta in un commit di quella sessione (`abaf0db`, non intenzionale ma innocuo), poi separate in commit propri da qui in avanti. Step 4 resta sospeso in attesa di conferma esplicita del titolare (non è un bug, è una scelta già fatta). Step 5 è il prossimo passo naturale a basso rischio, ma esteso (30 controller) — da fare con calma, verificando ogni controller prima di toccarlo per non entrare in conflitto con lavoro in corso altrove nel repository. Step 7 resta il più esteso e rischioso: va preventivato a parte.
 
-**Da fare, non da codice**: applicare la migrazione `AddAuditLogIndexes` su Neon produzione con `dotnet ef database update` (additiva, nessun rischio sui dati esistenti — crea solo due indici).
+**Migrazione `AddAuditLogIndexes`**: applicata su Neon produzione il 06/10/2026 con lo script `scripts/migrazione-AddAuditLogIndexes.sql`, verificata in `__EFMigrationsHistory` e in `pg_indexes`.
 
 ## Decisioni in sospeso
 

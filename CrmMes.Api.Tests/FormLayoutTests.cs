@@ -98,4 +98,89 @@ public class FormLayoutTests : IClassFixture<AdminSeededApiTestFixture>
         Assert.Equal(HttpStatusCode.Forbidden, (await client.PutAsJsonAsync(Url, new SaveLayoutRequest([Field("subject", null, 1)]))).StatusCode);
         Assert.Equal(HttpStatusCode.OK, (await client.GetAsync(Url)).StatusCode);
     }
+    [Fact]
+    public async Task AuthorisedRole_CanChangeTheLayout_AndOnlyAdminCanGrantIt()
+    {
+        // Le autorizzazioni vivono nel profilo aziendale: va configurato prima di poterle salvare.
+        (await _admin.PutAsJsonAsync("/api/company-profile",
+            new SaveCompanyProfileRequest("Officine Layout srl", null, null, null, null, "generic", null))).EnsureSuccessStatusCode();
+        var sales = await TestAuth.CreateUserWithRoleAsync(_fixture.Factory, _fixture.Admin.Token, "Sales");
+        using var salesClient = _fixture.Factory.AuthenticatedClient(sales.Token);
+        var layout = new SaveLayoutRequest([Field("subject", null, 1)]);
+
+        try
+        {
+            // Prima dell'autorizzazione: Sales legge, ma non modifica.
+            Assert.Equal(HttpStatusCode.Forbidden, (await salesClient.PutAsJsonAsync(Url, layout)).StatusCode);
+            Assert.False((await salesClient.GetFromJsonAsync<LayoutAccessResponse>("/api/layout/access"))!.CanEdit);
+
+            // Solo l'Admin concede il permesso; Sales non può darselo.
+            Assert.Equal(HttpStatusCode.Forbidden, (await salesClient.PutAsJsonAsync("/api/layout/access", new SaveLayoutAccessRequest(["Sales"]))).StatusCode);
+            var granted = await _admin.PutAsJsonAsync("/api/layout/access", new SaveLayoutAccessRequest(["Sales"]));
+            Assert.Equal(HttpStatusCode.OK, granted.StatusCode);
+
+            // Dopo: Sales può modificare e vede il permesso attivo.
+            Assert.Equal(HttpStatusCode.OK, (await salesClient.PutAsJsonAsync(Url, layout)).StatusCode);
+            var access = await salesClient.GetFromJsonAsync<LayoutAccessResponse>("/api/layout/access");
+            Assert.True(access!.CanEdit);
+            Assert.Contains("Sales", access.GrantedRoles);
+        }
+        finally
+        {
+            await _admin.PutAsJsonAsync("/api/layout/access", new SaveLayoutAccessRequest([]));
+        }
+    }
+
+    [Fact]
+    public async Task Grant_RefusesRolesThatCannotBeAuthorised()
+    {
+        Assert.Equal(HttpStatusCode.BadRequest, (await _admin.PutAsJsonAsync("/api/layout/access",
+            new SaveLayoutAccessRequest(["Admin"]))).StatusCode);
+        Assert.Equal(HttpStatusCode.BadRequest, (await _admin.PutAsJsonAsync("/api/layout/access",
+            new SaveLayoutAccessRequest(["Ruolo inventato"]))).StatusCode);
+    }
+    [Fact]
+    public void SupplierNew_ProtectsNameAndCode()
+    {
+        var fields = FormLayoutRegistry.Screens[FormLayoutRegistry.SupplierNew].ToDictionary(f => f.Key);
+
+        Assert.True(fields["name"].Required);
+        Assert.False(fields["name"].CanHide);
+        Assert.True(fields["code"].Required);
+        Assert.False(fields["code"].CanHide);
+        Assert.True(fields["email"].CanHide);
+    }
+
+    [Fact]
+    public void PurchaseOrderNew_ProtectsSupplierCodeAndQuantity()
+    {
+        var fields = FormLayoutRegistry.Screens[FormLayoutRegistry.PurchaseOrderNew].ToDictionary(f => f.Key);
+
+        Assert.False(fields["supplier"].CanHide);
+        Assert.False(fields["itemCode"].CanHide);
+        Assert.False(fields["itemQuantity"].CanHide);
+        Assert.True(fields["itemPrice"].CanHide);
+    }
+
+    [Fact]
+    public void QuoteNew_ProtectsCustomerAndLineFields()
+    {
+        var fields = FormLayoutRegistry.Screens[FormLayoutRegistry.QuoteNew].ToDictionary(f => f.Key);
+
+        Assert.False(fields["customer"].CanHide);
+        Assert.False(fields["lineDescription"].CanHide);
+        Assert.False(fields["lineQuantity"].CanHide);
+        Assert.False(fields["linePrice"].CanHide);
+        Assert.True(fields["lineDiscount"].CanHide);
+    }
+
+    [Fact]
+    public void InvoiceNew_ProtectsCustomer()
+    {
+        var fields = FormLayoutRegistry.Screens[FormLayoutRegistry.InvoiceNew].ToDictionary(f => f.Key);
+
+        Assert.False(fields["customer"].CanHide);
+        Assert.True(fields["customer"].Required);
+        Assert.True(fields["payment"].CanHide);
+    }
 }

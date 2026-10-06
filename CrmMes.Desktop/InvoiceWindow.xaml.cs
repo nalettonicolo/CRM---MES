@@ -1,4 +1,4 @@
-using System.Collections.ObjectModel;
+﻿using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Diagnostics;
 using System.Globalization;
@@ -7,6 +7,7 @@ using System.Runtime.CompilerServices;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
+using CrmMes.Desktop.Layout;
 
 namespace CrmMes.Desktop;
 
@@ -21,6 +22,8 @@ public partial class InvoiceWindow : Window
     private InvoiceDto? _invoice;
 
     public bool Changed { get; private set; }
+
+    private IReadOnlyList<LayoutFieldDto> _layout = [];
 
     public InvoiceWindow(ApiClient apiClient, Guid? invoiceId = null)
     {
@@ -43,6 +46,14 @@ public partial class InvoiceWindow : Window
             }
             else
             {
+                _layout = await FormLayoutApplier.LoadAsync(_apiClient, "invoice.new");
+                FormLayoutApplier.Apply(_layout,
+                [
+                    new FieldBinding("customer", CustomerCombo, CustomerLabel),
+                    new FieldBinding("payment", PaymentCombo, PaymentLabel),
+                    new FieldBinding("dueDate", DueDatePicker, DueDateLabel),
+                    new FieldBinding("notes", NotesBox, NotesLabel),
+                ]);
                 _lines.Add(NewRow(true));
                 ApplyState();
             }
@@ -194,6 +205,20 @@ public partial class InvoiceWindow : Window
         if (CustomerCombo.SelectedItem is not CustomerDto customer)
         {
             ErrorText.Text = "Scegli il cliente.";
+            return null;
+        }
+
+        var missing = FormLayoutApplier.Missing(_layout, key => key switch
+        {
+            "customer" => true,
+            "payment" => PaymentCombo.SelectedValue is string,
+            "dueDate" => DueDatePicker.SelectedDate.HasValue,
+            "notes" => !string.IsNullOrWhiteSpace(NotesBox.Text),
+            _ => true,
+        });
+        if (missing.Count > 0)
+        {
+            ErrorText.Text = "Compila i campi obbligatori: " + string.Join(", ", missing) + ".";
             return null;
         }
 
