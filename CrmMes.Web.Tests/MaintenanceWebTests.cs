@@ -70,7 +70,7 @@ public class MaintenanceWebTests : TestContext
 
         // Nothing selected yet: a clear error, not a silent failure.
         page.Find("button").Click();
-        page.WaitForAssertion(() => Assert.Contains("Scegli la macchina", page.Markup));
+        page.WaitForAssertion(() => Assert.Contains("Compila i campi obbligatori: Macchina, Titolo", page.Markup));
 
         page.Find("select[aria-label='Macchina per il nuovo intervento']").Change(_equipmentId.ToString());
         page.Find("input[placeholder='es. Controllo cinghie']").Change("Controllo cinghie");

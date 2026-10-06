@@ -1,4 +1,4 @@
-@page "/manutenzione"
+﻿@page "/manutenzione"
 @inject Api Api
 @inject Session Session
 
@@ -81,29 +81,45 @@
     <div class="card card-pad stack">
         <h2>Nuovo intervento</h2>
         <div class="form-grid">
-            <label>Macchina
-                <select @bind="_newEquipmentId" aria-label="Macchina per il nuovo intervento">
-                    <option value="">Scegli...</option>
-                    @if (_equipment is not null)
-                    {
-                        @foreach (var e in _equipment)
-                        {
-                            <option value="@e.Id">@e.Name</option>
-                        }
-                    }
-                </select>
-            </label>
-            <label>Titolo<input @bind="_newTitle" placeholder="es. Controllo cinghie" /></label>
-            <label>Tipo
-                <select @bind="_newType">
-                    <option value="Preventiva">Preventiva</option>
-                    <option value="Correttiva">Correttiva</option>
-                </select>
-            </label>
-            <label>Scadenza<input type="date" @bind="_newDueDate" /></label>
-            @if (_newType == "Preventiva")
+            @foreach (var f in _newFields.Where(f => f.Visible).OrderBy(f => f.Order))
             {
-                <label>Ricorrenza (giorni, opzionale)<input type="number" min="1" @bind="_newRecurrenceDays" /></label>
+                switch (f.Key)
+                {
+                    case "equipment":
+                        <label>@LayoutHelper.LabelOf(f)
+                            <select @bind="_newEquipmentId" aria-label="Macchina per il nuovo intervento">
+                                <option value="">Scegli...</option>
+                                @if (_equipment is not null)
+                                {
+                                    @foreach (var e in _equipment)
+                                    {
+                                        <option value="@e.Id">@e.Name</option>
+                                    }
+                                }
+                            </select>
+                        </label>
+                        break;
+                    case "title":
+                        <label>@LayoutHelper.LabelOf(f)<input @bind="_newTitle" placeholder="es. Controllo cinghie" /></label>
+                        break;
+                    case "type":
+                        <label>@LayoutHelper.LabelOf(f)
+                            <select @bind="_newType">
+                                <option value="Preventiva">Preventiva</option>
+                                <option value="Correttiva">Correttiva</option>
+                            </select>
+                        </label>
+                        break;
+                    case "dueDate":
+                        <label>@LayoutHelper.LabelOf(f)<input type="date" @bind="_newDueDate" /></label>
+                        break;
+                    case "recurrence":
+                        @if (_newType == "Preventiva")
+                        {
+                            <label>@LayoutHelper.LabelOf(f)<input type="number" min="1" @bind="_newRecurrenceDays" /></label>
+                        }
+                        break;
+                }
             }
         </div>
         <div class="actions"><button @onclick="CreateAsync" disabled="@_busy">Crea intervento</button></div>
@@ -127,11 +143,28 @@
 
     private bool CanEdit => Session.Role is "Admin" or "Warehouse";
 
+    /// <summary>Campi del modulo come li ha impostati l'Admin nello strumento Layout (default prima della risposta).</summary>
+    private List<LayoutField> _newFields =
+    [
+        new("equipment", "Macchina", 1, true, true, false),
+        new("title", "Titolo", 2, true, true, false),
+        new("type", "Tipo", 3, true, true, false),
+        new("dueDate", "Scadenza", 4, true, false, true),
+        new("recurrence", "Ricorrenza (giorni)", 5, true, false, true),
+    ];
+
+    private async Task LoadNewLayoutAsync()
+    {
+        try { _newFields = (await Api.GetAsync<LayoutScreen>("api/layout/maintenance.new")).Fields; }
+        catch (ApiException) { /* restano i default */ }
+    }
+
     protected override async Task OnInitializedAsync()
     {
         try
         {
             _equipment = await Api.GetAsync<List<Equipment>>("api/equipment");
+            await LoadNewLayoutAsync();
         }
         catch (ApiException exception)
         {
@@ -194,9 +227,18 @@
 
     private async Task CreateAsync()
     {
-        if (_newEquipmentId is null || string.IsNullOrWhiteSpace(_newTitle))
+        var missing = LayoutHelper.Missing(_newFields, key => key switch
         {
-            _error = "Scegli la macchina e scrivi il titolo dell'intervento.";
+            "equipment" => _newEquipmentId?.ToString(),
+            "title" => _newTitle,
+            "type" => _newType,
+            "dueDate" => _newDueDate?.ToString(),
+            "recurrence" => _newRecurrenceDays?.ToString(),
+            _ => null,
+        });
+        if (missing.Count > 0)
+        {
+            _error = "Compila i campi obbligatori: " + string.Join(", ", missing) + ".";
             return;
         }
 
