@@ -42,9 +42,12 @@ jobs:
         run: |
           dotnet publish CrmMes.Desktop/CrmMes.Desktop.csproj -c Release -r win-x64 --self-contained false -o publish
           choco install innosetup --no-progress -y
-          $iscc = Get-ChildItem "C:\Program Files (x86)\Inno Setup 6", "C:\Program Files\Inno Setup 6" -Filter ISCC.exe -ErrorAction SilentlyContinue |
+          if ($LASTEXITCODE -notin 0, 3010) { throw "Installazione di Inno Setup fallita (codice $LASTEXITCODE)." }
+          # Cerca ISCC.exe nei percorsi di installazione possibili (sistema e utente).
+          $iscc = Get-ChildItem "C:\Program Files (x86)\Inno Setup 6", "C:\Program Files\Inno Setup 6", "$env:LOCALAPPDATA\Programs\Inno Setup 6" -Filter ISCC.exe -ErrorAction SilentlyContinue |
             Select-Object -First 1 -ExpandProperty FullName
           if (-not $iscc) { throw "ISCC.exe non trovato dopo l'installazione di Inno Setup." }
+          Write-Host "ISCC: $iscc"
           & $iscc "/DMyAppVersion=0.0.0" installer\NicoloMES.iss
           if ($LASTEXITCODE -ne 0) { throw "Compilazione dell'installer fallita." }
           dotnet publish CrmMes.Api/CrmMes.Api.csproj -c Release -r win-x64 --self-contained true -o publish-server
