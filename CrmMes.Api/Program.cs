@@ -70,6 +70,13 @@ builder.Host.UseSerilog((context, services, loggerConfiguration) =>
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
+// Standard ASP.NET Core health check framework, additive to the existing hand-rolled /health and
+// /api/health/status (left untouched — the desktop client already polls /health during its startup
+// retry, and changing its response shape is not worth the risk). This one is for external monitoring
+// tooling (uptime checks, orchestrators) that expects the standard health-check JSON shape and wants
+// each dependency broken out individually rather than a single combined status.
+builder.Services.AddHealthChecks()
+    .AddCheck<CrmMes.Api.Services.DatabaseHealthCheck>("postgres");
 builder.Services.AddResponseCompression(options =>
 {
     options.EnableForHttps = true;
@@ -356,6 +363,30 @@ app.MapGet("/health", async (ApplicationDbContext db) =>
     {
         app.Logger.LogError(ex, "Database health check failed");
         return Results.Problem(title: "Database connection failed", statusCode: StatusCodes.Status503ServiceUnavailable);
+    }
+});
+
+// Standard ASP.NET Core health-check shape, one entry per dependency (today just "postgres"; a future
+// dependency — SDI, the AI provider — registers here too). For external monitoring tooling, not for the
+// desktop client's own startup retry, which keeps using the plain /health above.
+app.MapHealthChecks("/health/detailed", new Microsoft.AspNetCore.Diagnostics.HealthChecks.HealthCheckOptions
+{
+    ResponseWriter = async (context, report) =>
+    {
+        context.Response.ContentType = "application/json";
+        var payload = new
+        {
+            status = report.Status.ToString(),
+            checks = report.Entries.Select(entry => new
+            {
+                name = entry.Key,
+                status = entry.Value.Status.ToString(),
+                description = entry.Value.Description,
+                durationMs = entry.Value.Duration.TotalMilliseconds
+            }),
+            totalDurationMs = report.TotalDuration.TotalMilliseconds
+        };
+        await context.Response.WriteAsJsonAsync(payload);
     }
 });
 
