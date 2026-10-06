@@ -57,10 +57,10 @@ jobs:
             Select-Object -First 1 -ExpandProperty FullName
           if (-not $iscc) { throw "ISCC.exe non trovato dopo l'installazione di Inno Setup." }
           Write-Host "ISCC: $iscc"
-          $out = & $iscc "/DMyAppVersion=0.0.0" installer\NicoloMES.iss 2>&1
-          if ($LASTEXITCODE -ne 0) { Fail-WithOutput "Compilazione installer client" $out }
           $out = dotnet publish CrmMes.Api/CrmMes.Api.csproj -c Release -r win-x64 --self-contained true -o publish-server 2>&1
           if ($LASTEXITCODE -ne 0) { Fail-WithOutput "Publish server" $out }
+          $out = & $iscc "/DMyAppVersion=0.0.0" installer\NicoloMES.iss 2>&1
+          if ($LASTEXITCODE -ne 0) { Fail-WithOutput "Compilazione installer client" $out }
           $out = & $iscc "/DMyAppVersion=0.0.0" installer\NicoloMES-Server.iss 2>&1
           if ($LASTEXITCODE -ne 0) { Fail-WithOutput "Compilazione installer server" $out }
           foreach ($script in Get-ChildItem server\windows\*.ps1) {
