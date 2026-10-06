@@ -1,3 +1,4 @@
+using System.Security.Claims;
 using CrmMes.Core.Data;
 using CrmMes.Core.Models;
 using Microsoft.AspNetCore.Authorization;
@@ -91,6 +92,14 @@ public class SuppliersController : ControllerBase
         supplier.Phone = string.IsNullOrWhiteSpace(request.Phone) ? null : request.Phone.Trim();
         supplier.Website = string.IsNullOrWhiteSpace(request.Website) ? null : request.Website.Trim();
 
+        _dbContext.AuditLogs.Add(new AuditLog
+        {
+            Action = "SupplierUpdated",
+            EntityType = "Supplier",
+            EntityId = supplier.Id,
+            UserName = GetCurrentUserName(),
+            Details = $"Fornitore {supplier.Code}: anagrafica modificata."
+        });
         await _dbContext.SaveChangesAsync(cancellationToken);
         return Ok(new SupplierResponse(supplier.Id, supplier.Name, supplier.Code, supplier.Email, supplier.Phone, supplier.Website, supplier.IsActive));
     }
@@ -124,11 +133,21 @@ public class SuppliersController : ControllerBase
         };
 
         _dbContext.Suppliers.Add(supplier);
+        _dbContext.AuditLogs.Add(new AuditLog
+        {
+            Action = "SupplierCreated",
+            EntityType = "Supplier",
+            EntityId = supplier.Id,
+            UserName = GetCurrentUserName(),
+            Details = $"Fornitore {supplier.Code} ({supplier.Name}) creato."
+        });
         await _dbContext.SaveChangesAsync(cancellationToken);
 
         var response = new SupplierResponse(supplier.Id, supplier.Name, supplier.Code, supplier.Email, supplier.Phone, supplier.Website, supplier.IsActive);
         return Created($"api/suppliers/{supplier.Id}", response);
     }
+
+    private string? GetCurrentUserName() => User.FindFirstValue(ClaimTypes.Name);
 }
 
 public sealed record SupplierResponse(Guid Id, string Name, string Code, string? Email, string? Phone, string? Website, bool IsActive);

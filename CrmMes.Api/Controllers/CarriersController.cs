@@ -1,3 +1,4 @@
+using System.Security.Claims;
 using CrmMes.Core.Data;
 using CrmMes.Core.Models;
 using Microsoft.AspNetCore.Authorization;
@@ -65,6 +66,14 @@ public class CarriersController : ControllerBase
         };
 
         _dbContext.Carriers.Add(carrier);
+        _dbContext.AuditLogs.Add(new AuditLog
+        {
+            Action = "CarrierCreated",
+            EntityType = "Carrier",
+            EntityId = carrier.Id,
+            UserName = GetCurrentUserName(),
+            Details = $"Corriere {carrier.Code} ({carrier.Name}) creato."
+        });
         await _dbContext.SaveChangesAsync(cancellationToken);
 
         var response = new CarrierResponse(carrier.Id, carrier.Name, carrier.Code, carrier.Email, carrier.Phone, carrier.IsActive);
@@ -104,9 +113,19 @@ public class CarriersController : ControllerBase
         }
 
         carrier.IsActive = false;
+        _dbContext.AuditLogs.Add(new AuditLog
+        {
+            Action = "CarrierDeactivated",
+            EntityType = "Carrier",
+            EntityId = carrier.Id,
+            UserName = GetCurrentUserName(),
+            Details = $"Corriere {carrier.Code} disattivato."
+        });
         await _dbContext.SaveChangesAsync(cancellationToken);
         return NoContent();
     }
+
+    private string? GetCurrentUserName() => User.FindFirstValue(ClaimTypes.Name);
 }
 
 public sealed record CarrierResponse(Guid Id, string Name, string Code, string? Email, string? Phone, bool IsActive);

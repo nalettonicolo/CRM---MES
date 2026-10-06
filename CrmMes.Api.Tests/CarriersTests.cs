@@ -1,6 +1,7 @@
 using System.Net;
 using System.Net.Http.Json;
 using CrmMes.Api.Controllers;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace CrmMes.Api.Tests;
 
@@ -84,5 +85,23 @@ public class CarriersTests : IClassFixture<AdminSeededApiTestFixture>
 
         var listResponse = await _adminClient.GetFromJsonAsync<List<CarrierResponse>>("/api/carriers");
         Assert.DoesNotContain(listResponse!, c => c.Id == carrier.Id);
+    }
+
+    [Fact]
+    public async Task CreateAndDeactivateCarrier_WriteAuditEntries()
+    {
+        var carrier = await CreateCarrierAsync();
+        var deleteResponse = await _adminClient.DeleteAsync($"/api/carriers/{carrier.Id}");
+        Assert.Equal(HttpStatusCode.NoContent, deleteResponse.StatusCode);
+
+        using var scope = _fixture.Factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<CrmMes.Core.Data.ApplicationDbContext>();
+        var actions = db.AuditLogs
+            .Where(log => log.EntityType == "Carrier" && log.EntityId == carrier.Id)
+            .Select(log => log.Action)
+            .ToList();
+
+        Assert.Contains("CarrierCreated", actions);
+        Assert.Contains("CarrierDeactivated", actions);
     }
 }
