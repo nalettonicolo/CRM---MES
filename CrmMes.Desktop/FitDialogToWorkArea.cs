@@ -1,4 +1,4 @@
-using System.Windows;
+﻿using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
 
@@ -29,6 +29,7 @@ public static class FitDialogToWorkArea
             CapToWorkArea(window);
             EnsureScrollableFooter(window);
             WrapCrowdedFooters(window);
+            ScrollIfOverflowing(window);
             CapToWorkArea(window);
             ClampPosition(window);
         }
@@ -57,8 +58,11 @@ public static class FitDialogToWorkArea
             return;
         }
 
-        var maxH = Math.Max(240, work.Height - ScreenMargin);
-        var maxW = Math.Max(320, work.Width - ScreenMargin);
+        // SystemParameters.WorkArea is already in device-independent units for the primary screen: taking
+        // the smaller of the two can only shrink the window, so a DPI mistake can't push the footer under the taskbar.
+        var primary = SystemParameters.WorkArea;
+        var maxH = Math.Max(240, Math.Min(work.Height, primary.Height) - ScreenMargin);
+        var maxW = Math.Max(320, Math.Min(work.Width, primary.Width) - ScreenMargin);
         if (window.MaxHeight > maxH || double.IsInfinity(window.MaxHeight))
         {
             window.MaxHeight = maxH;
@@ -99,6 +103,50 @@ public static class FitDialogToWorkArea
         {
             window.SizeToContent = SizeToContent.Manual;
             window.Height = maxH;
+        }
+    }
+
+    /// <summary>Grid or other roots that are larger than the screen (a long form, a tab with a list) get a
+    /// scroll viewer around them, both ways: the buttons at the bottom or the right edge stay reachable.</summary>
+    private static void ScrollIfOverflowing(Window window)
+    {
+        if (window.Content is not UIElement content || content is ScrollViewer)
+        {
+            return;
+        }
+
+        if (content is DockPanel dock && dock.Children.OfType<ScrollViewer>().Any())
+        {
+            return;
+        }
+
+        if (!TryGetWorkAreaDip(window, out var work))
+        {
+            return;
+        }
+
+        var primary = SystemParameters.WorkArea;
+        var maxH = Math.Max(240, Math.Min(work.Height, primary.Height) - ScreenMargin - 40);
+        var maxW = Math.Max(320, Math.Min(work.Width, primary.Width) - ScreenMargin);
+        content.Measure(new Size(maxW, double.PositiveInfinity));
+        var desired = content.DesiredSize;
+        if (desired.Height <= maxH && desired.Width <= maxW)
+        {
+            return;
+        }
+
+        window.Content = null;
+        window.Content = new ScrollViewer
+        {
+            VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
+            HorizontalScrollBarVisibility = ScrollBarVisibility.Auto,
+            Content = content
+        };
+
+        if (window.SizeToContent != SizeToContent.Manual)
+        {
+            window.SizeToContent = SizeToContent.Manual;
+            window.Height = Math.Min(maxH + 40, window.MaxHeight);
         }
     }
 
