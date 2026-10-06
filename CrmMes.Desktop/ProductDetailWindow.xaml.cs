@@ -1,4 +1,5 @@
 ﻿using System.Collections.ObjectModel;
+using System.Net.Http;
 using System.Windows;
 
 namespace CrmMes.Desktop;
@@ -38,6 +39,7 @@ public partial class ProductDetailWindow : Window
             var product = await _apiClient.GetProductAsync(_productId);
 
             CodeText.Text = product.Code;
+            GtinBox.Text = product.Gtin ?? string.Empty;
             NameText.Text = string.IsNullOrWhiteSpace(product.Description) ? product.Name : $"{product.Name} — {product.Description}";
             StatusText.Text = product.IsActive ? "Attivo" : "Inattivo";
             var statusKey = product.IsActive ? "Received" : "Cancelled";
@@ -229,6 +231,28 @@ public partial class ProductDetailWindow : Window
     }
 
     private void Close_Click(object sender, RoutedEventArgs e) => Close();
+
+    /// <summary>GTIN: le cifre e la cifra di controllo le verifica il server (Gs1.IsValidGtin); qui si chiede solo di tenere 8, 12, 13 o 14 cifre, il resto è un errore di battitura.</summary>
+    private async void SaveGtin_Click(object sender, RoutedEventArgs e)
+    {
+        var gtin = GtinBox.Text.Trim();
+        if (gtin.Length > 0 && (gtin.Any(c => !char.IsDigit(c)) || gtin.Length is not (8 or 12 or 13 or 14)))
+        {
+            MessageBox.Show(this, "Il GTIN deve avere 8, 12, 13 o 14 cifre, senza lettere.", "GTIN", MessageBoxButton.OK, MessageBoxImage.Warning);
+            return;
+        }
+
+        try
+        {
+            var saved = await _apiClient.SetProductGtinAsync(_productId, gtin.Length == 0 ? null : gtin);
+            GtinBox.Text = saved.Gtin ?? string.Empty;
+            MessageBox.Show(this, saved.Gtin is null ? "GTIN rimosso." : $"GTIN {saved.Gtin} salvato.", "GTIN", MessageBoxButton.OK, MessageBoxImage.Information);
+        }
+        catch (Exception exception) when (exception is HttpRequestException or InvalidOperationException)
+        {
+            MessageBox.Show(this, exception.Message, "GTIN", MessageBoxButton.OK, MessageBoxImage.Error);
+        }
+    }
 
     private void TechnicalDocuments_Click(object sender, RoutedEventArgs e)
     {

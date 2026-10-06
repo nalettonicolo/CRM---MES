@@ -1653,6 +1653,10 @@ public sealed class ApiClient
         return GetAsync<ProductSummaryDto>(query, cancellationToken);
     }
 
+    /// <summary>GTIN del prodotto (14 cifre con cifra di controllo GS1), oppure null per rimuoverlo.</summary>
+    public Task<ProductDetailDto> SetProductGtinAsync(Guid id, string? gtin, CancellationToken cancellationToken = default)
+        => SendAsync<ProductDetailDto>(HttpMethod.Put, $"api/products/{id}/gtin", new { gtin }, cancellationToken);
+
     public async Task<ProductDetailDto> GetProductAsync(Guid id, CancellationToken cancellationToken = default)
     {
         using var response = await _httpClient.GetAsync($"api/products/{id}", cancellationToken);
@@ -2523,7 +2527,8 @@ public sealed record ProductDetailDto(
     string? Description,
     bool IsActive,
     List<BomItemDto> BillOfMaterial,
-    List<RoutingStepDto> RoutingSteps);
+    List<RoutingStepDto> RoutingSteps,
+    string? Gtin = null);
 
 public sealed record BomItemDto(Guid Id, string MaterialCode, decimal Quantity, string? Notes);
 

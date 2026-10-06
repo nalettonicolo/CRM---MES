@@ -1,6 +1,6 @@
 @page "/prodotti"
 @inject Api Api
-@inject NavigationManager Nav
+@inject Session Session
 
 <PageTitle>Prodotti · Nicolò MES</PageTitle>
 
@@ -35,13 +35,14 @@
     {
         <div class="table-wrap">
             <table class="cards">
-                <thead><tr><th>Codice</th><th>Nome</th><th class="num">Distinta</th><th class="num">Fasi</th><th>Stato</th></tr></thead>
+                <thead><tr><th>Codice</th><th>Nome</th><th>GTIN</th><th class="num">Distinta</th><th class="num">Fasi</th><th>Stato</th></tr></thead>
                 <tbody>
                     @foreach (var product in _rows)
                     {
-                        <tr class="link" @onclick="@(() => Nav.NavigateTo($"ufficio-tecnico"))">
+                        <tr class="link" @onclick="@(() => Select(product))">
                             <td data-label="Codice" class="code">@product.Code</td>
                             <td data-label="Nome">@product.Name</td>
+                            <td data-label="GTIN" class="code">@(product.Gtin ?? "—")</td>
                             <td data-label="Distinta" class="num">@product.BomItemCount</td>
                             <td data-label="Fasi" class="num">@product.RoutingStepCount</td>
                             <td data-label="Stato">@(product.IsActive ? "Attivo" : "Non attivo")</td>
@@ -53,12 +54,77 @@
     }
 </div>
 
+@if (_selected is not null)
+{
+    <div class="card card-pad stack">
+        <h2>GTIN di @_selected.Code · @_selected.Name</h2>
+        <p class="muted small">Il GTIN è il codice a barre del prodotto (8, 12, 13 o 14 cifre con cifra di controllo GS1). Lascialo vuoto per rimuoverlo. Un GTIN non può essere assegnato a due prodotti.</p>
+        @if (CanEdit)
+        {
+            <div class="form-grid">
+                <label>GTIN<input @bind="_gtin" maxlength="14" inputmode="numeric" aria-label="GTIN del prodotto" /></label>
+            </div>
+            <div class="actions">
+                <button @onclick="SaveGtinAsync" disabled="@_busy">@(_busy ? "Salvataggio..." : "Salva GTIN")</button>
+                <button class="secondary" @onclick="() => _selected = null">Chiudi</button>
+            </div>
+        }
+        else
+        {
+            <p>GTIN attuale: <strong>@(_selected.Gtin ?? "non impostato")</strong>. Solo Admin e Magazzino possono modificarlo.</p>
+            <div class="actions"><button class="secondary" @onclick="() => _selected = null">Chiudi</button></div>
+        }
+        @if (_info is not null) {<div class="success" role="status">@_info</div>}
+        @if (_saveError is not null) {<div class="alert" role="alert">@_saveError</div>}
+    </div>
+}
+
 @code {
     private string _search = "";
     private List<ProductListItem>? _rows;
     private string? _error;
+    private ProductListItem? _selected;
+    private string _gtin = string.Empty;
+    private string? _info;
+    private string? _saveError;
+    private bool _busy;
+
+    private bool CanEdit => Session.Role is "Admin" or "Warehouse";
 
     protected override Task OnInitializedAsync() => LoadAsync();
+
+    private void Select(ProductListItem product)
+    {
+        _selected = product;
+        _gtin = product.Gtin ?? string.Empty;
+        _info = null;
+        _saveError = null;
+    }
+
+    private async Task SaveGtinAsync()
+    {
+        if (_selected is null) return;
+        _busy = true;
+        _info = null;
+        _saveError = null;
+        try
+        {
+            var value = _gtin.Trim();
+            var saved = await Api.PutAsync<ProductListItem>($"api/products/{_selected.Id}/gtin", new { gtin = value.Length == 0 ? null : value });
+            _selected = saved;
+            _gtin = saved.Gtin ?? string.Empty;
+            _info = saved.Gtin is null ? "GTIN rimosso." : $"GTIN {saved.Gtin} salvato.";
+            await LoadAsync();
+        }
+        catch (ApiException exception)
+        {
+            _saveError = exception.Message;
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
 
     private Task OnEnter(KeyboardEventArgs e) => e.Key == "Enter" ? LoadAsync() : Task.CompletedTask;
 

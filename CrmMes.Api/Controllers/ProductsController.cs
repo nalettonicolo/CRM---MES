@@ -1,4 +1,4 @@
-using System.Globalization;
+﻿using System.Globalization;
 using System.Security.Claims;
 using ClosedXML.Excel;
 using CrmMes.Api.Services;
@@ -52,7 +52,8 @@ public class ProductsController : ControllerBase
                 product.Name,
                 product.IsActive,
                 product.BillOfMaterial.Count,
-                product.RoutingSteps.Count))
+                product.RoutingSteps.Count,
+                product.Gtin))
             .ToListAsync(cancellationToken);
 
         return Ok(products);
@@ -486,7 +487,7 @@ public sealed record ReplaceBillOfMaterialRequest(List<BillOfMaterialItemRequest
 public sealed record RoutingStepRequest(string Name, string? Description, string? WorkCenter, decimal EstimatedMinutes);
 public sealed record ReplaceRoutingRequest(List<RoutingStepRequest> Steps);
 
-public sealed record ProductSummaryResponse(Guid Id, string Code, string Name, bool IsActive, int BomItemCount, int RoutingStepCount);
+public sealed record ProductSummaryResponse(Guid Id, string Code, string Name, bool IsActive, int BomItemCount, int RoutingStepCount, string? Gtin = null);
 
 public sealed record ProductResponse(
     Guid Id,
