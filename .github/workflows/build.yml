@@ -42,8 +42,11 @@ jobs:
         run: |
           # Ogni errore viene pubblicato come annotazione (::error::), leggibile anche senza accesso ai log.
           function Fail-WithOutput($what, $output) {
-            $tail = @($output) | Select-Object -Last 25
-            foreach ($line in $tail) { Write-Host "::error title=$what::$line" }
+            $lines = @($output | ForEach-Object { "$_" } | Where-Object { $_.Trim() -ne "" })
+            # Prima le righe con l'errore vero (Error, Unable, Couldn't, not found...), poi le ultime righe di contesto.
+            $errs = @($lines | Where-Object { $_ -match "(?i)error|unable|couldn|not found|exception|fatal|invalid" }) | Select-Object -First 30
+            $ctx = @($lines) | Select-Object -Last 8
+            foreach ($line in ($errs + $ctx)) { Write-Host "::error title=$what::$line" }
             throw "$what fallito."
           }
           $out = dotnet publish CrmMes.Desktop/CrmMes.Desktop.csproj -c Release -r win-x64 --self-contained false -o publish 2>&1
