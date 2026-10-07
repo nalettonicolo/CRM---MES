@@ -1,3 +1,4 @@
+using CrmMes.Api.Services;
 using CrmMes.Core.Data;
 using CrmMes.Core.Models;
 using Microsoft.AspNetCore.Authorization;
@@ -73,6 +74,7 @@ public class PlanningBoardController : ControllerBase
         };
 
         _dbContext.PlanningCategories.Add(category);
+        AuditTrail.Add(_dbContext, User, "PlanningCategoryCreated", "PlanningCategory", category.Id, $"Categoria di planning {category.Code} creata.");
         await _dbContext.SaveChangesAsync(cancellationToken);
 
         return Ok(new PlanningCategoryResponse(category.Id, category.Code, category.Name, category.ColorHex, category.SequenceNumber, category.IsActive));
@@ -101,6 +103,7 @@ public class PlanningBoardController : ControllerBase
             category.ColorHex = request.ColorHex.Trim();
         }
 
+        AuditTrail.Add(_dbContext, User, "PlanningCategoryUpdated", "PlanningCategory", category.Id, $"Categoria di planning {category.Code} modificata.");
         await _dbContext.SaveChangesAsync(cancellationToken);
         return Ok(new PlanningCategoryResponse(category.Id, category.Code, category.Name, category.ColorHex, category.SequenceNumber, category.IsActive));
     }
@@ -116,6 +119,7 @@ public class PlanningBoardController : ControllerBase
         }
 
         category.IsActive = false;
+        AuditTrail.Add(_dbContext, User, "PlanningCategoryDeactivated", "PlanningCategory", category.Id, $"Categoria di planning {category.Code} disattivata.");
         await _dbContext.SaveChangesAsync(cancellationToken);
         return NoContent();
     }
@@ -187,6 +191,7 @@ public class PlanningBoardController : ControllerBase
         };
 
         _dbContext.PlanningProjects.Add(project);
+        AuditTrail.Add(_dbContext, User, "PlanningProjectCreated", "PlanningProject", project.Id, $"Progetto di planning {project.Name} creato.");
         await _dbContext.SaveChangesAsync(cancellationToken);
 
         return Ok(new PlanningProjectResponse(project.Id, project.Name, project.Status, project.Notes, project.SequenceNumber, project.IsActive, project.WorkOrderId));
@@ -219,6 +224,7 @@ public class PlanningBoardController : ControllerBase
         project.Notes = string.IsNullOrWhiteSpace(request.Notes) ? null : request.Notes.Trim();
         project.WorkOrderId = request.WorkOrderId;
 
+        AuditTrail.Add(_dbContext, User, "PlanningProjectUpdated", "PlanningProject", project.Id, $"Progetto di planning {project.Name} modificato.");
         await _dbContext.SaveChangesAsync(cancellationToken);
         return Ok(new PlanningProjectResponse(project.Id, project.Name, project.Status, project.Notes, project.SequenceNumber, project.IsActive, project.WorkOrderId));
     }
@@ -234,6 +240,7 @@ public class PlanningBoardController : ControllerBase
         }
 
         project.IsActive = false;
+        AuditTrail.Add(_dbContext, User, "PlanningProjectDeactivated", "PlanningProject", project.Id, $"Progetto di planning {project.Name} disattivato.");
         await _dbContext.SaveChangesAsync(cancellationToken);
         return NoContent();
     }

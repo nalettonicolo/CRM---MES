@@ -1,6 +1,7 @@
 using System.Security.Claims;
 using System.Security.Cryptography;
 using System.Text.Json;
+using CrmMes.Api.Services;
 using CrmMes.Core.Data;
 using CrmMes.Core.Models;
 using Microsoft.AspNetCore.Authorization;
@@ -148,6 +149,7 @@ public class EngineeringController(ApplicationDbContext db) : ControllerBase
         };
         db.TechnicalDocuments.Add(document);
         db.TechnicalDocumentContents.Add(new TechnicalDocumentContent { TechnicalDocumentId = document.Id, Data = data });
+        AuditTrail.Add(db, User, "TechnicalDocumentUploaded", "TechnicalDocument", document.Id, $"Documento tecnico {document.Title} caricato (v{document.Version}).");
         await db.SaveChangesAsync(cancellationToken);
         return Ok(ToResponse(document));
     }
@@ -178,6 +180,7 @@ public class EngineeringController(ApplicationDbContext db) : ControllerBase
         }
 
         document.IsCurrent = false;
+        AuditTrail.Add(db, User, "TechnicalDocumentWithdrawn", "TechnicalDocument", document.Id, $"Documento tecnico {document.Title} ritirato.");
         await db.SaveChangesAsync(cancellationToken);
         return NoContent();
     }
@@ -319,6 +322,7 @@ public class EngineeringController(ApplicationDbContext db) : ControllerBase
         };
         Fill(change, request);
         db.EngineeringChanges.Add(change);
+        AuditTrail.Add(db, User, "EngineeringChangeCreated", "EngineeringChange", change.Id, $"Modifica tecnica n. {change.Number} creata su {product.Code}.");
         await db.SaveChangesAsync(cancellationToken);
         return await GetChange(change.Id, cancellationToken);
     }
@@ -370,6 +374,7 @@ public class EngineeringController(ApplicationDbContext db) : ControllerBase
         }
 
         change.Status = EngineeringChangeStatus.Rejected;
+        AuditTrail.Add(db, User, "EngineeringChangeRejected", "EngineeringChange", change.Id, $"Modifica tecnica n. {change.Number} respinta.");
         await db.SaveChangesAsync(cancellationToken);
         return await GetChange(id, cancellationToken);
     }
@@ -485,6 +490,7 @@ public class EngineeringController(ApplicationDbContext db) : ControllerBase
         change.ApplyReport = (updated.Count == 0 ? "Nessuna commessa in bozza da aggiornare." : $"Commesse in bozza aggiornate alla rev. {toRevision}: {string.Join(", ", updated)}.")
             + (untouched.Count == 0 ? string.Empty : $" Commesse già rilasciate, non modificate (da valutare in reparto): {string.Join(", ", untouched)}.");
 
+        AuditTrail.Add(db, User, "EngineeringChangeApplied", "EngineeringChange", change.Id, $"Modifica tecnica n. {change.Number} applicata: rev. {fromRevision} -> {toRevision}.");
         await db.SaveChangesAsync(cancellationToken);
         if (transaction is not null)
         {
@@ -544,6 +550,7 @@ public class EngineeringController(ApplicationDbContext db) : ControllerBase
         change.Status = to;
         change.ApprovedBy = UserName();
         change.ApprovedAt = DateTime.UtcNow;
+        AuditTrail.Add(db, User, "EngineeringChangeApproved", "EngineeringChange", change.Id, $"Modifica tecnica n. {change.Number} spostata da {from} a {to}.");
         await db.SaveChangesAsync(cancellationToken);
         return await GetChange(id, cancellationToken);
     }

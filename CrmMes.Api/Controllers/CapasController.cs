@@ -1,3 +1,4 @@
+using CrmMes.Api.Services;
 using CrmMes.Core.Data;
 using CrmMes.Core.Models;
 using Microsoft.AspNetCore.Authorization;
@@ -92,6 +93,7 @@ public class CapasController : ControllerBase
         };
 
         _dbContext.CorrectiveActions.Add(capa);
+        AuditTrail.Add(_dbContext, User, "CapaCreated", "CorrectiveAction", capa.Id, "CAPA creata.");
         await _dbContext.SaveChangesAsync(cancellationToken);
 
         return Created($"api/capas/{capa.Id}", new CapaResponse(
@@ -125,6 +127,7 @@ public class CapasController : ControllerBase
         capa.CorrectiveActionText = string.IsNullOrWhiteSpace(request.CorrectiveActionText) ? null : request.CorrectiveActionText.Trim();
         capa.PreventiveActionText = string.IsNullOrWhiteSpace(request.PreventiveActionText) ? null : request.PreventiveActionText.Trim();
 
+        AuditTrail.Add(_dbContext, User, "CapaUpdated", "CorrectiveAction", capa.Id, "CAPA modificata.");
         await _dbContext.SaveChangesAsync(cancellationToken);
 
         return Ok(new CapaResponse(
@@ -154,6 +157,7 @@ public class CapasController : ControllerBase
         capa.Status = status;
         capa.ClosedAt = status == CapaStatuses.Closed ? DateTime.UtcNow : null;
 
+        AuditTrail.Add(_dbContext, User, "CapaStatusChanged", "CorrectiveAction", capa.Id, $"CAPA passata allo stato {status}.");
         await _dbContext.SaveChangesAsync(cancellationToken);
 
         return Ok(new CapaResponse(

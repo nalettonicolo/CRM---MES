@@ -1,3 +1,4 @@
+using CrmMes.Api.Services;
 using CrmMes.Core.Data;
 using CrmMes.Core.Models;
 using Microsoft.AspNetCore.Authorization;
@@ -120,6 +121,7 @@ public class ShipmentsController : ControllerBase
         };
 
         _dbContext.Shipments.Add(shipment);
+        AuditTrail.Add(_dbContext, User, "ShipmentCreated", "Shipment", shipment.Id, $"Spedizione {direction} creata, corriere {carrier.Code}.");
         await _dbContext.SaveChangesAsync(cancellationToken);
 
         shipment.Carrier = carrier;
@@ -151,6 +153,7 @@ public class ShipmentsController : ControllerBase
 
         shipment.Status = "Shipped";
         shipment.ShippedAt = DateTime.UtcNow;
+        AuditTrail.Add(_dbContext, User, "ShipmentShipped", "Shipment", shipment.Id, $"Spedizione {shipment.Code} partita.");
         await _dbContext.SaveChangesAsync(cancellationToken);
 
         // Service post-vendita: an outbound shipment of a job for a known customer registers the machine
@@ -195,6 +198,7 @@ public class ShipmentsController : ControllerBase
 
         shipment.Status = "Delivered";
         shipment.DeliveredAt = DateTime.UtcNow;
+        AuditTrail.Add(_dbContext, User, "ShipmentDelivered", "Shipment", shipment.Id, $"Spedizione {shipment.Code} consegnata.");
         await _dbContext.SaveChangesAsync(cancellationToken);
 
         return Ok(ToResponse(shipment));
@@ -218,6 +222,7 @@ public class ShipmentsController : ControllerBase
         }
 
         shipment.Status = "Cancelled";
+        AuditTrail.Add(_dbContext, User, "ShipmentCancelled", "Shipment", shipment.Id, $"Spedizione {shipment.Code} annullata.");
         await _dbContext.SaveChangesAsync(cancellationToken);
 
         return Ok(ToResponse(shipment));

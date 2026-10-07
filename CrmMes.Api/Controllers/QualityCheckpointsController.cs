@@ -1,3 +1,4 @@
+using CrmMes.Api.Services;
 using CrmMes.Core.Data;
 using CrmMes.Core.Models;
 using Microsoft.AspNetCore.Authorization;
@@ -82,6 +83,7 @@ public class QualityCheckpointsController : ControllerBase
         };
 
         _dbContext.QualityCheckpoints.Add(checkpoint);
+        AuditTrail.Add(_dbContext, User, "QualityCheckpointCreated", "QualityCheckpoint", checkpoint.Id, $"Punto di controllo {checkpoint.Name} creato su {product.Code}.");
         await _dbContext.SaveChangesAsync(cancellationToken);
 
         var response = new QualityCheckpointResponse(
@@ -102,6 +104,7 @@ public class QualityCheckpointsController : ControllerBase
         }
 
         checkpoint.IsActive = false;
+        AuditTrail.Add(_dbContext, User, "QualityCheckpointDeactivated", "QualityCheckpoint", checkpoint.Id, $"Punto di controllo {checkpoint.Name} disattivato.");
         await _dbContext.SaveChangesAsync(cancellationToken);
         return NoContent();
     }

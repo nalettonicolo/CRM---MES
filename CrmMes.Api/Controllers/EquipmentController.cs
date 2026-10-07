@@ -1,3 +1,4 @@
+using CrmMes.Api.Services;
 using CrmMes.Core.Data;
 using CrmMes.Core.Models;
 using Microsoft.AspNetCore.Authorization;
@@ -96,6 +97,7 @@ public class EquipmentController : ControllerBase
 
         var equipment = new Equipment { Name = name, Code = code, WorkCenterId = workCenter?.Id };
         _dbContext.Equipment.Add(equipment);
+        AuditTrail.Add(_dbContext, User, "EquipmentCreated", "Equipment", equipment.Id, $"Macchina {equipment.Code} creata.");
         await _dbContext.SaveChangesAsync(cancellationToken);
 
         var response = new EquipmentResponse(equipment.Id, equipment.Name, equipment.Code, equipment.WorkCenterId, workCenter?.Name, equipment.IsActive);
@@ -113,6 +115,7 @@ public class EquipmentController : ControllerBase
         }
 
         equipment.IsActive = false;
+        AuditTrail.Add(_dbContext, User, "EquipmentDeactivated", "Equipment", equipment.Id, $"Macchina {equipment.Code} disattivata.");
         await _dbContext.SaveChangesAsync(cancellationToken);
         return NoContent();
     }

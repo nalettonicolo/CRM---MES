@@ -1,5 +1,6 @@
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
+using CrmMes.Api.Services;
 using CrmMes.Core.Data;
 using CrmMes.Core.Models;
 using Microsoft.AspNetCore.Authorization;
@@ -78,6 +79,7 @@ public class LocationsController : ControllerBase
         };
 
         _dbContext.WarehouseLocations.Add(location);
+        AuditTrail.Add(_dbContext, User, "LocationCreated", "WarehouseLocation", location.Id, $"Ubicazione {location.Code} creata.");
         await _dbContext.SaveChangesAsync(cancellationToken);
 
         return Created($"api/locations/{location.Id}",
@@ -118,6 +120,7 @@ public class LocationsController : ControllerBase
             location.IsActive = request.IsActive.Value;
         }
 
+        AuditTrail.Add(_dbContext, User, "LocationUpdated", "WarehouseLocation", location.Id, $"Ubicazione {location.Code} modificata.");
         await _dbContext.SaveChangesAsync(cancellationToken);
 
         return Ok(new WarehouseLocationResponse(location.Id, location.Code, location.Name, location.SiteId, location.IsActive, location.CreatedAt));
@@ -201,6 +204,7 @@ public class LocationsController : ControllerBase
             return BadRequest(new { message = "La rettifica porterebbe la giacenza totale del materiale sotto zero." });
         }
 
+        AuditTrail.Add(_dbContext, User, "LocationStockAdjusted", "WarehouseLocation", location.Id, $"Giacenza di {material.Code} in {location.Code} rettificata a {request.Quantity} ({(delta >= 0 ? "+" : "")}{delta}).");
         await _dbContext.SaveChangesAsync(cancellationToken);
 
         return Ok(new LocationStockResponse(
@@ -245,6 +249,7 @@ public class LocationsController : ControllerBase
         };
 
         _dbContext.InventorySessions.Add(session);
+        AuditTrail.Add(_dbContext, User, "InventorySessionOpened", "InventorySession", session.Id, $"Sessione di inventario {session.Code} aperta.");
         await _dbContext.SaveChangesAsync(cancellationToken);
 
         return Created($"api/locations/inventory/{session.Id}",
@@ -371,6 +376,7 @@ public class LocationsController : ControllerBase
 
         session.Status = InventorySessionStatuses.Closed;
         session.ClosedAt = DateTime.UtcNow;
+        AuditTrail.Add(_dbContext, User, "InventorySessionClosed", "InventorySession", session.Id, $"Sessione di inventario {session.Code} chiusa.");
         await _dbContext.SaveChangesAsync(cancellationToken);
 
         var lines = session.Lines.Select(ToLineResponse).ToList();

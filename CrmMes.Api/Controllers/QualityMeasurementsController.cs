@@ -1,3 +1,4 @@
+using CrmMes.Api.Services;
 using CrmMes.Core.Data;
 using CrmMes.Core.Models;
 using Microsoft.AspNetCore.Authorization;
@@ -88,6 +89,7 @@ public class QualityMeasurementsController : ControllerBase
         };
 
         _dbContext.QualityMeasurements.Add(measurement);
+        AuditTrail.Add(_dbContext, User, "QualityMeasurementRecorded", "QualityMeasurement", measurement.Id, $"Misura registrata su commessa {workOrder.Code}.");
         await _dbContext.SaveChangesAsync(cancellationToken);
 
         var unit = request.WorkOrderUnitId.HasValue

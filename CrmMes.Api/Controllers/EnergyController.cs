@@ -1,4 +1,5 @@
 using System.Security.Claims;
+using CrmMes.Api.Services;
 using CrmMes.Core.Data;
 using CrmMes.Core.Models;
 using Microsoft.AspNetCore.Authorization;
@@ -214,6 +215,7 @@ public class EnergyController(ApplicationDbContext db) : ControllerBase
             CreatedBy = User.FindFirstValue(ClaimTypes.Name),
         };
         db.EnergyProjects.Add(project);
+        AuditTrail.Add(db, User, "EnergyProjectCreated", "EnergyProject", project.Id, $"Progetto di efficientamento {title} creato su {equipment.Name}.");
         await db.SaveChangesAsync(cancellationToken);
 
         return Created($"api/energy/projects/{project.Id}", await ToResponseAsync(db, project, cancellationToken, equipment));
@@ -245,6 +247,7 @@ public class EnergyController(ApplicationDbContext db) : ControllerBase
         project.AfterFrom = request.AfterFrom?.ToUniversalTime();
         project.AfterTo = request.AfterTo?.ToUniversalTime();
         project.UpdatedAt = DateTime.UtcNow;
+        AuditTrail.Add(db, User, "EnergyProjectAfterPeriodSet", "EnergyProject", project.Id, $"Periodo ex post impostato su {project.Title}.");
         await db.SaveChangesAsync(cancellationToken);
 
         return Ok(await ToResponseAsync(db, project, cancellationToken));
@@ -261,6 +264,7 @@ public class EnergyController(ApplicationDbContext db) : ControllerBase
         }
 
         db.EnergyProjects.Remove(project);
+        AuditTrail.Add(db, User, "EnergyProjectDeleted", "EnergyProject", project.Id, $"Progetto di efficientamento {project.Title} eliminato.");
         await db.SaveChangesAsync(cancellationToken);
         return NoContent();
     }

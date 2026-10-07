@@ -54,6 +54,7 @@ public class FoodController : ControllerBase
         material.IngredientName = Clean(request.IngredientName);
         var allergens = FoodAllergens.Normalize(request.Allergens ?? []);
         material.Allergens = allergens.Count == 0 ? null : string.Join(',', allergens);
+        AuditTrail.Add(_dbContext, User, "MaterialFoodInfoSaved", "Material", material.Id, $"Dati alimentari aggiornati su {material.Code}.");
         await _dbContext.SaveChangesAsync(cancellationToken);
         return Ok(ToResponse(material));
     }
@@ -86,6 +87,7 @@ public class FoodController : ControllerBase
         product.UseByDate = request.UseByDate;
         product.StorageConditions = Clean(request.StorageConditions);
         product.NetQuantity = Clean(request.NetQuantity);
+        AuditTrail.Add(_dbContext, User, "ProductFoodInfoSaved", "Product", product.Id, $"Dati alimentari aggiornati su {product.Code}.");
         await _dbContext.SaveChangesAsync(cancellationToken);
         return Ok(ToResponse(product));
     }

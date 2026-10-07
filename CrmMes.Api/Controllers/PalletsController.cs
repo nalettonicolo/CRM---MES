@@ -81,6 +81,7 @@ public class PalletsController : ControllerBase
                 CreatedBy = User.FindFirstValue(ClaimTypes.Name)
             };
             _dbContext.LogisticUnits.Add(unit);
+            AuditTrail.Add(_dbContext, User, "LogisticUnitCreated", "LogisticUnit", unit.Id, $"Pallet SSCC {unit.Sscc} assegnato.");
             try
             {
                 await _dbContext.SaveChangesAsync(cancellationToken);
@@ -130,6 +131,7 @@ public class PalletsController : ControllerBase
             company.LastSsccSerial = await _dbContext.LogisticUnits.CountAsync(u => u.Sscc.StartsWith("0" + prefix), cancellationToken);
         }
 
+        AuditTrail.Add(_dbContext, User, "Gs1PrefixSet", "CompanyProfile", company.Id, $"Prefisso aziendale GS1 impostato a {prefix}.");
         await _dbContext.SaveChangesAsync(cancellationToken);
         return NoContent();
     }

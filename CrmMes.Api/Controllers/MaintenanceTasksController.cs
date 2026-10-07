@@ -1,3 +1,4 @@
+using CrmMes.Api.Services;
 using CrmMes.Core.Data;
 using CrmMes.Core.Models;
 using Microsoft.AspNetCore.Authorization;
@@ -102,6 +103,7 @@ public class MaintenanceTasksController : ControllerBase
         };
 
         _dbContext.MaintenanceTasks.Add(task);
+        AuditTrail.Add(_dbContext, User, "MaintenanceTaskCreated", "MaintenanceTask", task.Id, $"Intervento {type} creato su {equipment.Name}.");
         await _dbContext.SaveChangesAsync(cancellationToken);
 
         return Created($"api/maintenance-tasks/{task.Id}", ToResponse(task, equipment.Name));
@@ -153,6 +155,7 @@ public class MaintenanceTasksController : ControllerBase
             _dbContext.MaintenanceTasks.Add(nextTask);
         }
 
+        AuditTrail.Add(_dbContext, User, "MaintenanceTaskCompleted", "MaintenanceTask", task.Id, $"Intervento {task.Title} completato.");
         await _dbContext.SaveChangesAsync(cancellationToken);
         return Ok(ToResponse(task, task.Equipment.Name));
     }

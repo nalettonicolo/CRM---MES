@@ -1,3 +1,4 @@
+using CrmMes.Api.Services;
 using CrmMes.Core.Data;
 using CrmMes.Core.Models;
 using Microsoft.AspNetCore.Authorization;
@@ -111,6 +112,7 @@ public class ServiceController(ApplicationDbContext db) : ControllerBase
             Notes = Clean(request.Notes),
         };
         db.InstalledMachines.Add(machine);
+        AuditTrail.Add(db, User, "InstalledMachineCreated", "InstalledMachine", machine.Id, $"Macchina installata {machine.Name} registrata per {customer.Name}.");
         await db.SaveChangesAsync(cancellationToken);
 
         return Created($"api/service/machines/{machine.Id}", new InstalledMachineResponse(machine.Id, customer.Id, customer.Name, machine.WorkOrderId,
@@ -128,6 +130,7 @@ public class ServiceController(ApplicationDbContext db) : ControllerBase
         }
 
         machine.Status = "Decommissioned";
+        AuditTrail.Add(db, User, "InstalledMachineDecommissioned", "InstalledMachine", machine.Id, $"Macchina {machine.Name} dismessa.");
         await db.SaveChangesAsync(cancellationToken);
         return NoContent();
     }
@@ -219,6 +222,7 @@ public class ServiceController(ApplicationDbContext db) : ControllerBase
             ContactInfo = Clean(request.ContactInfo),
         };
         db.ServiceRequests.Add(serviceRequest);
+        AuditTrail.Add(db, User, "ServiceRequestCreated", "ServiceRequest", serviceRequest.Id, $"Richiesta di assistenza creata per {machine.Name}.");
         await db.SaveChangesAsync(cancellationToken);
 
         return Created($"api/service/requests/{serviceRequest.Id}", ToDetailResponse(serviceRequest, machine));
@@ -242,6 +246,7 @@ public class ServiceController(ApplicationDbContext db) : ControllerBase
 
         request.Status = ServiceRequestStatus.Closed;
         request.ClosedAt = DateTime.UtcNow;
+        AuditTrail.Add(db, User, "ServiceRequestClosed", "ServiceRequest", request.Id, "Richiesta di assistenza chiusa.");
         await db.SaveChangesAsync(cancellationToken);
         return Ok(ToDetailResponse(request));
     }
@@ -264,6 +269,7 @@ public class ServiceController(ApplicationDbContext db) : ControllerBase
 
         request.Status = request.Interventions.Any() ? ServiceRequestStatus.InProgress : ServiceRequestStatus.Open;
         request.ClosedAt = null;
+        AuditTrail.Add(db, User, "ServiceRequestReopened", "ServiceRequest", request.Id, "Richiesta di assistenza riaperta.");
         await db.SaveChangesAsync(cancellationToken);
         return Ok(ToDetailResponse(request));
     }
@@ -305,6 +311,7 @@ public class ServiceController(ApplicationDbContext db) : ControllerBase
         db.ServiceInterventions.Add(intervention);
 
         serviceRequest.Status = ServiceRequestStatus.InProgress;
+        AuditTrail.Add(db, User, "ServiceInterventionAdded", "ServiceRequest", serviceRequest.Id, "Intervento aggiunto alla richiesta di assistenza.");
         await db.SaveChangesAsync(cancellationToken);
 
         return Created($"api/service/requests/{id}", ToDetailResponse(serviceRequest));

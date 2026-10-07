@@ -94,6 +94,7 @@ public class SectorPacksController(ApplicationDbContext db) : ControllerBase
             });
         }
 
+        AuditTrail.Add(db, User, "EplanBomImported", "Product", product.Id, $"Distinta da EPLAN importata su {product.Code}: {parsed.Rows.Count} righe.");
         await db.SaveChangesAsync(cancellationToken);
         return Ok(new SectorPackImportResponse(parsed.Rows.Count, materialsCreated, parsed.Errors.Count, parsed.Errors.Take(50).ToList()));
     }
@@ -136,6 +137,7 @@ public class SectorPacksController(ApplicationDbContext db) : ControllerBase
         }
 
         await UpsertTextDocumentAsync(productId, "Lista cavi", "wire-list.txt", body.ToString(), cancellationToken);
+        AuditTrail.Add(db, User, "WireListImported", "Product", productId, $"Lista cavi importata: {parsed.Rows.Count} righe.");
         await db.SaveChangesAsync(cancellationToken);
         return Ok(new SectorPackImportResponse(parsed.Rows.Count, 0, parsed.Errors.Count, parsed.Errors.Take(50).ToList()));
     }
@@ -174,6 +176,7 @@ public class SectorPacksController(ApplicationDbContext db) : ControllerBase
             parsed.Rows.Select(r => new { nutrient = r.Nutrient, per100g = r.Per100g }),
             JsonOptions);
         await UpsertTextDocumentAsync(productId, "Tabella nutrizionale", "nutrition.json", json, cancellationToken);
+        AuditTrail.Add(db, User, "NutritionTableImported", "Product", productId, $"Tabella nutrizionale importata: {parsed.Rows.Count} righe.");
         await db.SaveChangesAsync(cancellationToken);
         return Ok(new SectorPackImportResponse(parsed.Rows.Count, 0, parsed.Errors.Count, parsed.Errors.Take(50).ToList()));
     }
@@ -244,6 +247,7 @@ public class SectorPacksController(ApplicationDbContext db) : ControllerBase
             applied++;
         }
 
+        AuditTrail.Add(db, User, "SalApplied", "SAL", null, $"SAL applicato: {applied} commesse, {skipped.Count} scartate.");
         await db.SaveChangesAsync(cancellationToken);
         var issues = parsed.Errors.Concat(skipped).Take(50).ToList();
         return Ok(new SectorPackApplyResponse(applied, skipped.Count, issues, parsed.Errors.Count + skipped.Count));
@@ -298,6 +302,7 @@ public class SectorPacksController(ApplicationDbContext db) : ControllerBase
             applied++;
         }
 
+        AuditTrail.Add(db, User, "Cert31Applied", "Cert31", null, $"Certificati 3.1 applicati: {applied} lotti, {skipped.Count} scartati.");
         await db.SaveChangesAsync(cancellationToken);
         var issues = parsed.Errors.Concat(skipped).Take(50).ToList();
         return Ok(new SectorPackApplyResponse(applied, skipped.Count, issues, parsed.Errors.Count + skipped.Count));
@@ -334,6 +339,7 @@ public class SectorPacksController(ApplicationDbContext db) : ControllerBase
             Notes = string.IsNullOrWhiteSpace(request.Notes) ? null : request.Notes.Trim()
         };
         db.ScaleReadings.Add(reading);
+        AuditTrail.Add(db, User, "ScaleReadingRecorded", "ScaleReading", reading.Id, $"Lettura bilancia registrata per {reading.MaterialCode}.");
         await db.SaveChangesAsync(cancellationToken);
         return Ok(new ScaleReadingResponse(reading.Id, reading.MaterialCode, reading.WeightKg, reading.Unit, reading.RecordedAt, reading.Notes));
     }

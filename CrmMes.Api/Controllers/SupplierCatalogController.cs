@@ -427,6 +427,8 @@ public class SupplierCatalogController : ControllerBase
             imported++;
         }
 
+        AuditTrail.Add(_dbContext, User, "SupplierCatalogImported", "SupplierCatalog", null,
+            $"Importate {imported} righe di catalogo: {createdMaterials} materiali e {createdLinks} collegamenti fornitore creati.");
         await _dbContext.SaveChangesAsync(cancellationToken);
         return new ImportSummary(imported, createdMaterials, createdLinks);
     }
