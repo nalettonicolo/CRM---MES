@@ -162,6 +162,7 @@ builder.Services.AddSingleton<CrmMes.Api.Services.WorkOrderFactory>();
 builder.Services.AddScoped<CrmMes.Api.Services.MaterialPricing>();
 builder.Services.AddScoped<CrmMes.Api.Services.WorkOrderCosting>();
 builder.Services.AddScoped<CrmMes.Api.Services.StockLedger>();
+builder.Services.AddScoped<CrmMes.Api.Services.CustomFieldService>();
 var sdiProvider = builder.Configuration["Sdi:Provider"]?.Trim().ToLowerInvariant();
 if (sdiProvider == "http")
 {

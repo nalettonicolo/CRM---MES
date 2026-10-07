@@ -116,4 +116,59 @@ public class LayoutWebTests : TestContext
         Assert.Contains("\"fieldKey\":\"description\"", put.Body);
         Assert.Contains("\"label\":\"Guasto\"", put.Body);
     }
+
+    [Fact]
+    public async Task CustomFields_AreListed_AndANewOnePostsToTheApi()
+    {
+        await LogInAsync("Admin");
+        _server.OnJson("GET", "/api/layout/access", new LayoutAccess(true, [], []));
+        _server.OnJson("GET", "/api/layout/service.request", new LayoutScreen("service.request", "Nuova richiesta di assistenza (Service)",
+        [
+            F("subject", "Oggetto", 1, true, true, false),
+        ]));
+        var existingId = Guid.NewGuid();
+        _server.OnJson("GET", "/api/layout/service.request/custom-fields", new List<CustomFieldDefinition>
+        {
+            new(existingId, "giorni-di-pagamento", "Giorni di pagamento", "Number", 1, true),
+        });
+        var createdId = Guid.NewGuid();
+        _server.OnJson("POST", "/api/layout/service.request/custom-fields",
+            new CustomFieldDefinition(createdId, "note-interne", "Note interne", "Text", 2, false));
+
+        var page = RenderComponent<CrmMes.Web.Pages.Layout>();
+        page.WaitForAssertion(() => Assert.Contains("Giorni di pagamento", page.Markup));
+        Assert.Contains("Numero", page.Markup);
+
+        page.Find("input[placeholder='es. Giorni di pagamento']").Change("Note interne");
+        page.FindAll("button").Single(b => b.TextContent == "Aggiungi campo").Click();
+
+        page.WaitForAssertion(() => Assert.Contains(_server.Requests, r =>
+            r.Request.Method == HttpMethod.Post && r.Request.RequestUri!.PathAndQuery == "/api/layout/service.request/custom-fields"));
+        var post = _server.Requests.Single(r => r.Request.Method == HttpMethod.Post);
+        Assert.Contains("\"label\":\"Note interne\"", post.Body);
+    }
+
+    [Fact]
+    public async Task DeletingACustomField_SendsTheDeleteRequest()
+    {
+        await LogInAsync("Admin");
+        _server.OnJson("GET", "/api/layout/access", new LayoutAccess(true, [], []));
+        _server.OnJson("GET", "/api/layout/service.request", new LayoutScreen("service.request", "Nuova richiesta di assistenza (Service)",
+        [
+            F("subject", "Oggetto", 1, true, true, false),
+        ]));
+        var fieldId = Guid.NewGuid();
+        _server.OnJson("GET", "/api/layout/service.request/custom-fields", new List<CustomFieldDefinition>
+        {
+            new(fieldId, "note-interne", "Note interne", "Text", 1, false),
+        });
+        _server.On("DELETE", $"/api/layout/service.request/custom-fields/{fieldId}", _ => FakeServer.Json(new { }, System.Net.HttpStatusCode.NoContent));
+
+        var page = RenderComponent<CrmMes.Web.Pages.Layout>();
+        page.WaitForAssertion(() => Assert.Contains("Note interne", page.Markup));
+
+        page.FindAll("button").Single(b => b.TextContent == "Elimina").Click();
+
+        page.WaitForAssertion(() => Assert.Contains(_server.Requests, r => r.Request.Method == HttpMethod.Delete));
+    }
 }

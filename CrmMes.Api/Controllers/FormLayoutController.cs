@@ -17,6 +17,180 @@ namespace CrmMes.Api.Controllers;
 [Route("api/layout")]
 public class FormLayoutController(ApplicationDbContext db) : ControllerBase
 {
+    /// <summary>Campi personalizzati di una schermata (oltre ai predefiniti nel codice). Aperto a tutti gli
+    /// utenti autenticati: ogni modulo ne ha bisogno per disegnarsi, come per i campi predefiniti.</summary>
+    [HttpGet("{screen}/custom-fields")]
+    public async Task<ActionResult<List<CustomFieldDefinitionResponse>>> GetCustomFields(string screen, CancellationToken cancellationToken = default)
+    {
+        if (!FormLayoutRegistry.IsKnown(screen))
+        {
+            return NotFound(new { message = "Schermata non gestita dallo strumento Layout." });
+        }
+
+        var fields = await db.CustomFieldDefinitions.AsNoTracking()
+            .Where(f => f.Screen == screen).OrderBy(f => f.Order).ToListAsync(cancellationToken);
+        return Ok(fields.Select(ToCustomFieldResponse).ToList());
+    }
+
+    /// <summary>Aggiunge un campo nuovo di sana pianta alla schermata (es. "Giorni di pagamento" su "Nuovo
+    /// fornitore"): a differenza degli altri campi dello Strumento Layout, questo non esiste nel modello, il suo
+    /// valore si salva per record in CustomFieldValue (vedi CustomFieldService).</summary>
+    [HttpPost("{screen}/custom-fields")]
+    public async Task<ActionResult<CustomFieldDefinitionResponse>> CreateCustomField(
+        string screen, SaveCustomFieldRequest request, CancellationToken cancellationToken = default)
+    {
+        var forbidden = await EnsureCanEditAsync(cancellationToken);
+        if (forbidden is not null)
+        {
+            return forbidden;
+        }
+
+        if (!FormLayoutRegistry.IsKnown(screen))
+        {
+            return NotFound(new { message = "Schermata non gestita dallo strumento Layout." });
+        }
+
+        var label = request.Label?.Trim();
+        if (string.IsNullOrWhiteSpace(label))
+        {
+            return BadRequest(new { message = "L'etichetta del campo è obbligatoria." });
+        }
+
+        if (label.Length > 120)
+        {
+            return BadRequest(new { message = "L'etichetta non può superare 120 caratteri." });
+        }
+
+        var fieldType = string.IsNullOrWhiteSpace(request.FieldType) ? CustomFieldType.Text : request.FieldType.Trim();
+        if (!CustomFieldType.IsKnown(fieldType))
+        {
+            return BadRequest(new { message = $"Tipo di campo sconosciuto. Valori ammessi: {string.Join(", ", CustomFieldType.All)}." });
+        }
+
+        var key = Slugify(label);
+        if (await db.CustomFieldDefinitions.AnyAsync(f => f.Screen == screen && f.Key == key, cancellationToken))
+        {
+            return Conflict(new { message = $"Esiste già un campo personalizzato con chiave '{key}' su questa schermata: scegli un'etichetta diversa." });
+        }
+
+        var maxOrder = await db.CustomFieldDefinitions.Where(f => f.Screen == screen)
+            .Select(f => (int?)f.Order).MaxAsync(cancellationToken) ?? 0;
+
+        var field = new CustomFieldDefinition
+        {
+            Screen = screen,
+            Key = key,
+            Label = label,
+            FieldType = fieldType,
+            Order = maxOrder + 1,
+            Required = request.Required,
+            UpdatedBy = User.FindFirstValue(ClaimTypes.Name),
+            UpdatedAt = DateTime.UtcNow,
+        };
+        db.CustomFieldDefinitions.Add(field);
+        db.AuditLogs.Add(new AuditLog
+        {
+            Action = "CustomFieldCreated",
+            EntityType = "CustomFieldDefinition",
+            EntityId = field.Id,
+            UserName = field.UpdatedBy,
+            Details = $"Campo personalizzato '{field.Label}' ({field.FieldType}) aggiunto a {screen}."
+        });
+        await db.SaveChangesAsync(cancellationToken);
+        return CreatedAtAction(nameof(GetCustomFields), new { screen }, ToCustomFieldResponse(field));
+    }
+
+    /// <summary>Etichetta, ordine e obbligatorietà sono modificabili dopo la creazione; tipo e schermata no,
+    /// perché cambierebbero il significato dei valori già salvati per i record esistenti.</summary>
+    [HttpPut("{screen}/custom-fields/{id:guid}")]
+    public async Task<ActionResult<CustomFieldDefinitionResponse>> EditCustomField(
+        string screen, Guid id, SaveCustomFieldRequest request, CancellationToken cancellationToken = default)
+    {
+        var forbidden = await EnsureCanEditAsync(cancellationToken);
+        if (forbidden is not null)
+        {
+            return forbidden;
+        }
+
+        var field = await db.CustomFieldDefinitions.SingleOrDefaultAsync(f => f.Id == id && f.Screen == screen, cancellationToken);
+        if (field is null)
+        {
+            return NotFound();
+        }
+
+        var label = request.Label?.Trim();
+        if (string.IsNullOrWhiteSpace(label))
+        {
+            return BadRequest(new { message = "L'etichetta del campo è obbligatoria." });
+        }
+
+        if (label.Length > 120)
+        {
+            return BadRequest(new { message = "L'etichetta non può superare 120 caratteri." });
+        }
+
+        field.Label = label;
+        field.Order = request.Order;
+        field.Required = request.Required;
+        field.UpdatedBy = User.FindFirstValue(ClaimTypes.Name);
+        field.UpdatedAt = DateTime.UtcNow;
+        await db.SaveChangesAsync(cancellationToken);
+        return Ok(ToCustomFieldResponse(field));
+    }
+
+    /// <summary>Rimuove il campo e, in cascata, tutti i valori già salvati per i record esistenti.</summary>
+    [HttpDelete("{screen}/custom-fields/{id:guid}")]
+    public async Task<IActionResult> DeleteCustomField(string screen, Guid id, CancellationToken cancellationToken = default)
+    {
+        var forbidden = await EnsureCanEditAsync(cancellationToken);
+        if (forbidden is not null)
+        {
+            return forbidden;
+        }
+
+        var field = await db.CustomFieldDefinitions.SingleOrDefaultAsync(f => f.Id == id && f.Screen == screen, cancellationToken);
+        if (field is null)
+        {
+            return NotFound();
+        }
+
+        db.CustomFieldDefinitions.Remove(field);
+        db.AuditLogs.Add(new AuditLog
+        {
+            Action = "CustomFieldDeleted",
+            EntityType = "CustomFieldDefinition",
+            EntityId = field.Id,
+            UserName = User.FindFirstValue(ClaimTypes.Name),
+            Details = $"Campo personalizzato '{field.Label}' rimosso da {screen}."
+        });
+        await db.SaveChangesAsync(cancellationToken);
+        return NoContent();
+    }
+
+    private async Task<ActionResult?> EnsureCanEditAsync(CancellationToken cancellationToken)
+    {
+        var granted = await LoadGrantedRolesAsync(cancellationToken);
+        return FormLayoutAccess.CanEdit(User.FindFirstValue(ClaimTypes.Role), string.Join(',', granted)) ? null : Forbid();
+    }
+
+    /// <summary>Slug leggibile e stabile dall'etichetta (es. "Giorni di pagamento" → "giorni-di-pagamento"),
+    /// usato come chiave: non cambia anche se l'etichetta viene poi modificata.</summary>
+    private static string Slugify(string label)
+    {
+        var slug = new string(label.Trim().ToLowerInvariant()
+            .Select(c => char.IsLetterOrDigit(c) ? c : '-').ToArray());
+        while (slug.Contains("--"))
+        {
+            slug = slug.Replace("--", "-");
+        }
+
+        slug = slug.Trim('-');
+        return slug.Length > 80 ? slug[..80] : (slug.Length == 0 ? Guid.NewGuid().ToString("N")[..8] : slug);
+    }
+
+    private static CustomFieldDefinitionResponse ToCustomFieldResponse(CustomFieldDefinition field) =>
+        new(field.Id, field.Key, field.Label, field.FieldType, field.Order, field.Required);
+
     /// <summary>Chi può modificare i layout, per l'utente che chiede: serve ai client per mostrare o nascondere
     /// i comandi di modifica. Aperto a tutti gli utenti autenticati.</summary>
     [HttpGet("access")]
@@ -185,3 +359,7 @@ public sealed record SaveLayoutAccessRequest(List<string>? Roles);
 public sealed record SaveLayoutRequest(List<SaveLayoutFieldRequest>? Fields);
 
 public sealed record SaveLayoutFieldRequest(string FieldKey, string? Label, int Order, bool Visible, bool Required);
+
+public sealed record CustomFieldDefinitionResponse(Guid Id, string Key, string Label, string FieldType, int Order, bool Required);
+
+public sealed record SaveCustomFieldRequest(string? Label, string? FieldType, int Order, bool Required);

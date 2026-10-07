@@ -44,6 +44,26 @@
                         break;
                 }
             }
+            @foreach (var f in _customFields.OrderBy(f => f.Order))
+            {
+                <label>@(f.Required ? f.Label + " *" : f.Label)
+                    @switch (f.FieldType)
+                    {
+                        case "Number":
+                            <input type="number" step="any" aria-label="@f.Label" value="@CustomFieldValue(f.Key)" @oninput="e => SetCustomField(f.Key, e.Value?.ToString())" />
+                            break;
+                        case "Date":
+                            <input type="date" aria-label="@f.Label" value="@CustomFieldValue(f.Key)" @oninput="e => SetCustomField(f.Key, e.Value?.ToString())" />
+                            break;
+                        case "Checkbox":
+                            <input type="checkbox" aria-label="@f.Label" checked="@CustomFieldChecked(f.Key)" @onchange="e => SetCustomFieldChecked(f.Key, e.Value)" />
+                            break;
+                        default:
+                            <input aria-label="@f.Label" value="@CustomFieldValue(f.Key)" @oninput="e => SetCustomField(f.Key, e.Value?.ToString())" />
+                            break;
+                    }
+                </label>
+            }
         </div>
         <div class="actions"><button @onclick="CreateAsync" disabled="@_creating">@(_creating ? "Salvataggio..." : "Crea cliente")</button></div>
     </div>
@@ -102,6 +122,13 @@
     private string _newCode = string.Empty;
     private string _newName = string.Empty;
     private string _newVat = string.Empty;
+    private List<CustomFieldDefinition> _customFields = [];
+    private readonly Dictionary<string, string?> _customFieldValues = [];
+
+    private string? CustomFieldValue(string key) => _customFieldValues.GetValueOrDefault(key);
+    private void SetCustomField(string key, string? value) => _customFieldValues[key] = value;
+    private bool CustomFieldChecked(string key) => bool.TryParse(_customFieldValues.GetValueOrDefault(key), out var value) && value;
+    private void SetCustomFieldChecked(string key, object? value) => _customFieldValues[key] = value is true ? bool.TrueString : bool.FalseString;
 
     private bool CanCreate => Session.Role is "Admin" or "Sales";
 
@@ -163,6 +190,15 @@
         {
             // Restano i default: il layout non deve impedire di creare clienti.
         }
+
+        try
+        {
+            _customFields = await Api.GetAsync<List<CustomFieldDefinition>>("api/layout/customers.new/custom-fields");
+        }
+        catch (ApiException)
+        {
+            // Nessun campo personalizzato, o non raggiungibile: il modulo resta con i soli campi standard.
+        }
     }
 
     private async Task CreateAsync()
@@ -174,6 +210,7 @@
                 "vatNumber" => _newVat,
                 _ => null,
             })).Select(LabelOf).ToList();
+        missing.AddRange(_customFields.Where(f => f.Required && string.IsNullOrWhiteSpace(CustomFieldValue(f.Key))).Select(f => f.Label));
         if (missing.Count > 0)
         {
             _createError = "Compila i campi obbligatori: " + string.Join(", ", missing) + ".";
@@ -191,11 +228,13 @@
                 email = (string?)null,
                 phone = (string?)null,
                 address = (string?)null,
-                notes = (string?)null
+                notes = (string?)null,
+                customFields = _customFieldValues,
             });
             _newCode = string.Empty;
             _newName = string.Empty;
             _newVat = string.Empty;
+            _customFieldValues.Clear();
             _showCreate = false;
             Nav.NavigateTo(created.DetailHref());
         }

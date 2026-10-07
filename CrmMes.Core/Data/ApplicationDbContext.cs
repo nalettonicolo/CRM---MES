@@ -82,6 +82,8 @@ public class ApplicationDbContext : DbContext
     public DbSet<MachineEvent> MachineEvents => Set<MachineEvent>();
     public DbSet<EnergyProject> EnergyProjects => Set<EnergyProject>();
     public DbSet<CrmMes.Core.Layout.FormFieldSetting> FormFieldSettings => Set<CrmMes.Core.Layout.FormFieldSetting>();
+    public DbSet<CrmMes.Core.Layout.CustomFieldDefinition> CustomFieldDefinitions => Set<CrmMes.Core.Layout.CustomFieldDefinition>();
+    public DbSet<CrmMes.Core.Layout.CustomFieldValue> CustomFieldValues => Set<CrmMes.Core.Layout.CustomFieldValue>();
     public DbSet<WarehouseLocation> WarehouseLocations => Set<WarehouseLocation>();
     public DbSet<LocationStock> LocationStocks => Set<LocationStock>();
     public DbSet<InventorySession> InventorySessions => Set<InventorySession>();
@@ -742,6 +744,28 @@ public class ApplicationDbContext : DbContext
             entity.Property(f => f.FieldKey).HasMaxLength(100);
             entity.Property(f => f.Label).HasMaxLength(120);
             entity.Property(f => f.UpdatedBy).HasMaxLength(200);
+        });
+
+        modelBuilder.Entity<CrmMes.Core.Layout.CustomFieldDefinition>(entity =>
+        {
+            entity.HasIndex(f => new { f.Screen, f.Key }).IsUnique();
+            entity.Property(f => f.Screen).HasMaxLength(100);
+            entity.Property(f => f.Key).HasMaxLength(100);
+            entity.Property(f => f.Label).HasMaxLength(120);
+            entity.Property(f => f.FieldType).HasMaxLength(20);
+            entity.Property(f => f.UpdatedBy).HasMaxLength(200);
+        });
+
+        modelBuilder.Entity<CrmMes.Core.Layout.CustomFieldValue>(entity =>
+        {
+            // Un solo valore per campo e record; l'indice serve anche a leggere in fretta tutti i campi
+            // personalizzati di un'entità (EntityType, EntityId).
+            entity.HasIndex(v => new { v.FieldDefinitionId, v.EntityType, v.EntityId }).IsUnique();
+            entity.HasIndex(v => new { v.EntityType, v.EntityId });
+            entity.Property(v => v.EntityType).HasMaxLength(50);
+            entity.Property(v => v.Value).HasMaxLength(2000);
+            entity.HasOne(v => v.FieldDefinition).WithMany()
+                .HasForeignKey(v => v.FieldDefinitionId).OnDelete(DeleteBehavior.Cascade);
         });
 
         modelBuilder.Entity<EnergyProject>(entity =>

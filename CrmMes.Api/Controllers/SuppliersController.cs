@@ -1,5 +1,7 @@
 using System.Security.Claims;
+using CrmMes.Api.Services;
 using CrmMes.Core.Data;
+using CrmMes.Core.Layout;
 using CrmMes.Core.Models;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -13,10 +15,12 @@ namespace CrmMes.Api.Controllers;
 public class SuppliersController : ControllerBase
 {
     private readonly ApplicationDbContext _dbContext;
+    private readonly CustomFieldService _customFields;
 
-    public SuppliersController(ApplicationDbContext dbContext)
+    public SuppliersController(ApplicationDbContext dbContext, CustomFieldService customFields)
     {
         _dbContext = dbContext;
+        _customFields = customFields;
     }
 
     [HttpGet]
@@ -49,6 +53,8 @@ public class SuppliersController : ControllerBase
             return NotFound();
         }
 
+        var customFields = await _customFields.GetValuesAsync("Supplier", id, cancellationToken);
+
         var purchaseOrders = await _dbContext.PurchaseOrders.AsNoTracking()
             .Where(order => order.SupplierId == id)
             .OrderByDescending(order => order.CreatedAt)
@@ -65,7 +71,7 @@ public class SuppliersController : ControllerBase
 
         return Ok(new SupplierDetailResponse(
             supplier.Id, supplier.Name, supplier.Code, supplier.Email, supplier.Phone, supplier.Website, supplier.IsActive,
-            purchaseOrders, catalogEntries));
+            purchaseOrders, catalogEntries, customFields));
     }
 
     [Authorize(Policy = "Purchasing")]
@@ -85,6 +91,13 @@ public class SuppliersController : ControllerBase
         if (string.IsNullOrWhiteSpace(name))
         {
             return BadRequest(new { message = "Il nome è obbligatorio." });
+        }
+
+        var customFieldsError = await _customFields.ValidateAndStageAsync(
+            FormLayoutRegistry.SupplierNew, "Supplier", supplier.Id, request.CustomFields, cancellationToken);
+        if (customFieldsError is not null)
+        {
+            return BadRequest(new { message = customFieldsError });
         }
 
         supplier.Name = name;
@@ -132,6 +145,13 @@ public class SuppliersController : ControllerBase
             Website = string.IsNullOrWhiteSpace(request.Website) ? null : request.Website.Trim()
         };
 
+        var customFieldsError = await _customFields.ValidateAndStageAsync(
+            FormLayoutRegistry.SupplierNew, "Supplier", supplier.Id, request.CustomFields, cancellationToken);
+        if (customFieldsError is not null)
+        {
+            return BadRequest(new { message = customFieldsError });
+        }
+
         _dbContext.Suppliers.Add(supplier);
         _dbContext.AuditLogs.Add(new AuditLog
         {
@@ -152,9 +172,10 @@ public class SuppliersController : ControllerBase
 
 public sealed record SupplierResponse(Guid Id, string Name, string Code, string? Email, string? Phone, string? Website, bool IsActive);
 
-public sealed record CreateSupplierRequest(string? Name, string? Code, string? Email, string? Phone, string? Website = null);
+public sealed record CreateSupplierRequest(
+    string? Name, string? Code, string? Email, string? Phone, string? Website = null, Dictionary<string, string?>? CustomFields = null);
 
-public sealed record EditSupplierRequest(string? Name, string? Email, string? Phone, string? Website);
+public sealed record EditSupplierRequest(string? Name, string? Email, string? Phone, string? Website, Dictionary<string, string?>? CustomFields = null);
 
 public sealed record SupplierPurchaseOrderResponse(Guid Id, string Code, string Status, DateTime CreatedAt);
 
@@ -162,4 +183,5 @@ public sealed record SupplierCatalogEntryResponse(string MaterialCode, string Ma
 
 public sealed record SupplierDetailResponse(
     Guid Id, string Name, string Code, string? Email, string? Phone, string? Website, bool IsActive,
-    List<SupplierPurchaseOrderResponse> PurchaseOrders, List<SupplierCatalogEntryResponse> CatalogEntries);
+    List<SupplierPurchaseOrderResponse> PurchaseOrders, List<SupplierCatalogEntryResponse> CatalogEntries,
+    Dictionary<string, string?> CustomFields);

@@ -1,12 +1,12 @@
 ﻿# Stato del progetto: Nicolò MES (CrmMes)
 
-Aggiornato: **7 ottobre 2026 (registro operazioni esteso ad aree, sedi, centri di lavoro e clienti)**. Diario tecnico: [RIEPILOGO-SVILUPPO.md](RIEPILOGO-SVILUPPO.md). Istruzioni operative: [HANDOFF-CLAUDE.md](HANDOFF-CLAUDE.md). Gate: [GATES.md](GATES.md). Priorità commerciali: [ANALISI-MERCATO-MES.md](ANALISI-MERCATO-MES.md) (sezione 8, "Cosa possiamo migliorare").
+Aggiornato: **7 ottobre 2026 (campi personalizzati nello Strumento Layout)**. Diario tecnico: [RIEPILOGO-SVILUPPO.md](RIEPILOGO-SVILUPPO.md). Istruzioni operative: [HANDOFF-CLAUDE.md](HANDOFF-CLAUDE.md). Gate: [GATES.md](GATES.md). Priorità commerciali: [ANALISI-MERCATO-MES.md](ANALISI-MERCATO-MES.md) (sezione 8, "Cosa possiamo migliorare").
 
 > **Punto della situazione**
 >
 > - **In produzione (`main` / Render):** allineato all'ultimo push (vedi cronologia); G9–G15 e contro già pubblicati in precedenza.
-> - **Fatto in codice + Neon:** G9–G15 + contro (SdI HTTP, demo campo, SSO, locale/valuta, assistente IA, CAPA, presenze, Swagger…), GTIN di prodotto, modelli HACCP per tipologia, Strumento Layout su gran parte delle schermate, creazione di un preventivo dalla piattaforma web, **registro operazioni esteso a aree, sedi, centri di lavoro e clienti** (28 controller su 51, da 24). Suite **663/663** (API 435 + Desktop 125 + Web 85 + Console 18).
-> - **Prossimo passo:** continuare il registro operazioni sui controller restanti (spedizioni, manutenzione, qualità...), poi creazione fattura sul web.
+> - **Fatto in codice + Neon:** G9–G15 + contro, GTIN di prodotto, Strumento Layout su gran parte delle schermate, creazione preventivo dal web, registro operazioni esteso (28/51), **campi personalizzati nello Strumento Layout** (es. "Giorni di pagamento") su fornitori e clienti, lato API e web. Suite **676/676** (API 443 + Desktop 125 + Web 90 + Console 18).
+> - **Prossimo passo:** campi personalizzati anche nelle finestre desktop (fornitori/clienti), poi creazione fattura sul web, poi diagramma del flusso dei dati tra i moduli.
 > - **Non è codice:** contratto SdI, macchina fisica, G16 hosting/referenze, IdP OIDC completo, prezzo pubblico, policy GDPR.
 
 ## In sintesi
@@ -14,7 +14,7 @@ Aggiornato: **7 ottobre 2026 (registro operazioni esteso ad aree, sedi, centri d
 - **Cos'è**: gestionale di produzione (MES) con parte commerciale e documentale, per piccole e medie aziende manifatturiere. Nato per un quadrista, oggi si configura per cinque settori.
 - **Versione pubblicata**: v1.7.0 (30/09/2026) + push 02/10 con G8/OEE/MRP/tema. I PC si aggiornano da soli dalle release GitHub.
 - **Architettura**: client Windows (WPF, .NET 8) + API web (ASP.NET Core 8) su Render + database Postgres su Neon. Stessa API per `/app/` (Blazor) e `/tecnici/`.
-- **Test automatici** (07/10/2026): **663/663** verdi — API 435, Desktop 125, Web 85, Console 18.
+- **Test automatici** (07/10/2026): **676/676** verdi — API 443, Desktop 125, Web 90, Console 18.
 - **Backtest end-to-end** (30/09/2026): 68/68 su DB vuoto isolato.
 - **Uso attuale**: interno, un'azienda con due sedi.
 
@@ -162,7 +162,9 @@ Non ancora provato: la pagina web dei tecnici dal browser con accesso reale (il 
 | 06/10/2026 | (prossimo commit) | **Strumento Layout: conversione preventivo sul web.** Schermata `quote.convert` (area e consegna prevista, facoltative di default, nascondibili; l'Admin può renderle obbligatorie) nel form *Crea le commesse* di `QuotePage`. Se il layout non arriva, il form resta com'è. Le pagine web di fattura e preventivo non hanno form di creazione: la creazione web resta da fare come funzionalità nuova. Test API 12/12 sul layout, Web 81/81. |
 | 07/10/2026 | (prossimo commit) | **Creazione di un preventivo dalla piattaforma web.** Pagina `/preventivi`: pulsante *Nuovo preventivo* (Admin e Sales) con cliente, validità, note e righe libere o collegate a un prodotto (il prodotto propone la descrizione, serve per poter poi creare le commesse); campi secondo il registro Layout `quote.new`, con default se il layout non arriva. Nessuna modifica all'API (`POST api/quotes` esisteva già) né migrazione. **Ancora da fare:** creazione fattura sul web, poi il resto delle circa 26 pagine web senza Strumento Layout. Test Web 85/85 (+4). |
 | 07/10/2026 | (prossimo commit) | **Analisi di mercato ricompilata** in un solo documento (prima tre round impilati nel tempo), centrata sulla sezione "Cosa possiamo migliorare"; ricerca aggiornata su GDPR (il codice di condotta non fissa tempi di conservazione fissi), normativa iperammortamento (legge 88/2026) e conteggio fornitori MES in Italia. **Registro operazioni (step 5 della mappa di hardening)**: aggiunto ad `AreasController`, `SitesController`, `WorkCentersController`, `CustomersController` — 28 controller su 51 (da 24). Nessuna migrazione. Test API +7, suite 663/663. |
-| prossimo | - | Continuare il registro operazioni sui 23 controller restanti; poi creazione fattura sul web; poi le altre schermate senza Strumento Layout; infine restano solo contratto SdI, macchina fisica, G16, prezzo pubblico, policy GDPR e IdP OIDC di produzione |
+| 07/10/2026 | (prossimo commit) | **Correzione: pulsante nascosto nella barra Materiali (programma).** Troppi pulsanti in fila (`DockPanel` non va a capo): con più moduli attivi (Metel, alimentare) la casella di ricerca e altri pulsanti uscivano dalla vista senza errore. I quattro pulsanti di importazione sono ora un unico menu *Importa ▾*, come già *Esporta ▾*. |
+| 07/10/2026 | (prossimo commit) | **Campi personalizzati nello Strumento Layout.** Novità vera: oltre a rietichettare/riordinare/nascondere i campi già nel modello, l'Admin può ora aggiungere a una schermata un campo **nuovo di sana pianta** (es. "Giorni di pagamento", "Tipologia di pagamento"), con tipo (testo, numero, data, sì/no) e obbligatorietà. Modelli `CustomFieldDefinition`/`CustomFieldValue` (migrazione `AddCustomFields`, additiva); `CustomFieldService` valida e salva i valori per record; endpoint `GET/POST/PUT/DELETE api/layout/{schermata}/custom-fields`, stesso permesso di modifica dello Strumento Layout. Cablato end-to-end su **fornitori e clienti** (API) e sul **web**: pagina Layout (aggiungi/elimina campo) e form *Nuovo cliente* (campi dinamici, obbligatorietà, invio). **Da fare**: le stesse finestre sul programma (fornitori/clienti), poi sulle altre schermate. Test +15 (API 7, Web 8), suite 676/676. |
+| prossimo | - | Campi personalizzati nelle finestre desktop fornitori/clienti; diagramma del flusso dei dati tra i moduli (con qualche esempio); registro operazioni sui 23 controller restanti; creazione fattura sul web; le altre schermate senza Strumento Layout; infine restano solo contratto SdI, macchina fisica, G16, prezzo pubblico, policy GDPR e IdP OIDC di produzione |
 
 ## Pubblicazione e ambienti
 

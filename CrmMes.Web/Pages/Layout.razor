@@ -72,6 +72,55 @@ else
             </div>
         }
     </div>
+
+    <div class="card card-pad stack">
+        <div class="section-head"><h2>Campi personalizzati</h2></div>
+        <p class="small muted">Campi aggiunti apposta per questo modulo, oltre a quelli predefiniti sopra (es. "Giorni di pagamento"). Valgono per tutti gli utenti, anche sul programma.</p>
+
+        @if (_customFieldError is not null)
+        {
+            <div class="alert" role="alert">@_customFieldError</div>
+        }
+
+        @if (_customFields.Count == 0)
+        {
+            <div class="state small">Nessun campo personalizzato su questo modulo.</div>
+        }
+        else
+        {
+            <div class="table-wrap">
+                <table class="cards">
+                    <thead><tr><th>Etichetta</th><th>Tipo</th><th class="num">Ordine</th><th>Obbligatorio</th><th></th></tr></thead>
+                    <tbody>
+                        @foreach (var f in _customFields)
+                        {
+                            <tr>
+                                <td data-label="Etichetta">@f.Label</td>
+                                <td data-label="Tipo" class="muted">@CustomFieldTypes.LabelOf(f.FieldType)</td>
+                                <td data-label="Ordine" class="num">@f.Order</td>
+                                <td data-label="Obbligatorio">@(f.Required ? "Sì" : "No")</td>
+                                <td><button class="secondary small" @onclick="() => DeleteCustomFieldAsync(f)" disabled="@_busy">Elimina</button></td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        }
+
+        <div class="form-grid">
+            <label>Etichetta del nuovo campo<input @bind="_newFieldLabel" placeholder="es. Giorni di pagamento" /></label>
+            <label>Tipo
+                <select @bind="_newFieldType">
+                    @foreach (var (value, label) in CustomFieldTypes.All)
+                    {
+                        <option value="@value">@label</option>
+                    }
+                </select>
+            </label>
+            <label class="check"><input type="checkbox" @bind="_newFieldRequired" /> Obbligatorio</label>
+        </div>
+        <div class="actions"><button class="secondary" @onclick="AddCustomFieldAsync" disabled="@_busy">Aggiungi campo</button></div>
+    </div>
 }
 
 @if (IsAdmin && _access is not null)
@@ -101,6 +150,12 @@ else
     private LayoutAccess? _access;
     private List<string> _granted = [];
     private bool _canEdit;
+
+    private List<CustomFieldDefinition> _customFields = [];
+    private string? _customFieldError;
+    private string _newFieldLabel = string.Empty;
+    private string _newFieldType = "Text";
+    private bool _newFieldRequired;
 
     private bool IsAdmin => Session.Role == "Admin";
 
@@ -168,6 +223,74 @@ else
         catch (ApiException exception)
         {
             _error = exception.Message;
+        }
+
+        await LoadCustomFieldsAsync();
+    }
+
+    private async Task LoadCustomFieldsAsync()
+    {
+        _customFieldError = null;
+        try
+        {
+            _customFields = await Api.GetAsync<List<CustomFieldDefinition>>($"api/layout/{_screen}/custom-fields");
+        }
+        catch (ApiException exception)
+        {
+            _customFieldError = exception.Message;
+        }
+    }
+
+    private async Task AddCustomFieldAsync()
+    {
+        if (string.IsNullOrWhiteSpace(_newFieldLabel))
+        {
+            _customFieldError = "Dai un'etichetta al campo prima di aggiungerlo.";
+            return;
+        }
+
+        _busy = true;
+        _customFieldError = null;
+        try
+        {
+            await Api.PostAsync<CustomFieldDefinition>($"api/layout/{_screen}/custom-fields", new
+            {
+                label = _newFieldLabel.Trim(),
+                fieldType = _newFieldType,
+                order = _customFields.Count + 1,
+                required = _newFieldRequired,
+            });
+            _newFieldLabel = string.Empty;
+            _newFieldType = "Text";
+            _newFieldRequired = false;
+            await LoadCustomFieldsAsync();
+        }
+        catch (ApiException exception)
+        {
+            _customFieldError = exception.Message;
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+
+    private async Task DeleteCustomFieldAsync(CustomFieldDefinition field)
+    {
+        _busy = true;
+        _customFieldError = null;
+        try
+        {
+            await Api.DeleteAsync($"api/layout/{_screen}/custom-fields/{field.Id}");
+            await LoadCustomFieldsAsync();
+        }
+        catch (ApiException exception)
+        {
+            _customFieldError = exception.Message;
+        }
+        finally
+        {
+            _busy = false;
         }
     }
 

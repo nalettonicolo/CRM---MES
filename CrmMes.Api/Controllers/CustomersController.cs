@@ -1,6 +1,7 @@
 using System.Security.Claims;
 using CrmMes.Api.Services;
 using CrmMes.Core.Data;
+using CrmMes.Core.Layout;
 using CrmMes.Core.Models;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -14,10 +15,12 @@ namespace CrmMes.Api.Controllers;
 public class CustomersController : ControllerBase
 {
     private readonly ApplicationDbContext _dbContext;
+    private readonly CustomFieldService _customFields;
 
-    public CustomersController(ApplicationDbContext dbContext)
+    public CustomersController(ApplicationDbContext dbContext, CustomFieldService customFields)
     {
         _dbContext = dbContext;
+        _customFields = customFields;
     }
 
     [HttpGet]
@@ -72,6 +75,13 @@ public class CustomersController : ControllerBase
         var customer = new Customer { Name = name, Code = code };
         Apply(customer, request);
 
+        var customFieldsError = await _customFields.ValidateAndStageAsync(
+            FormLayoutRegistry.CustomerNew, "Customer", customer.Id, request.CustomFields, cancellationToken);
+        if (customFieldsError is not null)
+        {
+            return BadRequest(new { message = customFieldsError });
+        }
+
         _dbContext.Customers.Add(customer);
         _dbContext.AuditLogs.Add(new AuditLog
         {
@@ -105,6 +115,13 @@ public class CustomersController : ControllerBase
         if (string.IsNullOrWhiteSpace(name))
         {
             return BadRequest(new { message = "Il nome cliente è obbligatorio." });
+        }
+
+        var customFieldsError = await _customFields.ValidateAndStageAsync(
+            FormLayoutRegistry.CustomerNew, "Customer", customer.Id, request.CustomFields, cancellationToken);
+        if (customFieldsError is not null)
+        {
+            return BadRequest(new { message = customFieldsError });
         }
 
         customer.Name = name;
@@ -148,7 +165,8 @@ public class CustomersController : ControllerBase
                 order.Id, order.Code, order.Product.Code, order.Product.Name, order.Quantity, order.Status, order.DueDate))
             .ToListAsync(cancellationToken);
 
-        return Ok(new CustomerDetailResponse(ToResponse(customer), quotes, workOrders));
+        var customFields = await _customFields.GetValuesAsync("Customer", id, cancellationToken);
+        return Ok(new CustomerDetailResponse(ToResponse(customer), quotes, workOrders, customFields));
     }
 
     [Authorize(Policy = "Sales")]
@@ -196,7 +214,8 @@ public sealed record CustomerResponse(
     Guid Id, string Code, string Name, string? VatNumber, string? Email, string? Phone, string? Address, string? Notes, bool IsActive);
 
 public sealed record SaveCustomerRequest(
-    string? Name, string? Code, string? VatNumber, string? Email, string? Phone, string? Address, string? Notes);
+    string? Name, string? Code, string? VatNumber, string? Email, string? Phone, string? Address, string? Notes,
+    Dictionary<string, string?>? CustomFields = null);
 
 public sealed record CustomerQuoteResponse(
     Guid Id, string Code, string Status, DateTime CreatedAt, DateTime? ValidUntil, decimal Total);
@@ -205,4 +224,5 @@ public sealed record CustomerWorkOrderResponse(
     Guid Id, string Code, string ProductCode, string ProductName, decimal Quantity, string Status, DateTime? DueDate);
 
 public sealed record CustomerDetailResponse(
-    CustomerResponse Customer, List<CustomerQuoteResponse> Quotes, List<CustomerWorkOrderResponse> WorkOrders);
+    CustomerResponse Customer, List<CustomerQuoteResponse> Quotes, List<CustomerWorkOrderResponse> WorkOrders,
+    Dictionary<string, string?> CustomFields);
