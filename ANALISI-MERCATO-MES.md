@@ -78,6 +78,35 @@ Il vantaggio è **l'ampiezza con il fiscale italiano nativo** (MRPeasy e Katana 
 | 10 | Import PDF su cataloghi reali | Da verificare | Campo |
 | 11 | Mapper OIDC di produzione per SSO | Configurazione | Titolare |
 
+## Approfondimento 7 ottobre 2026
+
+Seconda ricerca per chiudere i punti rimasti deboli (fonti dirette su Bravo/Antos e siMES) e due questioni nuove: un competitor PMI non ancora censito e requisiti concreti per il gap GDPR.
+
+### Bravo (Antos) — confermato, prezzo ancora non trovato
+Bravo Manufacturing è un prodotto reale di **Antos** (software house marchigiana): governa l'avanzamento degli ordini di produzione, porta la documentazione in ufficio, raccoglie dati di campo con più strumenti (tastiera, barcode, touch screen), genera report e esporta dati verso altri software aziendali. Nessuna fonte con il prezzo, nemmeno in questa seconda ricerca: resta un buco nel confronto di costo.
+
+### siMES — non trovato in due ricerche separate
+Né questa né la ricerca del 6 ottobre hanno trovato un sito ufficiale o una fonte diretta per un prodotto chiamato "siMES". È possibile che il nome nel documento originale fosse impreciso o che si tratti di un prodotto di nicchia poco indicizzato. **Raccomandazione:** non riusare questo nome in materiale commerciale finché qualcuno non conferma il prodotto esatto (magari è "SiVaF" o un altro nome); per ora resta fuori dal confronto affidabile.
+
+### Nuovo competitor: Mago.Net (Microarea)
+ERP italiano per PMI in quattro edizioni (Standard, Professional Lite, Professional, Enterprise). L'edizione Enterprise include controllo di produzione e pianificazione risorse, gestione disegni con revisioni, note tecniche sull'anagrafica prodotto, consuntivazione per fase di lavorazione, multicalendario. È lo stesso schema di TeamSystem/Zucchetti: **ERP con produzione come modulo**, non MES nativo — punto di forza sul fiscale/gestionale, punto debole sulla profondità di reparto (non verificata in questa ricerca).
+
+### GDPR — un riferimento concreto per il gap, non consulenza legale
+Il Garante Privacy ha approvato (novembre 2024, in vigore) il primo **Codice di condotta per i produttori di software gestionale**, promosso da Assosoftware ai sensi degli artt. 40-41 GDPR. Punti operativi utili come traccia (non sono consigli legali — vanno validati con un legale o un DPO prima di implementarli):
+- **Privacy by design e by default**: i principi di protezione dati vanno nel software fin dalla progettazione, non aggiunti dopo.
+- **Minimizzazione dei dati** raccolti e **cifratura dei dati sensibili**.
+- **Trasparenza** sull'uso dei dati verso l'utente finale.
+- Il produttore, quando tratta dati per conto del cliente (installazione, assistenza, manutenzione), può assumere il ruolo di **responsabile del trattamento** ex art. 28 GDPR — con gli obblighi che ne derivano.
+- **Aperto a tutte le aziende produttrici di software**, non solo ai soci Assosoftware, purché rispettino i requisiti.
+- Non siamo riusciti a estrarre dal codice i tempi di conservazione esatti (il PDF ufficiale non è leggibile in modo automatico): va recuperato il testo integrale prima di scrivere una policy di retention basata su questo codice.
+
+**Collegamento con "Cosa manca" (punto 7 sopra):** questo codice di condotta è il punto di riferimento di settore più concreto trovato finora per impostare una policy GDPR credibile — meglio usarlo come base che inventare da zero, ma il passo successivo resta una decisione del titolare con un legale, non un'implementazione autonoma.
+
+### Fonti (7 ottobre)
+- Bravo / Antos: [Antos vicina al rilascio di Bravo Manufacturing](https://www.01net.it/antos-vicina-al-rilascio-di-bravo-manufacturing/), [caso d'uso Alleantia](https://www.alleantia.com/resources/use-cases/antos/)
+- Mago.Net / Microarea: [ricerca 01net su Microarea](https://www.01net.it/?p=91629)
+- Codice di condotta software gestionali: [Agenda Digitale](https://www.agendadigitale.eu/cultura-digitale/codice-di-condotta-per-i-software-gestionali-tutela-dei-dati-al-centro-dello-sviluppo/), [Federprivacy](https://www.federprivacy.org/informazione/primo-piano/in-vigore-il-codice-di-condotta-sullo-sviluppo-e-produzione-di-software-gestionale-approvato-dal-garante-privacy), [testo del codice (PDF)](https://lentepubblica.it/wp-content/uploads/2024/12/Codice-di-condotta-per-il-trattamento-dei-dati-personali-effettuato-dalle-imprese-di-sviluppo-e-produzione-di-software-gestionale.pdf)
+
 ### Fonti
 - Katana: [prezzi 2026](https://costbench.com/software/inventory-management/katana-mrp/), [ribasso febbraio 2026](https://costbench.com/changelog/katana-price-decrease-2026-02-2/), [piano luglio 2026](https://costbench.com/changelog/katana-plan-added-2026-07/)
 - MRPeasy: [prezzi 2026](https://erpresearch.com/pricing/mrpeasy), [aumento febbraio 2026](https://costbench.com/changelog/mrpeasy-price-increase-2026-02/)
