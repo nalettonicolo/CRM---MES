@@ -1,0 +1,61 @@
+@page "/pallet-sscc"
+@inject Api Api
+
+<PageTitle>Etichette pallet (SSCC) · Nicolò MES</PageTitle>
+
+<div class="page-head">
+    <div>
+        <div class="eyebrow">Spedizioni</div>
+        <h1>Etichette pallet (SSCC)</h1>
+        <p class="sub">Etichetta logistica del pallet con codice SSCC GS1-128, lotto e quantità. Si assegna dal dettaglio commessa, nel programma desktop.</p>
+    </div>
+</div>
+
+<div class="stack">
+    <div class="card">
+        @if (_ssccError is not null)
+        {
+            <div class="state"><strong>@Labels.LoadFailed("i pallet")</strong>@_ssccError</div>
+        }
+        else if (_units is null)
+        {
+            <div class="state">@Labels.Loading</div>
+        }
+        else if (_units.Count == 0)
+        {
+            <div class="state">Nessun pallet etichettato.</div>
+        }
+        else
+        {
+            <div class="table-wrap">
+                <table class="cards">
+                    <thead><tr><th>SSCC</th><th>Prodotto</th><th>Lotto</th><th class="num">Quantità</th></tr></thead>
+                    <tbody>
+                        @foreach (var unit in _units)
+                        {
+                            <tr>
+                                <td data-label="SSCC" class="code">@unit.Sscc</td>
+                                <td data-label="Prodotto">@(unit.ProductName ?? unit.ProductCode ?? "—")</td>
+                                <td data-label="Lotto">@(unit.LotNumber ?? "—")</td>
+                                <td data-label="Quantità" class="num">@(unit.Quantity is null ? "—" : Labels.Number(unit.Quantity.Value))</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        }
+    </div>
+</div>
+
+@code {
+    private List<LogisticUnit>? _units;
+    private string? _ssccError;
+
+    protected override Task OnInitializedAsync() => LoadUnitsAsync();
+
+    private async Task LoadUnitsAsync()
+    {
+        try { _units = await Api.GetAsync<List<LogisticUnit>>("api/pallets/logistic-units"); }
+        catch (ApiException exception) { _ssccError = exception.Message; }
+    }
+}

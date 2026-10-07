@@ -23,7 +23,9 @@ public partial class WorkOrderDetailWindow : Window
         // Panel builders only: the CEI EN 61439 routine verification and declaration.
         PanelVerificationButton.Visibility = apiClient.IsModuleEnabled("panel-verification") ? Visibility.Visible : Visibility.Collapsed;
         MachineTestingButton.Visibility = apiClient.IsModuleEnabled("machine-testing") ? Visibility.Visible : Visibility.Collapsed;
-        FoodLabelButton.Visibility = PalletButton.Visibility = apiClient.IsModuleEnabled("food-labels") ? Visibility.Visible : Visibility.Collapsed;
+        FoodLabelButton.Visibility = apiClient.IsModuleEnabled("food-labels") ? Visibility.Visible : Visibility.Collapsed;
+        // Pallet SSCC labelling is generic (any sector ships on pallets), separate from the food module.
+        PalletButton.Visibility = apiClient.IsModuleEnabled("pallet-labels") ? Visibility.Visible : Visibility.Collapsed;
         SiteReportButton.Visibility = apiClient.IsModuleEnabled("site-work") ? Visibility.Visible : Visibility.Collapsed;
     }
 

@@ -919,14 +919,14 @@ public sealed class ApiClient
         => GetOneAsync<FoodLabelDto>($"api/food/work-orders/{workOrderId}/label", cancellationToken);
 
     public Task<LogisticUnitDto> CreateLogisticUnitAsync(Guid? workOrderId, Guid? transportDocumentId, decimal? quantity, CancellationToken cancellationToken = default)
-        => SendAsync<LogisticUnitDto>(HttpMethod.Post, "api/food/logistic-units", new { workOrderId, transportDocumentId, quantity }, cancellationToken);
+        => SendAsync<LogisticUnitDto>(HttpMethod.Post, "api/pallets/logistic-units", new { workOrderId, transportDocumentId, quantity }, cancellationToken);
 
     public Task<IReadOnlyList<LogisticUnitDto>> GetLogisticUnitsAsync(Guid workOrderId, CancellationToken cancellationToken = default)
-        => GetAsync<LogisticUnitDto>($"api/food/logistic-units?workOrderId={workOrderId}", cancellationToken);
+        => GetAsync<LogisticUnitDto>($"api/pallets/logistic-units?workOrderId={workOrderId}", cancellationToken);
 
     public async Task SetGs1PrefixAsync(string companyPrefix, CancellationToken cancellationToken = default)
     {
-        using var response = await _httpClient.PutAsJsonAsync("api/food/gs1-prefix", new { companyPrefix }, cancellationToken);
+        using var response = await _httpClient.PutAsJsonAsync("api/pallets/gs1-prefix", new { companyPrefix }, cancellationToken);
         await EnsureSuccessAsync(response, cancellationToken);
     }
 

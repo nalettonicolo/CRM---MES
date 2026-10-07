@@ -29,7 +29,8 @@ public static class Sectors
         new("panel-verification", "Verifica quadri CEI EN 61439", "Verifica individuale e dichiarazione di conformità del quadro.", true),
         new("metel", "Listini Metel", "Importazione dei listini dei produttori di materiale elettrico (tracciato ANIE/METEL).", true),
         new("lot-expiry", "Scadenze lotti", "Data di scadenza dei lotti e prelievo del lotto che scade prima.", true),
-        new("food-labels", "Etichette, allergeni e SSCC", "Ingredienti e allergeni dalla distinta, etichetta del lotto, etichetta pallet SSCC.", true),
+        new("food-labels", "Etichette alimentari e allergeni", "Ingredienti e allergeni dalla distinta, etichetta del lotto con data di scadenza.", true),
+        new("pallet-labels", "Etichette pallet e spedizione (SSCC)", "Etichetta logistica del pallet con codice SSCC GS1-128, lotto e quantità: utile per codificare e spedire in qualunque settore, non solo alimentare.", false),
         new("haccp", "Registri HACCP", "Punti di controllo, letture con limiti e azioni correttive.", true),
         new("site-work", "Lavori in cantiere", "Rapportini con ore, materiali e firma del cliente, anche da telefono.", true),
         new("engineering", "Ufficio tecnico", "Revisioni di distinte e cicli, disegni e schemi allegati, modifiche tecniche approvate.", true),
@@ -38,7 +39,7 @@ public static class Sectors
         new("energy-monitoring", "Monitoraggio energetico", "Consumi kWh per macchina dai dati macchina, progetti di efficientamento con confronto prima/dopo per l'iperammortamento.", true),
     ];
 
-    private static readonly string[] Common = ["sales", "purchasing", "planning", "shopfloor", "quality", "maintenance", "shipping", "costing", "invoicing"];
+    private static readonly string[] Common = ["sales", "purchasing", "planning", "shopfloor", "quality", "maintenance", "shipping", "costing", "invoicing", "pallet-labels"];
 
     public static readonly IReadOnlyList<SectorInfo> All =
     [

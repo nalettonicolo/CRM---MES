@@ -6,8 +6,8 @@
 <div class="page-head">
     <div>
         <div class="eyebrow">Qualità</div>
-        <h1>Etichette, allergeni e SSCC</h1>
-        <p class="sub">Etichetta del lotto dalla distinta e pallet etichettati. Ingredienti e allergeni si impostano dal programma desktop.</p>
+        <h1>Etichette alimentari e allergeni</h1>
+        <p class="sub">Etichetta del lotto dalla distinta, con ingredienti e allergeni. Si impostano dal programma desktop. Per l'etichetta pallet SSCC vedi "Etichette pallet (SSCC)".</p>
     </div>
 </div>
 
@@ -58,51 +58,12 @@
             </div>
         </div>
     }
-
-    <div class="card">
-        <div class="section-head"><h2>Pallet SSCC</h2></div>
-        @if (_ssccError is not null)
-        {
-            <div class="state"><strong>@Labels.LoadFailed("i pallet")</strong>@_ssccError</div>
-        }
-        else if (_units is null)
-        {
-            <div class="state">@Labels.Loading</div>
-        }
-        else if (_units.Count == 0)
-        {
-            <div class="state">Nessun pallet etichettato.</div>
-        }
-        else
-        {
-            <div class="table-wrap">
-                <table class="cards">
-                    <thead><tr><th>SSCC</th><th>Prodotto</th><th>Lotto</th><th class="num">Quantità</th></tr></thead>
-                    <tbody>
-                        @foreach (var unit in _units)
-                        {
-                            <tr>
-                                <td data-label="SSCC" class="code">@unit.Sscc</td>
-                                <td data-label="Prodotto">@(unit.ProductName ?? unit.ProductCode ?? "—")</td>
-                                <td data-label="Lotto">@(unit.LotNumber ?? "—")</td>
-                                <td data-label="Quantità" class="num">@(unit.Quantity is null ? "—" : Labels.Number(unit.Quantity.Value))</td>
-                            </tr>
-                        }
-                    </tbody>
-                </table>
-            </div>
-        }
-    </div>
 </div>
 
 @code {
     private string _code = "";
     private FoodLabel? _label;
     private string? _labelError;
-    private List<LogisticUnit>? _units;
-    private string? _ssccError;
-
-    protected override Task OnInitializedAsync() => LoadUnitsAsync();
 
     private Task OnEnter(KeyboardEventArgs e) => e.Key == "Enter" ? LoadLabelAsync() : Task.CompletedTask;
 
@@ -133,11 +94,5 @@
         {
             _labelError = exception.Message;
         }
-    }
-
-    private async Task LoadUnitsAsync()
-    {
-        try { _units = await Api.GetAsync<List<LogisticUnit>>("api/food/logistic-units"); }
-        catch (ApiException exception) { _ssccError = exception.Message; }
     }
 }

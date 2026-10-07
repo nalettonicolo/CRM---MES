@@ -196,12 +196,12 @@ public class FoodLabelTests : FoodAndSiteTestBase
         var order = await CreateWorkOrderAsync(product.Id, 240);
 
         Assert.Equal(HttpStatusCode.BadRequest,
-            (await Admin.PutAsJsonAsync("/api/food/gs1-prefix", new SetGs1PrefixRequest("12AB567"))).StatusCode);
-        (await Admin.PutAsJsonAsync("/api/food/gs1-prefix", new SetGs1PrefixRequest("8012345"))).EnsureSuccessStatusCode();
+            (await Admin.PutAsJsonAsync("/api/pallets/gs1-prefix", new SetGs1PrefixRequest("12AB567"))).StatusCode);
+        (await Admin.PutAsJsonAsync("/api/pallets/gs1-prefix", new SetGs1PrefixRequest("8012345"))).EnsureSuccessStatusCode();
 
-        var first = (await (await Admin.PostAsJsonAsync("/api/food/logistic-units", new CreateLogisticUnitRequest(order.Id, null, 120)))
+        var first = (await (await Admin.PostAsJsonAsync("/api/pallets/logistic-units", new CreateLogisticUnitRequest(order.Id, null, 120)))
             .Content.ReadFromJsonAsync<LogisticUnitResponse>())!;
-        var second = (await (await Admin.PostAsJsonAsync("/api/food/logistic-units", new CreateLogisticUnitRequest(order.Id, null, null)))
+        var second = (await (await Admin.PostAsJsonAsync("/api/pallets/logistic-units", new CreateLogisticUnitRequest(order.Id, null, null)))
             .Content.ReadFromJsonAsync<LogisticUnitResponse>())!;
         Assert.True(Gs1.IsValidSscc(first.Sscc));
         Assert.True(Gs1.IsValidSscc(second.Sscc));
@@ -210,8 +210,23 @@ public class FoodLabelTests : FoodAndSiteTestBase
         Assert.Equal(240, second.Quantity);            // whole work order by default
         Assert.Equal(order.ProductLotNumber, first.LotNumber);
 
-        var units = (await Admin.GetFromJsonAsync<List<LogisticUnitResponse>>($"/api/food/logistic-units?workOrderId={order.Id}"))!;
+        var units = (await Admin.GetFromJsonAsync<List<LogisticUnitResponse>>($"/api/pallets/logistic-units?workOrderId={order.Id}"))!;
         Assert.Equal(2, units.Count);
+    }
+
+    [Fact]
+    public async Task PalletLabels_IsAGenericModule_NotFoodSpecific()
+    {
+        // "pallet-labels" is a common module (every sector gets it by default), separate from "food-labels":
+        // a non-food company should be able to use SSCC pallet labelling without the module list claiming
+        // it needs the food sector.
+        var catalog = await Admin.GetFromJsonAsync<CompanyCatalogResponse>("/api/company-profile/catalog");
+        var palletModule = catalog!.Modules.Single(m => m.Key == "pallet-labels");
+        Assert.False(palletModule.SectorSpecific);
+
+        var mechanicalSector = catalog.Sectors.Single(s => s.Key == "mechanical");
+        Assert.Contains("pallet-labels", mechanicalSector.Modules);
+        Assert.DoesNotContain("food-labels", mechanicalSector.Modules);
     }
 }
 

@@ -39,6 +39,7 @@ public static class Navigation
         new("lot-expiry", "Scadenze lotti", "lotti", "Magazzino"),
         new("metel", "Listini Metel", "catalogo", "Acquisti"),
         new("food-labels", "Etichette alimentari", "etichette", "Qualità"),
+        new("pallet-labels", "Etichette pallet (SSCC)", "pallet-sscc", "Spedizioni"),
         new("registry", "Anagrafiche", "anagrafiche", "Amministrazione"),
         new("registry", "Presenze", "presenze", "Amministrazione"),
         new("users", "Utenti", "utenti", "Amministrazione", ["Admin"]),
