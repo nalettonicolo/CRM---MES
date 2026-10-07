@@ -1,3 +1,4 @@
+using System.Security.Claims;
 using CrmMes.Core.Data;
 using CrmMes.Core.Models;
 using Microsoft.AspNetCore.Authorization;
@@ -92,6 +93,14 @@ public class AreasController : ControllerBase
         }
 
         area.Users.Remove(user);
+        _dbContext.AuditLogs.Add(new AuditLog
+        {
+            Action = "AreaUserUnassigned",
+            EntityType = "Area",
+            EntityId = area.Id,
+            UserName = GetCurrentUserName(),
+            Details = $"Area {area.Code}: utente {user.Name} rimosso."
+        });
         await _dbContext.SaveChangesAsync(cancellationToken);
         return NoContent();
     }
@@ -127,6 +136,14 @@ public class AreasController : ControllerBase
 
         var area = new Area { Name = name, Code = code, SiteId = site?.Id };
         _dbContext.Areas.Add(area);
+        _dbContext.AuditLogs.Add(new AuditLog
+        {
+            Action = "AreaCreated",
+            EntityType = "Area",
+            EntityId = area.Id,
+            UserName = GetCurrentUserName(),
+            Details = $"Area {area.Code} ({area.Name}) creata."
+        });
         await _dbContext.SaveChangesAsync(cancellationToken);
         return Created($"api/areas/{area.Id}", area);
     }
@@ -148,6 +165,14 @@ public class AreasController : ControllerBase
         }
 
         area.SiteId = request.SiteId;
+        _dbContext.AuditLogs.Add(new AuditLog
+        {
+            Action = "AreaSiteChanged",
+            EntityType = "Area",
+            EntityId = area.Id,
+            UserName = GetCurrentUserName(),
+            Details = $"Area {area.Code}: sede cambiata."
+        });
         await _dbContext.SaveChangesAsync(cancellationToken);
         return NoContent();
     }
@@ -169,11 +194,21 @@ public class AreasController : ControllerBase
         if (!await _dbContext.Areas.AnyAsync(item => item.Id == areaId && item.Users.Any(candidate => candidate.Id == userId), cancellationToken))
         {
             area.Users.Add(user);
+            _dbContext.AuditLogs.Add(new AuditLog
+            {
+                Action = "AreaUserAssigned",
+                EntityType = "Area",
+                EntityId = area.Id,
+                UserName = GetCurrentUserName(),
+                Details = $"Area {area.Code}: utente {user.Name} assegnato."
+            });
             await _dbContext.SaveChangesAsync(cancellationToken);
         }
 
         return NoContent();
     }
+
+    private string? GetCurrentUserName() => User.FindFirstValue(ClaimTypes.Name);
 }
 
 public sealed record CreateAreaRequest(string? Name, string? Code, Guid? SiteId = null);

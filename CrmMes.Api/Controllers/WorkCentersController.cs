@@ -1,4 +1,5 @@
-﻿using CrmMes.Api.Services;
+﻿using System.Security.Claims;
+using CrmMes.Api.Services;
 using CrmMes.Core.Data;
 using CrmMes.Core.Models;
 using Microsoft.AspNetCore.Authorization;
@@ -96,6 +97,14 @@ public class WorkCentersController : ControllerBase
         };
 
         _dbContext.WorkCenters.Add(workCenter);
+        _dbContext.AuditLogs.Add(new AuditLog
+        {
+            Action = "WorkCenterCreated",
+            EntityType = "WorkCenter",
+            EntityId = workCenter.Id,
+            UserName = GetCurrentUserName(),
+            Details = $"Centro di lavoro {workCenter.Code} ({workCenter.Name}) creato."
+        });
         await _dbContext.SaveChangesAsync(cancellationToken);
 
         return Ok(new WorkCenterResponse(workCenter.Id, workCenter.Code, workCenter.Name, workCenter.Description, workCenter.DailyCapacityMinutes, workCenter.IsActive, workCenter.SiteId, MarginAccess.CanView(User) ? workCenter.HourlyRate : null, workCenter.AreaId));
@@ -135,6 +144,14 @@ public class WorkCentersController : ControllerBase
         workCenter.DailyCapacityMinutes = request.DailyCapacityMinutes;
         workCenter.SiteId = request.SiteId;
 
+        _dbContext.AuditLogs.Add(new AuditLog
+        {
+            Action = "WorkCenterUpdated",
+            EntityType = "WorkCenter",
+            EntityId = workCenter.Id,
+            UserName = GetCurrentUserName(),
+            Details = $"Centro di lavoro {workCenter.Code}: anagrafica modificata."
+        });
         await _dbContext.SaveChangesAsync(cancellationToken);
         return Ok(new WorkCenterResponse(workCenter.Id, workCenter.Code, workCenter.Name, workCenter.Description, workCenter.DailyCapacityMinutes, workCenter.IsActive, workCenter.SiteId, MarginAccess.CanView(User) ? workCenter.HourlyRate : null, workCenter.AreaId));
     }
@@ -158,6 +175,14 @@ public class WorkCentersController : ControllerBase
         }
 
         workCenter.HourlyRate = request.HourlyRate;
+        _dbContext.AuditLogs.Add(new AuditLog
+        {
+            Action = "WorkCenterHourlyRateChanged",
+            EntityType = "WorkCenter",
+            EntityId = workCenter.Id,
+            UserName = GetCurrentUserName(),
+            Details = $"Centro di lavoro {workCenter.Code}: tariffa oraria modificata."
+        });
         await _dbContext.SaveChangesAsync(cancellationToken);
         return NoContent();
     }
@@ -173,6 +198,14 @@ public class WorkCentersController : ControllerBase
         }
 
         workCenter.IsActive = false;
+        _dbContext.AuditLogs.Add(new AuditLog
+        {
+            Action = "WorkCenterDeactivated",
+            EntityType = "WorkCenter",
+            EntityId = workCenter.Id,
+            UserName = GetCurrentUserName(),
+            Details = $"Centro di lavoro {workCenter.Code} disattivato."
+        });
         await _dbContext.SaveChangesAsync(cancellationToken);
         return NoContent();
     }
@@ -308,6 +341,8 @@ public class WorkCentersController : ControllerBase
 
         return Ok(plan);
     }
+
+    private string? GetCurrentUserName() => User.FindFirstValue(ClaimTypes.Name);
 }
 
 public sealed record CreateWorkCenterRequest(string Code, string Name, string? Description, decimal DailyCapacityMinutes, Guid? SiteId = null);

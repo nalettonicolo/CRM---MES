@@ -1,6 +1,7 @@
 using System.Net;
 using System.Net.Http.Json;
 using CrmMes.Api.Controllers;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace CrmMes.Api.Tests;
 
@@ -134,5 +135,27 @@ public class WorkCentersTests : IClassFixture<AdminSeededApiTestFixture>
         var pendingOperation = Assert.Single(detail!.PendingOperations);
         Assert.Equal("Fase 1", pendingOperation.OperationName);
         Assert.Equal(150, pendingOperation.EstimatedMinutes);
+    }
+
+    [Fact]
+    public async Task CreateEditRateAndDeactivate_WriteAuditLog()
+    {
+        var workCenter = await CreateWorkCenterAsync();
+
+        await _adminClient.PutAsJsonAsync($"/api/work-centers/{workCenter.Id}", new EditWorkCenterRequest("Rinominato", null, 480));
+        await _adminClient.PutAsJsonAsync($"/api/work-centers/{workCenter.Id}/hourly-rate", new SetHourlyRateRequest(35.5m));
+        await _adminClient.DeleteAsync($"/api/work-centers/{workCenter.Id}");
+
+        using var scope = _fixture.Factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<CrmMes.Core.Data.ApplicationDbContext>();
+        var actions = db.AuditLogs
+            .Where(log => log.EntityType == "WorkCenter" && log.EntityId == workCenter.Id)
+            .Select(log => log.Action)
+            .ToList();
+
+        Assert.Contains("WorkCenterCreated", actions);
+        Assert.Contains("WorkCenterUpdated", actions);
+        Assert.Contains("WorkCenterHourlyRateChanged", actions);
+        Assert.Contains("WorkCenterDeactivated", actions);
     }
 }

@@ -1,3 +1,4 @@
+using System.Security.Claims;
 using CrmMes.Api.Services;
 using CrmMes.Core.Data;
 using CrmMes.Core.Models;
@@ -72,6 +73,14 @@ public class CustomersController : ControllerBase
         Apply(customer, request);
 
         _dbContext.Customers.Add(customer);
+        _dbContext.AuditLogs.Add(new AuditLog
+        {
+            Action = "CustomerCreated",
+            EntityType = "Customer",
+            EntityId = customer.Id,
+            UserName = GetCurrentUserName(),
+            Details = $"Cliente {customer.Code} ({customer.Name}) creato."
+        });
         await _dbContext.SaveChangesAsync(cancellationToken);
 
         return Created($"api/customers/{customer.Id}", ToResponse(customer));
@@ -100,6 +109,14 @@ public class CustomersController : ControllerBase
 
         customer.Name = name;
         Apply(customer, request);
+        _dbContext.AuditLogs.Add(new AuditLog
+        {
+            Action = "CustomerUpdated",
+            EntityType = "Customer",
+            EntityId = customer.Id,
+            UserName = GetCurrentUserName(),
+            Details = $"Cliente {customer.Code}: anagrafica modificata."
+        });
         await _dbContext.SaveChangesAsync(cancellationToken);
         return Ok(ToResponse(customer));
     }
@@ -145,9 +162,19 @@ public class CustomersController : ControllerBase
         }
 
         customer.IsActive = false;
+        _dbContext.AuditLogs.Add(new AuditLog
+        {
+            Action = "CustomerDeactivated",
+            EntityType = "Customer",
+            EntityId = customer.Id,
+            UserName = GetCurrentUserName(),
+            Details = $"Cliente {customer.Code} disattivato."
+        });
         await _dbContext.SaveChangesAsync(cancellationToken);
         return NoContent();
     }
+
+    private string? GetCurrentUserName() => User.FindFirstValue(ClaimTypes.Name);
 
     private static void Apply(Customer customer, SaveCustomerRequest request)
     {

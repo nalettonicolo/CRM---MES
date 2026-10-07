@@ -2,6 +2,7 @@ using System.Net;
 using System.Net.Http.Json;
 using CrmMes.Api.Controllers;
 using CrmMes.Core.Models;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace CrmMes.Api.Tests;
 
@@ -108,5 +109,23 @@ public class SitesTests : IClassFixture<AdminSeededApiTestFixture>
 
         var listResponse = await _adminClient.GetFromJsonAsync<List<SiteResponse>>("/api/sites");
         Assert.DoesNotContain(listResponse!, s => s.Id == site.Id);
+    }
+
+    [Fact]
+    public async Task CreateAndDeactivateSite_WriteAuditLog()
+    {
+        var site = await CreateSiteAsync();
+
+        await _adminClient.DeleteAsync($"/api/sites/{site.Id}");
+
+        using var scope = _fixture.Factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<CrmMes.Core.Data.ApplicationDbContext>();
+        var actions = db.AuditLogs
+            .Where(log => log.EntityType == "Site" && log.EntityId == site.Id)
+            .Select(log => log.Action)
+            .ToList();
+
+        Assert.Contains("SiteCreated", actions);
+        Assert.Contains("SiteDeactivated", actions);
     }
 }

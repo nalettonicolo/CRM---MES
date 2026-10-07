@@ -1,20 +1,20 @@
 ﻿# Stato del progetto: Nicolò MES (CrmMes)
 
-Aggiornato: **7 ottobre 2026 (creazione preventivi sul web)**. Diario tecnico: [RIEPILOGO-SVILUPPO.md](RIEPILOGO-SVILUPPO.md). Istruzioni operative: [HANDOFF-CLAUDE.md](HANDOFF-CLAUDE.md). Gate: [GATES.md](GATES.md).
+Aggiornato: **7 ottobre 2026 (registro operazioni esteso ad aree, sedi, centri di lavoro e clienti)**. Diario tecnico: [RIEPILOGO-SVILUPPO.md](RIEPILOGO-SVILUPPO.md). Istruzioni operative: [HANDOFF-CLAUDE.md](HANDOFF-CLAUDE.md). Gate: [GATES.md](GATES.md). Priorità commerciali: [ANALISI-MERCATO-MES.md](ANALISI-MERCATO-MES.md) (sezione 8, "Cosa possiamo migliorare").
 
 > **Punto della situazione**
 >
 > - **In produzione (`main` / Render):** allineato all'ultimo push (vedi cronologia); G9–G15 e contro già pubblicati in precedenza.
-> - **Fatto in codice + Neon:** G9–G15 + contro (SdI HTTP, demo campo, SSO, locale/valuta, assistente IA, CAPA, presenze, Swagger…), GTIN di prodotto, modelli HACCP per tipologia, Strumento Layout su gran parte delle schermate, **creazione di un preventivo dalla piattaforma web** (prima solo dal programma). Suite **656/656** (API 428 + Desktop 125 + Web 85 + Console 18).
-> - **Prossimo passo:** creazione fattura sul web (oggi solo dal programma); poi le altre schermate ancora senza Strumento Layout.
-> - **Non è codice:** contratto SdI, macchina fisica, G16 hosting/referenze, IdP OIDC completo.
+> - **Fatto in codice + Neon:** G9–G15 + contro (SdI HTTP, demo campo, SSO, locale/valuta, assistente IA, CAPA, presenze, Swagger…), GTIN di prodotto, modelli HACCP per tipologia, Strumento Layout su gran parte delle schermate, creazione di un preventivo dalla piattaforma web, **registro operazioni esteso a aree, sedi, centri di lavoro e clienti** (28 controller su 51, da 24). Suite **663/663** (API 435 + Desktop 125 + Web 85 + Console 18).
+> - **Prossimo passo:** continuare il registro operazioni sui controller restanti (spedizioni, manutenzione, qualità...), poi creazione fattura sul web.
+> - **Non è codice:** contratto SdI, macchina fisica, G16 hosting/referenze, IdP OIDC completo, prezzo pubblico, policy GDPR.
 
 ## In sintesi
 
 - **Cos'è**: gestionale di produzione (MES) con parte commerciale e documentale, per piccole e medie aziende manifatturiere. Nato per un quadrista, oggi si configura per cinque settori.
 - **Versione pubblicata**: v1.7.0 (30/09/2026) + push 02/10 con G8/OEE/MRP/tema. I PC si aggiornano da soli dalle release GitHub.
 - **Architettura**: client Windows (WPF, .NET 8) + API web (ASP.NET Core 8) su Render + database Postgres su Neon. Stessa API per `/app/` (Blazor) e `/tecnici/`.
-- **Test automatici** (07/10/2026): **656/656** verdi — API 428, Desktop 125, Web 85, Console 18.
+- **Test automatici** (07/10/2026): **663/663** verdi — API 435, Desktop 125, Web 85, Console 18.
 - **Backtest end-to-end** (30/09/2026): 68/68 su DB vuoto isolato.
 - **Uso attuale**: interno, un'azienda con due sedi.
 
@@ -161,7 +161,8 @@ Non ancora provato: la pagina web dei tecnici dal browser con accesso reale (il 
 | 06/10/2026 | (prossimo commit) | **Strumento Layout: fatture (testata).** Schermata `invoice.new` (cliente sempre obbligatorio; pagamento, scadenza e causale nascondibili) in *Nuova fattura*, desktop. Le righe restano nella griglia con le sue intestazioni. Il controllo dei campi obbligatori è in `BuildRequest`, quindi vale per salvataggio ed emissione. Web non ancora collegato. |
 | 06/10/2026 | (prossimo commit) | **Strumento Layout: conversione preventivo sul web.** Schermata `quote.convert` (area e consegna prevista, facoltative di default, nascondibili; l'Admin può renderle obbligatorie) nel form *Crea le commesse* di `QuotePage`. Se il layout non arriva, il form resta com'è. Le pagine web di fattura e preventivo non hanno form di creazione: la creazione web resta da fare come funzionalità nuova. Test API 12/12 sul layout, Web 81/81. |
 | 07/10/2026 | (prossimo commit) | **Creazione di un preventivo dalla piattaforma web.** Pagina `/preventivi`: pulsante *Nuovo preventivo* (Admin e Sales) con cliente, validità, note e righe libere o collegate a un prodotto (il prodotto propone la descrizione, serve per poter poi creare le commesse); campi secondo il registro Layout `quote.new`, con default se il layout non arriva. Nessuna modifica all'API (`POST api/quotes` esisteva già) né migrazione. **Ancora da fare:** creazione fattura sul web, poi il resto delle circa 26 pagine web senza Strumento Layout. Test Web 85/85 (+4). |
-| prossimo | - | Creazione fattura sul web; poi le altre schermate senza Strumento Layout; infine restano solo contratto SdI, macchina fisica, G16 e IdP OIDC di produzione |
+| 07/10/2026 | (prossimo commit) | **Analisi di mercato ricompilata** in un solo documento (prima tre round impilati nel tempo), centrata sulla sezione "Cosa possiamo migliorare"; ricerca aggiornata su GDPR (il codice di condotta non fissa tempi di conservazione fissi), normativa iperammortamento (legge 88/2026) e conteggio fornitori MES in Italia. **Registro operazioni (step 5 della mappa di hardening)**: aggiunto ad `AreasController`, `SitesController`, `WorkCentersController`, `CustomersController` — 28 controller su 51 (da 24). Nessuna migrazione. Test API +7, suite 663/663. |
+| prossimo | - | Continuare il registro operazioni sui 23 controller restanti; poi creazione fattura sul web; poi le altre schermate senza Strumento Layout; infine restano solo contratto SdI, macchina fisica, G16, prezzo pubblico, policy GDPR e IdP OIDC di produzione |
 
 ## Pubblicazione e ambienti
 
@@ -180,11 +181,11 @@ Il titolare ha chiesto di portare il sistema a un livello enterprise. Area scelt
 | 2 | Limite dimensione richiesta globale a 10 MB per gli endpoint senza `[RequestSizeLimit]` proprio (verificato: tutti gli 8 endpoint di upload file nei 5 controller con `IFormFile` hanno già il loro limite esplicito più alto, che resta valido e ha precedenza) | Basso | ✅ Fatto — commit `77e6d1e` |
 | 3 | Indici sulla tabella `AuditLog` (prima nessuno): su `EntityType`+`EntityId` e su `CreatedAt` | Basso | ✅ Fatto — commit `77e6d1e`, migrazione `AddAuditLogIndexes` applicata e verificata su Neon produzione il 06/10/2026 |
 | 4 | Rivalutare l'esposizione pubblica di Swagger in produzione (scelta deliberata del 02/10 per dare documentazione a chi integra) | Da decidere col titolare | Non iniziato — nessuna azione senza conferma, è una scelta deliberata recente |
-| 5 | Audit log esteso ai controller che oggi non scrivono traccia (circa 30 su 51: presenze, spedizioni, fornitori, clienti, corrieri, aree, centri di lavoro...) | Basso ma esteso | Non iniziato |
+| 5 | Audit log esteso ai controller che oggi non scrivono traccia | Basso ma esteso | 🟡 In corso — 28/51 (timbrature, strumenti di misura, fornitori, corrieri, **aree, sedi, centri di lavoro, clienti** aggiunti 07/10); restano 23: spedizioni, manutenzione, qualità, service, energia, HACCP, alimentare, ufficio tecnico, pack settore, assistente, licenza, margini, planning... |
 | 6 | Nuovo endpoint `/health/detailed` basato sul framework standard ASP.NET Core Health Checks, per strumenti di monitoring esterni — **additivo**, non sostituisce `/health` (lasciato intonso: il client desktop lo usa per il retry "server in avvio" al login, cambiarne la forma non valeva il rischio) | Basso | ✅ Fatto — commit `77e6d1e` |
 | 7 | Validazione input sistematica (oggi manuale endpoint per endpoint, nessuna FluentValidation) e versionamento API (`/api/v1/`, oggi assente) | Più alto — tocca molti controller esistenti, da pianificare a parte | Non iniziato, rimandato di proposito |
 
-Step 1, 2, 3, 6 fatti e verificati (build pulita, 639/639 test, pushati su `main`). **Nota**: durante questo lavoro un'altra sessione Claude Code era attiva in parallelo sullo stesso repository, sviluppando uno "Strumento Layout" — le mie modifiche erano finite per una volta in un commit di quella sessione (`abaf0db`, non intenzionale ma innocuo), poi separate in commit propri da qui in avanti. Step 4 resta sospeso in attesa di conferma esplicita del titolare (non è un bug, è una scelta già fatta). Step 5 è il prossimo passo naturale a basso rischio, ma esteso (30 controller) — da fare con calma, verificando ogni controller prima di toccarlo per non entrare in conflitto con lavoro in corso altrove nel repository. Step 7 resta il più esteso e rischioso: va preventivato a parte.
+Step 1, 2, 3, 6 fatti e verificati (build pulita, 639/639 test, pushati su `main`). **Nota**: durante questo lavoro un'altra sessione Claude Code era attiva in parallelo sullo stesso repository, sviluppando uno "Strumento Layout" — le mie modifiche erano finite per una volta in un commit di quella sessione (`abaf0db`, non intenzionale ma innocuo), poi separate in commit propri da qui in avanti. Step 4 resta sospeso in attesa di conferma esplicita del titolare (non è un bug, è una scelta già fatta). Step 5 è in corso: 07/10/2026 aggiunto il registro ad `AreasController`, `SitesController`, `WorkCentersController`, `CustomersController` (creazione/modifica/disattivazione, assegnazione e spostamento area, tariffa oraria), con test dedicati (API +7, suite 663/663) — un gruppo alla volta, verificando ogni controller prima di toccarlo per non entrare in conflitto con lavoro in corso altrove nel repository. Step 7 resta il più esteso e rischioso: va preventivato a parte.
 
 **Migrazione `AddAuditLogIndexes`**: applicata su Neon produzione il 06/10/2026 con lo script `scripts/migrazione-AddAuditLogIndexes.sql`, verificata in `__EFMigrationsHistory` e in `pg_indexes`.
 

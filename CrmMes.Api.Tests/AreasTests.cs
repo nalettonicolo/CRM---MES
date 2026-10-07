@@ -2,6 +2,7 @@ using System.Net;
 using System.Net.Http.Json;
 using CrmMes.Api.Controllers;
 using CrmMes.Core.Models;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace CrmMes.Api.Tests;
 
@@ -76,5 +77,37 @@ public class AreasTests : IClassFixture<AdminSeededApiTestFixture>
         var detail = await detailResponse.Content.ReadFromJsonAsync<AreaDetailResponse>();
 
         Assert.Single(detail!.WorkOrders, wo => wo.Id == workOrder.Id);
+    }
+
+    [Fact]
+    public async Task CreateAssignUnassignAndMoveSite_WriteAuditLog()
+    {
+        var site = await CreateSiteAsync();
+        var area = await CreateAreaAsync();
+        var operatorAuth = await TestAuth.CreateUserWithRoleAsync(_fixture.Factory, _fixture.Admin.Token, "Operator", "area-audit");
+
+        await _adminClient.PostAsync($"/api/areas/{area.Id}/users/{operatorAuth.UserId}", null);
+        await _adminClient.DeleteAsync($"/api/areas/{area.Id}/users/{operatorAuth.UserId}");
+        await _adminClient.PutAsJsonAsync($"/api/areas/{area.Id}/site", new SetSiteRequest(site.Id));
+
+        using var scope = _fixture.Factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<CrmMes.Core.Data.ApplicationDbContext>();
+        var actions = db.AuditLogs
+            .Where(log => log.EntityType == "Area" && log.EntityId == area.Id)
+            .Select(log => log.Action)
+            .ToList();
+
+        Assert.Contains("AreaCreated", actions);
+        Assert.Contains("AreaUserAssigned", actions);
+        Assert.Contains("AreaUserUnassigned", actions);
+        Assert.Contains("AreaSiteChanged", actions);
+    }
+
+    private async Task<SiteResponse> CreateSiteAsync()
+    {
+        var code = $"AREA-SITE-{Guid.NewGuid():N}"[..16];
+        var response = await _adminClient.PostAsJsonAsync("/api/sites", new CreateSiteRequest($"Sede {code}", code, null));
+        response.EnsureSuccessStatusCode();
+        return (await response.Content.ReadFromJsonAsync<SiteResponse>())!;
     }
 }

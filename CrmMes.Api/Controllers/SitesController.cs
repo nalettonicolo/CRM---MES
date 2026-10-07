@@ -1,3 +1,4 @@
+using System.Security.Claims;
 using CrmMes.Core.Data;
 using CrmMes.Core.Models;
 using Microsoft.AspNetCore.Authorization;
@@ -92,6 +93,14 @@ public class SitesController : ControllerBase
         };
 
         _dbContext.Sites.Add(site);
+        _dbContext.AuditLogs.Add(new AuditLog
+        {
+            Action = "SiteCreated",
+            EntityType = "Site",
+            EntityId = site.Id,
+            UserName = GetCurrentUserName(),
+            Details = $"Sede {site.Code} ({site.Name}) creata."
+        });
         await _dbContext.SaveChangesAsync(cancellationToken);
 
         var response = new SiteResponse(site.Id, site.Name, site.Code, site.Address, site.IsActive);
@@ -109,9 +118,19 @@ public class SitesController : ControllerBase
         }
 
         site.IsActive = false;
+        _dbContext.AuditLogs.Add(new AuditLog
+        {
+            Action = "SiteDeactivated",
+            EntityType = "Site",
+            EntityId = site.Id,
+            UserName = GetCurrentUserName(),
+            Details = $"Sede {site.Code} disattivata."
+        });
         await _dbContext.SaveChangesAsync(cancellationToken);
         return NoContent();
     }
+
+    private string? GetCurrentUserName() => User.FindFirstValue(ClaimTypes.Name);
 }
 
 public sealed record CreateSiteRequest(string? Name, string? Code, string? Address);
