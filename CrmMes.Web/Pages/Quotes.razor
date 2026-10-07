@@ -1,5 +1,6 @@
 @page "/preventivi"
 @inject Api Api
+@inject Session Session
 @inject NavigationManager Nav
 
 <PageTitle>Preventivi · Nicolò MES</PageTitle>
@@ -10,7 +11,104 @@
         <h1>Preventivi</h1>
         <p class="sub">Dall'invio al cliente alla commessa.</p>
     </div>
+    @if (CanCreate)
+    {
+        <div class="actions">
+            <button class="secondary" aria-expanded="@_showCreate" @onclick="ToggleCreate">@(_showCreate ? "Chiudi nuovo preventivo" : "Nuovo preventivo")</button>
+        </div>
+    }
 </div>
+
+@if (_showCreate && CanCreate)
+{
+    <div class="card card-pad stack stack-gap">
+        <h2>Nuovo preventivo</h2>
+        @if (_createError is not null)
+        {
+            <div class="alert" role="alert">@_createError</div>
+        }
+        @if (_customers is null && _createLoading)
+        {
+            <div class="state">Caricamento...</div>
+        }
+        else
+        {
+            <div class="form-grid">
+                @foreach (var f in _fields.Where(f => f.Visible && f.Key is "customer" or "validUntil" or "notes").OrderBy(f => f.Order))
+                {
+                    switch (f.Key)
+                    {
+                        case "customer":
+                            <label>@LayoutHelper.LabelOf(f)
+                                <select aria-label="Cliente" @onchange="e => _customerId = e.Value?.ToString() ?? string.Empty">
+                                    <option value="" selected="@string.IsNullOrEmpty(_customerId)">Scegli cliente</option>
+                                    @foreach (var customer in _customers ?? [])
+                                    {
+                                        <option value="@customer.Id" selected="@(_customerId == customer.Id.ToString())">@customer.Name (@customer.Code)</option>
+                                    }
+                                </select>
+                            </label>
+                            break;
+                        case "validUntil":
+                            <label>@LayoutHelper.LabelOf(f)<input type="date" aria-label="Valido fino al" @bind="_validUntil" /></label>
+                            break;
+                        case "notes":
+                            <label>@LayoutHelper.LabelOf(f)<input aria-label="Note per il cliente" @bind="_notes" /></label>
+                            break;
+                    }
+                }
+            </div>
+
+            <div class="table-wrap">
+                <table class="cards">
+                    <thead>
+                        <tr>
+                            <th>Prodotto (facoltativo)</th>
+                            <th>@LabelFor("lineDescription", "Descrizione")</th>
+                            <th class="num">@LabelFor("lineQuantity", "Q.tà")</th>
+                            <th class="num">@LabelFor("linePrice", "Prezzo unit. €")</th>
+                            @if (Shows("lineDiscount"))
+                            {
+                                <th class="num">@LabelFor("lineDiscount", "Sconto %")</th>
+                            }
+                            <th></th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var line in _lines)
+                        {
+                            <tr>
+                                <td data-label="Prodotto">
+                                    <select aria-label="Prodotto della riga" @onchange="e => SetProduct(line, e.Value?.ToString())">
+                                        <option value="" selected="@(line.ProductId is null)">Nessuno (riga libera)</option>
+                                        @foreach (var product in _products ?? [])
+                                        {
+                                            <option value="@product.Id" selected="@(line.ProductId == product.Id)">@product.Code · @product.Name</option>
+                                        }
+                                    </select>
+                                </td>
+                                <td data-label="Descrizione"><input aria-label="Descrizione della riga" @bind="line.Description" /></td>
+                                <td data-label="Q.tà" class="num"><input type="number" step="any" min="0" aria-label="Quantità della riga" @bind="line.Quantity" /></td>
+                                <td data-label="Prezzo" class="num"><input type="number" step="any" min="0" aria-label="Prezzo della riga" @bind="line.UnitPrice" /></td>
+                                @if (Shows("lineDiscount"))
+                                {
+                                    <td data-label="Sconto" class="num"><input type="number" step="any" min="0" max="100" aria-label="Sconto della riga" @bind="line.DiscountPercent" /></td>
+                                }
+                                <td>
+                                    <button class="secondary small" aria-label="Rimuovi riga" disabled="@(_lines.Count == 1)" @onclick="() => RemoveLine(line)">Rimuovi</button>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+            <div class="actions">
+                <button class="secondary small" @onclick="AddLine">Aggiungi riga</button>
+                <button @onclick="CreateAsync" disabled="@_creating">@(_creating ? "Salvataggio..." : "Crea preventivo")</button>
+            </div>
+        }
+    </div>
+}
 
 <div class="toolbar">
     <input class="search" type="search" placeholder="Codice o cliente" aria-label="Filtra preventivi" @bind="_search" @bind:event="oninput" />
@@ -70,10 +168,47 @@
         ("", "Tutti"), ("Draft", "Bozze"), ("Sent", "Inviati"), ("Accepted", "Accettati"), ("Rejected", "Rifiutati"),
     ];
 
+    /// <summary>Campi del modulo Nuovo preventivo come li ha impostati l'Admin nello strumento Layout; senza
+    /// risposta restano i default della schermata (stessi del registro lato API).</summary>
+    private List<LayoutField> _fields =
+    [
+        new("customer", "Cliente", 1, true, true, false) { DefaultLabel = "Cliente", DefaultRequired = true },
+        new("validUntil", "Valido fino al", 2, true, false, true) { DefaultLabel = "Valido fino al" },
+        new("notes", "Note per il cliente", 3, true, false, true) { DefaultLabel = "Note per il cliente" },
+        new("lineDescription", "Descrizione", 4, true, true, false) { DefaultLabel = "Descrizione", DefaultRequired = true },
+        new("lineQuantity", "Q.tà", 5, true, true, false) { DefaultLabel = "Q.tà", DefaultRequired = true },
+        new("linePrice", "Prezzo unit. €", 6, true, true, false) { DefaultLabel = "Prezzo unit. €", DefaultRequired = true },
+        new("lineDiscount", "Sconto %", 7, true, false, true) { DefaultLabel = "Sconto %" },
+    ];
+
     private string _status = string.Empty;
     private string _search = string.Empty;
     private List<QuoteSummary>? _quotes;
     private string? _error;
+
+    private bool _showCreate;
+    private bool _createLoading;
+    private bool _creating;
+    private string? _createError;
+    private List<Customer>? _customers;
+    private List<ProductListItem>? _products;
+    private string _customerId = string.Empty;
+    private DateTime? _validUntil;
+    private string _notes = string.Empty;
+    private List<LineDraft> _lines = [];
+
+    /// <summary>Una riga in corso di compilazione. Le quantità sono decimal perché i campi numerici le leggono
+    /// con cultura invariante, come nel resto del web.</summary>
+    private sealed class LineDraft
+    {
+        public Guid? ProductId { get; set; }
+        public string Description { get; set; } = string.Empty;
+        public decimal Quantity { get; set; } = 1;
+        public decimal UnitPrice { get; set; }
+        public decimal DiscountPercent { get; set; }
+    }
+
+    private bool CanCreate => QuoteRules.CanSell(Session.Role);
 
     /// <summary>Filtered on the page: the list is per status and small enough to narrow as you type.</summary>
     private List<QuoteSummary> Visible => (_quotes ?? [])
@@ -83,7 +218,27 @@
         .OrderByDescending(q => q.CreatedAt)
         .ToList();
 
-    protected override Task OnInitializedAsync() => LoadAsync();
+    private LayoutField? FieldOf(string key) => _fields.FirstOrDefault(f => f.Key == key);
+
+    private bool Shows(string key) => FieldOf(key) is not { Visible: false };
+
+    private string LabelFor(string key, string fallback) => FieldOf(key) is { } field ? LayoutHelper.LabelOf(field) : fallback;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadAsync();
+        if (CanCreate)
+        {
+            try
+            {
+                _fields = (await Api.GetAsync<LayoutScreen>("api/layout/quote.new")).Fields;
+            }
+            catch (ApiException)
+            {
+                // Restano i default: il layout non deve impedire di creare preventivi.
+            }
+        }
+    }
 
     private async Task ChangeStatusAsync(string status)
     {
@@ -102,6 +257,113 @@
         catch (ApiException exception)
         {
             _error = exception.Message;
+        }
+    }
+
+    private async Task ToggleCreate()
+    {
+        _showCreate = !_showCreate;
+        if (_showCreate && _lines.Count == 0)
+        {
+            _lines.Add(new LineDraft());
+        }
+
+        if (_showCreate && _customers is null)
+        {
+            await LoadFormDataAsync();
+        }
+    }
+
+    private async Task LoadFormDataAsync()
+    {
+        _createError = null;
+        _createLoading = true;
+        try
+        {
+            _customers ??= await Api.GetAsync<List<Customer>>("api/customers");
+            _products ??= await Api.GetAsync<List<ProductListItem>>("api/products");
+        }
+        catch (ApiException exception)
+        {
+            _createError = exception.Message;
+        }
+        finally
+        {
+            _createLoading = false;
+        }
+    }
+
+    private void AddLine() => _lines.Add(new LineDraft());
+
+    private void RemoveLine(LineDraft line)
+    {
+        if (_lines.Count > 1)
+        {
+            _lines.Remove(line);
+        }
+    }
+
+    /// <summary>Scegliere un prodotto propone il suo nome come descrizione, se la riga è ancora vuota.</summary>
+    private void SetProduct(LineDraft line, string? value)
+    {
+        line.ProductId = Guid.TryParse(value, out var id) ? id : null;
+        if (line.ProductId is { } productId && string.IsNullOrWhiteSpace(line.Description))
+        {
+            line.Description = _products?.FirstOrDefault(p => p.Id == productId)?.Name ?? string.Empty;
+        }
+    }
+
+    private async Task CreateAsync()
+    {
+        _createError = null;
+        var missing = LayoutHelper.Missing(_fields, key => key switch
+        {
+            "customer" => Guid.TryParse(_customerId, out _) ? _customerId : null,
+            "validUntil" => _validUntil?.ToString("yyyy-MM-dd"),
+            "notes" => _notes,
+            "lineDescription" => _lines.TrueForAll(line => !string.IsNullOrWhiteSpace(line.Description)) ? "ok" : null,
+            "lineQuantity" => _lines.TrueForAll(line => line.Quantity > 0) ? "ok" : null,
+            // Il prezzo è un decimal: 0 è un valore valido, quindi non può risultare vuoto.
+            _ => "ok",
+        });
+        if (missing.Count > 0)
+        {
+            _createError = "Compila i campi obbligatori: " + string.Join(", ", missing) + ".";
+            return;
+        }
+
+        if (_lines.Any(line => line.UnitPrice < 0 || line.DiscountPercent is < 0 or > 100))
+        {
+            _createError = "Ogni riga deve avere prezzo non negativo e sconto tra 0 e 100%.";
+            return;
+        }
+
+        _creating = true;
+        try
+        {
+            var created = await Api.PostAsync<Quote>("api/quotes", new
+            {
+                customerId = Guid.Parse(_customerId),
+                validUntil = _validUntil,
+                notes = string.IsNullOrWhiteSpace(_notes) ? null : _notes.Trim(),
+                items = _lines.Select(line => new
+                {
+                    productId = line.ProductId,
+                    description = line.Description.Trim(),
+                    quantity = line.Quantity,
+                    unitPrice = line.UnitPrice,
+                    discountPercent = line.DiscountPercent,
+                }),
+            });
+            Nav.NavigateTo($"preventivi/{created.Id}");
+        }
+        catch (ApiException exception)
+        {
+            _createError = exception.Message;
+        }
+        finally
+        {
+            _creating = false;
         }
     }
 }

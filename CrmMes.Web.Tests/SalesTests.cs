@@ -2,6 +2,7 @@ using System.Net;
 using Bunit;
 using CrmMes.Web.Pages;
 using CrmMes.Web.Services;
+using Microsoft.AspNetCore.Components;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace CrmMes.Web.Tests;
@@ -130,5 +131,99 @@ public class QuotePageTests : TestContext
         page.FindAll("button").Single(b => b.TextContent == "Segna come inviato").Click();
 
         page.WaitForAssertion(() => Assert.Contains("non può essere inviato", page.Find("[role=alert]").TextContent));
+    }
+}
+
+public class QuotesPageTests : TestContext
+{
+    private readonly FakeServer _server = new();
+    private readonly Guid _customerId = Guid.NewGuid();
+    private readonly Guid _productId = Guid.NewGuid();
+
+    public QuotesPageTests()
+    {
+        JSInterop.Mode = JSRuntimeMode.Loose;
+        Services.AddSingleton(_server.CreateClient());
+        Services.AddScoped<Session>();
+        Services.AddScoped<Api>();
+        _server.OnJson("GET", "/api/quotes", new List<QuoteSummary>());
+        _server.OnJson("GET", "/api/customers", new List<Customer>
+        {
+            new(_customerId, "C-AUR", "Condominio Aurora", null, null, null, null, null, true),
+        });
+        _server.OnJson("GET", "/api/products", new List<ProductListItem>
+        {
+            new(_productId, "QE-GEN", "Quadro generale", true, 3, 2),
+        });
+    }
+
+    private async Task<IRenderedComponent<Quotes>> OpenAsync(string role)
+    {
+        await Services.GetRequiredService<Session>().SetAsync(
+            new AuthResponse("t", "r", DateTime.UtcNow.AddMinutes(30), Guid.NewGuid(), "Prova", "prova@example.test", role));
+        var page = RenderComponent<Quotes>();
+        page.WaitForAssertion(() => Assert.Contains("Nessun preventivo", page.Markup));
+        return page;
+    }
+
+    [Fact]
+    public async Task Operator_DoesNotSeeTheNewQuoteButton()
+    {
+        var page = await OpenAsync("Operator");
+
+        Assert.DoesNotContain("Nuovo preventivo", page.Markup);
+    }
+
+    [Fact]
+    public async Task Sales_OpensTheForm_WithCustomersAndProductsLoaded()
+    {
+        var page = await OpenAsync("Sales");
+
+        page.FindAll("button").Single(b => b.TextContent == "Nuovo preventivo").Click();
+
+        page.WaitForAssertion(() => Assert.Contains("Condominio Aurora", page.Markup));
+        Assert.Contains("Quadro generale", page.Markup);
+    }
+
+    [Fact]
+    public async Task MissingCustomer_IsRefusedBeforeSending()
+    {
+        var page = await OpenAsync("Sales");
+        page.FindAll("button").Single(b => b.TextContent == "Nuovo preventivo").Click();
+        page.WaitForAssertion(() => Assert.Contains("Condominio Aurora", page.Markup));
+
+        page.Find("input[aria-label='Descrizione della riga']").Change("Quadro generale BT");
+        page.FindAll("button").Single(b => b.TextContent == "Crea preventivo").Click();
+
+        page.WaitForAssertion(() => Assert.Contains("Compila i campi obbligatori: Cliente", page.Find("[role=alert]").TextContent));
+        Assert.DoesNotContain(_server.Requests, r => r.Request.Method == HttpMethod.Post);
+    }
+
+    [Fact]
+    public async Task Sales_CreatesAQuoteWithAProductLine_AndOpensIt()
+    {
+        var newId = Guid.NewGuid();
+        _server.OnJson("POST", "/api/quotes", new Quote(
+            newId, "PV-20261007-000001", _customerId, "Condominio Aurora", "C-AUR", "Draft", null, null,
+            DateTime.UtcNow, null, null, null, null, 4560, []));
+        var page = await OpenAsync("Sales");
+        page.FindAll("button").Single(b => b.TextContent == "Nuovo preventivo").Click();
+        page.WaitForAssertion(() => Assert.Contains("Condominio Aurora", page.Markup));
+
+        page.Find("select[aria-label='Cliente']").Change(_customerId.ToString());
+        page.Find("select[aria-label='Prodotto della riga']").Change(_productId.ToString());
+        page.WaitForAssertion(() => Assert.Equal("Quadro generale", page.Find("input[aria-label='Descrizione della riga']").GetAttribute("value")));
+        page.Find("input[aria-label='Quantità della riga']").Change("2");
+        page.Find("input[aria-label='Prezzo della riga']").Change("2280");
+
+        page.FindAll("button").Single(b => b.TextContent == "Crea preventivo").Click();
+
+        page.WaitForAssertion(() => Assert.EndsWith($"preventivi/{newId}", Services.GetRequiredService<NavigationManager>().Uri));
+        Assert.Contains(_server.Requests, r => r.Request.Method == HttpMethod.Post
+            && r.Request.RequestUri!.PathAndQuery == "/api/quotes"
+            && r.Body.Contains(_customerId.ToString())
+            && r.Body.Contains(_productId.ToString())
+            && r.Body.Contains("Quadro generale")
+            && r.Body.Contains("2280"));
     }
 }

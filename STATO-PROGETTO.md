@@ -1,12 +1,12 @@
 ﻿# Stato del progetto: Nicolò MES (CrmMes)
 
-Aggiornato: **6 ottobre 2026 (GTIN e modelli HACCP)**. Diario tecnico: [RIEPILOGO-SVILUPPO.md](RIEPILOGO-SVILUPPO.md). Istruzioni operative: [HANDOFF-CLAUDE.md](HANDOFF-CLAUDE.md). Gate: [GATES.md](GATES.md).
+Aggiornato: **7 ottobre 2026 (creazione preventivi sul web)**. Diario tecnico: [RIEPILOGO-SVILUPPO.md](RIEPILOGO-SVILUPPO.md). Istruzioni operative: [HANDOFF-CLAUDE.md](HANDOFF-CLAUDE.md). Gate: [GATES.md](GATES.md).
 
 > **Punto della situazione**
 >
-> - **In produzione (`main` / Render):** allineato a `293f14f` (G9–G15 e contro già pubblicati). Il lavoro del 6 ottobre (GTIN e modelli HACCP) è in commit successivo, con migrazione `AddProductGtin` già applicata su Neon.
-> - **Fatto in codice + Neon:** G9–G15 + contro (SdI HTTP, demo campo, SSO, locale/valuta, assistente IA, CAPA, presenze, Swagger…), GTIN di prodotto con cifra di controllo, modelli HACCP per tipologia. Suite **631/631** (API 414 + Desktop 122 + Web 77 + Console 18).
-> - **Prossimo passo:** campo GTIN nei form desktop e web del prodotto (oggi si imposta via API).
+> - **In produzione (`main` / Render):** allineato all'ultimo push (vedi cronologia); G9–G15 e contro già pubblicati in precedenza.
+> - **Fatto in codice + Neon:** G9–G15 + contro (SdI HTTP, demo campo, SSO, locale/valuta, assistente IA, CAPA, presenze, Swagger…), GTIN di prodotto, modelli HACCP per tipologia, Strumento Layout su gran parte delle schermate, **creazione di un preventivo dalla piattaforma web** (prima solo dal programma). Suite **656/656** (API 428 + Desktop 125 + Web 85 + Console 18).
+> - **Prossimo passo:** creazione fattura sul web (oggi solo dal programma); poi le altre schermate ancora senza Strumento Layout.
 > - **Non è codice:** contratto SdI, macchina fisica, G16 hosting/referenze, IdP OIDC completo.
 
 ## In sintesi
@@ -14,7 +14,7 @@ Aggiornato: **6 ottobre 2026 (GTIN e modelli HACCP)**. Diario tecnico: [RIEPILOG
 - **Cos'è**: gestionale di produzione (MES) con parte commerciale e documentale, per piccole e medie aziende manifatturiere. Nato per un quadrista, oggi si configura per cinque settori.
 - **Versione pubblicata**: v1.7.0 (30/09/2026) + push 02/10 con G8/OEE/MRP/tema. I PC si aggiornano da soli dalle release GitHub.
 - **Architettura**: client Windows (WPF, .NET 8) + API web (ASP.NET Core 8) su Render + database Postgres su Neon. Stessa API per `/app/` (Blazor) e `/tecnici/`.
-- **Test automatici** (06/10/2026): **645/645** verdi — API 421, Desktop 125, Web 81, Console 18.
+- **Test automatici** (07/10/2026): **656/656** verdi — API 428, Desktop 125, Web 85, Console 18.
 - **Backtest end-to-end** (30/09/2026): 68/68 su DB vuoto isolato.
 - **Uso attuale**: interno, un'azienda con due sedi.
 
@@ -67,7 +67,7 @@ Aggiornato: **6 ottobre 2026 (GTIN e modelli HACCP)**. Diario tecnico: [RIEPILOG
 
 ### Web e mobile
 - **Piattaforma web** `/app/` (in produzione dal 30/09/2026, https://crmmes-api.onrender.com/app/): stesso indirizzo e stesse credenziali del programma desktop, si adatta a PC, tablet e telefono, tema chiaro o scuro automatico.
-  - Oggi contiene: cruscotto (commesse aperte, completate, puntualità, OEE, fermi), commesse (filtri per stato, ricerca anche con le ultime cifre, avanzamento, ritardi, codici copiabili), dettaglio commessa (fasi, lotti di materiale usati), materiali (giacenze, sotto scorta), **vendite** (clienti con preventivi e commesse; preventivi con righe e totali, e le azioni segna come inviato, accettato o rifiutato dal cliente, crea le commesse, con conferma), **documenti di trasporto** (elenco per stato e ricerca, dettaglio con destinatario, trasporto, merce, lotti e rientri del conto lavoro), **fatture** (per amministrazione, direzione e commerciale: righe, riepilogo IVA, DDT collegati, avvisi, scarico del file XML FatturaPA delle fatture emesse), **acquisti** (fornitori con ordini e listino; ordini fornitore con consegne in ritardo, conferma e ricevimento merce riga per riga con quantità e lotto del fornitore; elenco "da ordinare" con sotto scorta e mancanti), canali di accesso per l'amministratore.
+  - Oggi contiene: cruscotto (commesse aperte, completate, puntualità, OEE, fermi), commesse (filtri per stato, ricerca anche con le ultime cifre, avanzamento, ritardi, codici copiabili), dettaglio commessa (fasi, lotti di materiale usati), materiali (giacenze, sotto scorta), **vendite** (clienti con preventivi e commesse; preventivi con righe e totali, **creazione di un nuovo preventivo con cliente, validità, note e righe anche collegate a un prodotto (07/10/2026, campi secondo lo Strumento Layout)**, e le azioni segna come inviato, accettato o rifiutato dal cliente, crea le commesse, con conferma), **documenti di trasporto** (elenco per stato e ricerca, dettaglio con destinatario, trasporto, merce, lotti e rientri del conto lavoro), **fatture** (per amministrazione, direzione e commerciale: righe, riepilogo IVA, DDT collegati, avvisi, scarico del file XML FatturaPA delle fatture emesse; la creazione resta solo dal programma), **acquisti** (fornitori con ordini e listino; ordini fornitore con consegne in ritardo, conferma e ricevimento merce riga per riga con quantità e lotto del fornitore; elenco "da ordinare" con sotto scorta e mancanti), canali di accesso per l'amministratore.
   - Le altre aree restano nel programma desktop e il menu web le elenca, così nessuno si chiede dove siano finite. Sul web ci sono anche **distinte di prelievo**, **lotti materiali** e **ricerca catalogo** (stessi nomi del desktop), più l'import Metel se il modulo è acceso.
   - Provata dal vivo: login, cruscotto, ricerca per ultime cifre, dettaglio, canali (il menu cambia subito), blocco per ruolo, vista da telefono, tema chiaro e scuro.
 - **Canali di accesso configurabili dall'amministratore** (desktop, piattaforma web, pagina tecnici da telefono): quali canali usa l'azienda, da dove entra ogni ruolo, su quale canale si vede ogni area. L'amministratore entra sempre da tutti i canali attivi. La scelta vale al login e al rinnovo della sessione (entro 30 minuti), con un messaggio chiaro a chi non è abilitato. Configurabile sia dal desktop ("Canali di accesso" in Amministrazione) sia dal web.
@@ -115,7 +115,7 @@ Non ancora provato: la pagina web dei tecnici dal browser con accesso reale (il 
 | G9 intermediario SdI reale | Codice pronto, dipende dal titolare | Provider HTTP, stati e registrazione esito; servono contratto, URL e chiavi su Render |
 | G11/G12 | Fatto in tree | Pubblicare; poi uso operativo |
 | G13 pack settore | Fatto in codice | Persistenza EPLAN, wire-list, nutrizionale, DM 37/08, SAL e certificati 3.1; hardware bilance da collegare sul campo |
-| G15 web | Fatto nel perimetro attivo | Creazione clienti/materiali, planning, capacità, qualità/CAPA, strumenti e presenze; terminale shop-floor resta desktop/tecnici |
+| G15 web | Fatto nel perimetro attivo | Creazione clienti/materiali/preventivi, planning, capacità, qualità/CAPA, strumenti e presenze; manca ancora la creazione fattura sul web; terminale shop-floor resta desktop/tecnici |
 | MRP avanzato | Fatto in codice | Multi-livello, lead time e creazione ordini fornitore Draft dalle proposte |
 | Hosting a pagamento (G16) | Da acquistare | Piano Render a pagamento — vedi RIEPILOGO «Hosting e firma» |
 | Firma digitale .exe | Da acquistare | Certificato code signing |
@@ -159,7 +159,8 @@ Non ancora provato: la pagina web dei tecnici dal browser con accesso reale (il 
 | 06/10/2026 | (prossimo commit) | **Strumento Layout: ordini fornitore.** Schermata `purchaseOrder.new` (fornitore, codice, quantità, prezzo di riga) con le intestazioni di colonna come etichette, modificabili dall'Admin. `FieldBinding` accetta un'etichetta esplicita. Desktop: finestra *Nuovo ordine fornitore*. **Ancora da fare:** preventivi (`QuoteEditorWindow`), fatture (`InvoiceWindow`) e il resto. Test API 425/425, Desktop 125/125. |
 | 06/10/2026 | (prossimo commit) | **Strumento Layout: preventivi.** Schermata `quote.new` (cliente, validità, note in testata; descrizione, quantità, prezzo, sconto di riga) con intestazioni di colonna come etichette. Desktop: editor *Nuovo preventivo* in creazione. Stima da distinta invariata. **Ancora da fare:** fatture (`InvoiceWindow`) e il resto delle schermate. Test API 426/426, Desktop 125/125. Analisi competitor in `ANALISI-COMPETITOR-MES.md`. |
 | 06/10/2026 | (prossimo commit) | **Strumento Layout: fatture (testata).** Schermata `invoice.new` (cliente sempre obbligatorio; pagamento, scadenza e causale nascondibili) in *Nuova fattura*, desktop. Le righe restano nella griglia con le sue intestazioni. Il controllo dei campi obbligatori è in `BuildRequest`, quindi vale per salvataggio ed emissione. Web non ancora collegato. |
-| prossimo | - | Push del tree su main; poi restano solo contratto SdI, macchina fisica, G16 e IdP OIDC di produzione |
+| 07/10/2026 | (prossimo commit) | **Creazione di un preventivo dalla piattaforma web.** Pagina `/preventivi`: pulsante *Nuovo preventivo* (Admin e Sales) con cliente, validità, note e righe libere o collegate a un prodotto (il prodotto propone la descrizione, serve per poter poi creare le commesse); campi secondo il registro Layout `quote.new`, con default se il layout non arriva. Nessuna modifica all'API (`POST api/quotes` esisteva già) né migrazione. **Ancora da fare:** creazione fattura sul web, poi il resto delle circa 26 pagine web senza Strumento Layout. Test Web 85/85 (+4), suite completa 656/656. |
+| prossimo | - | Creazione fattura sul web; poi le altre schermate senza Strumento Layout; infine restano solo contratto SdI, macchina fisica, G16 e IdP OIDC di produzione |
 
 ## Pubblicazione e ambienti
 
