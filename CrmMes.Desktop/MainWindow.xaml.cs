@@ -607,7 +607,7 @@ public partial class MainWindow : Window
         CompanyFiscalButton.Visibility = Show(_apiClient.IsModuleEnabled("invoicing") && _apiClient.CurrentRole == "Admin");
         NavHaccp.Visibility = Show(_apiClient.IsModuleEnabled("haccp"));
         NavSiteReports.Visibility = Show(_apiClient.IsModuleEnabled("site-work"));
-        ImportMetelButton.Visibility = Show(_apiClient.IsModuleEnabled("metel"));
+        ImportMetelMenuItem.Visibility = Show(_apiClient.IsModuleEnabled("metel"));
         MaterialFoodButton.Visibility = Show(_apiClient.IsModuleEnabled("food-labels"));
         ProductFoodButton.Visibility = Show(_apiClient.IsModuleEnabled("food-labels"));
         var lotExpiry = _apiClient.IsModuleEnabled("lot-expiry");
