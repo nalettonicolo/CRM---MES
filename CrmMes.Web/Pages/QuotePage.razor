@@ -1,4 +1,4 @@
-@page "/preventivi/{Id:guid}"
+﻿@page "/preventivi/{Id:guid}"
 @inject Api Api
 @inject Session Session
 
@@ -122,8 +122,10 @@ else
                 @if (_confirm.IsConvert)
                 {
                     <div class="facts">
+                        @if (Shows("area"))
+                        {
                         <div class="fact">
-                            <div class="label">Area di produzione</div>
+                            <div class="label">@LabelFor("area", "Area di produzione")</div>
                             <div class="value">
                                 <select @bind="_convertAreaId">
                                     <option value="">Scegli area (consigliato)</option>
@@ -134,10 +136,14 @@ else
                                 </select>
                             </div>
                         </div>
+                        }
+                        @if (Shows("dueDate"))
+                        {
                         <div class="fact">
-                            <div class="label">Consegna prevista</div>
+                            <div class="label">@LabelFor("dueDate", "Consegna prevista")</div>
                             <div class="value"><input type="date" @bind="_convertDueDate" /></div>
                         </div>
+                        }
                     </div>
                     @if (_areas is { Count: 0 })
                     {
@@ -185,6 +191,7 @@ else
     private Confirmation? _confirm;
     private List<ConvertedWorkOrder>? _converted;
     private List<AreaRow>? _areas;
+    private LayoutScreen? _convertLayout;
     private string _convertAreaId = "";
     private DateTime? _convertDueDate;
     private bool _busy;
@@ -219,11 +226,21 @@ else
         "Il preventivo resta in archivio come rifiutato e non si potrà più accettare.",
         () => RunAsync(async () => _quote = await Api.PostAsync<Quote>($"api/quotes/{Id}/reject")));
 
+    /// <summary>Layout della conversione: area e consegna con etichette e obbligatorietà dell'Admin. Se non
+    /// arriva, il form resta con i valori di default.</summary>
+    private LayoutField? FieldOf(string key) => _convertLayout?.Fields.FirstOrDefault(f => f.Key == key);
+
+    private bool Shows(string key) => FieldOf(key) is not { Visible: false };
+
+    private string LabelFor(string key, string fallback) => FieldOf(key) is { } field ? LayoutHelper.LabelOf(field) : fallback;
+
     private async Task AskConvertAsync()
     {
         _actionError = null;
         try
         {
+            try { _convertLayout ??= await Api.GetAsync<LayoutScreen>("api/layout/quote.convert"); }
+            catch (ApiException) { _convertLayout = null; }
             _areas ??= await Api.GetAsync<List<AreaRow>>("api/areas");
             if (string.IsNullOrEmpty(_convertAreaId) && _areas is { Count: 1 })
             {
@@ -240,6 +257,20 @@ else
             $"Viene creata una commessa in bozza per ogni riga con un prodotto ({_quote!.Items.Count(i => i.ProductId is not null)}). L'area consente subito la distinta di prelievo. Le righe descrittive restano solo nel preventivo.",
             () => RunAsync(async () =>
             {
+                if (_convertLayout is not null)
+                {
+                    var missing = LayoutHelper.Missing(_convertLayout.Fields, key => key switch
+                    {
+                        "area" => _convertAreaId,
+                        "dueDate" => _convertDueDate?.ToString("yyyy-MM-dd"),
+                        _ => null,
+                    });
+                    if (missing.Count > 0)
+                    {
+                        throw new ApiException("Compila i campi obbligatori: " + string.Join(", ", missing) + ".");
+                    }
+                }
+
                 Guid? areaId = Guid.TryParse(_convertAreaId, out var parsed) ? parsed : null;
                 var result = await Api.PostAsync<ConvertQuoteResult>($"api/quotes/{Id}/convert",
                     new { dueDate = _convertDueDate, areaId });
