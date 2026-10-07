@@ -56,6 +56,8 @@ public class MarginsController : ControllerBase
         var priced = rows.Where(row => row.SalePrice.HasValue).ToList();
         var revenue = priced.Sum(row => row.SalePrice!.Value);
         var cost = priced.Sum(row => row.ActualCost);
+        AuditTrail.Add(_dbContext, User, "MarginsViewed", "Margins", null, $"Controllo margini consultato: {rows.Count} commesse.");
+        await _dbContext.SaveChangesAsync(cancellationToken);
         return Ok(new MarginOverviewResponse(
             rows.Count, priced.Count, revenue, cost, revenue - cost,
             revenue > 0 ? Math.Round((revenue - cost) / revenue, 4) : null,

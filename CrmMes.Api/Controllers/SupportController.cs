@@ -94,6 +94,8 @@ public class SupportController : ControllerBase
                 return StatusCode(StatusCodes.Status502BadGateway, new { message = "La console di assistenza non ha accettato la richiesta: contatta l'assistenza per telefono o email." });
             }
 
+            AuditTrail.Add(_dbContext, User, "SupportRequestSent", "SupportRequest", null, $"Richiesta di assistenza inviata: {subject}.");
+            await _dbContext.SaveChangesAsync(cancellationToken);
             return Ok(await response.Content.ReadFromJsonAsync<SupportTicketInfo>(cancellationToken));
         }
         catch (HttpRequestException)

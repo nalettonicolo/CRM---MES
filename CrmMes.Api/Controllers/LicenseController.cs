@@ -1,4 +1,5 @@
 using CrmMes.Api.Services;
+using CrmMes.Core.Data;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -13,11 +14,13 @@ public class LicenseController : ControllerBase
 {
     private readonly LicenseState _state;
     private readonly LicenseHeartbeatService _heartbeat;
+    private readonly ApplicationDbContext _dbContext;
 
-    public LicenseController(LicenseState state, LicenseHeartbeatService heartbeat)
+    public LicenseController(LicenseState state, LicenseHeartbeatService heartbeat, ApplicationDbContext dbContext)
     {
         _state = state;
         _heartbeat = heartbeat;
+        _dbContext = dbContext;
     }
 
     [HttpGet]
@@ -35,6 +38,9 @@ public class LicenseController : ControllerBase
 
         var ok = await _heartbeat.CheckNowAsync(cancellationToken);
         var snapshot = await _state.CurrentAsync(cancellationToken);
+        AuditTrail.Add(_dbContext, User, "LicenseCheckedManually", "License", null,
+            ok ? $"Controllo licenza forzato: stato {snapshot.Status}." : "Controllo licenza forzato: console non raggiungibile.");
+        await _dbContext.SaveChangesAsync(cancellationToken);
         return ok ? Ok(ToResponse(snapshot)) : StatusCode(StatusCodes.Status502BadGateway, new { message = "Console licenze non raggiungibile: riprova più tardi." });
     }
 

@@ -1,3 +1,4 @@
+using CrmMes.Api.Services;
 using CrmMes.Core.Data;
 using CrmMes.Core.Models;
 using Microsoft.AspNetCore.Authorization;
@@ -157,6 +158,8 @@ public class RecallController : ControllerBase
         }
 
         var customers = shipments.Select(s => s.RecipientName).Distinct(StringComparer.OrdinalIgnoreCase).OrderBy(n => n).ToList();
+        AuditTrail.Add(_dbContext, User, "RecallTraced", "Recall", null, $"Richiamo avviato: {subject}, {orders.Count} commesse coinvolte.");
+        await _dbContext.SaveChangesAsync(cancellationToken);
         return new RecallResponse(
             subject,
             orders.OrderBy(o => o.CreatedAt).Select(o => new RecallWorkOrder(

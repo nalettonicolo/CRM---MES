@@ -1,4 +1,5 @@
 using CrmMes.Api.Services;
+using CrmMes.Core.Data;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -11,10 +12,12 @@ public class AssistantController : ControllerBase
 {
     private readonly IAiAssistant? _assistant;
     private readonly IConfiguration _configuration;
+    private readonly ApplicationDbContext _dbContext;
 
-    public AssistantController(IConfiguration configuration, IAiAssistant? assistant = null)
+    public AssistantController(IConfiguration configuration, ApplicationDbContext dbContext, IAiAssistant? assistant = null)
     {
         _configuration = configuration;
+        _dbContext = dbContext;
         _assistant = assistant;
     }
 
@@ -37,6 +40,9 @@ public class AssistantController : ControllerBase
         try
         {
             var result = await _assistant.AskAsync(question, cancellationToken);
+            AuditTrail.Add(_dbContext, User, "AssistantAsked", "Assistant", null,
+                $"Domanda all'assistente IA: {question[..Math.Min(question.Length, 300)]}");
+            await _dbContext.SaveChangesAsync(cancellationToken);
             return Ok(result);
         }
         catch (InvalidOperationException ex)
