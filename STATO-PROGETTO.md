@@ -1,12 +1,12 @@
 ﻿# Stato del progetto: Nicolò MES (CrmMes)
 
-Aggiornato: **7 ottobre 2026 (campi personalizzati nello Strumento Layout)**. Diario tecnico: [RIEPILOGO-SVILUPPO.md](RIEPILOGO-SVILUPPO.md). Istruzioni operative: [HANDOFF-CLAUDE.md](HANDOFF-CLAUDE.md). Gate: [GATES.md](GATES.md). Priorità commerciali: [ANALISI-MERCATO-MES.md](ANALISI-MERCATO-MES.md) (sezione 8, "Cosa possiamo migliorare").
+Aggiornato: **8 ottobre 2026 (campi personalizzati sulle finestre desktop fornitori/clienti)**. Diario tecnico: [RIEPILOGO-SVILUPPO.md](RIEPILOGO-SVILUPPO.md). Istruzioni operative: [HANDOFF-CLAUDE.md](HANDOFF-CLAUDE.md). Gate: [GATES.md](GATES.md). Priorità commerciali: [ANALISI-MERCATO-MES.md](ANALISI-MERCATO-MES.md) (sezione 8, "Cosa possiamo migliorare").
 
 > **Punto della situazione**
 >
 > - **In produzione (`main` / Render):** allineato all'ultimo push (vedi cronologia); G9–G15 e contro già pubblicati in precedenza.
-> - **Fatto in codice + Neon:** G9–G15 + contro, GTIN di prodotto, Strumento Layout su gran parte delle schermate, creazione preventivo dal web, registro operazioni esteso (28/51), **campi personalizzati nello Strumento Layout** (es. "Giorni di pagamento") su fornitori e clienti, lato API e web. Suite **676/676** (API 443 + Desktop 125 + Web 90 + Console 18).
-> - **Prossimo passo:** campi personalizzati anche nelle finestre desktop (fornitori/clienti), poi creazione fattura sul web, poi diagramma del flusso dei dati tra i moduli.
+> - **Fatto in codice + Neon:** G9–G15 + contro, GTIN di prodotto, Strumento Layout su gran parte delle schermate, creazione preventivo dal web, registro operazioni esteso (28/51), campi personalizzati nello Strumento Layout (es. "Giorni di pagamento") su fornitori e clienti, lato API e web **e ora anche nelle finestre desktop** (nessuna modifica all'API né migrazione). Suite **681/681** (API 443 + Desktop 130 + Web 90 + Console 18).
+> - **Prossimo passo:** creazione fattura sul web, poi diagramma del flusso dei dati tra i moduli, poi registro operazioni sui 23 controller restanti.
 > - **Non è codice:** contratto SdI, macchina fisica, G16 hosting/referenze, IdP OIDC completo, prezzo pubblico, policy GDPR.
 
 ## In sintesi
@@ -14,7 +14,7 @@ Aggiornato: **7 ottobre 2026 (campi personalizzati nello Strumento Layout)**. Di
 - **Cos'è**: gestionale di produzione (MES) con parte commerciale e documentale, per piccole e medie aziende manifatturiere. Nato per un quadrista, oggi si configura per cinque settori.
 - **Versione pubblicata**: v1.7.0 (30/09/2026) + push 02/10 con G8/OEE/MRP/tema. I PC si aggiornano da soli dalle release GitHub.
 - **Architettura**: client Windows (WPF, .NET 8) + API web (ASP.NET Core 8) su Render + database Postgres su Neon. Stessa API per `/app/` (Blazor) e `/tecnici/`.
-- **Test automatici** (07/10/2026): **676/676** verdi — API 443, Desktop 125, Web 90, Console 18.
+- **Test automatici** (08/10/2026): **681/681** verdi — API 443, Desktop 130, Web 90, Console 18.
 - **Backtest end-to-end** (30/09/2026): 68/68 su DB vuoto isolato.
 - **Uso attuale**: interno, un'azienda con due sedi.
 
@@ -164,7 +164,8 @@ Non ancora provato: la pagina web dei tecnici dal browser con accesso reale (il 
 | 07/10/2026 | (prossimo commit) | **Analisi di mercato ricompilata** in un solo documento (prima tre round impilati nel tempo), centrata sulla sezione "Cosa possiamo migliorare"; ricerca aggiornata su GDPR (il codice di condotta non fissa tempi di conservazione fissi), normativa iperammortamento (legge 88/2026) e conteggio fornitori MES in Italia. **Registro operazioni (step 5 della mappa di hardening)**: aggiunto ad `AreasController`, `SitesController`, `WorkCentersController`, `CustomersController` — 28 controller su 51 (da 24). Nessuna migrazione. Test API +7, suite 663/663. |
 | 07/10/2026 | (prossimo commit) | **Correzione: pulsante nascosto nella barra Materiali (programma).** Troppi pulsanti in fila (`DockPanel` non va a capo): con più moduli attivi (Metel, alimentare) la casella di ricerca e altri pulsanti uscivano dalla vista senza errore. I quattro pulsanti di importazione sono ora un unico menu *Importa ▾*, come già *Esporta ▾*. |
 | 07/10/2026 | (prossimo commit) | **Campi personalizzati nello Strumento Layout.** Novità vera: oltre a rietichettare/riordinare/nascondere i campi già nel modello, l'Admin può ora aggiungere a una schermata un campo **nuovo di sana pianta** (es. "Giorni di pagamento", "Tipologia di pagamento"), con tipo (testo, numero, data, sì/no) e obbligatorietà. Modelli `CustomFieldDefinition`/`CustomFieldValue` (migrazione `AddCustomFields`, additiva); `CustomFieldService` valida e salva i valori per record; endpoint `GET/POST/PUT/DELETE api/layout/{schermata}/custom-fields`, stesso permesso di modifica dello Strumento Layout. Cablato end-to-end su **fornitori e clienti** (API) e sul **web**: pagina Layout (aggiungi/elimina campo) e form *Nuovo cliente* (campi dinamici, obbligatorietà, invio). **Da fare**: le stesse finestre sul programma (fornitori/clienti), poi sulle altre schermate. Test +15 (API 7, Web 8), suite 676/676. |
-| prossimo | - | Campi personalizzati nelle finestre desktop fornitori/clienti; diagramma del flusso dei dati tra i moduli (con qualche esempio); registro operazioni sui 23 controller restanti; creazione fattura sul web; le altre schermate senza Strumento Layout; infine restano solo contratto SdI, macchina fisica, G16, prezzo pubblico, policy GDPR e IdP OIDC di produzione |
+| 08/10/2026 | (prossimo commit) | **Campi personalizzati sulle finestre desktop fornitori/clienti.** Le finestre *Nuovo/Modifica fornitore* e *Nuovo/Modifica cliente* mostrano ora, oltre ai campi fissi, i campi che l'Admin ha aggiunto dalla pagina web Layout (es. "Giorni di pagamento"): costruiti a runtime (`CustomFieldForm.BuildControls`, TextBox/DatePicker/CheckBox secondo il tipo) perché non esistono nel XAML, precompilati con il valore già salvato in modifica, con lo stesso controllo del server su obbligatorietà e formato Numero/Data prima di inviare. Nessuna modifica all'API (gli endpoint e la validazione server esistevano già) né migrazione. Codice condiviso in `CrmMes.Desktop/Layout/CustomFieldForm.cs` (nuovo), riusabile per le prossime schermate desktop con campi personalizzati. Test +5 (logica pura Missing/Validate; la costruzione dei controlli WPF richiede un thread STA non disponibile in xunit, quindi resta provata dall'uso dell'app, come già per `FormLayoutApplier.Apply`), suite 681/681. |
+| prossimo | - | Creazione fattura sul web; diagramma del flusso dei dati tra i moduli (con qualche esempio); registro operazioni sui 23 controller restanti; le altre schermate senza Strumento Layout; infine restano solo contratto SdI, macchina fisica, G16, prezzo pubblico, policy GDPR e IdP OIDC di produzione |
 
 ## Pubblicazione e ambienti
 

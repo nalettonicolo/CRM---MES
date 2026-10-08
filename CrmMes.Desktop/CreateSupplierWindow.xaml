@@ -22,6 +22,9 @@
         <TextBlock Text="Sito web / catalogo online (opzionale, utile quando non c'è un PDF da importare)" Foreground="{StaticResource TextSecondaryBrush}" FontSize="12.5" Margin="0,0,0,5" />
         <TextBox x:Name="WebsiteBox" Margin="0,0,0,14" />
 
+        <!-- Campi personalizzati aggiunti dall'Admin dallo strumento Layout (es. "Giorni di pagamento"): costruiti a runtime, non sono nel XAML. -->
+        <StackPanel x:Name="CustomFieldsPanel" />
+
         <TextBlock x:Name="ErrorText" Foreground="{StaticResource DangerBrush}" TextWrapping="Wrap" Margin="0,0,0,10" />
 
         <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,6,0,0">

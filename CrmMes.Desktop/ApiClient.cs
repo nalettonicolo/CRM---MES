@@ -557,9 +557,9 @@ public sealed class ApiClient
             ?? throw new InvalidOperationException("Risposta dettaglio fornitore non valida.");
     }
 
-    public async Task EditSupplierAsync(Guid id, string name, string? email, string? phone, string? website, CancellationToken cancellationToken = default)
+    public async Task EditSupplierAsync(Guid id, string name, string? email, string? phone, string? website, Dictionary<string, string?>? customFields = null, CancellationToken cancellationToken = default)
     {
-        using var response = await _httpClient.PutAsJsonAsync($"api/suppliers/{id}", new { name, email, phone, website }, cancellationToken);
+        using var response = await _httpClient.PutAsJsonAsync($"api/suppliers/{id}", new { name, email, phone, website, customFields }, cancellationToken);
         await EnsureSuccessAsync(response, cancellationToken);
     }
 
@@ -1372,6 +1372,15 @@ public sealed class ApiClient
     public Task<CrmMes.Desktop.Layout.LayoutAccessDto> SaveLayoutAccessAsync(IEnumerable<string> roles, CancellationToken cancellationToken = default)
         => SendAsync<CrmMes.Desktop.Layout.LayoutAccessDto>(HttpMethod.Put, "api/layout/access", new { roles = roles.ToList() }, cancellationToken);
 
+    /// <summary>Campi personalizzati di una schermata (oltre ai predefiniti nel codice), come li ha aggiunti
+    /// l'Admin dallo strumento Layout. Aperto a tutti gli utenti autenticati.</summary>
+    public async Task<List<CrmMes.Desktop.Layout.CustomFieldDefinitionDto>> GetCustomFieldDefinitionsAsync(string screen, CancellationToken cancellationToken = default)
+    {
+        using var response = await _httpClient.GetAsync($"api/layout/{screen}/custom-fields", cancellationToken);
+        await EnsureSuccessAsync(response, cancellationToken);
+        return await response.Content.ReadFromJsonAsync<List<CrmMes.Desktop.Layout.CustomFieldDefinitionDto>>(cancellationToken: cancellationToken) ?? [];
+    }
+
     public Task<CrmMes.Desktop.Layout.LayoutScreenDto> SaveLayoutScreenAsync(string screen, IEnumerable<CrmMes.Desktop.Layout.LayoutFieldDto> fields, CancellationToken cancellationToken = default)
         => SendAsync<CrmMes.Desktop.Layout.LayoutScreenDto>(HttpMethod.Put, $"api/layout/{screen}", new
         {
@@ -1641,11 +1650,11 @@ public sealed class ApiClient
         await EnsureSuccessAsync(response, cancellationToken);
     }
 
-    public async Task CreateSupplierAsync(string name, string code, string? email, string? phone, string? website = null, CancellationToken cancellationToken = default)
+    public async Task CreateSupplierAsync(string name, string code, string? email, string? phone, string? website = null, Dictionary<string, string?>? customFields = null, CancellationToken cancellationToken = default)
     {
         using var response = await _httpClient.PostAsJsonAsync(
             "api/suppliers",
-            new { name, code, email, phone, website },
+            new { name, code, email, phone, website, customFields },
             cancellationToken);
         await EnsureSuccessAsync(response, cancellationToken);
     }
@@ -2410,7 +2419,8 @@ public sealed record SupplierCatalogEntryDto(string MaterialCode, string Materia
 
 public sealed record SupplierDetailDto(
     Guid Id, string Name, string Code, string? Email, string? Phone, string? Website, bool IsActive,
-    List<SupplierPurchaseOrderDto> PurchaseOrders, List<SupplierCatalogEntryDto> CatalogEntries);
+    List<SupplierPurchaseOrderDto> PurchaseOrders, List<SupplierCatalogEntryDto> CatalogEntries,
+    Dictionary<string, string?>? CustomFields = null);
 
 public sealed record CatalogSearchResultDto(
     string MaterialCode, string MaterialName, Guid SupplierId, string SupplierName, string SupplierCode,
@@ -2420,14 +2430,17 @@ public sealed record CustomerDto(
     Guid Id, string Code, string Name, string? VatNumber, string? Email, string? Phone, string? Address, string? Notes, bool IsActive);
 
 public sealed record SaveCustomerDto(
-    string Name, string Code, string? VatNumber, string? Email, string? Phone, string? Address, string? Notes);
+    string Name, string Code, string? VatNumber, string? Email, string? Phone, string? Address, string? Notes,
+    Dictionary<string, string?>? CustomFields = null);
 
 public sealed record CustomerQuoteDto(Guid Id, string Code, string Status, DateTime CreatedAt, DateTime? ValidUntil, decimal Total);
 
 public sealed record CustomerWorkOrderDto(
     Guid Id, string Code, string ProductCode, string ProductName, decimal Quantity, string Status, DateTime? DueDate);
 
-public sealed record CustomerDetailDto(CustomerDto Customer, List<CustomerQuoteDto> Quotes, List<CustomerWorkOrderDto> WorkOrders);
+public sealed record CustomerDetailDto(
+    CustomerDto Customer, List<CustomerQuoteDto> Quotes, List<CustomerWorkOrderDto> WorkOrders,
+    Dictionary<string, string?>? CustomFields = null);
 
 public sealed record QuoteSummaryDto(
     Guid Id, string Code, Guid CustomerId, string CustomerName, string Status,

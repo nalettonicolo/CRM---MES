@@ -7,10 +7,13 @@ public partial class CreateSupplierWindow : Window
 {
     private readonly ApiClient _apiClient;
     private readonly Guid? _editingSupplierId;
+    private readonly IReadOnlyDictionary<string, string?> _existingCustomFields;
 
     public bool Created { get; private set; }
 
     private IReadOnlyList<LayoutFieldDto> _layout = [];
+    private IReadOnlyList<CustomFieldDefinitionDto> _customFieldDefinitions = [];
+    private List<CustomFieldControl> _customFieldControls = [];
 
     /// <summary>Creation mode.</summary>
     public CreateSupplierWindow(ApiClient apiClient) : this(apiClient, existing: null)
@@ -23,11 +26,7 @@ public partial class CreateSupplierWindow : Window
     {
         InitializeComponent();
         _apiClient = apiClient;
-
-        if (existing is null)
-        {
-            Loaded += async (_, _) => await LoadLayoutAsync();
-        }
+        _existingCustomFields = existing?.CustomFields ?? new Dictionary<string, string?>();
 
         if (existing is not null)
         {
@@ -42,6 +41,16 @@ public partial class CreateSupplierWindow : Window
             PhoneBox.Text = existing.Phone;
             WebsiteBox.Text = existing.Website;
         }
+
+        Loaded += async (_, _) =>
+        {
+            if (existing is null)
+            {
+                await LoadLayoutAsync();
+            }
+
+            await LoadCustomFieldsAsync();
+        };
     }
 
     /// <summary>Layout del modulo fornitore in creazione: etichette, visibilità e obbligatorietà dall'Admin.
@@ -59,6 +68,14 @@ public partial class CreateSupplierWindow : Window
         ]);
     }
 
+    /// <summary>Campi personalizzati aggiunti dall'Admin alla schermata "Nuovo fornitore" (es. "Giorni di
+    /// pagamento"): in modifica arrivano precompilati con il valore già salvato per questo fornitore.</summary>
+    private async Task LoadCustomFieldsAsync()
+    {
+        _customFieldDefinitions = await CustomFieldForm.LoadAsync(_apiClient, "suppliers.new");
+        _customFieldControls = CustomFieldForm.BuildControls(CustomFieldsPanel, _customFieldDefinitions, _existingCustomFields);
+    }
+
     private async void Create_Click(object sender, RoutedEventArgs e)
     {
         var name = NameBox.Text.Trim();
@@ -69,6 +86,8 @@ public partial class CreateSupplierWindow : Window
             ErrorText.Text = "Nome e codice sono obbligatori.";
             return;
         }
+
+        var customFieldValues = CustomFieldForm.ToValues(_customFieldControls);
 
         if (_editingSupplierId is null)
         {
@@ -81,6 +100,7 @@ public partial class CreateSupplierWindow : Window
                 "website" => !string.IsNullOrWhiteSpace(WebsiteBox.Text),
                 _ => true,
             });
+            missing.AddRange(CustomFieldForm.Missing(_customFieldDefinitions, customFieldValues));
             if (missing.Count > 0)
             {
                 ErrorText.Text = "Compila i campi obbligatori: " + string.Join(", ", missing) + ".";
@@ -88,16 +108,23 @@ public partial class CreateSupplierWindow : Window
             }
         }
 
+        var typeError = CustomFieldForm.Validate(_customFieldDefinitions, customFieldValues);
+        if (typeError is not null)
+        {
+            ErrorText.Text = typeError;
+            return;
+        }
+
         CreateButton.IsEnabled = false;
         try
         {
             if (_editingSupplierId is Guid supplierId)
             {
-                await _apiClient.EditSupplierAsync(supplierId, name, EmailBox.Text, PhoneBox.Text, WebsiteBox.Text);
+                await _apiClient.EditSupplierAsync(supplierId, name, EmailBox.Text, PhoneBox.Text, WebsiteBox.Text, customFieldValues);
             }
             else
             {
-                await _apiClient.CreateSupplierAsync(name, code, EmailBox.Text, PhoneBox.Text, WebsiteBox.Text);
+                await _apiClient.CreateSupplierAsync(name, code, EmailBox.Text, PhoneBox.Text, WebsiteBox.Text, customFieldValues);
             }
 
             Created = true;

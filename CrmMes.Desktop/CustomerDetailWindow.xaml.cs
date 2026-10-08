@@ -9,6 +9,7 @@ public partial class CustomerDetailWindow : Window
     private readonly ApiClient _apiClient;
     private readonly Guid _customerId;
     private CustomerDto? _customer;
+    private Dictionary<string, string?> _customFields = [];
 
     /// <summary>True when the customer was edited from here, so the list behind can refresh.</summary>
     public bool Changed { get; private set; }
@@ -27,6 +28,7 @@ public partial class CustomerDetailWindow : Window
         {
             var detail = await _apiClient.GetCustomerDetailAsync(_customerId);
             _customer = detail.Customer;
+            _customFields = detail.CustomFields ?? [];
             Title = $"Cliente {detail.Customer.Code}";
             CustomerTitleText.Text = detail.Customer.Name;
             CustomerInfoText.Text = string.Join(" · ", new[]
@@ -54,7 +56,7 @@ public partial class CustomerDetailWindow : Window
             return;
         }
 
-        var dialog = new CustomerEditWindow(_apiClient, _customer) { Owner = this };
+        var dialog = new CustomerEditWindow(_apiClient, _customer, _customFields) { Owner = this };
         dialog.ShowDialog();
         if (dialog.Created)
         {
