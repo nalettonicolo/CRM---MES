@@ -3,7 +3,7 @@
 Ricompilata il **7 ottobre 2026**, unendo in un solo documento le ricerche del 2, 6 e 7 ottobre (prima erano sezioni separate, con parti ripetute). Centrata su **cosa possiamo migliorare**: la sezione 8 è il punto di partenza per decidere il prossimo passo. Allineata a [STATO-PROGETTO.md](STATO-PROGETTO.md), [GATES.md](GATES.md) e [ANALISI-COMPETITOR-MES.md](ANALISI-COMPETITOR-MES.md).
 Punto di vista: commerciale, commercialista, fatturazione, capocantiere, responsabile tecnico, capo reparto, ingegneri (gestionale / meccanico / informatico / 4.0–5.0), cybersecurity, data analyst.
 
-I prezzi dei competitor vengono da aggregatori e pagine di terzi, non dai listini ufficiali: da confermare prima di usarli in trattativa. Dove una fonte precedente non è stata confermata (es. prezzo Bravo, esistenza di "siMES"), resta segnalato come **non verificato** invece di essere ripetuto come fatto.
+I prezzi dei competitor vengono da aggregatori e pagine di terzi, non dai listini ufficiali: da confermare prima di usarli in trattativa. **Aggiornamento 08/10/2026**: Bravo, siMES e Opera MES sono stati verificati direttamente sui siti ufficiali — erano segnalati come "non verificati" nella versione precedente di questo documento. Il prezzo di siMES scritto in precedenza (~3.500 €/macchina) era **sbagliato**: quello reale è ~1.100 €/anno base, molto più basso. Lezione per le prossime ricerche: "nessuna fonte trovata" in una ricerca generica non significa che il dato sia falso, solo che va cercato con termini più mirati (nome esatto dell'azienda, non solo del prodotto) prima di scartarlo.
 
 ---
 
@@ -21,7 +21,7 @@ I prezzi dei competitor vengono da aggregatori e pagine di terzi, non dai listin
 | Fascia | Esempi | Per chi | Prezzo indicativo (2026) | Punto forte | Limite per una PMI |
 |---|---|---|---|---|---|
 | MES enterprise | Siemens Opcenter, SAP DM, Rockwell/Plex, AVEVA, Critical Manufacturing | Grandi gruppi | Decine–centinaia di k€ + canoni | Profondità, PLC/SCADA, APS, AI | Costo, mesi di progetto, integratori |
-| MES italiani PMI | Bravo (Antos), siMES/SiVaF, Opera MES (Cybertec), NET@PRO, moduli TeamSystem/Zucchetti, Mago.Net (Microarea) | PMI manifatturiere | Bravo Plus ~290 €/risorsa/anno (min. 10, **non verificato in questa ricerca**); siMES da ~3.500 €/macchina (**non verificato**, nessuna fonte diretta trovata in tre ricerche) | OEE da macchina, IoT, connettori ERP | Quasi sempre **solo reparto**: DDT/FatturaPA/clienti restano nell'ERP |
+| MES italiani PMI | Bravo (Antos), siMES (Sivaf Informatica), Opera MES (Cybertec, gruppo Zucchetti), NET@PRO, moduli TeamSystem/Zucchetti, Mago.Net (Microarea) | PMI manifatturiere | **Confermati 08/10 sui siti ufficiali**: Bravo Plus **290 €/risorsa/anno** (min. 10 non confermato); siMES **~1.100 €/anno** base, 1 postazione (non ~3.500 €/macchina come scritto prima — errore corretto) | OEE da macchina, IoT, connettori ERP | Quasi sempre **solo reparto**: DDT/FatturaPA/clienti restano nell'ERP |
 | ERP / gestionali IT | TeamSystem, Zucchetti, Danea, Fatture in Cloud + add-on | PMI di ogni settore | Canoni per utente (TeamSystem modulo produzione ~2.500 €/anno) | Fiscale IT, fatturazione, contabilità | Produzione e campo deboli o assenti |
 | MRP / ERP cloud esteri | MRPeasy ($49–149/utente/mese), Katana (Free/$299/mese/su preventivo), Odoo (Italia €24,90–37,40/utente/mese) | Piccole aziende | Decine–centinaia $/mese | Avvio rapido, distinte, magazzino | Fiscale IT debole, poche macchine |
 | MES no-code | Tulip ($100–250/interfaccia/mese, minimo 10) | Chi ha un reparto IT interno | Centinaia–migliaia $/mese | App di reparto su misura | Va costruito tutto |
@@ -29,7 +29,7 @@ I prezzi dei competitor vengono da aggregatori e pagine di terzi, non dai listin
 | Verticali food | Plex/AVEVA food, FoodDocs, SafetyChain | Alimentare | SaaS → progetti | HACCP, audit | Spesso esteri; fiscale IT assente |
 | **Nicolò MES** | — | PMI multisettore | **Non definito** — nessun listino pubblico | Unico con fiscale IT nativo + MES completo | — |
 
-**Lettura competitiva.** Bravo = OEE + IoT add-on + ERP esterno. siMES (se esiste con questo nome: vedi §8.3) = retrofit + AI dichiarata. Opera / NET@PRO = modularità produzione, prezzo solo su preventivo. Mago.Net, TeamSystem, Zucchetti = ERP con la produzione come modulo, fiscale forte ma shop-floor poco profondo. **Nessun competitor citato unisce, in un solo prodotto per la PMI, FatturaPA nativa + DDT + MES di fabbrica + moduli di settore** come Nicolò: il confronto tipico resta "MES + ERP già in casa", non "un solo prodotto". Il prezzo di Nicolò MES resta l'unico dato mancante per rendere il confronto completo, non solo di funzioni.
+**Lettura competitiva.** Bravo = OEE + IoT add-on + ERP esterno, 290 €/risorsa/anno confermato. siMES = capacità finita + raccolta dati macchina + AI dichiarata, **confermato a ~1.100 €/anno base** — molto più accessibile di quanto stimato in precedenza, non un prodotto di fascia alta. Opera (Cybertec, gruppo Zucchetti) / NET@PRO = modularità produzione, prezzo solo su preventivo. Mago.Net, TeamSystem, Zucchetti = ERP con la produzione come modulo, fiscale forte ma shop-floor poco profondo. **Nessun competitor citato unisce, in un solo prodotto per la PMI, FatturaPA nativa + DDT + MES di fabbrica + moduli di settore** come Nicolò: il confronto tipico resta "MES + ERP già in casa", non "un solo prodotto". Con Bravo e siMES ora a prezzi bassi e pubblici, il prezzo di Nicolò MES è l'unico dato mancante per completare il confronto — e più urgente di prima, perché i due concorrenti più vicini sul fiscale/produzione costano poco.
 
 ---
 
@@ -61,7 +61,7 @@ Legenda: ✅ c'è e pubblicato · 🟡 parziale o solo su un canale · ❌ manca
 | Capacità finita, MRP multi-livello + crea PO, ubicazioni/inventario | ✅ | 🟡 via ERP | ✅ parziale | 🟡 | ✅ |
 | Ufficio tecnico, FAT/SAT + fascicolo + CE/UE, service post-vendita | ✅ | 🟡 | ❌ | 🟡 | ✅ |
 | Qualità (NC, piani), taratura strumenti, CAPA, manutenzione | ✅ | ✅/🟡 | ❌/🟡 | 🟡 | ✅ |
-| Clienti / preventivi (creazione anche da web) | ✅ | ❌ (ERP) | ✅ | ✅ | 🟡 |
+| Clienti / preventivi / fatture (creazione anche da web) | ✅ (08/10) | ❌ (ERP) | ✅ | ✅ | 🟡 |
 | DDT / conto lavoro | ✅ | ❌ | 🟡 | 🟡 | 🟡 |
 | FatturaPA XML validata (creazione solo da programma) | ✅ 🟡 web | ❌ (ERP) | ❌ | ✅ | ❌ |
 | Invio SdI | 🟡 provider HTTP pronto, **contratto reale ❌** | ❌ | ❌ | ✅ (spesso) | ❌ |
@@ -69,7 +69,7 @@ Legenda: ✅ c'è e pubblicato · 🟡 parziale o solo su un canale · ❌ manca
 | Web + telefono | ✅ in crescita (12 schermate col layout personalizzabile) | ✅ | ✅ | ✅ | ✅ |
 | Cloud o server cliente | ✅ entrambi | ✅ | solo cloud | ✅ | ✅ |
 | 2FA / SSO aziendale | ✅ 2FA; SSO plumbing ok, **IdP di produzione ❌** | 🟡 | ✅ | 🟡 | ✅ |
-| Registro operazioni (audit) | 🟡 **28 controller su 51** | 🟡 | ✅ | 🟡 | ✅ |
+| Registro operazioni (audit) | ✅ **50 controller su 52** (08/10) | 🟡 | ✅ | 🟡 | ✅ |
 | Policy GDPR (retention, cancellazione) | ❌ | 🟡 | 🟡 | 🟡 | ✅ |
 | Assistente IA / multilingua | 🟡 IA stub; multilingua ❌ | 🟡 | 🟡 | 🟡 | ✅ |
 | Pack settore (EPLAN, DM37, SAL, 3.1…) | ✅ base | 🟡 | ❌ | 🟡 | 🟡 |
@@ -100,15 +100,15 @@ Legenda: ✅ c'è e pubblicato · 🟡 parziale o solo su un canale · ❌ manca
 7. **Canali multipli.** Desktop Windows, web `/app`, `/tecnici` da telefono; temi grafici aziendali; cloud o server cliente; 2FA; Swagger; auto-update.
 8. **Agevolazioni 2026–2028.** Gateway di interconnessione + energia + dichiarazione origine software già pronti per la narrazione di perizia.
 9. **Costo di ingresso potenzialmente competitivo** rispetto a Bravo Plus (se il prezzo citato fosse confermato) o a progetti enterprise, se il modello commerciale resta snello — ma serve definirlo.
-10. **Profondità tecnica dimostrabile.** Suite test **663/663**, CI, migrazioni, registro operazioni (in crescita, 28/51), header di sicurezza estesi, health check standard.
+10. **Profondità tecnica dimostrabile.** Suite test **686/686** (08/10/2026), CI, migrazioni, registro operazioni (**50 controller su 52**, essenzialmente completo — i 2 rimasti sono di sola lettura automatica), header di sicurezza estesi, health check standard.
 
 ### Contro
 
 1. **Nessuna referenza né prova sul campo.** Nessuna macchina reale collegata, nessun cliente pubblico citabile. È il rischio commerciale più alto, più di qualsiasi funzione mancante.
 2. **Prezzo non definito.** Senza un listino, anche solo indicativo, il confronto con Bravo o MRPeasy si ferma prima di cominciare.
 3. **Macchina fisica in officina.** Demo-feed e simulatore Python chiudono la demo commerciale; per la perizia e per vincere su Bravo/siMES serve un collegamento reale.
-4. **Fattura dal web non ancora possibile.** Il preventivo si crea da web dal 07/10; la fattura resta solo dal programma — incoerente per chi lavora solo da browser o tablet.
-5. **Registro operazioni parziale.** 28 controller su 51 scrivono traccia (aree, sedi, centri di lavoro e clienti aggiunti il 07/10): i restanti 23 (spedizioni, manutenzione, qualità, service, energia, HACCP, alimentare, ufficio tecnico, pack settore...) sono a basso rischio singolarmente ma pesano in un audit NIS2.
+4. ~~**Fattura dal web non ancora possibile.**~~ Risolto l'08/10/2026: la fattura si crea ora anche dalla piattaforma web, come il preventivo.
+5. ~~**Registro operazioni parziale.**~~ Risolto il 07-08/10/2026: ora 50 controller su 52 scrivono traccia; i 2 rimasti (health check automatico, pianificazione aggregata) non hanno nulla da registrare.
 6. **Nessuna policy GDPR** (conservazione, cancellazione su richiesta) — solo un riferimento di settore individuato (§8.6), non ancora una policy propria.
 7. **SSO incompleto.** Plumbing e login esterno pronti; manca il mapper OIDC di produzione verso un IdP aziendale reale.
 8. **Single-tenant, Windows-first.** Un'installazione per azienda; l'app nativa è solo Windows, il web copre una parte crescente ma non tutta.
@@ -140,10 +140,10 @@ Ordinate per impatto commerciale/competitivo, non per facilità. I primi tre non
 | # | Punto | Impatto | Perché conta nel confronto | Chi | Prossimo passo concreto |
 |---|---|---|---|---|---|
 | 1 | Pilota con macchina reale e prima referenza | Molto alto | È l'unico vantaggio vero di Bravo e siMES: hanno un retrofit macchina dimostrabile, noi oggi solo un simulatore | Titolare / campo | Scegliere un reparto con 1–2 macchine già dotate di PLC o contatore accessibile; collegare il gateway OPC UA/MQTT già pronto in `scripts/machine-gateway` |
-| 2 | Prezzo pubblico e modello commerciale | Alto | Ogni competitor citato (Bravo, MRPeasy, Katana, Tulip, Odoo) ha un listino pubblico o quasi; senza prezzo il cliente non arriva nemmeno al confronto di funzioni | Titolare | Un listino a fascia (per numero di utenti o di macchine), usando Bravo Plus (~290 €/risorsa/anno, min. 10, da confermare) come riferimento di fascia bassa |
+| 2 | Prezzo pubblico e modello commerciale | Alto | Bravo (290 €/risorsa/anno) e siMES (~1.100 €/anno base) hanno entrambi un prezzo **confermato e basso** (08/10): senza un numero nostro, il cliente li sceglie prima ancora di guardare le funzioni | Titolare | Un listino a fascia (per numero di utenti o di macchine), usando questi due come riferimento di fascia bassa — non un listino enterprise |
 | 3 | Contratto con un intermediario SdI | Alto | Chiude il ciclo fiscale: oggi il provider HTTP è pronto in codice (`Sdi:Provider=http`), manca solo chi lo eroga | Titolare | Scegliere un provider (Aruba o simili), ottenere URL e chiavi, configurarlo su Render |
-| 4 | Creazione fattura dalla piattaforma web | Medio-alto | Il preventivo si crea da web dal 07/10; la fattura resta solo desktop — chi lavora da tablet/browser non può chiudere il ciclo | Codice | Pagina *Nuova fattura* in `/fatture`: il layout `invoice.new` (cliente, pagamento, scadenza, note) è già nel registro, manca solo la UI web (come fatto oggi per `quote.new`) |
-| 5 | Registro operazioni estesa | Medio | 28 controller su 51 scrivono traccia (aree, sedi, centri di lavoro, clienti fatti il 07/10); un audit NIS2 o una verifica di un cliente strutturato noterebbe i restanti 23 | Codice | Continuare un gruppo alla volta (spedizioni, manutenzione, qualità, service, energia...), verificando ognuno prima di toccarlo per non entrare in conflitto con altro lavoro in corso |
+| 4 | ~~Creazione fattura dalla piattaforma web~~ | — | — | — | **Fatto l'08/10/2026**: `/fatture` ha ora "Nuova fattura" sul web, come i preventivi |
+| 5 | ~~Registro operazioni estesa~~ | — | — | — | **Fatto il 07-08/10/2026**: 50 controller su 52, essenzialmente completo |
 | 6 | Policy GDPR (conservazione, cancellazione su richiesta) | Medio | Il Codice di condotta Assosoftware (in vigore da novembre 2024) non fissa tempi di conservazione precisi — per principio (art. 5.1.e GDPR) la durata dipende dalla finalità, quindi va decisa caso per caso — ma dà una struttura condivisa di settore | Titolare + legale/DPO, poi codice | Scrivere la policy con un legale usando il codice di condotta come riferimento, poi implementare cancellazione/anonimizzazione su richiesta |
 | 7 | Mapper OIDC di produzione per SSO aziendale | Medio | Oggi utile solo a chi ha già un IdP (Azure AD, Google Workspace…); senza il mapper resta solo demo | Titolare / configurazione | Attivare solo dietro un IdP realmente fidato da un cliente che lo richieda |
 | 8 | Validazione input sistematica e versionamento API (`/api/v1/`) | Medio ma esteso | Oggi la validazione è manuale endpoint per endpoint; tocca gran parte dei controller | Codice | Pianificare a parte (è lo step 7 della mappa di hardening in STATO-PROGETTO.md), non improvvisare in mezzo ad altro lavoro |
@@ -171,10 +171,10 @@ Ordinate per impatto commerciale/competitivo, non per facilità. I primi tre non
 - [Testo del codice di condotta (PDF)](https://lentepubblica.it/wp-content/uploads/2024/12/Codice-di-condotta-per-il-trattamento-dei-dati-personali-effettuato-dalle-imprese-di-sviluppo-e-produzione-di-software-gestionale.pdf)
 
 ### Concorrenti
-- [Bravo — confronta prezzi](https://www.bravomanufacturing.it/confronta-prezzi/) (prezzo non confermato in tre ricerche separate)
-- [siMES / SiVaF](https://www.sivaf.it/software-mes-per-pmi-infallibile-controllo-produzione/) (nessuna fonte indipendente trovata: nome da verificare prima di riusarlo in materiale commerciale)
+- [Bravo — confronta prezzi](https://www.bravomanufacturing.it/confronta-prezzi/) — **verificato 08/10**: Bravo Plus 290 €/risorsa/anno, di Antos S.r.l. (Camerano, AN)
+- [siMES — Sivaf Informatica](https://www.sivaf.it/software-mes-per-pmi-infallibile-controllo-produzione/) — **verificato e corretto 08/10**: ~1.100 €/anno base (non ~3.500 €/macchina come scritto prima), Sivaf Informatica (Stezzano, BG)
 - [Antos — caso d'uso Alleantia](https://www.alleantia.com/resources/use-cases/antos/)
-- [Opera MES (Cybertec)](https://www.operames.it/opera-mes/)
+- [Opera MES (Cybertec, gruppo Zucchetti)](https://www.operames.it/opera-mes/) — **verificato 08/10**: nessun prezzo pubblico
 - [NET@PRO](https://www.erpselection.it/software/software-gestione-produzione-mes-manufacturing-netpro/)
 - [TeamSystem — guida MES 2026](https://www.teamsystem.com/magazine/manufacturing/mes-software-smart-factory-guida-2026/)
 - [Microarea Mago.Net — ricerca 01net](https://www.01net.it/?p=91629)
