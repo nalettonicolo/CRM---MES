@@ -63,6 +63,28 @@ public class FormLayoutTests : IClassFixture<AdminSeededApiTestFixture>
     }
 
     [Fact]
+    public async Task List_ReflectsSavedCustomizations_NotJustDefaults()
+    {
+        // Regressione: l'elenco di tutte le schermate (GET /api/layout, senza nome schermata) in passato
+        // ignorava del tutto le personalizzazioni salvate e mostrava sempre i soli valori di default,
+        // anche per una schermata appena modificata — un Admin che riapriva lo strumento Layout dal
+        // programma desktop vedeva i vecchi valori e rischiava di sovrascriverli salvando per errore.
+        var fields = new List<SaveLayoutFieldRequest> { Field("subject", "Titolo del ticket", 1, required: true) };
+        await _admin.PutAsJsonAsync(Url, new SaveLayoutRequest(fields));
+
+        try
+        {
+            var all = await _admin.GetFromJsonAsync<List<LayoutScreenResponse>>("/api/layout");
+            var screen = all!.Single(s => s.Screen == FormLayoutRegistry.ServiceRequest);
+            Assert.Equal("Titolo del ticket", screen.Fields.Single(f => f.Key == "subject").Label);
+        }
+        finally
+        {
+            await _admin.PutAsJsonAsync(Url, new SaveLayoutRequest([]));
+        }
+    }
+
+    [Fact]
     public async Task ProtectedFields_CannotBeHiddenAndSubjectStaysRequired()
     {
         var fields = new List<SaveLayoutFieldRequest>

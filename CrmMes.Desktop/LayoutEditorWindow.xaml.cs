@@ -59,13 +59,16 @@ public partial class LayoutEditorWindow : Window
         Loaded += async (_, _) => await LoadAsync();
     }
 
-    private async Task LoadAsync()
+    /// <summary>Carica l'elenco delle schermate. Dopo un salvataggio o un ripristino, <paramref name="keepScreen"/>
+    /// tiene l'Admin sulla schermata appena toccata invece di farlo tornare sempre alla prima dell'elenco.</summary>
+    private async Task LoadAsync(string? keepScreen = null)
     {
         try
         {
             var screens = await _apiClient.GetLayoutScreensAsync();
             ScreenCombo.ItemsSource = screens;
-            ScreenCombo.SelectedIndex = screens.Count > 0 ? 0 : -1;
+            var index = keepScreen is null ? -1 : screens.FindIndex(s => s.Screen == keepScreen);
+            ScreenCombo.SelectedIndex = index >= 0 ? index : (screens.Count > 0 ? 0 : -1);
             if (_apiClient.CurrentRole == "Admin")
             {
                 await LoadAccessAsync();
@@ -110,15 +113,27 @@ public partial class LayoutEditorWindow : Window
         }
     }
 
-    private void ScreenCombo_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    /// <summary>Rilegge sempre la schermata scelta dal server invece di riusare i campi già in memoria
+    /// dall'elenco iniziale: lo stato può essere cambiato da un altro utente, o in un'altra finestra,
+    /// da quando l'elenco è stato caricato — mostrare dati non aggiornati rischierebbe di farli
+    /// sovrascrivere al primo "Salva".</summary>
+    private async void ScreenCombo_SelectionChanged(object sender, SelectionChangedEventArgs e)
     {
         if (ScreenCombo.SelectedItem is not LayoutScreenDto screen)
         {
             return;
         }
 
-        FieldsList.ItemsSource = screen.Fields.OrderBy(f => f.Order).Select(f => new EditableField(f)).ToList();
         ErrorText.Text = string.Empty;
+        try
+        {
+            var fresh = await _apiClient.GetLayoutScreenAsync(screen.Screen);
+            FieldsList.ItemsSource = fresh.Fields.OrderBy(f => f.Order).Select(f => new EditableField(f)).ToList();
+        }
+        catch (Exception exception) when (exception is HttpRequestException or InvalidOperationException)
+        {
+            ErrorText.Text = exception.Message;
+        }
     }
 
     private async void Save_Click(object sender, RoutedEventArgs e)
@@ -133,7 +148,7 @@ public partial class LayoutEditorWindow : Window
         {
             await _apiClient.SaveLayoutScreenAsync(screen.Screen, rows.Select(r => r.ToDto()));
             ErrorText.Text = "Layout salvato: vale da subito per tutti gli utenti.";
-            await LoadAsync();
+            await LoadAsync(screen.Screen);
         }
         catch (Exception exception) when (exception is HttpRequestException or InvalidOperationException)
         {
@@ -156,7 +171,7 @@ public partial class LayoutEditorWindow : Window
         {
             await _apiClient.SaveLayoutScreenAsync(screen.Screen, []);
             ErrorText.Text = "Valori predefiniti ripristinati.";
-            await LoadAsync();
+            await LoadAsync(screen.Screen);
         }
         catch (Exception exception) when (exception is HttpRequestException or InvalidOperationException)
         {

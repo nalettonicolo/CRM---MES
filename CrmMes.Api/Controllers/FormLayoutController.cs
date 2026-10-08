@@ -134,6 +134,14 @@ public class FormLayoutController(ApplicationDbContext db) : ControllerBase
         field.Required = request.Required;
         field.UpdatedBy = User.FindFirstValue(ClaimTypes.Name);
         field.UpdatedAt = DateTime.UtcNow;
+        db.AuditLogs.Add(new AuditLog
+        {
+            Action = "CustomFieldUpdated",
+            EntityType = "CustomFieldDefinition",
+            EntityId = field.Id,
+            UserName = field.UpdatedBy,
+            Details = $"Campo personalizzato '{field.Label}' modificato su {screen}."
+        });
         await db.SaveChangesAsync(cancellationToken);
         return Ok(ToCustomFieldResponse(field));
     }
@@ -237,13 +245,16 @@ public class FormLayoutController(ApplicationDbContext db) : ControllerBase
         return Ok(new LayoutAccessResponse(true, granted.ToList(), FormLayoutAccess.GrantableRoles.ToList()));
     }
 
-    /// <summary>Elenco di tutte le schermate gestite dallo strumento Layout, con i loro campi di default.</summary>
+    /// <summary>Elenco di tutte le schermate gestite dallo strumento Layout, già con le personalizzazioni
+    /// salvate (non solo i campi di default): chi la usa come fonte dei dati, non solo come elenco nomi,
+    /// deve vedere lo stato vero.</summary>
     [HttpGet]
-    public ActionResult<List<LayoutScreenResponse>> List()
+    public async Task<ActionResult<List<LayoutScreenResponse>>> List(CancellationToken cancellationToken = default)
     {
-        var saved = new List<FormFieldSetting>();
+        var saved = await db.FormFieldSettings.AsNoTracking().ToListAsync(cancellationToken);
+        var byScreen = saved.GroupBy(s => s.Screen).ToDictionary(g => g.Key, g => (IReadOnlyList<FormFieldSetting>)g.ToList());
         return Ok(FormLayoutRegistry.Screens.Keys.OrderBy(k => k)
-            .Select(screen => Merge(screen, saved))
+            .Select(screen => Merge(screen, byScreen.GetValueOrDefault(screen, [])))
             .ToList());
     }
 
@@ -312,6 +323,16 @@ public class FormLayoutController(ApplicationDbContext db) : ControllerBase
             });
         }
 
+        db.AuditLogs.Add(new AuditLog
+        {
+            Action = "FormLayoutSaved",
+            EntityType = "FormFieldSetting",
+            EntityId = null,
+            UserName = user,
+            Details = requested.Count == 0
+                ? $"Layout di {screen} ripristinato ai valori predefiniti."
+                : $"Layout di {screen} salvato: {requested.Count} campi personalizzati."
+        });
         await db.SaveChangesAsync(cancellationToken);
         var saved = await db.FormFieldSettings.AsNoTracking().Where(f => f.Screen == screen).ToListAsync(cancellationToken);
         return Ok(Merge(screen, saved));
