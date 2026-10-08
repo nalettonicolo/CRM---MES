@@ -11,6 +11,12 @@
         <h1>Fatture</h1>
         <p class="sub">Fatture elettroniche, con il file XML da inviare allo SdI.</p>
     </div>
+    @if (CanCreate)
+    {
+        <div class="actions">
+            <button class="secondary" aria-expanded="@_showCreate" @onclick="ToggleCreate">@(_showCreate ? "Chiudi nuova fattura" : "Nuova fattura")</button>
+        </div>
+    }
 </div>
 
 @if (!CanSee)
@@ -19,6 +25,108 @@
 }
 else
 {
+    @if (_showCreate && CanCreate)
+    {
+        <div class="card card-pad stack stack-gap">
+            <h2>Nuova fattura</h2>
+            <p class="small muted">Fattura immediata (TD01), senza DDT. Per fatturare dei DDT emessi usa la fattura differita dalla loro pagina.</p>
+            @if (_createError is not null)
+            {
+                <div class="alert" role="alert">@_createError</div>
+            }
+            @if (_customers is null && _createLoading)
+            {
+                <div class="state">Caricamento...</div>
+            }
+            else
+            {
+                <div class="form-grid">
+                    @foreach (var f in _fields.Where(f => f.Visible && f.Key is "customer" or "payment" or "dueDate" or "notes").OrderBy(f => f.Order))
+                    {
+                        switch (f.Key)
+                        {
+                            case "customer":
+                                <label>@LayoutHelper.LabelOf(f)
+                                    <select aria-label="Cliente" @onchange="e => _customerId = e.Value?.ToString() ?? string.Empty">
+                                        <option value="" selected="@string.IsNullOrEmpty(_customerId)">Scegli cliente</option>
+                                        @foreach (var customer in _customers ?? [])
+                                        {
+                                            <option value="@customer.Id" selected="@(_customerId == customer.Id.ToString())">@customer.Name (@customer.Code)</option>
+                                        }
+                                    </select>
+                                </label>
+                                break;
+                            case "payment":
+                                <label>@LayoutHelper.LabelOf(f)
+                                    <select aria-label="Pagamento" @bind="_paymentMethod">
+                                        @foreach (var (payCode, label) in PaymentMethods)
+                                        {
+                                            <option value="@payCode">@label</option>
+                                        }
+                                    </select>
+                                </label>
+                                break;
+                            case "dueDate":
+                                <label>@LayoutHelper.LabelOf(f)<input type="date" aria-label="Scadenza" @bind="_dueDate" /></label>
+                                break;
+                            case "notes":
+                                <label>@LayoutHelper.LabelOf(f)<input aria-label="Causale o note" @bind="_notes" /></label>
+                                break;
+                        }
+                    }
+                </div>
+
+                <div class="table-wrap">
+                    <table class="cards">
+                        <thead>
+                            <tr>
+                                <th>Codice</th><th>Descrizione</th><th class="num">Q.tà</th><th>Unità</th>
+                                <th class="num">Prezzo unit. €</th><th class="num">Sconto %</th><th class="num">IVA %</th><th>Natura (se IVA 0%)</th><th></th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var line in _lines)
+                            {
+                                <tr>
+                                    <td data-label="Codice"><input aria-label="Codice della riga" @bind="line.Code" /></td>
+                                    <td data-label="Descrizione"><input aria-label="Descrizione della riga" @bind="line.Description" /></td>
+                                    <td data-label="Q.tà" class="num"><input type="number" step="any" min="0" aria-label="Quantità della riga" @bind="line.Quantity" /></td>
+                                    <td data-label="Unità"><input aria-label="Unità di misura della riga" @bind="line.Unit" /></td>
+                                    <td data-label="Prezzo" class="num"><input type="number" step="any" min="0" aria-label="Prezzo della riga" @bind="line.UnitPrice" /></td>
+                                    <td data-label="Sconto" class="num"><input type="number" step="any" min="0" max="100" aria-label="Sconto della riga" @bind="line.DiscountPercent" /></td>
+                                    <td data-label="IVA" class="num">
+                                        <select aria-label="Aliquota IVA della riga" @bind="line.VatRate">
+                                            @foreach (var rate in VatRates)
+                                            {
+                                                <option value="@rate">@rate</option>
+                                            }
+                                        </select>
+                                    </td>
+                                    <td data-label="Natura">
+                                        <select aria-label="Natura IVA della riga" disabled="@(line.VatRate != 0)" @bind="line.VatNature">
+                                            <option value="">—</option>
+                                            @foreach (var nature in NatureCodes)
+                                            {
+                                                <option value="@nature">@nature</option>
+                                            }
+                                        </select>
+                                    </td>
+                                    <td>
+                                        <button class="secondary small" aria-label="Rimuovi riga" disabled="@(_lines.Count == 1)" @onclick="() => RemoveLine(line)">Rimuovi</button>
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+                <div class="actions">
+                    <button class="secondary small" @onclick="AddLine">Aggiungi riga</button>
+                    <button @onclick="CreateAsync" disabled="@_creating">@(_creating ? "Salvataggio..." : "Crea fattura")</button>
+                </div>
+            }
+        </div>
+    }
+
     <div class="toolbar">
         <input class="search" type="search" placeholder="Numero o cliente" aria-label="Filtra fatture" @bind="_search" @bind:event="oninput" />
         <div class="chips" role="group" aria-label="Stato">
@@ -75,12 +183,62 @@ else
 @code {
     private static readonly (string Key, string Label)[] Filters = [("", "Tutte"), ("Draft", "Bozze"), ("Issued", "Emesse")];
 
+    /// <summary>Le stesse sei modalità di pagamento del programma desktop (FatturaPa.PaymentMethods non è
+    /// esposto via API, quindi l'elenco è duplicato qui, nello stesso ordine).</summary>
+    private static readonly (string Code, string Label)[] PaymentMethods =
+    [
+        ("MP05", "Bonifico"), ("MP12", "RIBA"), ("MP01", "Contanti"), ("MP02", "Assegno"), ("MP08", "Carta di pagamento"), ("MP19", "SEPA Direct Debit"),
+    ];
+
+    private static readonly decimal[] VatRates = [22m, 10m, 5m, 4m, 0m];
+
+    /// <summary>Nature IVA più usate quando l'aliquota è 0%, stesso elenco del programma desktop.</summary>
+    private static readonly string[] NatureCodes =
+        ["N1", "N2.1", "N2.2", "N3.1", "N3.2", "N3.3", "N3.4", "N3.5", "N3.6", "N4", "N5", "N6.1", "N6.3", "N6.7", "N6.9", "N7"];
+
+    /// <summary>Campi del modulo Nuova fattura come li ha impostati l'Admin nello strumento Layout; senza
+    /// risposta restano i default della schermata (stessi del registro lato API, schermata invoice.new).</summary>
+    private List<LayoutField> _fields =
+    [
+        new("customer", "Cliente", 1, true, true, false) { DefaultLabel = "Cliente", DefaultRequired = true },
+        new("payment", "Pagamento", 2, true, false, true) { DefaultLabel = "Pagamento" },
+        new("dueDate", "Scadenza", 3, true, false, true) { DefaultLabel = "Scadenza" },
+        new("notes", "Causale / note", 4, true, false, true) { DefaultLabel = "Causale / note" },
+    ];
+
     private string _status = string.Empty;
     private string _search = string.Empty;
     private List<InvoiceSummary>? _invoices;
     private string? _error;
 
+    private bool _showCreate;
+    private bool _createLoading;
+    private bool _creating;
+    private string? _createError;
+    private List<Customer>? _customers;
+    private string _customerId = string.Empty;
+    private string _paymentMethod = "MP05";
+    private DateTime? _dueDate;
+    private string _notes = string.Empty;
+    private List<LineDraft> _lines = [];
+
+    /// <summary>Una riga in corso di compilazione, con le stesse regole IVA della fattura: con aliquota 0%
+    /// serve la natura (es. N3.1 esportazione, N6.7 settore edile).</summary>
+    private sealed class LineDraft
+    {
+        public string Code { get; set; } = string.Empty;
+        public string Description { get; set; } = string.Empty;
+        public decimal Quantity { get; set; } = 1;
+        public string Unit { get; set; } = "pz";
+        public decimal UnitPrice { get; set; }
+        public decimal DiscountPercent { get; set; }
+        public decimal VatRate { get; set; } = 22;
+        public string VatNature { get; set; } = string.Empty;
+    }
+
     private bool CanSee => Session.Role is "Admin" or "Sales" or "Management";
+
+    private bool CanCreate => Session.Role is "Admin" or "Sales";
 
     private List<InvoiceSummary> Visible => (_invoices ?? [])
         .Where(i => string.IsNullOrWhiteSpace(_search)
@@ -89,7 +247,26 @@ else
         .OrderByDescending(i => i.IssueDate ?? i.CreatedAt)
         .ToList();
 
-    protected override Task OnInitializedAsync() => CanSee ? LoadAsync() : Task.CompletedTask;
+    protected override async Task OnInitializedAsync()
+    {
+        if (!CanSee)
+        {
+            return;
+        }
+
+        await LoadAsync();
+        if (CanCreate)
+        {
+            try
+            {
+                _fields = (await Api.GetAsync<LayoutScreen>("api/layout/invoice.new")).Fields;
+            }
+            catch (ApiException)
+            {
+                // Restano i default: il layout non deve impedire di creare fatture.
+            }
+        }
+    }
 
     private async Task ChangeStatusAsync(string status)
     {
@@ -108,6 +285,115 @@ else
         catch (ApiException exception)
         {
             _error = exception.Message;
+        }
+    }
+
+    private async Task ToggleCreate()
+    {
+        _showCreate = !_showCreate;
+        if (_showCreate && _lines.Count == 0)
+        {
+            _lines.Add(new LineDraft());
+        }
+
+        if (_showCreate && _customers is null)
+        {
+            await LoadFormDataAsync();
+        }
+    }
+
+    private async Task LoadFormDataAsync()
+    {
+        _createError = null;
+        _createLoading = true;
+        try
+        {
+            _customers ??= await Api.GetAsync<List<Customer>>("api/customers");
+        }
+        catch (ApiException exception)
+        {
+            _createError = exception.Message;
+        }
+        finally
+        {
+            _createLoading = false;
+        }
+    }
+
+    private void AddLine() => _lines.Add(new LineDraft());
+
+    private void RemoveLine(LineDraft line)
+    {
+        if (_lines.Count > 1)
+        {
+            _lines.Remove(line);
+        }
+    }
+
+    private async Task CreateAsync()
+    {
+        _createError = null;
+        var missing = LayoutHelper.Missing(_fields, key => key switch
+        {
+            "customer" => Guid.TryParse(_customerId, out _) ? _customerId : null,
+            "payment" => _paymentMethod,
+            "dueDate" => _dueDate?.ToString("yyyy-MM-dd"),
+            "notes" => _notes,
+            _ => "ok",
+        });
+        if (missing.Count > 0)
+        {
+            _createError = "Compila i campi obbligatori: " + string.Join(", ", missing) + ".";
+            return;
+        }
+
+        for (var i = 0; i < _lines.Count; i++)
+        {
+            var line = _lines[i];
+            if (string.IsNullOrWhiteSpace(line.Description) || line.Quantity <= 0 || line.UnitPrice < 0 || line.DiscountPercent is < 0 or > 100)
+            {
+                _createError = $"Riga {i + 1}: descrizione, quantità positiva, prezzo e sconto validi.";
+                return;
+            }
+
+            if (line.VatRate == 0 && string.IsNullOrWhiteSpace(line.VatNature))
+            {
+                _createError = $"Riga {i + 1}: con IVA 0% indica la natura (es. N3.1, N6.7).";
+                return;
+            }
+        }
+
+        _creating = true;
+        try
+        {
+            var created = await Api.PostAsync<Invoice>("api/invoices", new
+            {
+                customerId = Guid.Parse(_customerId),
+                paymentMethod = _paymentMethod,
+                paymentDueDate = _dueDate,
+                notes = string.IsNullOrWhiteSpace(_notes) ? null : _notes.Trim(),
+                lines = _lines.Select(line => new
+                {
+                    code = string.IsNullOrWhiteSpace(line.Code) ? null : line.Code.Trim(),
+                    description = line.Description.Trim(),
+                    quantity = line.Quantity,
+                    unit = string.IsNullOrWhiteSpace(line.Unit) ? "pz" : line.Unit.Trim(),
+                    unitPrice = line.UnitPrice,
+                    discountPercent = line.DiscountPercent,
+                    vatRate = line.VatRate,
+                    vatNature = line.VatRate == 0 ? line.VatNature : null,
+                    transportDocumentId = (Guid?)null,
+                }),
+            });
+            Nav.NavigateTo($"fatture/{created.Id}");
+        }
+        catch (ApiException exception)
+        {
+            _createError = exception.Message;
+        }
+        finally
+        {
+            _creating = false;
         }
     }
 }

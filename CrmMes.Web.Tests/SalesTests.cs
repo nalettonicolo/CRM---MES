@@ -227,3 +227,106 @@ public class QuotesPageTests : TestContext
             && r.Body.Contains("2280"));
     }
 }
+
+public class InvoicesPageTests : TestContext
+{
+    private readonly FakeServer _server = new();
+    private readonly Guid _customerId = Guid.NewGuid();
+
+    public InvoicesPageTests()
+    {
+        JSInterop.Mode = JSRuntimeMode.Loose;
+        Services.AddSingleton(_server.CreateClient());
+        Services.AddScoped<Session>();
+        Services.AddScoped<Api>();
+        _server.OnJson("GET", "/api/invoices", new List<InvoiceSummary>());
+        _server.OnJson("GET", "/api/customers", new List<Customer>
+        {
+            new(_customerId, "C-AUR", "Condominio Aurora", null, null, null, null, null, true),
+        });
+    }
+
+    private async Task<IRenderedComponent<Invoices>> OpenAsync(string role)
+    {
+        await Services.GetRequiredService<Session>().SetAsync(
+            new AuthResponse("t", "r", DateTime.UtcNow.AddMinutes(30), Guid.NewGuid(), "Prova", "prova@example.test", role));
+        var page = RenderComponent<Invoices>();
+        page.WaitForAssertion(() => Assert.Contains("Nessuna fattura", page.Markup));
+        return page;
+    }
+
+    [Fact]
+    public async Task Management_SeesInvoices_WithoutTheNewInvoiceButton()
+    {
+        var page = await OpenAsync("Management");
+
+        Assert.DoesNotContain("Nuova fattura", page.Markup);
+    }
+
+    [Fact]
+    public async Task Sales_OpensTheForm_WithCustomersLoaded()
+    {
+        var page = await OpenAsync("Sales");
+
+        page.FindAll("button").Single(b => b.TextContent == "Nuova fattura").Click();
+
+        page.WaitForAssertion(() => Assert.Contains("Condominio Aurora", page.Markup));
+    }
+
+    [Fact]
+    public async Task MissingCustomer_IsRefusedBeforeSending()
+    {
+        var page = await OpenAsync("Sales");
+        page.FindAll("button").Single(b => b.TextContent == "Nuova fattura").Click();
+        page.WaitForAssertion(() => Assert.Contains("Condominio Aurora", page.Markup));
+
+        page.Find("input[aria-label='Descrizione della riga']").Change("Consulenza");
+        page.Find("input[aria-label='Prezzo della riga']").Change("500");
+        page.FindAll("button").Single(b => b.TextContent == "Crea fattura").Click();
+
+        page.WaitForAssertion(() => Assert.Contains("Compila i campi obbligatori: Cliente", page.Find("[role=alert]").TextContent));
+        Assert.DoesNotContain(_server.Requests, r => r.Request.Method == HttpMethod.Post);
+    }
+
+    [Fact]
+    public async Task ZeroVat_WithoutNature_IsRefused()
+    {
+        var page = await OpenAsync("Sales");
+        page.FindAll("button").Single(b => b.TextContent == "Nuova fattura").Click();
+        page.WaitForAssertion(() => Assert.Contains("Condominio Aurora", page.Markup));
+
+        page.Find("select[aria-label='Cliente']").Change(_customerId.ToString());
+        page.Find("input[aria-label='Descrizione della riga']").Change("Esportazione");
+        page.Find("input[aria-label='Prezzo della riga']").Change("500");
+        page.Find("select[aria-label='Aliquota IVA della riga']").Change("0");
+        page.FindAll("button").Single(b => b.TextContent == "Crea fattura").Click();
+
+        page.WaitForAssertion(() => Assert.Contains("indica la natura", page.Find("[role=alert]").TextContent));
+        Assert.DoesNotContain(_server.Requests, r => r.Request.Method == HttpMethod.Post);
+    }
+
+    [Fact]
+    public async Task Sales_CreatesAnInvoiceWithALine_AndOpensIt()
+    {
+        var newId = Guid.NewGuid();
+        _server.OnJson("POST", "/api/invoices", new Invoice(
+            newId, "FT-2026-0001", null, null, "Draft", "TD01", _customerId, "Condominio Aurora", null, "MP05", null, null,
+            [], [], [], 500, [], null, null));
+        var page = await OpenAsync("Sales");
+        page.FindAll("button").Single(b => b.TextContent == "Nuova fattura").Click();
+        page.WaitForAssertion(() => Assert.Contains("Condominio Aurora", page.Markup));
+
+        page.Find("select[aria-label='Cliente']").Change(_customerId.ToString());
+        page.Find("input[aria-label='Descrizione della riga']").Change("Consulenza avviamento");
+        page.Find("input[aria-label='Prezzo della riga']").Change("500");
+
+        page.FindAll("button").Single(b => b.TextContent == "Crea fattura").Click();
+
+        page.WaitForAssertion(() => Assert.EndsWith($"fatture/{newId}", Services.GetRequiredService<NavigationManager>().Uri));
+        Assert.Contains(_server.Requests, r => r.Request.Method == HttpMethod.Post
+            && r.Request.RequestUri!.PathAndQuery == "/api/invoices"
+            && r.Body.Contains(_customerId.ToString())
+            && r.Body.Contains("Consulenza avviamento")
+            && r.Body.Contains("500"));
+    }
+}
