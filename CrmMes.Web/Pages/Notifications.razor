@@ -1,0 +1,150 @@
+@page "/notifiche"
+@inject Api Api
+
+<PageTitle>Notifiche · Nicolò MES</PageTitle>
+
+<div class="page-head">
+    <div>
+        <div class="eyebrow">Amministrazione</div>
+        <h1>Notifiche</h1>
+        <p class="sub">Avvisi dai flussi di dati; le approvazioni che aspettano una tua decisione.</p>
+    </div>
+</div>
+
+@if (_error is not null)
+{
+    <div class="alert" role="alert">@_error</div>
+}
+
+@if (_pending.Count > 0)
+{
+    <div class="card">
+        <div class="section-head"><h2>In attesa della tua approvazione</h2></div>
+        <div class="table-wrap">
+            <table class="cards">
+                <thead><tr><th>Flusso</th><th>Da</th><th></th></tr></thead>
+                <tbody>
+                    @foreach (var run in _pending)
+                    {
+                        <tr>
+                            <td data-label="Flusso">@run.FlowName</td>
+                            <td data-label="Da" class="muted">@Labels.DateTime(run.UpdatedAt)</td>
+                            <td>
+                                <button class="secondary small" @onclick="() => ResolveAsync(run, approve: true)">Approva</button>
+                                <button class="secondary small" @onclick="() => ResolveAsync(run, approve: false)">Rifiuta</button>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+}
+
+<div class="card">
+    <div class="section-head">
+        <h2>Notifiche</h2>
+        @if (_notifications.Any(n => n.ReadAt is null))
+        {
+            <button class="secondary small" @onclick="MarkAllReadAsync">Segna tutte come lette</button>
+        }
+    </div>
+    @if (_loading)
+    {
+        <div class="state">@Labels.Loading</div>
+    }
+    else if (_notifications.Count == 0)
+    {
+        <div class="state"><strong>Nessuna notifica</strong>Qui arrivano gli avvisi dei flussi di dati che ti riguardano.</div>
+    }
+    else
+    {
+        <div class="table-wrap">
+            <table class="cards">
+                <thead><tr><th>Messaggio</th><th>Quando</th><th></th></tr></thead>
+                <tbody>
+                    @foreach (var notification in _notifications)
+                    {
+                        <tr class="@(notification.ReadAt is null ? "unread" : "muted")">
+                            <td data-label="Messaggio">@notification.Message</td>
+                            <td data-label="Quando" class="muted">@Labels.DateTime(notification.CreatedAt)</td>
+                            <td>
+                                @if (notification.ReadAt is null)
+                                {
+                                    <button class="secondary small" @onclick="() => MarkReadAsync(notification)">Segna come letta</button>
+                                }
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    }
+</div>
+
+@code {
+    private bool _loading = true;
+    private string? _error;
+    private List<Notification> _notifications = [];
+    private List<DataFlowRun> _pending = [];
+
+    protected override async Task OnInitializedAsync() => await LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        _error = null;
+        try
+        {
+            _notifications = await Api.GetAsync<List<Notification>>("api/notifications");
+            _pending = await Api.GetAsync<List<DataFlowRun>>("api/data-flows/runs?status=WaitingApproval");
+        }
+        catch (ApiException exception)
+        {
+            _error = exception.Message;
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private async Task MarkReadAsync(Notification notification)
+    {
+        try
+        {
+            await Api.PostNoContentAsync($"api/notifications/{notification.Id}/read");
+            await LoadAsync();
+        }
+        catch (ApiException exception)
+        {
+            _error = exception.Message;
+        }
+    }
+
+    private async Task MarkAllReadAsync()
+    {
+        try
+        {
+            await Api.PostNoContentAsync("api/notifications/read-all");
+            await LoadAsync();
+        }
+        catch (ApiException exception)
+        {
+            _error = exception.Message;
+        }
+    }
+
+    private async Task ResolveAsync(DataFlowRun run, bool approve)
+    {
+        _error = null;
+        try
+        {
+            await Api.PostAsync<DataFlowRun>($"api/data-flows/runs/{run.Id}/{(approve ? "approve" : "reject")}");
+            await LoadAsync();
+        }
+        catch (ApiException exception)
+        {
+            _error = exception.Message;
+        }
+    }
+}

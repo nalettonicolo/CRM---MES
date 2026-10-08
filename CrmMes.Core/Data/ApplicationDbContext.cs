@@ -84,6 +84,10 @@ public class ApplicationDbContext : DbContext
     public DbSet<CrmMes.Core.Layout.FormFieldSetting> FormFieldSettings => Set<CrmMes.Core.Layout.FormFieldSetting>();
     public DbSet<CrmMes.Core.Layout.CustomFieldDefinition> CustomFieldDefinitions => Set<CrmMes.Core.Layout.CustomFieldDefinition>();
     public DbSet<CrmMes.Core.Layout.CustomFieldValue> CustomFieldValues => Set<CrmMes.Core.Layout.CustomFieldValue>();
+    public DbSet<CrmMes.Core.Flows.DataFlowDefinition> DataFlowDefinitions => Set<CrmMes.Core.Flows.DataFlowDefinition>();
+    public DbSet<CrmMes.Core.Flows.DataFlowStep> DataFlowSteps => Set<CrmMes.Core.Flows.DataFlowStep>();
+    public DbSet<CrmMes.Core.Flows.DataFlowRun> DataFlowRuns => Set<CrmMes.Core.Flows.DataFlowRun>();
+    public DbSet<CrmMes.Core.Flows.Notification> Notifications => Set<CrmMes.Core.Flows.Notification>();
     public DbSet<WarehouseLocation> WarehouseLocations => Set<WarehouseLocation>();
     public DbSet<LocationStock> LocationStocks => Set<LocationStock>();
     public DbSet<InventorySession> InventorySessions => Set<InventorySession>();
@@ -766,6 +770,42 @@ public class ApplicationDbContext : DbContext
             entity.Property(v => v.Value).HasMaxLength(2000);
             entity.HasOne(v => v.FieldDefinition).WithMany()
                 .HasForeignKey(v => v.FieldDefinitionId).OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<CrmMes.Core.Flows.DataFlowDefinition>(entity =>
+        {
+            entity.Property(f => f.Name).HasMaxLength(200);
+            entity.Property(f => f.TriggerEventKey).HasMaxLength(100);
+            entity.Property(f => f.UpdatedBy).HasMaxLength(200);
+            entity.HasIndex(f => f.TriggerEventKey);
+        });
+
+        modelBuilder.Entity<CrmMes.Core.Flows.DataFlowStep>(entity =>
+        {
+            entity.Property(s => s.Type).HasMaxLength(30);
+            entity.Property(s => s.TargetRole).HasMaxLength(50);
+            entity.Property(s => s.MessageTemplate).HasMaxLength(1000);
+            entity.HasOne(s => s.DataFlowDefinition).WithMany(f => f.Steps)
+                .HasForeignKey(s => s.DataFlowDefinitionId).OnDelete(DeleteBehavior.Cascade);
+            entity.HasIndex(s => new { s.DataFlowDefinitionId, s.Order }).IsUnique();
+        });
+
+        modelBuilder.Entity<CrmMes.Core.Flows.DataFlowRun>(entity =>
+        {
+            entity.Property(r => r.EventKey).HasMaxLength(100);
+            entity.Property(r => r.EntityType).HasMaxLength(50);
+            entity.Property(r => r.Status).HasMaxLength(30);
+            entity.Property(r => r.ResolvedBy).HasMaxLength(200);
+            entity.Property(r => r.PayloadJson).HasMaxLength(4000);
+            entity.HasOne(r => r.DataFlowDefinition).WithMany()
+                .HasForeignKey(r => r.DataFlowDefinitionId).OnDelete(DeleteBehavior.Cascade);
+            entity.HasIndex(r => r.Status);
+        });
+
+        modelBuilder.Entity<CrmMes.Core.Flows.Notification>(entity =>
+        {
+            entity.Property(n => n.Message).HasMaxLength(1000);
+            entity.HasIndex(n => new { n.UserId, n.ReadAt });
         });
 
         modelBuilder.Entity<EnergyProject>(entity =>

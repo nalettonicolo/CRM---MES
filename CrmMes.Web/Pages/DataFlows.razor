@@ -1,0 +1,282 @@
+﻿@page "/flussi-dati"
+@inject Api Api
+@inject Session Session
+
+<PageTitle>Flussi di dati · Nicolò MES</PageTitle>
+
+<div class="page-head">
+    <div>
+        <div class="eyebrow">Amministrazione</div>
+        <h1>Flussi di dati</h1>
+        <p class="sub">Quando succede un evento, avvisa un ruolo o fermati per un'approvazione. Versione 1: niente rami, niente azioni che toccano il magazzino — vedi STRUMENTO-FLUSSI-DATI.md.</p>
+    </div>
+</div>
+
+@if (!IsAdmin)
+{
+    <div class="card state"><strong>Solo amministratore</strong>I flussi di dati li configura l'Admin.</div>
+}
+else if (_loading)
+{
+    <div class="card state">@Labels.Loading</div>
+}
+else
+{
+    @if (_error is not null)
+    {
+        <div class="alert" role="alert">@_error</div>
+    }
+    @if (_info is not null)
+    {
+        <div class="success" role="status">@_info</div>
+    }
+
+    <div class="card card-pad stack stack-gap">
+        <h2>@(_editingId is null ? "Nuovo flusso" : "Modifica flusso")</h2>
+        <div class="form-grid">
+            <label>Nome<input aria-label="Nome del flusso" @bind="_name" /></label>
+            <label>Evento che lo avvia
+                <select aria-label="Evento" @bind="_eventKey">
+                    @foreach (var ev in _events)
+                    {
+                        <option value="@ev.Key">@ev.Name</option>
+                    }
+                </select>
+            </label>
+            <label><input type="checkbox" aria-label="Attivo" @bind="_enabled" /> Attivo</label>
+        </div>
+        @if (FieldsOf(_eventKey).Count > 0)
+        {
+            <p class="small muted">Segnaposto disponibili nel messaggio: @string.Join(", ", FieldsOf(_eventKey).Select(f => $"{{{{{f.Key}}}}} ({f.Label})"))</p>
+        }
+
+        <h3>Passi, in ordine</h3>
+        <div class="table-wrap">
+            <table class="cards">
+                <thead><tr><th>Tipo</th><th>Ruolo</th><th>Messaggio (se "Avvisa ruolo")</th><th></th></tr></thead>
+                <tbody>
+                    @foreach (var step in _steps)
+                    {
+                        <tr>
+                            <td data-label="Tipo">
+                                <select aria-label="Tipo di passo" @bind="step.Type">
+                                    <option value="@DataFlowStepTypes.NotifyRole">Avvisa ruolo</option>
+                                    <option value="@DataFlowStepTypes.RequireApproval">Richiedi approvazione</option>
+                                </select>
+                            </td>
+                            <td data-label="Ruolo">
+                                <select aria-label="Ruolo del passo" @bind="step.TargetRole">
+                                    @foreach (var role in _roles)
+                                    {
+                                        <option value="@role">@role</option>
+                                    }
+                                </select>
+                            </td>
+                            <td data-label="Messaggio">
+                                <input aria-label="Messaggio del passo" disabled="@(step.Type != DataFlowStepTypes.NotifyRole)" @bind="step.Message" />
+                            </td>
+                            <td>
+                                <button class="secondary small" aria-label="Rimuovi passo" disabled="@(_steps.Count == 1)" @onclick="() => RemoveStep(step)">Rimuovi</button>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+        <div class="actions">
+            <button class="secondary small" @onclick="AddStep">Aggiungi passo</button>
+            <button @onclick="SaveAsync" disabled="@_saving">@(_saving ? "Salvataggio..." : (_editingId is null ? "Crea flusso" : "Salva modifiche"))</button>
+            @if (_editingId is not null)
+            {
+                <button class="secondary" @onclick="NewFlow">Annulla modifica</button>
+            }
+        </div>
+    </div>
+
+    <div class="card">
+        @if (_flows.Count == 0)
+        {
+            <div class="state"><strong>Nessun flusso configurato</strong>Crealo qui sopra.</div>
+        }
+        else
+        {
+            <div class="table-wrap">
+                <table class="cards">
+                    <thead><tr><th>Nome</th><th>Evento</th><th class="num">Passi</th><th>Stato</th><th></th></tr></thead>
+                    <tbody>
+                        @foreach (var flow in _flows)
+                        {
+                            <tr>
+                                <td data-label="Nome">@flow.Name</td>
+                                <td data-label="Evento" class="muted">@EventName(flow.TriggerEventKey)</td>
+                                <td data-label="Passi" class="num">@flow.Steps.Count</td>
+                                <td data-label="Stato"><span class="badge @(flow.Enabled ? "ok" : "warn")">@(flow.Enabled ? "Attivo" : "Disattivo")</span></td>
+                                <td>
+                                    <button class="secondary small" @onclick="() => EditFlow(flow)">Modifica</button>
+                                    <button class="secondary small" @onclick="() => ToggleEnabledAsync(flow)">@(flow.Enabled ? "Disattiva" : "Attiva")</button>
+                                    <button class="secondary small" @onclick="() => DeleteAsync(flow)">Elimina</button>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        }
+    </div>
+}
+
+@code {
+    private bool IsAdmin => Session.Role == "Admin";
+
+    private bool _loading = true;
+    private string? _error;
+    private string? _info;
+
+    private List<DataFlowEvent> _events = [];
+    private List<string> _roles = [];
+    private List<DataFlow> _flows = [];
+
+    private Guid? _editingId;
+    private string _name = string.Empty;
+    private string _eventKey = string.Empty;
+    private bool _enabled = true;
+    private List<StepDraft> _steps = [];
+    private bool _saving;
+
+    private sealed class StepDraft
+    {
+        public string Type { get; set; } = DataFlowStepTypes.NotifyRole;
+        public string TargetRole { get; set; } = string.Empty;
+        public string Message { get; set; } = string.Empty;
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (!IsAdmin)
+        {
+            return;
+        }
+
+        await LoadAsync();
+        NewFlow();
+        _loading = false;
+    }
+
+    private async Task LoadAsync()
+    {
+        _error = null;
+        try
+        {
+            _events = await Api.GetAsync<List<DataFlowEvent>>("api/data-flows/events");
+            var access = await Api.GetAsync<AccessChannels>("api/company-profile/access");
+            _roles = access.KnownRoles;
+            _flows = await Api.GetAsync<List<DataFlow>>("api/data-flows");
+        }
+        catch (ApiException exception)
+        {
+            _error = exception.Message;
+        }
+    }
+
+    private List<DataFlowEventField> FieldsOf(string key) => _events.FirstOrDefault(e => e.Key == key)?.Fields ?? [];
+
+    private string EventName(string key) => _events.FirstOrDefault(e => e.Key == key)?.Name ?? key;
+
+    private void NewFlow()
+    {
+        _editingId = null;
+        _name = string.Empty;
+        _eventKey = _events.Count > 0 ? _events[0].Key : string.Empty;
+        _enabled = true;
+        _steps = [new StepDraft { TargetRole = _roles.FirstOrDefault() ?? string.Empty }];
+    }
+
+    private void EditFlow(DataFlow flow)
+    {
+        _editingId = flow.Id;
+        _name = flow.Name;
+        _eventKey = flow.TriggerEventKey;
+        _enabled = flow.Enabled;
+        _steps = flow.Steps.OrderBy(s => s.Order)
+            .Select(s => new StepDraft { Type = s.Type, TargetRole = s.TargetRole, Message = s.MessageTemplate ?? string.Empty })
+            .ToList();
+    }
+
+    private void AddStep() => _steps.Add(new StepDraft { TargetRole = _roles.FirstOrDefault() ?? string.Empty });
+
+    private void RemoveStep(StepDraft step)
+    {
+        if (_steps.Count > 1)
+        {
+            _steps.Remove(step);
+        }
+    }
+
+    private async Task SaveAsync()
+    {
+        _error = null;
+        _info = null;
+        if (string.IsNullOrWhiteSpace(_name))
+        {
+            _error = "Il nome del flusso è obbligatorio.";
+            return;
+        }
+
+        _saving = true;
+        try
+        {
+            var body = new SaveDataFlow(_name.Trim(), _eventKey, _enabled,
+                _steps.Select(s => new SaveDataFlowStep(s.Type, s.TargetRole, s.Type == DataFlowStepTypes.NotifyRole ? s.Message : null)).ToList());
+            if (_editingId is Guid id)
+            {
+                await Api.PutAsync<DataFlow>($"api/data-flows/{id}", body);
+            }
+            else
+            {
+                await Api.PostAsync<DataFlow>("api/data-flows", body);
+            }
+
+            _info = "Flusso salvato.";
+            _flows = await Api.GetAsync<List<DataFlow>>("api/data-flows");
+            NewFlow();
+        }
+        catch (ApiException exception)
+        {
+            _error = exception.Message;
+        }
+        finally
+        {
+            _saving = false;
+        }
+    }
+
+    private async Task ToggleEnabledAsync(DataFlow flow)
+    {
+        _error = null;
+        try
+        {
+            var body = new SaveDataFlow(flow.Name, flow.TriggerEventKey, !flow.Enabled,
+                flow.Steps.OrderBy(s => s.Order).Select(s => new SaveDataFlowStep(s.Type, s.TargetRole, s.MessageTemplate)).ToList());
+            await Api.PutAsync<DataFlow>($"api/data-flows/{flow.Id}", body);
+            _flows = await Api.GetAsync<List<DataFlow>>("api/data-flows");
+        }
+        catch (ApiException exception)
+        {
+            _error = exception.Message;
+        }
+    }
+
+    private async Task DeleteAsync(DataFlow flow)
+    {
+        _error = null;
+        try
+        {
+            await Api.DeleteAsync($"api/data-flows/{flow.Id}");
+            _flows = await Api.GetAsync<List<DataFlow>>("api/data-flows");
+        }
+        catch (ApiException exception)
+        {
+            _error = exception.Message;
+        }
+    }
+}

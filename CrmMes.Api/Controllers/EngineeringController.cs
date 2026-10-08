@@ -3,6 +3,7 @@ using System.Security.Cryptography;
 using System.Text.Json;
 using CrmMes.Api.Services;
 using CrmMes.Core.Data;
+using CrmMes.Core.Flows;
 using CrmMes.Core.Models;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -17,7 +18,7 @@ namespace CrmMes.Api.Controllers;
 [ApiController]
 [Authorize]
 [Route("api/engineering")]
-public class EngineeringController(ApplicationDbContext db) : ControllerBase
+public class EngineeringController(ApplicationDbContext db, DataFlowEngine flows) : ControllerBase
 {
     public const long MaxDocumentBytes = 20 * 1024 * 1024;
 
@@ -496,6 +497,17 @@ public class EngineeringController(ApplicationDbContext db) : ControllerBase
         {
             await transaction.CommitAsync(cancellationToken);
         }
+
+        // Dopo il commit, non prima: un flusso che fallisce non deve far sembrare fallita la modifica applicata.
+        await flows.PublishAsync(DataFlowEvents.EngineeringChangeApplied, "EngineeringChange", change.Id, new Dictionary<string, string>
+        {
+            ["changeNumber"] = change.Number.ToString(),
+            ["productCode"] = product.Code,
+            ["productName"] = product.Name,
+            ["fromRevision"] = fromRevision,
+            ["toRevision"] = toRevision,
+            ["requestedBy"] = change.RequestedBy ?? string.Empty,
+        }, cancellationToken);
 
         return await GetChange(id, cancellationToken);
     }
