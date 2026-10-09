@@ -110,7 +110,23 @@ else
         Session.Changed += OnSessionChanged;
         await Session.RestoreAsync();
         _restored = true;
+        await LoadThemeAsync();
         await LoadMenuAsync();
+    }
+
+    /// <summary>Il tema aziendale (colori, font) si legge senza accesso: anche la schermata di login deve
+    /// avere l'aspetto scelto dall'Admin, non solo le pagine dopo l'ingresso.</summary>
+    private async Task LoadThemeAsync()
+    {
+        try
+        {
+            var theme = await Api.GetAsync<UiThemeDto>("api/company-profile/theme");
+            await Js.InvokeVoidAsync("nicolomes.applyTheme", theme.CssVariables, theme.BackgroundStyle);
+        }
+        catch (ApiException)
+        {
+            // Older server without theme endpoint: keep CSS defaults.
+        }
     }
 
     private void OnSessionChanged() => _ = InvokeAsync(async () =>
@@ -145,16 +161,6 @@ else
 
             var access = await Api.GetAsync<AccessChannels>("api/company-profile/access");
             _areaNames = access.KnownAreas.ToDictionary(area => area.Key, area => area.Name);
-
-            try
-            {
-                var theme = await Api.GetAsync<UiThemeDto>("api/company-profile/theme");
-                await Js.InvokeVoidAsync("nicolomes.applyTheme", theme.CssVariables, theme.BackgroundStyle);
-            }
-            catch (ApiException)
-            {
-                // Older server without theme endpoint: keep CSS defaults.
-            }
 
             if (Nav.ToBaseRelativePath(Nav.Uri).Length == 0)
             {

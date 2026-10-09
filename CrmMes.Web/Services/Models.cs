@@ -107,13 +107,16 @@ public sealed record UiThemePreset(
     string Key, string Name, string Description,
     string Background, string Surface, string SurfaceRaised, string Ink, string Muted, string Line,
     string Accent, string AccentHover, string AccentSoft, string OnAccent, string Sidebar, string SidebarText,
-    string Ok, string Warn, int Radius, string Density, string BackgroundStyle, int FieldBorder, int FieldHeight);
+    string Ok, string Warn, int Radius, string Density, string BackgroundStyle, int FieldBorder, int FieldHeight,
+    string FontFamily);
+
+public sealed record UiFontOption(string Key, string Label);
 
 public sealed record UiThemeDto(
     string Preset, string Background, string Surface, string SurfaceRaised, string Ink, string Muted, string Line,
     string Accent, string AccentHover, string AccentSoft, string OnAccent, string Sidebar, string SidebarText,
     string Ok, string Warn, int Radius, string Density, string BackgroundStyle, int FieldBorder, int FieldHeight,
-    Dictionary<string, string> CssVariables, List<UiThemePreset> Presets);
+    string FontFamily, Dictionary<string, string> CssVariables, List<UiThemePreset> Presets, List<UiFontOption> FontOptions);
 
 public sealed record Material(
     Guid Id, string Code, string Name, string Unit, decimal Stock, decimal MinStock, bool IsActive, bool BelowMinimum,

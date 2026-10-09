@@ -42,6 +42,32 @@ public static class ThemeApplier
         Set("HeaderBgBrush", theme.Surface);
         Set("RowHoverBrush", theme.SurfaceRaised);
         Set("RowAlternateBrush", theme.SurfaceRaised);
+        SetFont(theme.FontFamily);
+    }
+
+    /// <summary>Nome WPF del font scelto dall'Admin — un solo nome, perché WPF usa i font già installati su
+    /// Windows e non ne scarica come il web. Stessa chiave di <c>UiTheme.Fonts</c> lato server, duplicata
+    /// qui: il programma non referenzia il progetto API.</summary>
+    private static readonly Dictionary<string, string> WpfFontNames = new(StringComparer.OrdinalIgnoreCase)
+    {
+        ["default"] = "Segoe UI",
+        ["segoe"] = "Segoe UI",
+        ["calibri"] = "Calibri",
+        ["georgia"] = "Georgia",
+        ["verdana"] = "Verdana",
+    };
+
+    private static void SetFont(string? key)
+    {
+        var name = key is not null && WpfFontNames.TryGetValue(key, out var mapped) ? mapped : "Segoe UI";
+        try
+        {
+            Application.Current.Resources["AppFontFamily"] = new FontFamily(name);
+        }
+        catch (FormatException)
+        {
+            // Keep the previous font if the server sent something WPF can't parse.
+        }
     }
 
     private static void Set(string key, string hex)

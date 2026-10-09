@@ -156,6 +156,7 @@ public partial class AppearanceWindow : Window
         SelectTag(DensityBox, t.Density);
         SelectTag(BgStyleBox, t.BackgroundStyle);
         SelectTag(BorderBox, t.FieldBorder.ToString());
+        SelectTag(FontBox, t.FontFamily);
         RadiusValue.Text = $"{t.Radius}";
         HeightValue.Text = $"{t.FieldHeight}";
         _loading = false;
@@ -167,8 +168,8 @@ public partial class AppearanceWindow : Window
         ApplyToForm(new UiThemeDto(
             p.Key, p.Background, p.Surface, p.SurfaceRaised, p.Ink, p.Muted, p.Line,
             p.Accent, p.AccentHover, p.AccentSoft, p.OnAccent, p.Sidebar, p.SidebarText, p.Ok, p.Warn,
-            p.Radius, p.Density, p.BackgroundStyle, p.FieldBorder, p.FieldHeight,
-            [], _theme?.Presets ?? []));
+            p.Radius, p.Density, p.BackgroundStyle, p.FieldBorder, p.FieldHeight, p.FontFamily,
+            [], _theme?.Presets ?? [], _theme?.FontOptions ?? []));
         _preset = p.Key;
     }
 
@@ -235,8 +236,8 @@ public partial class AppearanceWindow : Window
             _preset, C("Background"), C("Surface"), C("SurfaceRaised"), C("Ink"), C("Muted"), C("Line"),
             C("Accent"), C("AccentHover"), C("AccentSoft"), C("OnAccent"), C("Sidebar"), C("SidebarText"),
             C("Ok"), C("Warn"), (int)RadiusSlider.Value, Tag(DensityBox), Tag(BgStyleBox),
-            int.TryParse(Tag(BorderBox), out var border) ? border : 1, (int)HeightSlider.Value,
-            [], _theme?.Presets ?? []);
+            int.TryParse(Tag(BorderBox), out var border) ? border : 1, (int)HeightSlider.Value, Tag(FontBox),
+            [], _theme?.Presets ?? [], _theme?.FontOptions ?? []);
     }
 
     private async void Save_Click(object sender, RoutedEventArgs e)
@@ -249,7 +250,8 @@ public partial class AppearanceWindow : Window
             _theme = await _apiClient.SaveUiThemeAsync(new SaveUiThemeDto(
                 null, draft.Preset, draft.Background, draft.Surface, draft.SurfaceRaised, draft.Ink, draft.Muted, draft.Line,
                 draft.Accent, draft.AccentHover, draft.AccentSoft, draft.OnAccent, draft.Sidebar, draft.SidebarText,
-                draft.Ok, draft.Warn, draft.Radius, draft.Density, draft.BackgroundStyle, draft.FieldBorder, draft.FieldHeight));
+                draft.Ok, draft.Warn, draft.Radius, draft.Density, draft.BackgroundStyle, draft.FieldBorder, draft.FieldHeight,
+                draft.FontFamily));
             ThemeApplier.Apply(_theme);
             StatusText.Text = "Aspetto salvato per tutta l'azienda.";
             DialogResult = true;

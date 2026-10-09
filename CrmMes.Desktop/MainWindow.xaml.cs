@@ -347,6 +347,20 @@ public partial class MainWindow : Window
             ConnectionStatus.Text = healthy ? "Server online" : "Server non raggiungibile";
             LoginButton.IsEnabled = healthy;
 
+            if (healthy)
+            {
+                // Il tema aziendale (colori, font) si legge senza accesso: la schermata di login stessa
+                // deve avere l'aspetto scelto dall'Admin, non solo le finestre dopo l'ingresso.
+                try
+                {
+                    ThemeApplier.Apply(await _apiClient.GetUiThemeAsync());
+                }
+                catch (Exception exception) when (exception is HttpRequestException or InvalidOperationException)
+                {
+                    // Server senza l'endpoint del tema, o momentaneamente irraggiungibile: restano i colori di base.
+                }
+            }
+
 #if DEBUG
             if (healthy && !string.IsNullOrWhiteSpace(DevLoginEmail) && !string.IsNullOrWhiteSpace(DevLoginPassword))
             {

@@ -2809,13 +2809,16 @@ public sealed record UiThemePresetDto(
     string Key, string Name, string Description,
     string Background, string Surface, string SurfaceRaised, string Ink, string Muted, string Line,
     string Accent, string AccentHover, string AccentSoft, string OnAccent, string Sidebar, string SidebarText,
-    string Ok, string Warn, int Radius, string Density, string BackgroundStyle, int FieldBorder, int FieldHeight);
+    string Ok, string Warn, int Radius, string Density, string BackgroundStyle, int FieldBorder, int FieldHeight,
+    string FontFamily);
+
+public sealed record UiFontOptionDto(string Key, string Label);
 
 public sealed record UiThemeDto(
     string Preset, string Background, string Surface, string SurfaceRaised, string Ink, string Muted, string Line,
     string Accent, string AccentHover, string AccentSoft, string OnAccent, string Sidebar, string SidebarText,
     string Ok, string Warn, int Radius, string Density, string BackgroundStyle, int FieldBorder, int FieldHeight,
-    Dictionary<string, string> CssVariables, List<UiThemePresetDto> Presets);
+    string FontFamily, Dictionary<string, string> CssVariables, List<UiThemePresetDto> Presets, List<UiFontOptionDto> FontOptions);
 
 public sealed record SaveUiThemeDto(
     string? ApplyPreset = null,
@@ -2838,7 +2841,8 @@ public sealed record SaveUiThemeDto(
     string? Density = null,
     string? BackgroundStyle = null,
     int? FieldBorder = null,
-    int? FieldHeight = null);
+    int? FieldHeight = null,
+    string? FontFamily = null);
 
 public sealed record TransportReasonDto(string Key, string Label);
 

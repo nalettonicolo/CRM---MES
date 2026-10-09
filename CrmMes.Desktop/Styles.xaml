@@ -2,6 +2,9 @@
                     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
                     xmlns:local="clr-namespace:CrmMes.Desktop">
 
+    <!-- Default before the theme loads from the server (ThemeApplier.SetFont overrides it at runtime). -->
+    <FontFamily x:Key="AppFontFamily">Segoe UI</FontFamily>
+
     <!-- Converters -->
     <local:StatusToBrushConverter x:Key="StatusToBrush" />
     <local:StatusToItalianTextConverter x:Key="StatusToItalianText" />
@@ -87,7 +90,7 @@
 
     <!-- Window default font -->
     <Style TargetType="Window">
-        <Setter Property="FontFamily" Value="Segoe UI" />
+        <Setter Property="FontFamily" Value="{DynamicResource AppFontFamily}" />
         <Setter Property="TextOptions.TextFormattingMode" Value="Display" />
         <Setter Property="TextOptions.TextRenderingMode" Value="ClearType" />
     </Style>
@@ -99,7 +102,7 @@
     <!-- Page title, e.g. "Materiali" at the top of a screen. Same family as the UI (no serif in a
          data tool): hierarchy comes from size and weight, not from a second typeface. -->
     <Style x:Key="EditorialTitle" TargetType="TextBlock">
-        <Setter Property="FontFamily" Value="Segoe UI" />
+        <Setter Property="FontFamily" Value="{DynamicResource AppFontFamily}" />
         <Setter Property="FontSize" Value="28" />
         <Setter Property="FontWeight" Value="SemiBold" />
         <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}" />

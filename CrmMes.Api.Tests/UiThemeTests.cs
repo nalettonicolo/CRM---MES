@@ -7,10 +7,14 @@ namespace CrmMes.Api.Tests;
 
 public class UiThemeTests : IClassFixture<AdminSeededApiTestFixture>
 {
+    private readonly AdminSeededApiTestFixture _fixture;
     private readonly HttpClient _admin;
 
-    public UiThemeTests(AdminSeededApiTestFixture fixture) =>
+    public UiThemeTests(AdminSeededApiTestFixture fixture)
+    {
+        _fixture = fixture;
         _admin = fixture.Factory.AuthenticatedClient(fixture.Admin.Token);
+    }
 
     [Fact]
     public void Parse_Empty_ReturnsOfficinaDefaults()
@@ -80,6 +84,49 @@ public class UiThemeTests : IClassFixture<AdminSeededApiTestFixture>
         // Restore default so other tests keep Officina look if they share the DB.
         await _admin.PutAsJsonAsync("/api/company-profile/theme",
             new SaveUiThemeRequest(ApplyPreset: UiTheme.PresetOfficina));
+    }
+
+    [Fact]
+    public void Normalize_UnknownFont_FallsBackToDefault()
+    {
+        var s = UiTheme.Parse(null);
+        s.FontFamily = "comic-sans-non-esiste";
+        var normalized = UiTheme.Normalize(s);
+        Assert.Equal(UiTheme.FontDefault, normalized.FontFamily);
+    }
+
+    [Fact]
+    public async Task Save_WithAFont_IsKeptAndAppliedToCssVariables()
+    {
+        var saved = (await (await _admin.PutAsJsonAsync("/api/company-profile/theme",
+            new SaveUiThemeRequest(
+                Preset: UiTheme.PresetOfficina,
+                Background: "#E6E6E1", Surface: "#F5F5F1", SurfaceRaised: "#ECECE7", Ink: "#141414", Muted: "#555550",
+                Line: "#C2C2BA", Accent: "#CF2A1F", AccentHover: "#B0241A", AccentSoft: "#F5E4E2", OnAccent: "#FFF8F7",
+                Sidebar: "#161616", SidebarText: "#A3A39C", Ok: "#2B5A36", Warn: "#8F5A10",
+                FontFamily: UiTheme.FontGeorgia)))
+            .Content.ReadFromJsonAsync<UiThemeResponse>())!;
+
+        Assert.Equal(UiTheme.FontGeorgia, saved.FontFamily);
+        Assert.Contains("Georgia", saved.CssVariables["--font"]);
+        Assert.Contains(saved.FontOptions, f => f.Key == UiTheme.FontGeorgia);
+
+        await _admin.PutAsJsonAsync("/api/company-profile/theme", new SaveUiThemeRequest(ApplyPreset: UiTheme.PresetOfficina));
+    }
+
+    [Fact]
+    public async Task Get_IsReadableWithoutLoggingIn()
+    {
+        // La schermata di login (web e desktop) deve poter leggere il tema prima di autenticarsi: non
+        // mostra nulla di sensibile, solo colori e carattere.
+        using var anonymousClient = _fixture.Factory.CreateClient();
+
+        var response = await anonymousClient.GetAsync("/api/company-profile/theme");
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var theme = await response.Content.ReadFromJsonAsync<UiThemeResponse>();
+        Assert.NotNull(theme);
+        Assert.True(theme!.FontOptions.Count >= 5);
     }
 
     [Fact]

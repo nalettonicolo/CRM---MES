@@ -1,4 +1,4 @@
-using System.Security.Claims;
+﻿using System.Security.Claims;
 using CrmMes.Api.Services;
 using CrmMes.Core.Data;
 using CrmMes.Core.Models;
@@ -306,8 +306,10 @@ public class CompanyProfileController : ControllerBase
         return Ok(ToAccessResponse(settings));
     }
 
-    /// <summary>Company visual theme (colours, radius, density, background). Readable by everyone so
-    /// clients can paint themselves; only Admin may change it.</summary>
+    /// <summary>Company visual theme (colours, radius, density, background, font). Readable by anyone,
+    /// including before login: the login screen itself paints with it (nothing sensitive here, just
+    /// appearance). Only Admin may change it.</summary>
+    [AllowAnonymous]
     [HttpGet("theme")]
     public async Task<ActionResult<UiThemeResponse>> GetTheme(CancellationToken cancellationToken = default)
     {
@@ -351,6 +353,7 @@ public class CompanyProfileController : ControllerBase
                 BackgroundStyle = request.BackgroundStyle ?? "solid",
                 FieldBorder = request.FieldBorder ?? 1,
                 FieldHeight = request.FieldHeight ?? 38,
+                FontFamily = request.FontFamily ?? UiTheme.FontDefault,
             };
         }
 
@@ -379,9 +382,10 @@ public class CompanyProfileController : ControllerBase
     private static UiThemeResponse ToThemeResponse(UiTheme.Settings s) => new(
         s.Preset, s.Background, s.Surface, s.SurfaceRaised, s.Ink, s.Muted, s.Line,
         s.Accent, s.AccentHover, s.AccentSoft, s.OnAccent, s.Sidebar, s.SidebarText, s.Ok, s.Warn,
-        s.Radius, s.Density, s.BackgroundStyle, s.FieldBorder, s.FieldHeight,
+        s.Radius, s.Density, s.BackgroundStyle, s.FieldBorder, s.FieldHeight, s.FontFamily,
         UiTheme.ToCssVariables(s),
-        UiTheme.Presets.Select(p => ToPresetResponse(p)).ToList());
+        UiTheme.Presets.Select(p => ToPresetResponse(p)).ToList(),
+        UiTheme.Fonts.Select(f => new UiFontOptionResponse(f.Key, f.Label)).ToList());
 
     private static UiThemePresetResponse ToPresetResponse(UiTheme.PresetInfo p)
     {
@@ -390,7 +394,7 @@ public class CompanyProfileController : ControllerBase
             p.Key, p.Name, p.Description,
             v.Background, v.Surface, v.SurfaceRaised, v.Ink, v.Muted, v.Line,
             v.Accent, v.AccentHover, v.AccentSoft, v.OnAccent, v.Sidebar, v.SidebarText, v.Ok, v.Warn,
-            v.Radius, v.Density, v.BackgroundStyle, v.FieldBorder, v.FieldHeight);
+            v.Radius, v.Density, v.BackgroundStyle, v.FieldBorder, v.FieldHeight, v.FontFamily);
     }
 
     /// <summary>Areas to show on a channel: modules switched on and allowed there by the Admin.</summary>
@@ -579,13 +583,16 @@ public sealed record UiThemePresetResponse(
     string Key, string Name, string Description,
     string Background, string Surface, string SurfaceRaised, string Ink, string Muted, string Line,
     string Accent, string AccentHover, string AccentSoft, string OnAccent, string Sidebar, string SidebarText,
-    string Ok, string Warn, int Radius, string Density, string BackgroundStyle, int FieldBorder, int FieldHeight);
+    string Ok, string Warn, int Radius, string Density, string BackgroundStyle, int FieldBorder, int FieldHeight,
+    string FontFamily);
+
+public sealed record UiFontOptionResponse(string Key, string Label);
 
 public sealed record UiThemeResponse(
     string Preset, string Background, string Surface, string SurfaceRaised, string Ink, string Muted, string Line,
     string Accent, string AccentHover, string AccentSoft, string OnAccent, string Sidebar, string SidebarText,
     string Ok, string Warn, int Radius, string Density, string BackgroundStyle, int FieldBorder, int FieldHeight,
-    Dictionary<string, string> CssVariables, List<UiThemePresetResponse> Presets);
+    string FontFamily, Dictionary<string, string> CssVariables, List<UiThemePresetResponse> Presets, List<UiFontOptionResponse> FontOptions);
 
 /// <summary>Send <see cref="ApplyPreset"/> alone to load a named palette; otherwise send the full colour set.</summary>
 public sealed record SaveUiThemeRequest(
@@ -609,4 +616,5 @@ public sealed record SaveUiThemeRequest(
     string? Density = null,
     string? BackgroundStyle = null,
     int? FieldBorder = null,
-    int? FieldHeight = null);
+    int? FieldHeight = null,
+    string? FontFamily = null);

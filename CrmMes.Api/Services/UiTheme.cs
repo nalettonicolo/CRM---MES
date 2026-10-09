@@ -52,9 +52,36 @@ public static partial class UiTheme
 
         /// <summary>Minimum control height in px (30–48).</summary>
         public int FieldHeight { get; set; } = 38;
+
+        /// <summary>Chiave di <see cref="Fonts"/>: non un nome libero, per evitare un valore che non esiste
+        /// su Windows (il desktop lo traduce in un <c>FontFamily</c> reale) o uno scorretto nel CSS.</summary>
+        public string FontFamily { get; set; } = FontDefault;
     }
 
     public sealed record PresetInfo(string Key, string Name, string Description, Settings Values);
+
+    public const string FontDefault = "default";
+    public const string FontSegoe = "segoe";
+    public const string FontCalibri = "calibri";
+    public const string FontGeorgia = "georgia";
+    public const string FontVerdana = "verdana";
+
+    /// <summary>Un font selezionabile dall'Admin: <see cref="CssStack"/> per il web (con alternative se il
+    /// carattere non è installato), <see cref="WpfFamily"/> per il programma desktop (un solo nome: WPF
+    /// usa i font di sistema, non ne scarica).</summary>
+    public sealed record FontOption(string Key, string Label, string CssStack, string WpfFamily);
+
+    public static readonly IReadOnlyList<FontOption> Fonts =
+    [
+        new(FontDefault, "Predefinito (IBM Plex Sans)", "\"IBM Plex Sans\", \"Bahnschrift\", \"Segoe UI\", system-ui, sans-serif", "Segoe UI"),
+        new(FontSegoe, "Segoe UI", "\"Segoe UI\", system-ui, sans-serif", "Segoe UI"),
+        new(FontCalibri, "Calibri", "Calibri, \"Segoe UI\", sans-serif", "Calibri"),
+        new(FontGeorgia, "Georgia (con grazie)", "Georgia, \"Times New Roman\", serif", "Georgia"),
+        new(FontVerdana, "Verdana", "Verdana, \"Segoe UI\", sans-serif", "Verdana"),
+    ];
+
+    public static FontOption FontFor(string? key) =>
+        Fonts.FirstOrDefault(f => string.Equals(f.Key, key, StringComparison.OrdinalIgnoreCase)) ?? Fonts[0];
 
     public static IReadOnlyList<PresetInfo> Presets { get; } =
     [
@@ -152,6 +179,7 @@ public static partial class UiTheme
         s.BackgroundStyle = s.BackgroundStyle is "solid" or "grid" or "grain" ? s.BackgroundStyle : "solid";
         s.FieldBorder = Math.Clamp(s.FieldBorder, 1, 2);
         s.FieldHeight = Math.Clamp(s.FieldHeight, 30, 48);
+        s.FontFamily = Fonts.Any(f => string.Equals(f.Key, s.FontFamily, StringComparison.OrdinalIgnoreCase)) ? s.FontFamily.ToLowerInvariant() : FontDefault;
         return s;
     }
 
@@ -194,6 +222,7 @@ public static partial class UiTheme
             ["--bg-style"] = s.BackgroundStyle,
             ["--sidebar-bg"] = s.Sidebar,
             ["--sidebar-text"] = s.SidebarText,
+            ["--font"] = FontFor(s.FontFamily).CssStack,
         };
     }
 

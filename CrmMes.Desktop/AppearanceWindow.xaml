@@ -80,6 +80,16 @@
                                 <ComboBoxItem Content="2 px" Tag="2" />
                             </ComboBox>
                         </StackPanel>
+                        <StackPanel Grid.Row="2" Grid.Column="1">
+                            <TextBlock Text="Carattere" Margin="0,0,0,4" />
+                            <ComboBox x:Name="FontBox" SelectionChanged="Shape_Changed">
+                                <ComboBoxItem Content="Predefinito (IBM Plex Sans)" Tag="default" IsSelected="True" />
+                                <ComboBoxItem Content="Segoe UI" Tag="segoe" />
+                                <ComboBoxItem Content="Calibri" Tag="calibri" />
+                                <ComboBoxItem Content="Georgia (con grazie)" Tag="georgia" />
+                                <ComboBoxItem Content="Verdana" Tag="verdana" />
+                            </ComboBox>
+                        </StackPanel>
                     </Grid>
                 </Border>
             </StackPanel>

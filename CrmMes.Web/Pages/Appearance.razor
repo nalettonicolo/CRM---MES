@@ -1,4 +1,4 @@
-@page "/aspetto"
+﻿@page "/aspetto"
 @inject Api Api
 @inject Session Session
 @inject IJSRuntime Js
@@ -103,6 +103,14 @@ else
                     <option value="solid">Tinta unita</option>
                     <option value="grid">Griglia</option>
                     <option value="grain">Grain sottile</option>
+                </select>
+            </label>
+            <label>Carattere
+                <select @bind="_draft.FontFamily" @bind:after="PreviewAsync">
+                    @foreach (var font in _theme?.FontOptions ?? [])
+                    {
+                        <option value="@font.Key">@font.Label</option>
+                    }
                 </select>
             </label>
         </div>
@@ -214,8 +222,20 @@ else
             ["--bg-style"] = d.BackgroundStyle,
             ["--sidebar-bg"] = d.Sidebar,
             ["--sidebar-text"] = d.SidebarText,
+            ["--font"] = FontStackFor(d.FontFamily),
         };
     }
+
+    /// <summary>Stessa pila di CrmMes.Api/Services/UiTheme.cs: l'anteprima deve avere lo stesso aspetto
+    /// del salvataggio, senza aspettare un giro di andata e ritorno al server.</summary>
+    private static string FontStackFor(string key) => key switch
+    {
+        "segoe" => "\"Segoe UI\", system-ui, sans-serif",
+        "calibri" => "Calibri, \"Segoe UI\", sans-serif",
+        "georgia" => "Georgia, \"Times New Roman\", serif",
+        "verdana" => "Verdana, \"Segoe UI\", sans-serif",
+        _ => "\"IBM Plex Sans\", \"Bahnschrift\", \"Segoe UI\", system-ui, sans-serif",
+    };
 
     private sealed class ThemeDraft
     {
@@ -239,6 +259,7 @@ else
         public string BackgroundStyle { get; set; } = "solid";
         public int FieldBorder { get; set; } = 1;
         public int FieldHeight { get; set; } = 38;
+        public string FontFamily { get; set; } = "default";
 
         public static ThemeDraft From(UiThemeDto t) => new()
         {
@@ -262,6 +283,7 @@ else
             BackgroundStyle = t.BackgroundStyle,
             FieldBorder = t.FieldBorder,
             FieldHeight = t.FieldHeight,
+            FontFamily = t.FontFamily,
         };
 
         public static ThemeDraft FromPreset(UiThemePreset p) => new()
@@ -286,6 +308,7 @@ else
             BackgroundStyle = p.BackgroundStyle,
             FieldBorder = p.FieldBorder,
             FieldHeight = p.FieldHeight,
+            FontFamily = p.FontFamily,
         };
 
         public object ToRequest() => new
@@ -310,6 +333,7 @@ else
             backgroundStyle = BackgroundStyle,
             fieldBorder = FieldBorder,
             fieldHeight = FieldHeight,
+            fontFamily = FontFamily,
         };
     }
 }
