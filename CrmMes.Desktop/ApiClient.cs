@@ -120,6 +120,14 @@ public sealed class ApiClient
         }
     }
 
+    /// <summary>Messaggio di "server non raggiungibile" calibrato sull'indirizzo davvero configurato:
+    /// il suggerimento "avvia CrmMes.Api in locale" ha senso solo quando il client punta a localhost,
+    /// non quando punta a un server remoto (cloud o azienda) che è semplicemente irraggiungibile.</summary>
+    private string UnavailableMessage() =>
+        _httpClient.BaseAddress is { IsLoopback: true }
+            ? "API non disponibile. Avvia CrmMes.Api sulla porta 5092."
+            : $"Server non raggiungibile all'indirizzo {_httpClient.BaseAddress}. Verifica la connessione o le Impostazioni server.";
+
     public async Task<AuthDto> LoginAsync(string email, string password, CancellationToken cancellationToken = default)
     {
         try
@@ -147,7 +155,7 @@ public sealed class ApiClient
         }
         catch (HttpRequestException exception)
         {
-            throw new InvalidOperationException("API non disponibile. Avvia CrmMes.Api sulla porta 5092.", exception);
+            throw new InvalidOperationException(UnavailableMessage(), exception);
         }
     }
 
@@ -270,7 +278,7 @@ public sealed class ApiClient
         }
         catch (HttpRequestException exception)
         {
-            throw new InvalidOperationException("API non disponibile. Avvia CrmMes.Api sulla porta 5092.", exception);
+            throw new InvalidOperationException(UnavailableMessage(), exception);
         }
     }
 
