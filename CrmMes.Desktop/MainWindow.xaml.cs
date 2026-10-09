@@ -2855,11 +2855,32 @@ public partial class MainWindow : Window
                 UpdateButton.Content = $"Aggiornamento disponibile: {release.TagName}";
                 UpdateButton.Foreground = (System.Windows.Media.Brush)FindResource("SidebarTextActiveBrush");
                 UpdateButton.FontWeight = FontWeights.Bold;
+                await AutoApplyUpdateAsync(release);
             }
         }
         catch
         {
             // Background convenience only.
+        }
+    }
+
+    /// <summary>Aggiornamento automatico: appena il programma trova all'accesso una versione più nuova, la
+    /// installa da sola, senza chiedere conferma — l'utente non deve fare nulla. È anche il momento più
+    /// sicuro per farlo: subito dopo il login non c'è ancora lavoro in corso da perdere quando il programma
+    /// si chiude per aggiornarsi. Se qualcosa va storto (rete assente, installer già occupato, checksum che
+    /// non corrisponde) fallisce in silenzio: resta solo il pulsante già acceso in barra laterale, da
+    /// cliccare a mano quando si vuole — lì la conferma resta esplicita.</summary>
+    private async Task AutoApplyUpdateAsync(ReleaseInfo release)
+    {
+        try
+        {
+            BusyIndicator.Text = $"Aggiornamento automatico a {release.TagName} in corso...";
+            await _updateService.StartUpdateAsync(release);
+            Application.Current.Shutdown();
+        }
+        catch
+        {
+            BusyIndicator.Text = string.Empty;
         }
     }
 

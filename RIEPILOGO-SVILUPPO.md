@@ -101,7 +101,7 @@ Sintesi ad alto livello di cosa è stato costruito finora e cosa manca ancora. P
 
 ### Installer e aggiornamenti (2026-09-29)
 - **Installer** (`installer/NicoloMES.iss`, Inno Setup) prodotto dalla pipeline di release: installazione per utente senza permessi di amministratore, collegamenti, disinstallazione da Windows, controllo di .NET 8 Desktop Runtime, pagina "Server" alla prima installazione.
-- **Aggiornamento automatico** rifatto sull'installer: prima uno script aspettava 2 secondi fissi e scompattava lo zip sopra il programma ancora aperto, falliva in silenzio e non riapriva l'app. Ora l'installer chiude il programma attendendo che sia davvero chiuso, mostra gli errori e lo riapre; controllo automatico dopo il login con avviso nella barra laterale.
+- **Aggiornamento automatico** rifatto sull'installer: prima uno script aspettava 2 secondi fissi e scompattava lo zip sopra il programma ancora aperto, falliva in silenzio e non riapriva l'app. Ora l'installer chiude il programma attendendo che sia davvero chiuso, mostra gli errori e lo riapre; controllo automatico dopo il login. **Dall'8/10/2026 è del tutto automatico**: se trova una versione più nuova si aggiorna da sola, subito dopo il login (il momento più sicuro, perché non c'è ancora lavoro in corso da perdere), senza chiedere conferma. Il pulsante in barra laterale resta come ripiego manuale, con la conferma di prima, se l'aggiornamento automatico non riesce (rete assente, installer occupato...).
 - Interfaccia: tabelle a tutta larghezza, finestra massimizzata che non finisce più sotto la barra di Windows.
 
 ### Vendite (aggiunto il 2026-09-29, primo passo del piano "punti deboli" dell'analisi di mercato)
