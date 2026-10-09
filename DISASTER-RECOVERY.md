@@ -41,6 +41,13 @@ Con solo 6 ore di PITR e nessuno snapshot automatico, un problema scoperto dopo 
 
 > **Nota operativa importante** (imparata il 2026-09-23 durante il primo test): `restore_snapshot` senza `target_branch_id`, con `finalize` lasciato al default, **non crea una copia isolata "di sola lettura"** — sposta l'endpoint di calcolo stabile (quello a cui si collegano Render e lo sviluppo locale) sul branch appena ripristinato e rinomina i branch, come se il ripristino fosse già stato promosso a produzione. Per un test di verifica che non deve toccare la produzione, va sempre passato esplicitamente `finalize: false`, oppure va verificato subito dopo quale branch porta il nome "production" e l'endpoint attivo, prima di considerare l'operazione "solo di prova".
 
+## Script pronti (9 ottobre 2026)
+
+Due script PowerShell in `scripts/`, entrambi basati su `neonctl` (CLI ufficiale di Neon, via `npx`) — niente API scritta a mano, niente endpoint indovinati. Richiedono una chiave API Neon in `$env:NEON_API_KEY` (si crea su https://console.neon.tech/app/settings/api-keys, mai salvata in un file). Pensati per essere lanciati da te, da fuori dal gestionale: nessuno dei due è raggiungibile da un utente dell'app.
+
+- **`ripristina-ambiente-test.ps1`**: riporta il branch di prova (`ui-verification-temp`) allo stato attuale della produzione (il suo genitore) e applica le migrazioni di `CrmMes.Api`. Nessun rischio: legge la produzione, non la scrive mai. Uso tipico: prima di sviluppare o verificare qualcosa in locale, per ripartire da dati freschi.
+- **`ripristina-produzione-da-snapshot.ps1`**: prepara un ripristino di produzione da uno snapshot, **sempre in anteprima** (`--target-branch` senza `--finalize`, che di default in `neonctl` è `false`). Stampa subito dopo l'elenco dei branch, così si vede a colpo d'occhio se "production" è ancora quello di prima — la stessa verifica raccomandata nella nota operativa qui sotto. Il comando che sostituisce davvero la produzione (`snapshots finalize`) lo stampa solo come suggerimento: va lanciato a mano, una seconda volta, di proposito.
+
 ## Test eseguito il 2026-09-23
 
 Snapshot manuale creato dal branch di produzione, ripristinato su un branch separato, e confrontato con la produzione: utenti, commesse, materiali, corrieri e spedizioni combaciavano esattamente (6 utenti, 8 commesse, 8 materiali, 0/0 corrieri/spedizioni). Il meccanismo di ripristino funziona; il branch di test è stato poi eliminato.
