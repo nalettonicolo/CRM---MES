@@ -14,6 +14,7 @@ public class CustomFieldsTests : IClassFixture<AdminSeededApiTestFixture>
     private readonly HttpClient _admin;
     private const string SupplierUrl = "/api/layout/" + FormLayoutRegistry.SupplierNew + "/custom-fields";
     private const string CustomerUrl = "/api/layout/" + FormLayoutRegistry.CustomerNew + "/custom-fields";
+    private const string MaterialUrl = "/api/layout/" + FormLayoutRegistry.MaterialNew + "/custom-fields";
 
     public CustomFieldsTests(AdminSeededApiTestFixture fixture)
     {
@@ -174,6 +175,53 @@ public class CustomFieldsTests : IClassFixture<AdminSeededApiTestFixture>
         finally
         {
             await _admin.DeleteAsync($"{CustomerUrl}/{field.Id}");
+        }
+    }
+
+    [Fact]
+    public async Task Material_RequiredCustomField_IsEnforcedOnCreateAndValuesRoundTrip()
+    {
+        var field = await CreateFieldAsync(MaterialUrl, $"Giorni di pagamento {Guid.NewGuid():N}", CustomFieldType.Number, required: true);
+        try
+        {
+            var code = $"MAT-{Guid.NewGuid():N}"[..12];
+
+            // Senza il campo obbligatorio: rifiutato.
+            var missing = await _admin.PostAsJsonAsync("/api/materials",
+                new CreateMaterialRequest(code, $"Materiale {code}", "pz", 10, 0));
+            Assert.Equal(HttpStatusCode.BadRequest, missing.StatusCode);
+
+            // Con il campo: creato, e il valore si legge dal dettaglio.
+            var created = await _admin.PostAsJsonAsync("/api/materials", new CreateMaterialRequest(
+                code, $"Materiale {code}", "pz", 10, 0,
+                new Dictionary<string, string?> { [field.Key] = "60" }));
+            Assert.Equal(HttpStatusCode.Created, created.StatusCode);
+            var material = (await created.Content.ReadFromJsonAsync<MaterialResponse>())!;
+
+            var detail = await _admin.GetFromJsonAsync<MaterialResponse>($"/api/materials/{material.Id}");
+            Assert.Equal("60", detail!.CustomFields![field.Key]);
+        }
+        finally
+        {
+            await _admin.DeleteAsync($"{MaterialUrl}/{field.Id}");
+        }
+    }
+
+    [Fact]
+    public async Task Material_NumberCustomField_RefusesNonNumericValue()
+    {
+        var field = await CreateFieldAsync(MaterialUrl, $"Giorni {Guid.NewGuid():N}", CustomFieldType.Number);
+        try
+        {
+            var code = $"MAT-{Guid.NewGuid():N}"[..12];
+            var response = await _admin.PostAsJsonAsync("/api/materials", new CreateMaterialRequest(
+                code, $"Materiale {code}", "pz", 0, 0,
+                new Dictionary<string, string?> { [field.Key] = "non-un-numero" }));
+            Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        }
+        finally
+        {
+            await _admin.DeleteAsync($"{MaterialUrl}/{field.Id}");
         }
     }
 }

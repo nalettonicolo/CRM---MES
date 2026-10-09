@@ -34,11 +34,47 @@
     <div class="card card-pad stack stack-gap">
         <h2>Nuovo materiale</h2>
         <div class="form-grid">
-            <label>Codice<input @bind="_newCode" placeholder="es. VIT-M6" autocomplete="off" /></label>
-            <label>Descrizione<input @bind="_newName" placeholder="Descrizione articolo" /></label>
-            <label>Unità di misura<input @bind="_newUnit" placeholder="pz" /></label>
-            <label>Giacenza iniziale<input type="number" step="any" min="0" @bind="_newStock" /></label>
-            <label>Scorta minima<input type="number" step="any" min="0" @bind="_newMinStock" /></label>
+            @foreach (var f in _fields.Where(f => f.Visible).OrderBy(f => f.Order))
+            {
+                switch (f.Key)
+                {
+                    case "code":
+                        <label>@LabelOf(f)<input @bind="_newCode" placeholder="es. VIT-M6" autocomplete="off" /></label>
+                        break;
+                    case "name":
+                        <label>@LabelOf(f)<input @bind="_newName" placeholder="Descrizione articolo" /></label>
+                        break;
+                    case "unit":
+                        <label>@LabelOf(f)<input @bind="_newUnit" placeholder="pz" /></label>
+                        break;
+                    case "stock":
+                        <label>@LabelOf(f)<input type="number" step="any" min="0" @bind="_newStock" /></label>
+                        break;
+                    case "minStock":
+                        <label>@LabelOf(f)<input type="number" step="any" min="0" @bind="_newMinStock" /></label>
+                        break;
+                }
+            }
+            @foreach (var f in _customFields.OrderBy(f => f.Order))
+            {
+                <label>@(f.Required ? f.Label + " *" : f.Label)
+                    @switch (f.FieldType)
+                    {
+                        case "Number":
+                            <input type="number" step="any" aria-label="@f.Label" value="@CustomFieldValue(f.Key)" @oninput="e => SetCustomField(f.Key, e.Value?.ToString())" />
+                            break;
+                        case "Date":
+                            <input type="date" aria-label="@f.Label" value="@CustomFieldValue(f.Key)" @oninput="e => SetCustomField(f.Key, e.Value?.ToString())" />
+                            break;
+                        case "Checkbox":
+                            <input type="checkbox" aria-label="@f.Label" checked="@CustomFieldChecked(f.Key)" @onchange="e => SetCustomFieldChecked(f.Key, e.Value)" />
+                            break;
+                        default:
+                            <input aria-label="@f.Label" value="@CustomFieldValue(f.Key)" @oninput="e => SetCustomField(f.Key, e.Value?.ToString())" />
+                            break;
+                    }
+                </label>
+            }
         </div>
         <div class="actions"><button @onclick="CreateAsync" disabled="@_creating">@(_creating ? "Salvataggio..." : "Crea materiale")</button></div>
     </div>
@@ -125,11 +161,55 @@
     private string _newUnit = "pz";
     private decimal _newStock;
     private decimal _newMinStock;
+    private List<CustomFieldDefinition> _customFields = [];
+    private readonly Dictionary<string, string?> _customFieldValues = [];
+
+    private string? CustomFieldValue(string key) => _customFieldValues.GetValueOrDefault(key);
+    private void SetCustomField(string key, string? value) => _customFieldValues[key] = value;
+    private bool CustomFieldChecked(string key) => bool.TryParse(_customFieldValues.GetValueOrDefault(key), out var value) && value;
+    private void SetCustomFieldChecked(string key, object? value) => _customFieldValues[key] = value is true ? bool.TrueString : bool.FalseString;
 
     private bool CanImport => Session.Role is "Admin" or "Warehouse" or "Purchasing";
     private bool CanManage => CanImport;
 
-    protected override Task OnInitializedAsync() => LoadAsync();
+    /// <summary>Campi del modulo Nuovo materiale come li ha impostati l'Admin nello strumento Layout.</summary>
+    private List<LayoutField> _fields =
+    [
+        new("code", "Codice", 1, true, true, false),
+        new("name", "Descrizione", 2, true, true, false),
+        new("unit", "Unità di misura", 3, true, false, true),
+        new("stock", "Giacenza iniziale", 4, true, false, true),
+        new("minStock", "Scorta minima", 5, true, false, true),
+    ];
+
+    private static string LabelOf(LayoutField f) => f.Required ? f.Label + " *" : f.Label;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadAsync();
+        await LoadCreateLayoutAsync();
+    }
+
+    private async Task LoadCreateLayoutAsync()
+    {
+        try
+        {
+            _fields = (await Api.GetAsync<LayoutScreen>("api/layout/materials.new")).Fields;
+        }
+        catch (ApiException)
+        {
+            // Restano i default: il layout non deve impedire di creare materiali.
+        }
+
+        try
+        {
+            _customFields = await Api.GetAsync<List<CustomFieldDefinition>>("api/layout/materials.new/custom-fields");
+        }
+        catch (ApiException)
+        {
+            // Nessun campo personalizzato, o non raggiungibile: il modulo resta con i soli campi standard.
+        }
+    }
 
     private async Task ExportAsync()
     {
@@ -199,6 +279,23 @@
 
     private async Task CreateAsync()
     {
+        var missing = _fields.Where(f => f.Visible && f.Required && string.IsNullOrWhiteSpace(f.Key switch
+            {
+                "code" => _newCode,
+                "name" => _newName,
+                "unit" => _newUnit,
+                // Giacenza e scorta minima sono numeriche con valore sempre presente (0 di default):
+                // "obbligatorio" per loro non ha un vuoto da intercettare qui.
+                "stock" or "minStock" => "0",
+                _ => null,
+            })).Select(LabelOf).ToList();
+        missing.AddRange(_customFields.Where(f => f.Required && string.IsNullOrWhiteSpace(CustomFieldValue(f.Key))).Select(f => f.Label));
+        if (missing.Count > 0)
+        {
+            _createError = "Compila i campi obbligatori: " + string.Join(", ", missing) + ".";
+            return;
+        }
+
         _creating = true;
         _createError = null;
         try
@@ -209,13 +306,15 @@
                 name = _newName.Trim(),
                 unit = string.IsNullOrWhiteSpace(_newUnit) ? "pz" : _newUnit.Trim(),
                 stock = _newStock,
-                minStock = _newMinStock
+                minStock = _newMinStock,
+                customFields = _customFieldValues,
             });
             _newCode = string.Empty;
             _newName = string.Empty;
             _newUnit = "pz";
             _newStock = 0;
             _newMinStock = 0;
+            _customFieldValues.Clear();
             _showCreate = false;
             await LoadAsync();
         }

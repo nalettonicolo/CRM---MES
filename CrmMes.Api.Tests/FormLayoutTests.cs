@@ -174,6 +174,49 @@ public class FormLayoutTests : IClassFixture<AdminSeededApiTestFixture>
     }
 
     [Fact]
+    public void MaterialNew_ProtectsCodeAndName()
+    {
+        var fields = FormLayoutRegistry.Screens[FormLayoutRegistry.MaterialNew].ToDictionary(f => f.Key);
+
+        Assert.True(fields["code"].Required);
+        Assert.False(fields["code"].CanHide);
+        Assert.True(fields["name"].Required);
+        Assert.False(fields["name"].CanHide);
+        Assert.True(fields["unit"].CanHide);
+        Assert.True(fields["stock"].CanHide);
+        Assert.True(fields["minStock"].CanHide);
+    }
+
+    [Fact]
+    public async Task MaterialNew_Admin_CanRelabelAndReorder()
+    {
+        const string url = "/api/layout/" + FormLayoutRegistry.MaterialNew;
+        var fields = new List<SaveLayoutFieldRequest>
+        {
+            Field("name", "Descrizione articolo", 1, required: true),
+            Field("code", "Codice interno", 2),
+            Field("unit", null, 3),
+            Field("stock", null, 4),
+            Field("minStock", "Scorta di sicurezza", 5),
+        };
+
+        var saved = await _admin.PutAsJsonAsync(url, new SaveLayoutRequest(fields));
+        Assert.Equal(HttpStatusCode.OK, saved.StatusCode);
+
+        try
+        {
+            var screen = await _admin.GetFromJsonAsync<LayoutScreenResponse>(url);
+            Assert.Equal("name", screen!.Fields[0].Key);
+            Assert.Equal("Descrizione articolo", screen.Fields[0].Label);
+            Assert.Equal("Scorta di sicurezza", screen.Fields.Single(f => f.Key == "minStock").Label);
+        }
+        finally
+        {
+            await _admin.PutAsJsonAsync(url, new SaveLayoutRequest([]));
+        }
+    }
+
+    [Fact]
     public void PurchaseOrderNew_ProtectsSupplierCodeAndQuantity()
     {
         var fields = FormLayoutRegistry.Screens[FormLayoutRegistry.PurchaseOrderNew].ToDictionary(f => f.Key);

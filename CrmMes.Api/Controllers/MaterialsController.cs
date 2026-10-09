@@ -1,6 +1,7 @@
 using System.Security.Claims;
 using CrmMes.Api.Services;
 using CrmMes.Core.Data;
+using CrmMes.Core.Layout;
 using CrmMes.Core.Models;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -14,10 +15,12 @@ namespace CrmMes.Api.Controllers;
 public class MaterialsController : ControllerBase
 {
     private readonly ApplicationDbContext _dbContext;
+    private readonly CustomFieldService _customFields;
 
-    public MaterialsController(ApplicationDbContext dbContext)
+    public MaterialsController(ApplicationDbContext dbContext, CustomFieldService customFields)
     {
         _dbContext = dbContext;
+        _customFields = customFields;
     }
 
     [HttpGet]
@@ -59,7 +62,8 @@ public class MaterialsController : ControllerBase
                 material.IsActive,
                 material.Stock <= material.MinStock,
                 material.ListPrice,
-                material.VatRate))
+                material.VatRate,
+                null))
             .ToListAsync(cancellationToken);
 
         return Ok(materials);
@@ -83,10 +87,17 @@ public class MaterialsController : ControllerBase
                 item.IsActive,
                 item.Stock <= item.MinStock,
                 item.ListPrice,
-                item.VatRate))
+                item.VatRate,
+                null))
             .SingleOrDefaultAsync(cancellationToken);
 
-        return material is null ? NotFound() : Ok(material);
+        if (material is null)
+        {
+            return NotFound();
+        }
+
+        var customFields = await _customFields.GetValuesAsync("Material", id, cancellationToken);
+        return Ok(material with { CustomFields = customFields });
     }
 
     /// <summary>Imports an article list (Excel .xlsx or CSV). preview=true only checks and counts; the
@@ -252,6 +263,13 @@ public class MaterialsController : ControllerBase
             MinStock = request.MinStock
         };
 
+        var customFieldsError = await _customFields.ValidateAndStageAsync(
+            FormLayoutRegistry.MaterialNew, "Material", material.Id, request.CustomFields, cancellationToken);
+        if (customFieldsError is not null)
+        {
+            return BadRequest(new { message = customFieldsError });
+        }
+
         _dbContext.Materials.Add(material);
 
         // Opening stock becomes its own traceable lot, so the material's lot ledger starts consistent
@@ -309,7 +327,8 @@ public sealed record CreateMaterialRequest(
     string Name,
     string? Unit,
     decimal Stock,
-    decimal MinStock);
+    decimal MinStock,
+    Dictionary<string, string?>? CustomFields = null);
 
 public sealed record MaterialResponse(
     Guid Id,
@@ -321,7 +340,8 @@ public sealed record MaterialResponse(
     bool IsActive,
     bool BelowMinimum,
     decimal? ListPrice = null,
-    decimal? VatRate = null);
+    decimal? VatRate = null,
+    Dictionary<string, string?>? CustomFields = null);
 
 public sealed record ArticleImportIssue(int Row, string? Code, string Message);
 
