@@ -118,4 +118,12 @@ Verifica di cosa è necessario nella radice del repository.
 | `node_modules/`, `publish/`, `publish-server/`, `installer-output/`, `tmp/` | **Rimosse dal disco** | Generate dalla build o dal prototipo; ignorate da git, si rigenerano |
 | `scripts/machine-gateway/__pycache__/` | **Rimossa** | Cache Python tracciata per errore |
 
+## Pulizia del 9 ottobre 2026
+
+| Cartella / file | Esito | Motivo |
+|---|---|---|
+| `server.js` | **Spostato in `archivio/`** | Ultimo pezzo del prototipo Node: le sue dipendenze (`public/`, `data/`, `package.json`) erano già state rimosse il 6 ottobre, era rimasto orfano |
+| `HANDOFF-CLAUDE.md`, `DEVELOPMENT-PLAN.md`, `TRASCRIZIONE-SESSIONE-2026-10-01.md` | **Spostati in `archivio/`** | Superati da `STATO-PROGETTO.md`, aggiornato ad ogni sviluppo; valore storico, non operativo |
+| `.dockerignore` righe `data/`, `public/` | **Rimosse** | Cartelle già cancellate il 6 ottobre, riferimento rimasto per errore |
+
 Dopo la pulizia la soluzione `CrmMes.sln` compila senza errori.
