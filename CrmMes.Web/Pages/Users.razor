@@ -26,10 +26,14 @@ else if (_rows is null)
 }
 else
 {
+    @if (_actionError is not null)
+    {
+        <div class="alert" role="alert">@_actionError</div>
+    }
     <div class="card">
         <div class="table-wrap">
             <table class="cards">
-                <thead><tr><th>Nome</th><th>Email</th><th>Ruolo</th><th>Stato</th></tr></thead>
+                <thead><tr><th>Nome</th><th>Email</th><th>Ruolo</th><th>Stato</th><th></th></tr></thead>
                 <tbody>
                     @foreach (var user in _rows)
                     {
@@ -37,7 +41,19 @@ else
                             <td data-label="Nome">@user.Name</td>
                             <td data-label="Email">@user.Email</td>
                             <td data-label="Ruolo">@Labels.Role(user.Role)</td>
-                            <td data-label="Stato">@(user.IsActive ? "Attivo" : "Disattivato")</td>
+                            <td data-label="Stato">
+                                @(user.IsActive ? "Attivo" : "Disattivato")
+                                @if (user.AnonymizedAt is not null)
+                                {
+                                    <div class="small muted">Anonimizzato il @Labels.Date(user.AnonymizedAt)</div>
+                                }
+                            </td>
+                            <td>
+                                @if (user.AnonymizedAt is null)
+                                {
+                                    <button class="secondary small" @onclick="() => AskAnonymizeAsync(user)">Anonimizza (GDPR)</button>
+                                }
+                            </td>
                         </tr>
                     }
                 </tbody>
@@ -46,9 +62,24 @@ else
     </div>
 }
 
+@if (_confirmTarget is { } target)
+{
+    <div class="card card-pad stack">
+        <h2>Anonimizzare @target.Name?</h2>
+        <p class="muted">Sostituisce nome ed email con valori non riconducibili alla persona, disattiva l'account e chiude le sessioni aperte su ogni PC. È il diritto all'oblio del GDPR: non si cancella la riga (resta citata da commesse e dal registro operazioni), non si annulla.</p>
+        <div class="actions">
+            <button class="secondary" @onclick="() => _confirmTarget = null" disabled="@_busy">Annulla</button>
+            <button @onclick="AnonymizeAsync" disabled="@_busy">@(_busy ? "In corso..." : "Anonimizza")</button>
+        </div>
+    </div>
+}
+
 @code {
     private List<UserRow>? _rows;
     private string? _error;
+    private string? _actionError;
+    private UserRow? _confirmTarget;
+    private bool _busy;
 
     protected override async Task OnInitializedAsync()
     {
@@ -57,7 +88,42 @@ else
             return;
         }
 
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
         try { _rows = await Api.GetAsync<List<UserRow>>("api/users"); }
         catch (ApiException exception) { _error = exception.Message; }
+    }
+
+    private void AskAnonymizeAsync(UserRow user)
+    {
+        _actionError = null;
+        _confirmTarget = user;
+    }
+
+    private async Task AnonymizeAsync()
+    {
+        if (_confirmTarget is not { } target)
+        {
+            return;
+        }
+
+        _busy = true;
+        try
+        {
+            await Api.PostNoContentAsync($"api/users/{target.Id}/anonymize");
+            _confirmTarget = null;
+            await LoadAsync();
+        }
+        catch (ApiException exception)
+        {
+            _actionError = exception.Message;
+        }
+        finally
+        {
+            _busy = false;
+        }
     }
 }

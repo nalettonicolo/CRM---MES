@@ -34,7 +34,7 @@ public class UsersController : ControllerBase
     {
         var users = await _dbContext.Users.AsNoTracking()
             .OrderBy(user => user.Name)
-            .Select(user => new UserResponse(user.Id, user.Name, user.Email, user.Role, user.IsActive, user.CreatedAt))
+            .Select(user => new UserResponse(user.Id, user.Name, user.Email, user.Role, user.IsActive, user.CreatedAt, user.AnonymizedAt))
             .ToListAsync(cancellationToken);
         return Ok(users);
     }
@@ -226,6 +226,55 @@ public class UsersController : ControllerBase
         return NoContent();
     }
 
+    /// <summary>Diritto all'oblio (GDPR, art. 17): sostituisce nome, email e ogni segreto dell'utente con
+    /// valori non riconducibili alla persona, disattiva l'account e revoca le sessioni aperte. Non cancella
+    /// la riga: il suo Id resta citato da commesse, documenti e dal registro operazioni, e romperlo
+    /// cancellerebbe quella storia insieme ai dati personali. Irreversibile: un utente già anonimizzato non
+    /// si può anonimizzare una seconda volta.</summary>
+    [Authorize(Policy = "AdminOnly")]
+    [HttpPost("{id:guid}/anonymize")]
+    public async Task<IActionResult> AnonymizeUser(Guid id, CancellationToken cancellationToken = default)
+    {
+        var user = await _dbContext.Users.SingleOrDefaultAsync(u => u.Id == id, cancellationToken);
+        if (user is null)
+        {
+            return NotFound();
+        }
+
+        if (user.AnonymizedAt is not null)
+        {
+            return Conflict(new { message = "Questo utente è già stato anonimizzato." });
+        }
+
+        var previousEmail = user.Email;
+        user.Name = "Utente anonimizzato";
+        user.Email = $"anonimizzato-{user.Id:N}@anonimizzato.local";
+        user.PinHash = null;
+        user.TwoFactorEnabled = false;
+        user.TwoFactorSecret = null;
+        user.TwoFactorPendingSecret = null;
+        user.TwoFactorRecoveryCodes = string.Empty;
+        user.ExternalProvider = null;
+        user.ExternalSubject = null;
+        user.IsActive = false;
+        user.AnonymizedAt = DateTime.UtcNow;
+        // Password impronunciabile e scartata subito: serve solo a invalidare quella vecchia e a far
+        // passare dallo stesso punto che già revoca le sessioni aperte su ogni PC.
+        await AuthController.SetPasswordAsync(_dbContext, _passwordHasher, user, Guid.NewGuid().ToString("N") + Guid.NewGuid().ToString("N"), cancellationToken);
+
+        _dbContext.AuditLogs.Add(new AuditLog
+        {
+            Action = "UserAnonymized",
+            EntityType = "User",
+            EntityId = user.Id,
+            UserName = User.FindFirstValue(ClaimTypes.Name),
+            Details = $"Utente {previousEmail} anonimizzato su richiesta (diritto all'oblio); account disattivato."
+        });
+
+        await _dbContext.SaveChangesAsync(cancellationToken);
+        return NoContent();
+    }
+
     /// <summary>What the shop-floor terminal calls after an operator types their PIN: finds which active
     /// user it belongs to. Checked against every active user with a PIN set — fine for a small team, and
     /// avoids an indexable plaintext PIN lookup that would defeat hashing it in the first place.</summary>
@@ -253,7 +302,7 @@ public class UsersController : ControllerBase
 }
 
 public sealed record CreateUserRequest(string? Name, string? Email, string? Password, string? Role);
-public sealed record UserResponse(Guid Id, string Name, string Email, string Role, bool IsActive, DateTime CreatedAt);
+public sealed record UserResponse(Guid Id, string Name, string Email, string Role, bool IsActive, DateTime CreatedAt, DateTime? AnonymizedAt = null);
 public sealed record SetUserPinRequest(string? Pin);
 public sealed record ResetUserPasswordRequest(string? NewPassword);
 public sealed record IdentifyByPinRequest(string? Pin);

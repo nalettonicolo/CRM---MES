@@ -94,7 +94,7 @@ public sealed record AreaRow(Guid Id, string Name, string Code, bool IsActive, G
 
 public sealed record WorkCenterRow(Guid Id, string Code, string Name, string? Description, decimal DailyCapacityMinutes, bool IsActive, Guid? SiteId = null, decimal? HourlyRate = null, Guid? AreaId = null);
 
-public sealed record UserRow(Guid Id, string Name, string Email, string Role, bool IsActive, DateTime CreatedAt);
+public sealed record UserRow(Guid Id, string Name, string Email, string Role, bool IsActive, DateTime CreatedAt, DateTime? AnonymizedAt = null);
 
 public sealed record PanelCheck(string Clause, string Description, string? Result, string? Notes);
 

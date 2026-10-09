@@ -29,6 +29,12 @@ public class User
     public bool IsActive { get; set; } = true;
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 
+    /// <summary>Diritto all'oblio (GDPR, art. 17): quando non nullo, nome ed email reali sono già stati
+    /// sostituiti e l'account non può più accedere. Resta la riga (non si cancella davvero): il suo Id è
+    /// citato da commesse, documenti e dal registro operazioni, e romperlo cancellerebbe quella storia
+    /// insieme ai dati personali — l'anonimizzazione toglie solo i secondi.</summary>
+    public DateTime? AnonymizedAt { get; set; }
+
     /// <summary>External identity provider key (OIDC/SSO exchange), e.g. "azure". Paired with <see cref="ExternalSubject"/>.</summary>
     public string? ExternalProvider { get; set; }
     public string? ExternalSubject { get; set; }
