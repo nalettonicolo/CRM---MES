@@ -1,4 +1,5 @@
-﻿using System.Security.Claims;
+﻿using System.ComponentModel.DataAnnotations;
+using System.Security.Claims;
 using CrmMes.Api.Services;
 using CrmMes.Core.Data;
 using CrmMes.Core.Flows;
@@ -1228,20 +1229,20 @@ public sealed record WorkOrderLookupResponse(
 public sealed record CreateWorkOrderRequest(
     Guid ProductId,
     decimal Quantity,
-    string? Code,
+    [MaxLength(80)] string? Code,
     Guid? AreaId,
-    string? CustomerReference,
+    [MaxLength(250)] string? CustomerReference,
     DateTime? DueDate,
-    string? Notes,
-    string? ProductLotNumber = null,
+    [MaxLength(1000)] string? Notes,
+    [MaxLength(120)] string? ProductLotNumber = null,
     Guid? CustomerId = null);
 
 public sealed record EditWorkOrderRequest(
     decimal Quantity,
     Guid? AreaId,
-    string? CustomerReference,
+    [MaxLength(250)] string? CustomerReference,
     DateTime? DueDate,
-    string? Notes);
+    [MaxLength(1000)] string? Notes);
 
 public sealed record WorkOrderSummaryResponse(
     Guid Id,

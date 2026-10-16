@@ -1,3 +1,4 @@
+using System.ComponentModel.DataAnnotations;
 using System.Security.Claims;
 using CrmMes.Api.Services;
 using CrmMes.Core.Data;
@@ -173,9 +174,19 @@ public class SuppliersController : ControllerBase
 public sealed record SupplierResponse(Guid Id, string Name, string Code, string? Email, string? Phone, string? Website, bool IsActive);
 
 public sealed record CreateSupplierRequest(
-    string? Name, string? Code, string? Email, string? Phone, string? Website = null, Dictionary<string, string?>? CustomFields = null);
+    [MaxLength(200)] string? Name,
+    [MaxLength(80)] string? Code,
+    [EmailAddress, MaxLength(200)] string? Email,
+    [MaxLength(50)] string? Phone,
+    [MaxLength(500)] string? Website = null,
+    Dictionary<string, string?>? CustomFields = null);
 
-public sealed record EditSupplierRequest(string? Name, string? Email, string? Phone, string? Website, Dictionary<string, string?>? CustomFields = null);
+public sealed record EditSupplierRequest(
+    [MaxLength(200)] string? Name,
+    [EmailAddress, MaxLength(200)] string? Email,
+    [MaxLength(50)] string? Phone,
+    [MaxLength(500)] string? Website,
+    Dictionary<string, string?>? CustomFields = null);
 
 public sealed record SupplierPurchaseOrderResponse(Guid Id, string Code, string Status, DateTime CreatedAt);
 
