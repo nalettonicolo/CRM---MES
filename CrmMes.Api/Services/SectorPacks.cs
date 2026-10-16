@@ -252,7 +252,7 @@ public static class SectorPacks
         var errors = new List<SectorPackLineIssue>();
         var lineNumber = 0;
 
-        foreach (var rawLine in text.Split(['\r', '\n'], StringSplitOptions.RemoveEmptyEntries))
+        foreach (var rawLine in text.Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries))
         {
             lineNumber++;
             var line = rawLine.Trim();
