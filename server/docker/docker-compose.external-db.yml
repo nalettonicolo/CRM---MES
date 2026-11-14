@@ -1,0 +1,36 @@
+# Variante di docker-compose.yml SENZA il contenitore del database: il gestionale si collega a un
+# PostgreSQL già esistente tramite DATABASE_URL. Il compose originale non è modificato.
+#
+#   1. copia .env.external-db.example in .env (stessa cartella) e sostituisci i segnaposto;
+#   2. dalla cartella principale del progetto:
+#        docker compose -f server/docker/docker-compose.external-db.yml up -d --build
+#   3. il gestionale risponde su http://<server>:5092/ (programma desktop), /app/ (web), /tecnici/ (telefono).
+#
+# Il backup notturno non è incluso (il contenitore "backup" dell'originale dipende dal database locale):
+# per il database esistente usa i backup già in corso su quel database.
+services:
+  api:
+    build:
+      context: ../..
+      dockerfile: CrmMes.Api/Dockerfile
+    restart: unless-stopped
+    ports:
+      - "${PORT:-5092}:8080"
+    environment:
+      ASPNETCORE_ENVIRONMENT: Production
+      # Stringa di connessione al PostgreSQL esistente (letta da CrmMes.Api/Program.cs).
+      DATABASE_URL: ${DATABASE_URL:?imposta DATABASE_URL in .env}
+      CRM_MES_JWT_KEY: ${JWT_KEY:?imposta JWT_KEY in .env}
+      # The database is brought up to date at every start: updating = pull + up -d --build.
+      Database__AutoMigrate: "true"
+      Logs__Path: /app/logs
+      Support__Name: ${SUPPORT_NAME:-}
+      Support__Phone: ${SUPPORT_PHONE:-}
+      Support__Email: ${SUPPORT_EMAIL:-}
+      Support__RustDeskIdServer: ${RUSTDESK_SERVER:-}
+      Support__RustDeskKey: ${RUSTDESK_KEY:-}
+    volumes:
+      - api-logs:/app/logs
+
+volumes:
+  api-logs:
